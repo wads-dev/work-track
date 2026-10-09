@@ -14,11 +14,14 @@ import {
   TableHead,
   TableRow,
   Typography,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { Link as RouterLink } from 'react-router-dom';
 import { date } from './data';
 import { detailPath } from './routes';
+import { UiIcon } from './UiIcons';
 
 import { hours, pieSlices, type Bucket } from './report-chart';
 export type Report = {
@@ -199,15 +202,13 @@ export function ProjectReport({
         Referência: {date(report.asOf)} (fuso do navegador). Política:{' '}
         {report.policy}.
       </Typography>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Estimativas não alteram registros originais. Abertos: até o menor entre
-        agora, início + 4 horas, meia-noite no fuso da atividade e próximo
-        início da mesma pessoa/projeto. Limite de 8 horas somente para
-        estimativas por pessoa/dia/projeto nesta página, não global para o dia
-        da pessoa. Tempos com fim explícito consomem o orçamento das estimativas
-        nessa página, mas são preservados sem truncamento, mesmo acima de 8
-        horas.
-      </Alert>
+      <Typography sx={{ mb: 2 }}>
+        Estimativas não alteram fatos.{' '}
+        <Link component={RouterLink} to="/rules">
+          Consultar regras e limites do relatório
+        </Link>
+        .
+      </Typography>
       {(report.estimatedCount > 0 || report.page.partial || cursor) && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           Relatório parcial
@@ -262,13 +263,15 @@ export function ProjectReport({
                       {report.byUser.find((item) => item.uid === record.uid)
                         ?.label ?? record.uid}
                       {record.uid === uid && (
-                        <Link
-                          component={RouterLink}
-                          to={detailPath('records', record.id, search)}
-                          sx={{ display: 'block' }}
-                        >
-                          Detalhes do meu registro
-                        </Link>
+                        <Tooltip title="Abrir detalhes do meu registro">
+                          <IconButton
+                            component={RouterLink}
+                            to={detailPath('records', record.id, search)}
+                            aria-label="Abrir detalhes do meu registro"
+                          >
+                            <UiIcon kind="detail" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </TableCell>
                     <TableCell>

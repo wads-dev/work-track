@@ -42,6 +42,9 @@ import {
 } from 'react-router-dom';
 import { safeReturnTo } from './routes';
 import { PrivacyContext } from './privacy';
+import { PendingBell, PendingPage } from './PendingPage';
+import { RulesPage } from './RulesPage';
+import { UiIcon } from './UiIcons';
 
 function allowed(user: User) {
   return (
@@ -228,6 +231,7 @@ function App() {
                   <span aria-hidden="true">☰</span>
                 </IconButton>
                 {toggleTheme}
+                <PendingBell db={services.db} uid={user.uid} />
                 <Button
                   color="inherit"
                   aria-pressed={revealed}
@@ -269,6 +273,8 @@ function App() {
                     ['/app', 'Visão geral'],
                     ['/projects', 'Projetos'],
                     ['/records', 'Meus registros'],
+                    ['/pending', 'Pendências'],
+                    ['/rules', 'Regras do relatório'],
                   ].map(([to, label]) => (
                     <ListItemButton
                       key={to}
@@ -280,7 +286,20 @@ function App() {
                       }
                       onClick={() => setMenuOpen(false)}
                     >
-                      <ListItemText primary={label} />
+                      <UiIcon
+                        kind={
+                          to === '/rules'
+                            ? 'rules'
+                            : to === '/pending'
+                              ? 'bell'
+                              : to === '/projects'
+                                ? 'projects'
+                                : to === '/app'
+                                  ? 'home'
+                                  : 'detail'
+                        }
+                      />
+                      <ListItemText primary={label} sx={{ ml: 2 }} />
                     </ListItemButton>
                   ))}
                 </List>
@@ -294,7 +313,7 @@ function App() {
               sx={{ py: 4 }}
             >
               <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
-                Seu trabalho, com contexto
+                Dashboard
               </Typography>
               <Typography color="text.secondary" sx={{ mb: 4 }}>
                 Projetos da equipe e seus registros de atividade.
@@ -304,34 +323,18 @@ function App() {
                   {error}
                 </Alert>
               )}
-              <Stack
-                component="nav"
-                direction="row"
-                spacing={1}
-                aria-label="Navegação principal"
-                sx={{ mb: 3, flexWrap: 'wrap' }}
-              >
-                {[
-                  ['/app', 'Visão geral'],
-                  ['/projects', 'Projetos'],
-                  ['/records', 'Meus registros'],
-                ].map(([to, label]) => (
-                  <Button
-                    key={to}
-                    component={RouterLink}
-                    to={to}
-                    variant={
-                      location.pathname === to ||
-                      location.pathname.startsWith(to + '/')
-                        ? 'contained'
-                        : 'outlined'
-                    }
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </Stack>
               <Routes>
+                <Route path="/rules" element={<RulesPage />} />
+                <Route
+                  path="/pending"
+                  element={
+                    <PendingPage
+                      key={user.uid}
+                      db={services.db}
+                      uid={user.uid}
+                    />
+                  }
+                />
                 <Route
                   path="/app"
                   element={

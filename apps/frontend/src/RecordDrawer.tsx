@@ -17,6 +17,7 @@ import { httpsCallable, type Functions } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { date, object, objects, text, useRows } from './data';
 import { validateEnd } from './record-edit';
+import { safeReturnTo } from './routes';
 import { usePrivacy, isHidden } from './privacy';
 
 export function RecordDrawer({
@@ -33,6 +34,10 @@ export function RecordDrawer({
   search: string;
 }) {
   const navigate = useNavigate();
+  const requestedReturn = new URLSearchParams(search).get('returnTo');
+  const closePath = requestedReturn
+    ? safeReturnTo(requestedReturn)
+    : '/records' + search;
   const { revealed } = usePrivacy();
   const projects = useRows(db, 'projects');
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
@@ -144,7 +149,7 @@ export function RecordDrawer({
       anchor="right"
       open
       onClose={() => {
-        if (!saving) navigate('/records' + search);
+        if (!saving) navigate(closePath);
       }}
     >
       <Box
@@ -160,10 +165,7 @@ export function RecordDrawer({
           <Typography id="registro-titulo" component="h2" variant="h5">
             Detalhes do registro
           </Typography>
-          <Button
-            disabled={saving}
-            onClick={() => navigate('/records' + search)}
-          >
+          <Button disabled={saving} onClick={() => navigate(closePath)}>
             Fechar
           </Button>
         </Stack>

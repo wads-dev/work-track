@@ -16,6 +16,8 @@ import {
   Typography,
   TextField,
   Link,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
@@ -29,6 +31,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { detailPath, matchesFilter } from './routes';
+import { UiIcon } from './UiIcons';
 import { usePrivacy, isHidden, safeProject, safeRecord } from './privacy';
 import { ProjectEditor } from './ProjectEditor';
 
@@ -413,12 +416,15 @@ export function Dashboard({
                 {text(data.timeZone, 'Fuso do navegador')}
               </Typography>
             </>,
-            <Link
-              component={RouterLink}
-              to={detailPath('records', id, location.search)}
-            >
-              Ver auditoria do registro
-            </Link>,
+            <Tooltip title="Abrir detalhes e auditoria">
+              <IconButton
+                component={RouterLink}
+                to={detailPath('records', id, location.search)}
+                aria-label="Abrir detalhes e auditoria do registro"
+              >
+                <UiIcon kind="detail" />
+              </IconButton>
+            </Tooltip>,
           ]}
         />
       )}

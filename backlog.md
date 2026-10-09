@@ -2,9 +2,9 @@
 
 ## Em implementação
 
-- [ ] Gerenciamento de projetos: editar título/descrição, categoria pessoal/trabalho e URL GitHub HTTPS validada.
-- [ ] Mesclagem de projetos: preview, confirmação, migração auditável e retomável de registros/tópicos e arquivamento da origem.
-- [ ] Confidencialidade visual: projeto marcado confidencial e modo live com olho fechado por padrão, ocultando nomes e contextos até revelação explícita.
+- [x] Gerenciamento de projetos: editar título/descrição, categoria pessoal/trabalho e URL GitHub HTTPS validada. Publicado na entrega 3.
+- [x] Mesclagem de projetos: preview, confirmação, migração auditável e retomável de registros/tópicos e arquivamento da origem. Cancelamento libera locks sem rollback de lotes.
+- [x] Confidencialidade visual: projeto marcado confidencial e modo live com olho fechado por padrão, ocultando nomes e contextos até revelação explícita. Não altera acesso autorizado aos dados.
 
 ## Próximas entregas planejadas
 
