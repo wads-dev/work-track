@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { isAlertOpen, isOpen } from './pending-utils';
+import { useClock } from './use-clock';
 import {
   Alert,
   Badge,
@@ -32,16 +34,17 @@ import { isHidden, safeProject, usePrivacy } from './privacy';
 import { UiIcon } from './UiIcons';
 export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
   const state = useRows(db, 'users/' + uid + '/records');
-  const count = state.rows.filter((row) => !row.data.endedAt).length;
+  const now = useClock();
+  const count = state.rows.filter((row) => isAlertOpen(row.data, now)).length;
   return (
-    <Tooltip title="Pendências nos até 100 registros carregados, não contagem global">
+    <Tooltip title="Abertos há mais de 8 horas nos até 100 registros carregados, não contagem global">
       <IconButton
         component={RouterLink}
         to="/pending"
         aria-label={
           'Ver pendências: ' +
           count +
-          ' abertos nos até 100 registros carregados'
+          ' abertos há mais de 8 horas nos até 100 registros carregados'
         }
       >
         <Badge badgeContent={count} color="warning">
@@ -94,7 +97,7 @@ export function PendingPage({ db, uid }: { db: Firestore; uid: string }) {
       active = false;
     };
   }, [db, uid, cursor, attempt]);
-  const open = rows.filter((row) => !row.data.endedAt);
+  const open = rows.filter((row) => isOpen(row.data));
   return (
     <Stack spacing={2}>
       <Typography component="h2" variant="h5">
@@ -102,8 +105,9 @@ export function PendingPage({ db, uid }: { db: Firestore; uid: string }) {
       </Typography>
       <Alert severity="info">
         Esta página examina até 100 registros próprios por ID, incluindo
-        fechados, e mostra somente os abertos encontrados. Não representa total
-        global nem ordem de recência. Nenhum encerramento automático é
+        fechados, e mostra todos os abertos encontrados, incluindo os iniciados
+        hoje. O sino alerta somente abertos há mais de 8 horas. Não representa
+        total global nem ordem de recência. Nenhum encerramento automático é
         realizado.
       </Alert>
       {loading ? (

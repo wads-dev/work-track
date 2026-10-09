@@ -16,7 +16,7 @@ import { doc, onSnapshot, type Firestore } from 'firebase/firestore';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { date, object, objects, text, useRows } from './data';
-import { validateEnd } from './record-edit';
+import { validateEnd, localEndToIso, endToLocal } from './record-edit';
 import { safeReturnTo } from './routes';
 import { usePrivacy, isHidden } from './privacy';
 
@@ -71,7 +71,7 @@ export function RecordDrawer({
         setRecord(data);
         setLoading(false);
         if (data) {
-          setEnd(typeof data.endedAt === 'string' ? data.endedAt : '');
+          setEnd(endToLocal(data.endedAt));
           setConfirmed(false);
         }
       },
@@ -88,7 +88,7 @@ export function RecordDrawer({
     try {
       const endedAt = removeEnd
         ? null
-        : validateEnd(end.trim(), record.startedAt);
+        : validateEnd(localEndToIso(end.trim()), record.startedAt);
       if (!reason.trim()) throw new Error('Informe o motivo da alteração.');
       const key = JSON.stringify({ recordId, endedAt, reason: reason.trim() });
       if (intent.current?.key !== key)
@@ -224,17 +224,15 @@ export function RecordDrawer({
                     .join(', ') || 'Não informado'}
                 </dd>
                 <dt>Início original</dt>
-                <dd>{text(record.startedAt)}</dd>
+                <dd>{date(record.startedAt, 'America/Sao_Paulo')}</dd>
                 <dt>Fim original</dt>
-                <dd>{text(record.endedAt)}</dd>
-                <dt>Fuso da atividade</dt>
-                <dd>{text(record.timeZone)}</dd>
+                <dd>{date(record.endedAt, 'America/Sao_Paulo')}</dd>
                 <dt>Texto original</dt>
                 <dd>{text(record.originalText)}</dd>
                 <dt>Contexto</dt>
                 <dd>{text(record.interpretation)}</dd>
                 <dt>Gravado em</dt>
-                <dd>{date(record.recordedAt)} (fuso do navegador)</dd>
+                <dd>{date(record.recordedAt)}</dd>
               </Box>
               {!record.endedAt && (
                 <Alert severity="warning">
@@ -255,14 +253,16 @@ export function RecordDrawer({
                 </Typography>
                 <Stack spacing={2}>
                   <TextField
-                    label="Fim com fuso (ISO 8601)"
+                    type="datetime-local"
+                    label="Fim efetivo"
+                    slotProps={{ inputLabel: { shrink: true } }}
                     value={end}
                     disabled={saving || removeEnd}
                     onChange={(event) => {
                       setEnd(event.target.value);
                       setConfirmed(false);
                     }}
-                    helperText="Digite o instante efetivo com Z ou offset. Nenhum horário é preenchido automaticamente."
+                    helperText="Informe a data e hora efetivas. Nenhum horário é preenchido automaticamente."
                     fullWidth
                   />
                   <FormControlLabel
@@ -291,8 +291,7 @@ export function RecordDrawer({
                   <Alert severity="info">
                     {removeEnd
                       ? 'Você irá remover o fim, tornando a atividade aberta.'
-                      : 'Confira o fim e seu offset: ' +
-                        (end || 'não informado')}
+                      : 'Confira o fim efetivo: ' + (end || 'não informado')}
                     . Início, texto original e horário de gravação serão
                     preservados. Alteração registrada com autor e antes/depois.
                   </Alert>
@@ -304,7 +303,7 @@ export function RecordDrawer({
                         onChange={(event) => setConfirmed(event.target.checked)}
                       />
                     }
-                    label="Confirmo o horário/fuso e esta alteração explícita"
+                    label="Confirmo o horário e esta alteração explícita"
                   />
                   <Button
                     type="submit"

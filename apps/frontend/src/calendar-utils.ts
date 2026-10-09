@@ -104,9 +104,9 @@ export function customRange(first: string, last: string, zone: string) {
     1;
   const from = midnight(first, zone),
     to = midnight(addDays(last, 1), zone);
-  if (count > 31 || Date.parse(to) - Date.parse(from) > 31 * 86400000 + 3600000)
+  if (count > 93 || Date.parse(to) - Date.parse(from) > 93 * 86400000 + 3600000)
     throw new Error(
-      'Intervalo máximo: 31 dias inclusivos (mais até 1 hora de ajuste de horário de verão). Escolha um intervalo menor; consultas não são somadas automaticamente.',
+      'Intervalo máximo: 93 dias inclusivos (mais até 1 hora de ajuste de horário de verão). Escolha um intervalo menor; consultas não são somadas automaticamente.',
     );
   return { first, count, from, to };
 }

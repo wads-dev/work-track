@@ -235,8 +235,7 @@ export function ProjectReport({
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
         Pode somar atividades simultâneas; não representa tempo líquido único.
-        Referência: {date(report.asOf)} (fuso do navegador). Política:{' '}
-        {report.policy} · fuso do orçamento: {report.budgetTimeZone}.
+        Referência: {date(report.asOf)}. Política: {report.policy}.
       </Typography>
       <Typography sx={{ mb: 2 }}>
         Estimativas não alteram fatos: orçamento global de 8 horas por

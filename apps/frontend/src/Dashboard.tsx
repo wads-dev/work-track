@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { isOpen } from './pending-utils';
 import {
   Alert,
   Box,
@@ -300,13 +301,13 @@ export function Dashboard({
           search={location.search}
         />
       )}
-      {mode !== 'projects' && records.rows.some((row) => !row.data.endedAt) && (
+      {mode !== 'projects' && records.rows.some((row) => isOpen(row.data)) && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           Há registros abertos entre os itens carregados. Confira detalhes antes
           de encerrar; nada será encerrado automaticamente.
           <Box component="ul">
             {records.rows
-              .filter((row) => !row.data.endedAt)
+              .filter((row) => isOpen(row.data))
               .slice(0, 5)
               .map((row) => (
                 <li key={row.id}>
@@ -433,9 +434,6 @@ export function Dashboard({
               {data.endedAt
                 ? date(data.endedAt, data.timeZone)
                 : 'Fim não informado'}
-              <Typography variant="caption" sx={{ display: 'block' }}>
-                {text(data.timeZone, 'Fuso do navegador')}
-              </Typography>
             </>,
             <Tooltip title="Abrir detalhes e auditoria">
               <IconButton

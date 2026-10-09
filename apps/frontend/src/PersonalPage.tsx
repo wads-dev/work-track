@@ -11,6 +11,7 @@ import {
   Stack,
   TextField,
   Typography,
+  Tooltip,
 } from '@mui/material';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import type { Firestore } from 'firebase/firestore';
@@ -79,7 +80,8 @@ export function PersonalPage({
   const location = useLocation();
   const { revealed } = usePrivacy();
   const projects = useRows(db, 'projects');
-  const zone = params.get('timeZone') ?? 'America/Sao_Paulo';
+  const zone = 'America/Sao_Paulo';
+  const density = params.get('density') ?? 'compact';
   const selected =
     params.get('date') ?? dayKey(new Date(), 'America/Sao_Paulo');
   const rawView = params.get('view') ?? (calendar ? 'week' : 'day');
@@ -93,6 +95,8 @@ export function PersonalPage({
   try {
     if (!['day', 'week', 'month'].includes(rawView))
       throw new Error('Visualização inválida.');
+    if (!['supercompact', 'compact', 'timeline'].includes(density))
+      throw new Error('Densidade inválida.');
     view = rawView as View;
     validated = calendar
       ? range(selected, view, validZone(zone))
@@ -234,15 +238,22 @@ export function PersonalPage({
             />
           </>
         )}
-        <TextField
-          label="Fuso IANA"
-          value={zone}
-          onChange={(e) => update('timeZone', e.target.value)}
-        />
+        {calendar && (
+          <TextField
+            select
+            label="Densidade"
+            value={density}
+            onChange={(e) => update('density', e.target.value)}
+          >
+            <MenuItem value="supercompact">Supercompacto</MenuItem>
+            <MenuItem value="compact">Compacto</MenuItem>
+            <MenuItem value="timeline">Linha do tempo</MenuItem>
+          </TextField>
+        )}
       </Stack>
       {!calendar && (
         <Typography color="text.secondary">
-          Intervalo máximo de 31 dias inclusivos, com até 1 hora adicional para
+          Intervalo máximo de 93 dias inclusivos, com até 1 hora adicional para
           horário de verão. Consultas não são somadas automaticamente; paginação
           continua limitada aos dados examinados.
         </Typography>
@@ -283,9 +294,9 @@ export function PersonalPage({
             </Typography>
             <Typography color="text.secondary">
               Pode somar simultâneas; não são horas líquidas únicas. Referência{' '}
-              {date(report.asOf, zone)} · {report.policy} · fuso do orçamento:{' '}
-              {report.budgetTimeZone}. {report.page.scannedCount} registros
-              examinados, {report.page.excludedCount} fora do período/inválidos.
+              {date(report.asOf, zone)} · {report.policy}.{' '}
+              {report.page.scannedCount} registros examinados,{' '}
+              {report.page.excludedCount} fora do período/inválidos.
             </Typography>
             {(report.page.partial || cursor || report.estimatedCount > 0) && (
               <Alert severity="warning">
@@ -389,7 +400,7 @@ export function PersonalPage({
                 ))}
               </Box>
             )}
-            {calendar && view !== 'month' && (
+            {calendar && density === 'timeline' && (
               <CalendarTimeline
                 items={report.intervals}
                 day={selected}
@@ -400,13 +411,13 @@ export function PersonalPage({
                 returnTo={location.pathname + location.search}
               />
             )}
-            {calendar && view === 'month' && (
+            {calendar && density !== 'timeline' && (
               <Box
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: {
                     xs: '1fr',
-                    sm: 'repeat(7,minmax(0,1fr))',
+                    sm: view === 'day' ? '1fr' : 'repeat(7,minmax(0,1fr))',
                   },
                   gap: 1,
                 }}
@@ -432,7 +443,11 @@ export function PersonalPage({
                   return (
                     <Paper
                       key={day}
-                      sx={{ p: 1, minHeight: 140, opacity: outside ? 0.55 : 1 }}
+                      sx={{
+                        p: 1,
+                        minHeight: density === 'supercompact' ? 80 : 140,
+                        opacity: outside ? 0.55 : 1,
+                      }}
                     >
                       <Typography component="h3" variant="subtitle2">
                         {day}
@@ -447,56 +462,122 @@ export function PersonalPage({
                         </Typography>
                       ) : (
                         entries.map((item) => (
-                          <Button
+                          <Tooltip
                             key={item.id}
-                            component={RouterLink}
-                            to={
-                              '/records/' +
-                              encodeURIComponent(item.id) +
-                              '?returnTo=' +
-                              encodeURIComponent(
-                                location.pathname + location.search,
-                              )
+                            title={
+                              label(item.projectId) +
+                              ' · ' +
+                              new Intl.DateTimeFormat('pt-BR', {
+                                timeZone: zone,
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              }).format(new Date(item.effectiveStartedAt)) +
+                              ' — ' +
+                              new Intl.DateTimeFormat('pt-BR', {
+                                timeZone: zone,
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              }).format(new Date(item.effectiveEndedAt)) +
+                              ' · ' +
+                              new Intl.NumberFormat('pt-BR', {
+                                maximumFractionDigits: 1,
+                              }).format(
+                                (Date.parse(item.effectiveEndedAt) -
+                                  Date.parse(item.effectiveStartedAt)) /
+                                  60000,
+                              ) +
+                              ' min'
                             }
-                            sx={{
-                              display: 'block',
-                              textAlign: 'left',
-                              borderLeft: '4px solid ' + color(item.projectId),
-                              my: 1,
-                              width: '100%',
-                            }}
                           >
-                            <Typography variant="caption">
-                              {label(item.projectId)}
-                              <br />
-                              {date(
-                                new Date(
-                                  Math.max(
-                                    start,
-                                    Date.parse(item.effectiveStartedAt),
+                            <Button
+                              component={RouterLink}
+                              to={
+                                '/records/' +
+                                encodeURIComponent(item.id) +
+                                '?returnTo=' +
+                                encodeURIComponent(
+                                  location.pathname + location.search,
+                                )
+                              }
+                              sx={{
+                                display: 'block',
+                                textAlign: 'left',
+                                borderLeft:
+                                  '4px solid ' + color(item.projectId),
+                                my: 1,
+                                width: '100%',
+                                whiteSpace:
+                                  density === 'supercompact'
+                                    ? 'nowrap'
+                                    : 'normal',
+                                py: density === 'supercompact' ? 0.25 : 1,
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  display: 'block',
+                                  whiteSpace:
+                                    density === 'supercompact'
+                                      ? 'nowrap'
+                                      : 'normal',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                <Box
+                                  component="span"
+                                  aria-hidden="true"
+                                  sx={{
+                                    display: 'inline-block',
+                                    width: 6,
+                                    height: 6,
+                                    bgcolor: color(item.projectId),
+                                    mr: 0.5,
+                                    borderRadius: '50%',
+                                  }}
+                                />
+                                {new Intl.DateTimeFormat('pt-BR', {
+                                  timeZone: zone,
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                }).format(
+                                  new Date(
+                                    Math.max(
+                                      start,
+                                      Date.parse(item.effectiveStartedAt),
+                                    ),
                                   ),
-                                ).toISOString(),
-                                zone,
-                              )}{' '}
-                              —{' '}
-                              {date(
-                                new Date(
-                                  Math.min(
-                                    end,
-                                    Date.parse(item.effectiveEndedAt),
-                                  ),
-                                ).toISOString(),
-                                zone,
-                              )}
-                              {item.estimated ? ' · Estimado' : ''}
-                              {report.intervals.some(
-                                (other) =>
-                                  other.id !== item.id && overlaps(item, other),
-                              )
-                                ? ' · Sobreposição'
-                                : ''}
-                            </Typography>
-                          </Button>
+                                )}{' '}
+                                {label(item.projectId)}
+                                {density !== 'supercompact' && (
+                                  <>
+                                    <br />
+                                    {new Intl.DateTimeFormat('pt-BR', {
+                                      timeZone: zone,
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    }).format(
+                                      new Date(
+                                        Math.min(
+                                          end,
+                                          Date.parse(item.effectiveEndedAt),
+                                        ),
+                                      ),
+                                    )}
+                                    {item.estimated ? ' · Estimado' : ''}
+                                    {report.intervals.some(
+                                      (other) =>
+                                        other.id !== item.id &&
+                                        overlaps(item, other),
+                                    )
+                                      ? ' · Sobreposição'
+                                      : ''}
+                                  </>
+                                )}
+                              </Typography>
+                            </Button>
+                          </Tooltip>
                         ))
                       )}
                     </Paper>

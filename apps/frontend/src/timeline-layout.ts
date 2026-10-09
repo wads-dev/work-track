@@ -1,3 +1,17 @@
+export function commonSpan(items: { start: number; end: number }[]) {
+  const valid = items.filter((item) => item.end > item.start);
+  if (!valid.length) return null;
+  return {
+    first: Math.max(
+      0,
+      Math.floor(Math.min(...valid.map((i) => i.start)) / 60) * 60,
+    ),
+    last: Math.min(
+      1440,
+      Math.ceil(Math.max(...valid.map((i) => i.end)) / 60) * 60,
+    ),
+  };
+}
 export type Timed = {
   id: string;
   effectiveStartedAt: string;

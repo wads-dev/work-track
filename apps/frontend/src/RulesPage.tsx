@@ -55,23 +55,23 @@ export function RulesPage() {
         Relatório de projeto
       </Typography>
       <Typography>
-        Política project-report-v3: orçamento global por pessoa/dia em
-        America/Sao_Paulo, considerando registros de todos os projetos. Próximo
-        início da mesma pessoa somente no mesmo projeto é considerado, inclusive
-        fora da página. Projetos diferentes nunca cortam a estimativa. Fusos
-        diferentes nos registros geram aviso. O filtro por projeto afeta apenas
-        dados exibidos, não cria orçamento adicional.
+        Política project-report-v3: orçamento global por pessoa/dia,
+        considerando registros de todos os projetos. Próximo início da mesma
+        pessoa somente no mesmo projeto é considerado, inclusive fora da página.
+        Projetos diferentes nunca cortam a estimativa. Critérios de cálculo são
+        consistentes entre consultas. O filtro por projeto afeta apenas dados
+        exibidos, não cria orçamento adicional.
       </Typography>
       <Typography component="h3" variant="h6" sx={{ mt: 3 }}>
         Dashboard e calendário pessoais
       </Typography>
       <Typography>
-        Política personal-v3: o orçamento global também usa America/Sao_Paulo; o
-        fuso solicitado no filtro define somente período e visualização. Próximo
-        início da própria pessoa é considerado somente no mesmo projeto,
-        inclusive fora da página selecionada; abertos também respeitam
-        meia-noite no fuso do registro e no fuso fixo do orçamento. Intervalos
-        são recortados apenas para visualização do período, sem mudar fatos.
+        Política personal-v3: o orçamento global segue os mesmos critérios. O
+        período selecionado afeta somente os dados exibidos. Próximo início da
+        própria pessoa é considerado somente no mesmo projeto, inclusive fora da
+        página selecionada; abertos também respeitam a virada de dia definida
+        pelos critérios do orçamento. Intervalos são recortados apenas para
+        visualização do período, sem mudar fatos.
       </Typography>
       <Typography sx={{ mt: 2 }}>
         Candidato ao próximo início com fim explícito e duração menor que 15
