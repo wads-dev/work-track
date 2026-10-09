@@ -1,6 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+export function indexesPath(group, pageToken) {
+  return (
+    '/collectionGroups/' +
+    encodeURIComponent(group) +
+    '/indexes' +
+    (pageToken ? '?pageToken=' + encodeURIComponent(pageToken) : '')
+  );
+}
 export function matchingReadyIndex(required, actual) {
   const fields = (list) =>
     list
@@ -62,12 +70,7 @@ export async function waitForIndexes(project, timeoutMs = 20 * 60_000) {
       const actual = [];
       let pageToken;
       do {
-        const page = await get(
-          '/collectionGroups/' +
-            encodeURIComponent(group) +
-            '/indexes?pageSize=100' +
-            (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''),
-        );
+        const page = await get(indexesPath(group, pageToken));
         actual.push(...(page.indexes ?? []));
         pageToken = page.nextPageToken;
       } while (pageToken);

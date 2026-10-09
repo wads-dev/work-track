@@ -1,6 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchingReadyIndex } from './wait-firestore-indexes.mjs';
+import { indexesPath, matchingReadyIndex } from './wait-firestore-indexes.mjs';
+test('index listing omits unsupported nonzero page size and preserves page tokens', () => {
+  assert.equal(indexesPath('records'), '/collectionGroups/records/indexes');
+  assert.equal(
+    indexesPath('records', 'next/page+token='),
+    '/collectionGroups/records/indexes?pageToken=next%2Fpage%2Btoken%3D',
+  );
+  for (const token of [undefined, '', 'next/page+token=']) {
+    const url = new URL(
+      indexesPath('records', token),
+      'https://firestore.googleapis.com',
+    );
+    assert.equal(url.searchParams.has('pageSize'), false);
+    assert.equal(url.searchParams.get('pageToken'), token || null);
+  }
+});
 const required = {
   queryScope: 'COLLECTION',
   fields: [
