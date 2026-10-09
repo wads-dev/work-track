@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Alert,
   Box,
@@ -29,6 +29,8 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { detailPath, matchesFilter } from './routes';
+import { usePrivacy, isHidden, safeProject, safeRecord } from './privacy';
+import { ProjectEditor } from './ProjectEditor';
 
 function DataTable({
   title,
@@ -151,15 +153,50 @@ export function Dashboard({
   uid: string;
   mode: 'overview' | 'projects' | 'records';
 }) {
-  const projects = useRows(db, 'projects');
-  const records = useRows(db, 'users/' + uid + '/records');
+  const { revealed } = usePrivacy();
+  const rawProjects = useRows(db, 'projects');
+  const rawRecords = useRows(db, 'users/' + uid + '/records');
+  const projects = {
+    ...rawProjects,
+    rows: rawProjects.rows.map((row) => ({
+      ...row,
+      data: safeProject(row.data, revealed),
+    })),
+  };
+  const records = {
+    ...rawRecords,
+    rows: rawRecords.rows.map((row) => ({
+      ...row,
+      data: safeRecord(
+        row.data,
+        isHidden(
+          rawProjects.rows.find((project) => project.id === row.data.projectId)
+            ?.data,
+          revealed,
+        ),
+      ),
+    })),
+  };
   const { projectId, recordId } = useParams();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
-  const filter = params.get('q') ?? '';
+  const [localFilter, setLocalFilter] = useState('');
+  const filter = revealed ? localFilter : '';
   const projectFilter = params.get('project') ?? '';
+  useEffect(() => {
+    if (!revealed) setLocalFilter('');
+    if (params.has('q')) {
+      const next = new URLSearchParams(params);
+      next.delete('q');
+      setParams(next, { replace: true });
+    }
+  }, [revealed, params, setParams]);
   function updateFilter(key: string, value: string) {
     const next = new URLSearchParams(params);
+    if (key === 'q') {
+      if (revealed) setLocalFilter(value);
+      return;
+    }
     if (value) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
@@ -187,10 +224,23 @@ export function Dashboard({
             'O relatório consulta o projeto diretamente, independente do limite da lista.',
           )}
         </Typography>
+        <ProjectEditor
+          functions={functions}
+          projectId={projectId}
+          project={rawProjects.rows.find((item) => item.id === projectId)?.data}
+          hidden={isHidden(
+            rawProjects.rows.find((item) => item.id === projectId)?.data,
+            revealed,
+          )}
+        />
         <ProjectReport
           key={projectId}
           projectId={projectId}
           functions={functions}
+          hidden={isHidden(
+            rawProjects.rows.find((item) => item.id === projectId)?.data,
+            revealed,
+          )}
           search={location.search}
           uid={uid}
         />
@@ -273,7 +323,12 @@ export function Dashboard({
       </Alert>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
         <TextField
-          label="Filtrar texto"
+          label={
+            revealed
+              ? 'Filtrar texto local (não compartilhado)'
+              : 'Filtro textual indisponível no modo live'
+          }
+          disabled={!revealed}
           value={filter}
           onChange={(event) => updateFilter('q', event.target.value)}
           fullWidth

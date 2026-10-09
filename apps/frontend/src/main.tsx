@@ -41,6 +41,7 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { safeReturnTo } from './routes';
+import { PrivacyContext } from './privacy';
 
 function allowed(user: User) {
   return (
@@ -63,6 +64,7 @@ function errorMessage(error: unknown): string {
     : 'Não foi possível concluir a operação. Tente novamente.';
 }
 function App() {
+  const [revealed, setRevealed] = useState(false);
   const systemDark = useMediaQuery('(prefers-color-scheme: dark)');
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const [themeOverride, setThemeOverride] = useState<'light' | 'dark' | null>(
@@ -138,6 +140,7 @@ function App() {
           (next) => {
             if (!active) return;
             setUser(next);
+            setRevealed(false);
             setLoading(false);
           },
           (failure) => {
@@ -205,275 +208,284 @@ function App() {
   if (!loading && authorized && location.pathname === '/')
     return <Navigate replace to={returnTo} />;
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <a className="skip-link" href="#conteudo">
-        Ir para o conteúdo
-      </a>
-      {authorized && services ? (
-        <>
-          <AppBar position="static" elevation={0}>
-            <Toolbar sx={{ gap: 2, flexWrap: 'wrap', py: 1 }}>
-              <IconButton
-                color="inherit"
-                aria-label="Abrir menu de navegação"
-                aria-expanded={menuOpen}
-                aria-controls={menuOpen ? 'menu-principal' : undefined}
-                onClick={() => setMenuOpen(true)}
+    <PrivacyContext.Provider value={{ revealed }}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <a className="skip-link" href="#conteudo">
+          Ir para o conteúdo
+        </a>
+        {authorized && services ? (
+          <>
+            <AppBar position="static" elevation={0}>
+              <Toolbar sx={{ gap: 2, flexWrap: 'wrap', py: 1 }}>
+                <IconButton
+                  color="inherit"
+                  aria-label="Abrir menu de navegação"
+                  aria-expanded={menuOpen}
+                  aria-controls={menuOpen ? 'menu-principal' : undefined}
+                  onClick={() => setMenuOpen(true)}
+                >
+                  <span aria-hidden="true">☰</span>
+                </IconButton>
+                {toggleTheme}
+                <Button
+                  color="inherit"
+                  aria-pressed={revealed}
+                  onClick={() => setRevealed((value) => !value)}
+                >
+                  {revealed ? '◉ Ocultar dados' : '⊘ Modo live: ocultos'}
+                </Button>
+                <Typography sx={{ flexGrow: 1, fontWeight: 700 }}>
+                  Work Track
+                </Typography>
+                <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+                  {user.email}
+                </Typography>
+                <Button
+                  color="inherit"
+                  onClick={() => void logout()}
+                  disabled={busy}
+                >
+                  Sair
+                </Button>
+              </Toolbar>
+            </AppBar>
+            <Drawer open={menuOpen} onClose={() => setMenuOpen(false)}>
+              <Box
+                component="nav"
+                id="menu-principal"
+                aria-label="Menu principal"
+                sx={{ width: 280, maxWidth: '85vw', p: 2 }}
               >
-                <span aria-hidden="true">☰</span>
-              </IconButton>
-              {toggleTheme}
-              <Typography sx={{ flexGrow: 1, fontWeight: 700 }}>
-                Work Track
-              </Typography>
-              <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
-                {user.email}
-              </Typography>
-              <Button
-                color="inherit"
-                onClick={() => void logout()}
-                disabled={busy}
-              >
-                Sair
-              </Button>
-            </Toolbar>
-          </AppBar>
-          <Drawer open={menuOpen} onClose={() => setMenuOpen(false)}>
-            <Box
-              component="nav"
-              id="menu-principal"
-              aria-label="Menu principal"
-              sx={{ width: 280, maxWidth: '85vw', p: 2 }}
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Work Track
+                </Typography>
+                <Button onClick={() => setMenuOpen(false)}>Fechar menu</Button>
+                <Button onClick={() => setThemeOverride(null)}>
+                  Tema do sistema
+                </Button>
+                <List>
+                  {[
+                    ['/app', 'Visão geral'],
+                    ['/projects', 'Projetos'],
+                    ['/records', 'Meus registros'],
+                  ].map(([to, label]) => (
+                    <ListItemButton
+                      key={to}
+                      component={RouterLink}
+                      to={to}
+                      selected={
+                        location.pathname === to ||
+                        location.pathname.startsWith(to + '/')
+                      }
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <ListItemText primary={label} />
+                    </ListItemButton>
+                  ))}
+                </List>
+              </Box>
+            </Drawer>
+            <Container
+              component="main"
+              id="conteudo"
+              tabIndex={-1}
+              maxWidth="xl"
+              sx={{ py: 4 }}
             >
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Work Track
+              <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
+                Seu trabalho, com contexto
               </Typography>
-              <Button onClick={() => setMenuOpen(false)}>Fechar menu</Button>
-              <Button onClick={() => setThemeOverride(null)}>
-                Tema do sistema
-              </Button>
-              <List>
+              <Typography color="text.secondary" sx={{ mb: 4 }}>
+                Projetos da equipe e seus registros de atividade.
+              </Typography>
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              )}
+              <Stack
+                component="nav"
+                direction="row"
+                spacing={1}
+                aria-label="Navegação principal"
+                sx={{ mb: 3, flexWrap: 'wrap' }}
+              >
                 {[
                   ['/app', 'Visão geral'],
                   ['/projects', 'Projetos'],
                   ['/records', 'Meus registros'],
                 ].map(([to, label]) => (
-                  <ListItemButton
+                  <Button
                     key={to}
                     component={RouterLink}
                     to={to}
-                    selected={
+                    variant={
                       location.pathname === to ||
                       location.pathname.startsWith(to + '/')
+                        ? 'contained'
+                        : 'outlined'
                     }
-                    onClick={() => setMenuOpen(false)}
                   >
-                    <ListItemText primary={label} />
-                  </ListItemButton>
+                    {label}
+                  </Button>
                 ))}
-              </List>
-            </Box>
-          </Drawer>
-          <Container
+              </Stack>
+              <Routes>
+                <Route
+                  path="/app"
+                  element={
+                    <Dashboard
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      mode="overview"
+                    />
+                  }
+                />
+                <Route
+                  path="/projects"
+                  element={
+                    <Dashboard
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      mode="projects"
+                    />
+                  }
+                />
+                <Route
+                  path="/projects/:projectId"
+                  element={
+                    <Dashboard
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      mode="projects"
+                    />
+                  }
+                />
+                <Route
+                  path="/records"
+                  element={
+                    <Dashboard
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      mode="records"
+                    />
+                  }
+                />
+                <Route
+                  path="/records/:recordId"
+                  element={
+                    <Dashboard
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      mode="records"
+                    />
+                  }
+                />
+                <Route
+                  path="*"
+                  element={
+                    <Alert severity="info">
+                      Página não encontrada. Use a navegação para voltar.
+                    </Alert>
+                  }
+                />
+              </Routes>
+            </Container>
+          </>
+        ) : (
+          <Box
             component="main"
             id="conteudo"
             tabIndex={-1}
-            maxWidth="xl"
-            sx={{ py: 4 }}
+            sx={{
+              minHeight: '100dvh',
+              display: 'grid',
+              placeItems: 'center',
+              p: 3,
+            }}
           >
-            <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
-              Seu trabalho, com contexto
-            </Typography>
-            <Typography color="text.secondary" sx={{ mb: 4 }}>
-              Projetos da equipe e seus registros de atividade.
-            </Typography>
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
-            <Stack
-              component="nav"
-              direction="row"
-              spacing={1}
-              aria-label="Navegação principal"
-              sx={{ mb: 3, flexWrap: 'wrap' }}
-            >
-              {[
-                ['/app', 'Visão geral'],
-                ['/projects', 'Projetos'],
-                ['/records', 'Meus registros'],
-              ].map(([to, label]) => (
-                <Button
-                  key={to}
-                  component={RouterLink}
-                  to={to}
-                  variant={
-                    location.pathname === to ||
-                    location.pathname.startsWith(to + '/')
-                      ? 'contained'
-                      : 'outlined'
-                  }
-                >
-                  {label}
-                </Button>
-              ))}
-            </Stack>
-            <Routes>
-              <Route
-                path="/app"
-                element={
-                  <Dashboard
-                    key={user.uid}
-                    db={services.db}
-                    functions={services.functions}
-                    uid={user.uid}
-                    mode="overview"
-                  />
-                }
-              />
-              <Route
-                path="/projects"
-                element={
-                  <Dashboard
-                    key={user.uid}
-                    db={services.db}
-                    functions={services.functions}
-                    uid={user.uid}
-                    mode="projects"
-                  />
-                }
-              />
-              <Route
-                path="/projects/:projectId"
-                element={
-                  <Dashboard
-                    key={user.uid}
-                    db={services.db}
-                    functions={services.functions}
-                    uid={user.uid}
-                    mode="projects"
-                  />
-                }
-              />
-              <Route
-                path="/records"
-                element={
-                  <Dashboard
-                    key={user.uid}
-                    db={services.db}
-                    functions={services.functions}
-                    uid={user.uid}
-                    mode="records"
-                  />
-                }
-              />
-              <Route
-                path="/records/:recordId"
-                element={
-                  <Dashboard
-                    key={user.uid}
-                    db={services.db}
-                    functions={services.functions}
-                    uid={user.uid}
-                    mode="records"
-                  />
-                }
-              />
-              <Route
-                path="*"
-                element={
-                  <Alert severity="info">
-                    Página não encontrada. Use a navegação para voltar.
-                  </Alert>
-                }
-              />
-            </Routes>
-          </Container>
-        </>
-      ) : (
-        <Box
-          component="main"
-          id="conteudo"
-          tabIndex={-1}
-          sx={{
-            minHeight: '100dvh',
-            display: 'grid',
-            placeItems: 'center',
-            p: 3,
-          }}
-        >
-          <Card sx={{ width: '100%', maxWidth: 440 }}>
-            <CardContent sx={{ p: 4 }}>
-              <Stack direction="row" sx={{ justifyContent: 'end' }}>
-                {toggleTheme}
-                <Button onClick={() => setThemeOverride(null)}>
-                  Tema do sistema
-                </Button>
-              </Stack>
-              <Stack spacing={3}>
-                <Typography
-                  component="h1"
-                  variant="h4"
-                  sx={{ fontWeight: 700 }}
-                >
-                  Work Track
-                </Typography>
-                <Typography color="text.secondary">
-                  Acesse projetos e seus registros com sua conta Google
-                  verificada @wads.dev.
-                </Typography>
-                {loading && (
-                  <Stack direction="row" sx={{ gap: 2 }} role="status">
-                    <CircularProgress
-                      size={24}
-                      aria-label="Carregando sessão"
-                    />
-                    <span>Carregando sessão…</span>
-                  </Stack>
-                )}
-                {error && <Alert severity="error">{error}</Alert>}
-                {!loading && user && !authorized && (
-                  <Alert severity="warning">
-                    Esta conta não tem acesso. Saia para entrar com uma conta
-                    Google verificada @wads.dev.
-                  </Alert>
-                )}
-                {!loading &&
-                  (user ? (
-                    <Button
-                      variant="contained"
-                      onClick={() => void logout()}
-                      disabled={busy}
-                    >
-                      Sair e trocar conta
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="contained"
-                      size="large"
-                      onClick={() => void login()}
-                      disabled={!services || busy}
-                    >
-                      {busy ? 'Aguardando Google…' : 'Entrar com Google'}
-                    </Button>
-                  ))}
-                {!loading && !services && (
-                  <Button onClick={() => window.location.reload()}>
-                    Recarregar configuração
+            <Card sx={{ width: '100%', maxWidth: 440 }}>
+              <CardContent sx={{ p: 4 }}>
+                <Stack direction="row" sx={{ justifyContent: 'end' }}>
+                  {toggleTheme}
+                  <Button onClick={() => setThemeOverride(null)}>
+                    Tema do sistema
                   </Button>
-                )}
-                <Typography variant="body2" color="text.secondary">
-                  Este acesso é independente da autorização MCP em /login.
-                  Nenhum registro é criado ao entrar.
-                </Typography>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
-      )}
-    </ThemeProvider>
+                </Stack>
+                <Stack spacing={3}>
+                  <Typography
+                    component="h1"
+                    variant="h4"
+                    sx={{ fontWeight: 700 }}
+                  >
+                    Work Track
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Acesse projetos e seus registros com sua conta Google
+                    verificada @wads.dev.
+                  </Typography>
+                  {loading && (
+                    <Stack direction="row" sx={{ gap: 2 }} role="status">
+                      <CircularProgress
+                        size={24}
+                        aria-label="Carregando sessão"
+                      />
+                      <span>Carregando sessão…</span>
+                    </Stack>
+                  )}
+                  {error && <Alert severity="error">{error}</Alert>}
+                  {!loading && user && !authorized && (
+                    <Alert severity="warning">
+                      Esta conta não tem acesso. Saia para entrar com uma conta
+                      Google verificada @wads.dev.
+                    </Alert>
+                  )}
+                  {!loading &&
+                    (user ? (
+                      <Button
+                        variant="contained"
+                        onClick={() => void logout()}
+                        disabled={busy}
+                      >
+                        Sair e trocar conta
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={() => void login()}
+                        disabled={!services || busy}
+                      >
+                        {busy ? 'Aguardando Google…' : 'Entrar com Google'}
+                      </Button>
+                    ))}
+                  {!loading && !services && (
+                    <Button onClick={() => window.location.reload()}>
+                      Recarregar configuração
+                    </Button>
+                  )}
+                  <Typography variant="body2" color="text.secondary">
+                    Este acesso é independente da autorização MCP em /login.
+                    Nenhum registro é criado ao entrar.
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+      </ThemeProvider>
+    </PrivacyContext.Provider>
   );
 }
 const root = document.getElementById('root');

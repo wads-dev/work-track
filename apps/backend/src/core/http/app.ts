@@ -1,4 +1,5 @@
 import express from 'express';
+import type { ProjectManagementRepository } from '../../modules/registration/domain/project-management.js';
 import type { RecordEditingRepository } from '../../modules/registration/domain/record-edit.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -13,6 +14,7 @@ export function createApp(
   provider: WorkTrackOAuth,
   repository?: WorkRepository,
   editingRepository?: RecordEditingRepository,
+  managementRepository?: ProjectManagementRepository,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -101,7 +103,13 @@ export function createApp(
       );
       const uid = req.auth?.extra?.uid;
       if (repository && typeof uid === 'string')
-        registerWorkTools(server, repository, uid, editingRepository);
+        registerWorkTools(
+          server,
+          repository,
+          uid,
+          editingRepository,
+          managementRepository,
+        );
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });

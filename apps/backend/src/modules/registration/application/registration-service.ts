@@ -17,7 +17,10 @@ export class RegistrationService {
       ),
     };
   }
-  createProject(input: { title: string; description: string }, uid: string) {
+  createProject(
+    input: Parameters<WorkRepository['createProject']>[0],
+    uid: string,
+  ) {
     return this.repository.createProject(projectInput.parse(input), uid);
   }
   createTopic(

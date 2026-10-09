@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { metadata } from './project-management.js';
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/);
 const instant = z.iso.datetime({ offset: true });
 export const projectInput = z.object({
+  ...metadata,
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().min(20).max(6000),
 });
@@ -85,6 +87,13 @@ export interface Topic {
   description: string;
 }
 export interface Project {
+  type?: 'personal' | 'work';
+  githubUrl?: string | null;
+  confidential?: boolean;
+  publicAlias?: string;
+  archived?: boolean;
+  mergedInto?: string;
+  mergeLock?: string;
   id: string;
   title: string;
   description: string;

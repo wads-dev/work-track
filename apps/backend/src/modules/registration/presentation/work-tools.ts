@@ -1,6 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
+  updateProjectInput,
+  mergeProjectsInput,
+  type ProjectManagementRepository,
+} from '../domain/project-management.js';
+import {
   updateRecordInput,
   type RecordEditingRepository,
 } from '../domain/record-edit.js';
@@ -16,6 +21,7 @@ export function registerWorkTools(
   repository: WorkRepository,
   uid: string,
   editing?: RecordEditingRepository,
+  management?: ProjectManagementRepository,
 ) {
   const service = new RegistrationService(repository);
   const output = (data: unknown) => ({
@@ -33,6 +39,26 @@ export function registerWorkTools(
       };
     }
   };
+  if (management) {
+    server.registerTool(
+      'update_project',
+      {
+        description:
+          'Edite metadados de projeto com ID explícito, motivo e requestId estável. Confidencialidade é apenas apresentação, não autorização.',
+        inputSchema: updateProjectInput,
+      },
+      (input) => run(() => management.updateProject(input, uid)),
+    );
+    server.registerTool(
+      'merge_projects',
+      {
+        description:
+          'Preview sem mutation por padrão. Exige origem/destino explícitos. confirmed true, requestId e motivo executam um lote até100. Repetir retoma. Nunca escolher ou confirmar sem pedido humano.',
+        inputSchema: mergeProjectsInput,
+      },
+      (input) => run(() => management.mergeProjects(input, uid)),
+    );
+  }
   if (editing) {
     server.registerTool(
       'update_record',

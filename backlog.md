@@ -12,7 +12,8 @@
 - [ ] Calendário pessoal semanal/mensal com atividades coloridas, sobreposições e estimativas identificadas.
 - [ ] Refinar reconciliação e limites de relatórios para considerar o contexto completo entre projetos/páginas.
 - [ ] Testes completos das regras no Firebase Emulator e execução real do Docker Compose, além da validação estática atual.
-- [ ] Refinamento visual e redução do bundle frontend.
+- [ ] Refinamento visual e redução do bundle frontend; ícones consistentes nas ações de detalhe/auditoria.
+- [ ] Edição de início e revisão da política de histórico: horários/projeto precisam histórico; mudança só de tópico não precisa histórico segundo solicitação de Victor. Implementação atual registra todas alterações.
 
 ## Futuro — não implementar agora
 

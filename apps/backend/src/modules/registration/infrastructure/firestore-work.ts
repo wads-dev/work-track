@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { assertProjectWritable } from '../domain/project-management.js';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import type {
   Project,
@@ -19,7 +20,7 @@ export class FirestoreWorkRepository implements WorkRepository {
     return snapshot.docs.map((doc) => doc.data() as Project);
   }
   async createProject(
-    raw: { title: string; description: string },
+    raw: Parameters<WorkRepository['createProject']>[0],
     uid: string,
   ): Promise<Project> {
     const input = projectInput.parse(raw);
@@ -29,9 +30,15 @@ export class FirestoreWorkRepository implements WorkRepository {
     const ref = this.db.collection('projects').doc(key);
     return this.db.runTransaction(async (tx) => {
       const existing = await tx.get(ref);
-      if (existing.exists) return existing.data() as Project;
+      if (existing.exists) {
+        const project = existing.data() as Project;
+        assertProjectWritable(project);
+        return project;
+      }
       const project: Project = {
         ...input,
+        confidential: input.confidential ?? false,
+        publicAlias: input.publicAlias ?? 'Projeto reservado',
         id: key,
         topics: [
           {
@@ -44,6 +51,12 @@ export class FirestoreWorkRepository implements WorkRepository {
         createdAt: new Date().toISOString(),
       };
       tx.create(ref, { ...project, recordedAt: FieldValue.serverTimestamp() });
+      tx.create(ref.collection('audit').doc('created'), {
+        authorUid: uid,
+        action: 'create',
+        after: project,
+        recordedAt: FieldValue.serverTimestamp(),
+      });
       return project;
     });
   }
@@ -60,6 +73,7 @@ export class FirestoreWorkRepository implements WorkRepository {
           'Projeto não existe. Use search_projects ou create_project.',
         );
       const project = doc.data() as Project;
+      assertProjectWritable(project);
       const existing = project.topics.find(
         (topic) => normalize(topic.title) === normalize(input.title),
       );
@@ -113,6 +127,7 @@ export class FirestoreWorkRepository implements WorkRepository {
           'Projeto não existe. Pesquise ou crie antes de registrar.',
         );
       const project = projectDoc.data() as Project;
+      assertProjectWritable(project);
       const topics = input.topics?.length
         ? input.topics
         : [{ topicId: 'general' }];

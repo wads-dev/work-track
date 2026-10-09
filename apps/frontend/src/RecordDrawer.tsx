@@ -17,6 +17,7 @@ import { httpsCallable, type Functions } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { date, object, objects, text, useRows } from './data';
 import { validateEnd } from './record-edit';
+import { usePrivacy, isHidden } from './privacy';
 
 export function RecordDrawer({
   db,
@@ -32,6 +33,8 @@ export function RecordDrawer({
   search: string;
 }) {
   const navigate = useNavigate();
+  const { revealed } = usePrivacy();
+  const projects = useRows(db, 'projects');
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -167,7 +170,7 @@ export function RecordDrawer({
         {loading && (
           <CircularProgress aria-label="Carregando registro" sx={{ mt: 3 }} />
         )}
-        {error && (
+        {error && revealed && (
           <Alert severity="error" sx={{ my: 2 }}>
             {error}
           </Alert>
@@ -175,162 +178,191 @@ export function RecordDrawer({
         {!loading && !record && !error && (
           <Alert severity="info">Registro não disponível nesta conta.</Alert>
         )}
-        {success && (
+        {success && revealed && (
           <Alert severity="success" role="status" sx={{ my: 2 }}>
             {success}
           </Alert>
         )}
-        {record && (
-          <>
-            <Box
-              component="dl"
-              sx={{
-                '& dt': { fontWeight: 700, mt: 2 },
-                '& dd': { m: 0, whiteSpace: 'pre-wrap' },
-              }}
-            >
-              <dt>ID</dt>
-              <dd>{recordId}</dd>
-              <dt>Projeto</dt>
-              <dd>
-                {text(
-                  object(record.projectSnapshot).title,
-                  text(record.projectId),
-                )}
-              </dd>
-              <dt>Tópicos</dt>
-              <dd>
-                {objects(record.topicSnapshots)
-                  .map((topic) => text(topic.title))
-                  .join(', ') || 'Não informado'}
-              </dd>
-              <dt>Início original</dt>
-              <dd>{text(record.startedAt)}</dd>
-              <dt>Fim original</dt>
-              <dd>{text(record.endedAt)}</dd>
-              <dt>Fuso da atividade</dt>
-              <dd>{text(record.timeZone)}</dd>
-              <dt>Texto original</dt>
-              <dd>{text(record.originalText)}</dd>
-              <dt>Contexto</dt>
-              <dd>{text(record.interpretation)}</dd>
-              <dt>Gravado em</dt>
-              <dd>{date(record.recordedAt)} (fuso do navegador)</dd>
-            </Box>
-            {!record.endedAt && (
-              <Alert severity="warning">
-                Registro aberto. Estimativas do relatório não encerram esta
-                atividade.
-              </Alert>
-            )}
-            <Paper
-              component="form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void save();
-              }}
-              sx={{ p: 2, my: 3 }}
-            >
-              <Typography component="h3" variant="h6" sx={{ mb: 2 }}>
-                Editar fim
-              </Typography>
-              <Stack spacing={2}>
-                <TextField
-                  label="Fim com fuso (ISO 8601)"
-                  value={end}
-                  disabled={saving || removeEnd}
-                  onChange={(event) => {
-                    setEnd(event.target.value);
-                    setConfirmed(false);
-                  }}
-                  helperText="Digite o instante efetivo com Z ou offset. Nenhum horário é preenchido automaticamente."
-                  fullWidth
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={removeEnd}
-                      disabled={saving}
-                      onChange={(event) => {
-                        setRemoveEnd(event.target.checked);
-                        setConfirmed(false);
-                      }}
-                    />
-                  }
-                  label="Remover fim e reabrir explicitamente"
-                />
-                <TextField
-                  label="Motivo da alteração"
-                  value={reason}
-                  disabled={saving}
-                  onChange={(event) => setReason(event.target.value)}
-                  multiline
-                  minRows={2}
-                  slotProps={{ htmlInput: { maxLength: 1000 } }}
-                  required
-                />
-                <Alert severity="info">
-                  {removeEnd
-                    ? 'Você irá remover o fim, tornando a atividade aberta.'
-                    : 'Confira o fim e seu offset: ' + (end || 'não informado')}
-                  . Início, texto original e horário de gravação serão
-                  preservados. Alteração registrada com autor e antes/depois.
-                </Alert>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={confirmed}
-                      disabled={saving}
-                      onChange={(event) => setConfirmed(event.target.checked)}
-                    />
-                  }
-                  label="Confirmo o horário/fuso e esta alteração explícita"
-                />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  disabled={saving || !confirmed}
-                >
-                  {saving ? 'Salvando…' : 'Salvar alteração'}
-                </Button>
-              </Stack>
-            </Paper>
-            <Typography component="h3" variant="h6">
-              Histórico de auditoria
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Até 20 eventos disponíveis; ordem não representa os mais recentes.
-            </Typography>
-            {audit.loading ? (
-              <CircularProgress aria-label="Carregando auditoria" />
-            ) : audit.error ? (
-              <Alert
-                severity="error"
-                action={<Button onClick={audit.retry}>Tentar novamente</Button>}
+        {record &&
+          isHidden(
+            projects.rows.find((item) => item.id === record.projectId)?.data,
+            revealed,
+          ) && (
+            <Alert severity="info">
+              Detalhes, edição e auditoria ocultos no modo live. Revele dados no
+              topo para continuar.
+            </Alert>
+          )}
+        {record &&
+          !isHidden(
+            projects.rows.find((item) => item.id === record.projectId)?.data,
+            revealed,
+          ) && (
+            <>
+              <Box
+                component="dl"
+                sx={{
+                  '& dt': { fontWeight: 700, mt: 2 },
+                  '& dd': { m: 0, whiteSpace: 'pre-wrap' },
+                }}
               >
-                {audit.error}
-              </Alert>
-            ) : audit.rows.length === 0 ? (
-              <Typography>Nenhuma alteração auditada disponível.</Typography>
-            ) : (
-              audit.rows.map((row) => (
-                <Paper key={row.id} sx={{ p: 2, my: 2 }}>
-                  <Typography>
-                    {date(row.data.updatedAt)} · {text(row.data.reason)}
+                <dt>ID</dt>
+                <dd>{recordId}</dd>
+                <dt>Projeto</dt>
+                <dd>
+                  {text(
+                    object(record.projectSnapshot).title,
+                    text(record.projectId),
+                  )}
+                </dd>
+                <dt>Tópicos</dt>
+                <dd>
+                  {objects(record.topicSnapshots)
+                    .map((topic) => text(topic.title))
+                    .join(', ') || 'Não informado'}
+                </dd>
+                <dt>Início original</dt>
+                <dd>{text(record.startedAt)}</dd>
+                <dt>Fim original</dt>
+                <dd>{text(record.endedAt)}</dd>
+                <dt>Fuso da atividade</dt>
+                <dd>{text(record.timeZone)}</dd>
+                <dt>Texto original</dt>
+                <dd>{text(record.originalText)}</dd>
+                <dt>Contexto</dt>
+                <dd>{text(record.interpretation)}</dd>
+                <dt>Gravado em</dt>
+                <dd>{date(record.recordedAt)} (fuso do navegador)</dd>
+              </Box>
+              {!record.endedAt && (
+                <Alert severity="warning">
+                  Registro aberto. Estimativas do relatório não encerram esta
+                  atividade.
+                </Alert>
+              )}
+              <Paper
+                component="form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void save();
+                }}
+                sx={{ p: 2, my: 3 }}
+              >
+                <Typography component="h3" variant="h6" sx={{ mb: 2 }}>
+                  Editar fim
+                </Typography>
+                <Stack spacing={2}>
+                  <TextField
+                    label="Fim com fuso (ISO 8601)"
+                    value={end}
+                    disabled={saving || removeEnd}
+                    onChange={(event) => {
+                      setEnd(event.target.value);
+                      setConfirmed(false);
+                    }}
+                    helperText="Digite o instante efetivo com Z ou offset. Nenhum horário é preenchido automaticamente."
+                    fullWidth
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={removeEnd}
+                        disabled={saving}
+                        onChange={(event) => {
+                          setRemoveEnd(event.target.checked);
+                          setConfirmed(false);
+                        }}
+                      />
+                    }
+                    label="Remover fim e reabrir explicitamente"
+                  />
+                  <TextField
+                    label="Motivo da alteração"
+                    value={reason}
+                    disabled={saving}
+                    onChange={(event) => setReason(event.target.value)}
+                    multiline
+                    minRows={2}
+                    slotProps={{ htmlInput: { maxLength: 1000 } }}
+                    required
+                  />
+                  <Alert severity="info">
+                    {removeEnd
+                      ? 'Você irá remover o fim, tornando a atividade aberta.'
+                      : 'Confira o fim e seu offset: ' +
+                        (end || 'não informado')}
+                    . Início, texto original e horário de gravação serão
+                    preservados. Alteração registrada com autor e antes/depois.
+                  </Alert>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={confirmed}
+                        disabled={saving}
+                        onChange={(event) => setConfirmed(event.target.checked)}
+                      />
+                    }
+                    label="Confirmo o horário/fuso e esta alteração explícita"
+                  />
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={saving || !confirmed}
+                  >
+                    {saving ? 'Salvando…' : 'Salvar alteração'}
+                  </Button>
+                </Stack>
+              </Paper>
+              {!revealed ? (
+                <Alert severity="info">
+                  Auditoria oculta no modo live, pois pode conter referências
+                  históricas confidenciais.
+                </Alert>
+              ) : (
+                <>
+                  <Typography component="h3" variant="h6">
+                    Histórico de auditoria
                   </Typography>
-                  <Typography variant="body2">
-                    Autor: {text(row.data.authorUid)}
+                  <Typography variant="body2" color="text.secondary">
+                    Até 20 eventos disponíveis; ordem não representa os mais
+                    recentes.
                   </Typography>
-                  <Typography variant="body2">
-                    Fim antes: {text(object(row.data.before).endedAt)}
-                    <br />
-                    Fim depois: {text(object(row.data.after).endedAt)}
-                  </Typography>
-                </Paper>
-              ))
-            )}
-          </>
-        )}
+                  {audit.loading ? (
+                    <CircularProgress aria-label="Carregando auditoria" />
+                  ) : audit.error ? (
+                    <Alert
+                      severity="error"
+                      action={
+                        <Button onClick={audit.retry}>Tentar novamente</Button>
+                      }
+                    >
+                      {audit.error}
+                    </Alert>
+                  ) : audit.rows.length === 0 ? (
+                    <Typography>
+                      Nenhuma alteração auditada disponível.
+                    </Typography>
+                  ) : (
+                    audit.rows.map((row) => (
+                      <Paper key={row.id} sx={{ p: 2, my: 2 }}>
+                        <Typography>
+                          {date(row.data.updatedAt)} · {text(row.data.reason)}
+                        </Typography>
+                        <Typography variant="body2">
+                          Autor: {text(row.data.authorUid)}
+                        </Typography>
+                        <Typography variant="body2">
+                          Fim antes: {text(object(row.data.before).endedAt)}
+                          <br />
+                          Fim depois: {text(object(row.data.after).endedAt)}
+                        </Typography>
+                      </Paper>
+                    ))
+                  )}
+                </>
+              )}
+            </>
+          )}
       </Box>
     </Drawer>
   );

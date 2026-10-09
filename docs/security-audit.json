@@ -1,0 +1,24 @@
+{
+  "score": 4,
+  "summary": "Revisão estática do protótipo: nenhum bypass de escrita cliente identificado. Google verificado @wads.dev lê projetos e registros canônicos corporativos; audit só dono. Não substitui testes emulator/adversarial runtime. Admin SDK ignora rules e exige gates próprios nas Functions/MCP.",
+  "findings": [
+    {
+      "check": "Business Logic vs. Rules",
+      "severity": "minor",
+      "issue": "collectionGroup records no cliente não autorizado; leitura corporativa canônica por path é autorizada. Reports usam Admin gated callable.",
+      "recommendation": "Testar queries usadas e negativas no emulador antes ampliar UI corporativa."
+    },
+    {
+      "check": "Field-Level vs. Identity-Level Security",
+      "severity": "minor",
+      "issue": "confidential é ofuscação UI: colegas autorizados ainda podem ler documento e texto inteiro via SDK. Não garante sigilo contra membro autenticado.",
+      "recommendation": "Manter aviso explícito modo live, não apresentar como ACL; permissões granulares e externos permanecem backlog."
+    },
+    {
+      "check": "Authority Source",
+      "severity": "minor",
+      "issue": "Auditoria e ownership de mutations dependem gate Admin SDK; rules negam todo write cliente e não validam os writes Admin.",
+      "recommendation": "Preservar owner UID de token, whitelist/idempotência transacional e testar rejeição cross-owner em callable/MCP."
+    }
+  ]
+}

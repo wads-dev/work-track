@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { manageProjectHandler } from './modules/registration/presentation/manage-projects.js';
+import { FirestoreProjectManagementRepository } from './modules/registration/infrastructure/firestore-project-management.js';
 import { updateRecordHandler } from './modules/registration/presentation/update-record.js';
 import { FirestoreRecordEditingRepository } from './modules/registration/infrastructure/firestore-record-editing.js';
 import { getAuth } from 'firebase-admin/auth';
@@ -14,6 +16,38 @@ import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
+export const updateProject = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    manageProjectHandler(
+      new FirestoreProjectManagementRepository(getFirestore()),
+      'update',
+      request.data as unknown,
+      request.auth,
+    ),
+);
+export const mergeProjects = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    manageProjectHandler(
+      new FirestoreProjectManagementRepository(getFirestore()),
+      'merge',
+      request.data as unknown,
+      request.auth,
+    ),
+);
 export const updateRecord = onCall(
   {
     region: 'southamerica-east1',
@@ -71,6 +105,7 @@ export const api = onRequest(
     provider,
     new FirestoreWorkRepository(getFirestore()),
     new FirestoreRecordEditingRepository(getFirestore()),
+    new FirestoreProjectManagementRepository(getFirestore()),
   ),
 );
 // Public diagnostic endpoint; never returns user data.

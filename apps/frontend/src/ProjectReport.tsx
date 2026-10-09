@@ -117,11 +117,13 @@ function Pie({ title, buckets }: { title: string; buckets: Bucket[] }) {
 }
 export function ProjectReport({
   functions,
+  hidden,
   projectId,
   search,
   uid,
 }: {
   functions: Functions;
+  hidden: boolean;
   projectId: string;
   search: string;
   uid: string;
@@ -180,6 +182,13 @@ export function ProjectReport({
       </Alert>
     );
   if (!report) return null;
+  if (hidden)
+    return (
+      <Alert severity="info" sx={{ mt: 2 }}>
+        Relatório, tópicos e avisos ocultos no modo live. Revele dados no topo
+        para visualizar. Esta ofuscação não altera permissões de acesso.
+      </Alert>
+    );
   return (
     <Box component="section" aria-label="Relatório do projeto" sx={{ mt: 3 }}>
       <Typography component="h2" variant="h5">

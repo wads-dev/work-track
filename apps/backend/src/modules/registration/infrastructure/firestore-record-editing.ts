@@ -1,4 +1,5 @@
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { assertProjectWritable } from '../domain/project-management.js';
 import {
   applyRecordPatch,
   recordSummary,
@@ -57,6 +58,22 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
         description: string;
         topics: { id: string; title: string; description: string }[];
       };
+      assertProjectWritable(
+        projectSnapshot.data() as { mergeLock?: string; archived?: boolean },
+      );
+      if (input.projectId && input.projectId !== before.projectId) {
+        const original = await tx.get(
+          this.db.collection('projects').doc(before.projectId as string),
+        );
+        if (!original.exists)
+          throw new RecordEditError(
+            'invalid-argument',
+            'Projeto original não existe.',
+          );
+        assertProjectWritable(
+          original.data() as { mergeLock?: string; archived?: boolean },
+        );
+      }
       const after = applyRecordPatch(before, input, uid, project);
       const summary = recordSummary(after, input.recordId);
       const patch: Record<string, unknown> = { updatedAt, updatedBy: uid };
