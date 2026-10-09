@@ -8,9 +8,14 @@ import { Textarea } from './components/ui/textarea';
 import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
 import { Sheet, SheetContent, SheetTitle } from './components/ui/sheet';
 import { MoveDialog } from './MoveDialog';
+import { hardDeleteRecord } from './hard-delete-record';
 import { useProjects } from './useProjects';
 import { canFinishNow, createFinishNowCommand } from './finish-now';
-import { isDeletedRecord, createDeletionObserver } from './record-deletion';
+import {
+  isDeletedRecord,
+  createDeletionObserver,
+  notifyRecordDeletion,
+} from './record-deletion';
 import { writeUrlTab } from './url-tabs';
 import { UiIcon } from './UiIcons';
 import { useEffect, useRef, useState } from 'react';
@@ -98,6 +103,8 @@ export function RecordDrawer({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState('');
   const [finishError, setFinishError] = useState('');
   const [finishSuccess, setFinishSuccess] = useState(false);
   const finishCommand = useRef(createFinishNowCommand());
@@ -128,6 +135,8 @@ export function RecordDrawer({
     mutationBusy.current = false;
     setMoveOpen(false);
     setMoving(false);
+    setRemoving(false);
+    setRemoveError('');
     finishCommand.current = createFinishNowCommand();
     setFinishing(false);
     setFinishError('');
@@ -163,6 +172,46 @@ export function RecordDrawer({
       stop();
     };
   }, [db, uid, recordId]);
+  async function removeRecord() {
+    if (mutationBusy.current || moveOpen || !record || record.uid !== uid)
+      return;
+    if (
+      !window.confirm(
+        'Remover este registro definitivamente? Esta ação não pode ser desfeita.',
+      )
+    )
+      return;
+    mutationBusy.current = true;
+    const scope = uid + '/' + recordId;
+    setRemoving(true);
+    setRemoveError('');
+    try {
+      await hardDeleteRecord(db, uid, recordId);
+      notifyRecordDeletion(uid);
+      if (currentScope.current === scope) {
+        mutationBusy.current = false;
+        close();
+      }
+    } catch (failure) {
+      if (currentScope.current === scope) {
+        const denied =
+          failure &&
+          typeof failure === 'object' &&
+          'code' in failure &&
+          failure.code === 'permission-denied';
+        setRemoveError(
+          denied
+            ? 'A exclusão foi bloqueada pelas regras do Firestore. É necessário permitir delete para o dono do registro.'
+            : 'Não foi possível remover o registro. Tente novamente.',
+        );
+      }
+    } finally {
+      if (currentScope.current === scope) {
+        mutationBusy.current = false;
+        setRemoving(false);
+      }
+    }
+  }
   async function finishNow() {
     if (saving || finishing || finishSuccess || !canFinishNow(record, uid))
       return;
@@ -298,7 +347,7 @@ export function RecordDrawer({
         </h2>
         <Button
           aria-label={'Fechar'}
-          disabled={finishing || saving || moving || moveOpen}
+          disabled={finishing || saving || moving || moveOpen || removing}
           onClick={close}
           variant="ghost"
           size="icon"
@@ -364,6 +413,11 @@ export function RecordDrawer({
                   ? date(record.endedAt, 'America/Sao_Paulo')
                   : 'Aberto'}
               </p>
+              {removeError && (
+                <Alert variant="destructive" role="alert" className="my-2">
+                  <AlertDescription>{removeError}</AlertDescription>
+                </Alert>
+              )}
               {finishError && (
                 <Alert variant="destructive" className="my-2">
                   <AlertDescription>{finishError}</AlertDescription>
@@ -380,7 +434,9 @@ export function RecordDrawer({
               <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
                 {!finishSuccess && canFinishNow(record, uid) && (
                   <Button
-                    disabled={finishing || saving || moving || moveOpen}
+                    disabled={
+                      finishing || saving || moving || moveOpen || removing
+                    }
                     onClick={finishNow}
                     variant="default"
                     className="min-h-11"
@@ -396,7 +452,9 @@ export function RecordDrawer({
                   (record.deletedAt === null ||
                     record.deletedAt === undefined) && (
                     <Button
-                      disabled={saving || finishing || moving || moveOpen}
+                      disabled={
+                        saving || finishing || moving || moveOpen || removing
+                      }
                       onClick={() => setMoveOpen(true)}
                       variant="outline"
                       className="min-h-11"
@@ -404,6 +462,18 @@ export function RecordDrawer({
                       Mover registro
                     </Button>
                   )}
+                {record.uid === uid && !isDeletedRecord(record) && (
+                  <Button
+                    disabled={
+                      saving || finishing || moving || moveOpen || removing
+                    }
+                    onClick={removeRecord}
+                    variant="destructive"
+                    className="min-h-11"
+                  >
+                    {removing ? 'Removendo…' : 'Remover registro'}
+                  </Button>
+                )}
               </div>
               {moveOpen && (
                 <MoveDialog
@@ -541,7 +611,11 @@ export function RecordDrawer({
                             <Checkbox
                               checked={removeEnd}
                               disabled={
-                                finishing || saving || moving || moveOpen
+                                finishing ||
+                                saving ||
+                                moving ||
+                                moveOpen ||
+                                removing
                               }
                               onCheckedChange={(checked) => {
                                 editorDirty.current = true;
@@ -561,7 +635,13 @@ export function RecordDrawer({
                         </Label>
                         <Textarea
                           value={reason}
-                          disabled={finishing || saving || moving || moveOpen}
+                          disabled={
+                            finishing ||
+                            saving ||
+                            moving ||
+                            moveOpen ||
+                            removing
+                          }
                           onChange={(event) => setReason(event.target.value)}
                           required={true}
                           id={'RecordDrawer-19047'}
@@ -577,7 +657,13 @@ export function RecordDrawer({
                       <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
                         <Checkbox
                           checked={confirmed}
-                          disabled={finishing || saving || moving || moveOpen}
+                          disabled={
+                            finishing ||
+                            saving ||
+                            moving ||
+                            moveOpen ||
+                            removing
+                          }
                           onCheckedChange={(checked) =>
                             setConfirmed(checked === true)
                           }
@@ -685,7 +771,14 @@ export function RecordDrawer({
             <Button
               type={'submit'}
               form={'record-edit-form'}
-              disabled={finishing || saving || moving || moveOpen || !confirmed}
+              disabled={
+                finishing ||
+                saving ||
+                moving ||
+                moveOpen ||
+                removing ||
+                !confirmed
+              }
               variant="default"
               className="min-h-11 w-full"
             >

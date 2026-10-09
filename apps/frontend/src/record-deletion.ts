@@ -33,6 +33,12 @@ export function useDeletionRevision(uid: string) {
     () => deletionRevision(uid),
   );
 }
+export function notifyRecordDeletion(uid: string) {
+  if (account !== null && uid !== account) return;
+  revisions.set(uid, deletionRevision(uid) + 1);
+  projectRepository.invalidate();
+  subscribers.get(uid)?.forEach((fn) => fn());
+}
 export function createDeletionObserver(uid: string) {
   const epoch = generation;
   let previous = new Set<string>();
@@ -45,9 +51,7 @@ export function createDeletionObserver(uid: string) {
       rows.filter((row) => !isDeletedRecord(row.data)).map((row) => row.id),
     );
     if (deleted) {
-      revisions.set(uid, deletionRevision(uid) + 1);
-      projectRepository.invalidate();
-      subscribers.get(uid)?.forEach((fn) => fn());
+      notifyRecordDeletion(uid);
     }
   };
 }
