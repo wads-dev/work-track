@@ -40,6 +40,9 @@ export async function getProjectReport(
   );
   if (!page)
     throw new ReportRequestError('not-found', 'Projeto não encontrado.');
+  const context = await repository.loadContext([
+    ...new Set(page.records.map((r) => r.uid)),
+  ]);
   const labels = await repository.userLabels([
     ...new Set(page.records.map((record) => record.uid)),
   ]);
@@ -50,5 +53,6 @@ export async function getProjectReport(
     asOf,
     labels,
     Boolean(input.data.cursor),
+    context,
   );
 }

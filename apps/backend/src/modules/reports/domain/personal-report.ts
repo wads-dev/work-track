@@ -7,7 +7,8 @@ export interface PersonalReportInput {
   cursor?: string;
 }
 export interface PersonalReport {
-  policy: 'personal-v1';
+  policy: 'personal-v2';
+  budgetTimeZone: 'America/Sao_Paulo';
   asOf: string;
   from: string;
   to: string;
@@ -40,6 +41,7 @@ export interface PersonalReportPage {
   nextCursor: string | null;
 }
 export interface PersonalReportRepository {
+  loadContext(uids: string[]): Promise<ReportSourceRecord[]>;
   readPage(
     uid: string,
     limit: number,

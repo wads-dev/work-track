@@ -1,4 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
+import { ReportContextError } from '../domain/global-estimates.js';
 import { z } from 'zod';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
 import type { PersonalReportRepository } from '../domain/personal-report.js';
@@ -50,8 +51,11 @@ export async function getPersonalReportHandler(
       input.data.limit,
       input.data.cursor,
     );
-    return buildPersonalReport(input.data, page, asOf);
-  } catch {
+    const context = await repository.loadContext([auth!.uid]);
+    return buildPersonalReport(input.data, page, asOf, context);
+  } catch (error) {
+    if (error instanceof ReportContextError)
+      throw new HttpsError('resource-exhausted', error.message);
     throw new HttpsError(
       'internal',
       'Não foi possível consultar o relatório pessoal.',

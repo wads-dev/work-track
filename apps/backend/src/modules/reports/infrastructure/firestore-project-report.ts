@@ -1,4 +1,5 @@
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
+import { loadGlobalContext } from './firestore-global-context.js';
 import type { Auth } from 'firebase-admin/auth';
 import { z } from 'zod';
 import type {
@@ -26,6 +27,9 @@ export class FirestoreProjectReportRepository implements ProjectReportRepository
     private readonly db: Firestore,
     private readonly auth: Auth,
   ) {}
+  loadContext(uids: string[]) {
+    return loadGlobalContext(this.db, uids);
+  }
   async readPage(
     projectId: string,
     limit: number,

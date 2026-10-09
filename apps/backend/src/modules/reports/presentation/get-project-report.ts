@@ -1,4 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
+import { ReportContextError } from '../domain/global-estimates.js';
 import type { ProjectReportRepository } from '../domain/project-report.js';
 import {
   getProjectReport,
@@ -39,6 +40,8 @@ export async function getProjectReportHandler(
   try {
     return await getProjectReport(repository, data, asOf);
   } catch (error) {
+    if (error instanceof ReportContextError)
+      throw new HttpsError('resource-exhausted', error.message);
     if (error instanceof ReportRequestError)
       throw new HttpsError(error.code, error.message);
     throw new HttpsError('internal', 'Não foi possível consultar o relatório.');

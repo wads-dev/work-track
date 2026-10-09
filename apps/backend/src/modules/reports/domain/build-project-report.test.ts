@@ -21,8 +21,10 @@ const report = (records: ReportSourceRecord[], asOf = '2026-10-09T20:00:00Z') =>
     200,
     Date.parse(asOf),
     { alice: 'Alice' },
+    false,
+    records,
   );
-describe('project-report-v1', () => {
+describe('project-report-v2', () => {
   it('caps open work at four hours and never persists estimates', () => {
     const input = [make('open', '2026-10-08T10:00:00Z')];
     const result = report(input);
@@ -67,10 +69,10 @@ describe('project-report-v1', () => {
   });
   it('caps only estimates at eight hours, preserving a closed twelve-hour fact', () => {
     const result = report([
-      make('closed', '2026-10-08T00:00:00Z', {
-        endedAt: '2026-10-08T12:00:00Z',
+      make('closed', '2026-10-08T00:00:00-03:00', {
+        endedAt: '2026-10-08T12:00:00-03:00',
       }),
-      make('a', '2026-10-08T00:00:00Z'),
+      make('a', '2026-10-08T00:00:00-03:00'),
       make('b', '2026-10-08T04:00:00Z'),
       make('c', '2026-10-08T08:00:00Z'),
     ]);
@@ -82,9 +84,7 @@ describe('project-report-v1', () => {
     ).toBe(0);
     expect(result.totalMinutes).toBe(720);
     expect(result.warnings.some((w) => w.includes('sobreposições'))).toBe(true);
-    expect(result.warnings.some((w) => w.includes('não globalmente'))).toBe(
-      true,
-    );
+    expect(result.warnings.some((w) => w.includes('global'))).toBe(true);
   });
   it('honors explicit topic percentages/durations and keeps undistributed remainder', () => {
     const result = report([
@@ -120,11 +120,11 @@ describe('project-report-v1', () => {
     expect(result.warnings.some((w) => w.includes('excedem'))).toBe(true);
   });
   it('excludes invalid intervals/timezones and zeroes future open duration', () => {
-    const result = report([
-      make('invalid', 'bad'),
-      make('zone', '2026-10-08T10:00:00Z', { timeZone: 'bad' }),
-      make('future', '2026-10-10T10:00:00Z'),
-    ]);
+    expect(() => report([make('invalid', 'bad')])).toThrow('Contexto');
+    expect(() =>
+      report([make('zone', '2026-10-08T10:00:00Z', { timeZone: 'bad' })]),
+    ).toThrow('Fuso');
+    const result = report([make('future', '2026-10-10T10:00:00Z')]);
     expect(result.totalMinutes).toBe(0);
     expect(result.records[0]?.effectiveEndedAt).toBe(
       '2026-10-10T10:00:00.000Z',

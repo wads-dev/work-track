@@ -6,57 +6,76 @@ export function RulesPage() {
         Regras do relatório
       </Typography>
       <Typography>
-        Política project-report-v1. Estimativas são somente apresentação; nenhum
+        Políticas v2: orçamento diário global de estimativas por pessoa,
+        considerando todos os projetos e registros do contexto completo. Nenhum
         fato original é alterado.
       </Typography>
       <Box component="ol" sx={{ '& li': { my: 2 } }}>
         <li>
-          Com fim explícito, o intervalo informado é preservado, mesmo acima de
-          8 horas.
+          Tempos com fim explícito são preservados, mesmo acima de 8 horas. Eles
+          consomem a margem diária disponível para estimativas; não são
+          truncados.
         </li>
         <li>
-          Registro aberto termina estimativamente no menor entre agora, início +
-          4 horas, meia-noite no fuso do registro e próximo início da mesma
-          pessoa no mesmo projeto dentro da página consultada. Se ainda não
-          transcorreram 4 horas, não se atribuem 4 horas completas.
+          O orçamento diário de 8 horas é global por pessoa/dia, não por projeto
+          ou página. A margem restante é distribuída em ordem cronológica
+          determinística de início e ID, nunca em partes iguais inventadas.
+          Quando fatos já atingem 8 horas, não há margem para novas estimativas
+          naquele dia.
         </li>
         <li>
-          Orçamento de 8 horas de estimativa por pessoa/dia/projeto/página.
-          Tempos fechados consomem esse orçamento, mas nunca são truncados. Não
-          é um limite global do dia da pessoa.
+          Registros abertos têm limite estimativo no menor entre agora, início +
+          4 horas, meia-noite e próximo início conforme a política específica.
+          Se não transcorreram 4 horas, não se atribuem 4 horas completas. Fins
+          estimados nunca são persistidos.
         </li>
         <li>
-          Atividades simultâneas podem ser somadas. O total agregado não é tempo
-          líquido único. Sobreposições e ambiguidades são sinalizadas.
+          O servidor calcula estimativas com contexto global completo antes de
+          selecionar a página exibida. Se o limite de segurança impedir
+          completar o contexto, a consulta deve falhar: não são apresentados
+          valores estimados como se fossem globais.
+        </li>
+        <li>
+          Totais, gráficos e calendário mostram somente a página selecionada e o
+          período consultado. Um contexto global de cálculo NÃO torna o total
+          exibido um total global do histórico. Consulte indicação parcial,
+          instante de referência e avisos.
+        </li>
+        <li>
+          Atividades simultâneas podem ser somadas. Total agregado não significa
+          horas líquidas únicas. Fatos com sobreposição permanecem intactos.
         </li>
         <li>
           Tópico único sem divisão recebe tempo integral; múltiplos sem divisão
-          ficam no bucket Não distribuído. Distribuições informadas são
-          preservadas; quando excedem total, há aviso. Pizza usa soma de suas
-          próprias fatias, não percentual sobre total do projeto.
-        </li>
-        <li>
-          Totais e gráficos representam somente a página carregada. Parcial,
-          estimativas e instante de referência ficam indicados. Estimativas
-          nunca encerram automaticamente registros.
+          ficam em Não distribuído. Distribuições informadas são preservadas e
+          divergências geram aviso. Pizza usa soma das próprias fatias.
         </li>
       </Box>
-      <Alert severity="warning">
-        A política atual considera próximo início no mesmo projeto, não entre
-        projetos diferentes. Não há conciliação automática cross-project.
-      </Alert>
-      <Typography component="h3" variant="h6" sx={{ mt: 3 }}>
-        Política pessoal personal-v1
+      <Typography component="h3" variant="h6">
+        Relatório de projeto
       </Typography>
       <Typography>
-        Dashboard e calendário pessoais consideram próximo início da mesma
-        pessoa entre projetos na página carregada. O orçamento diário usa o fuso
-        solicitado no filtro; abertos limitam-se também à meia-noite do registro
-        e à meia-noite nesse fuso. Intervalos são recortados visualmente ao
-        período solicitado, sem alterar fatos. Totais de páginas substituem
-        dados, não representam todo o histórico; podem somar atividades
-        simultâneas.
+        Política project-report-v2: orçamento global por pessoa/dia em
+        America/Sao_Paulo, considerando registros de todos os projetos. Próximo
+        início da própria pessoa também considera outros projetos fora da
+        página. Fusos diferentes nos registros geram aviso. O filtro por projeto
+        afeta apenas dados exibidos, não cria orçamento adicional.
       </Typography>
+      <Typography component="h3" variant="h6" sx={{ mt: 3 }}>
+        Dashboard e calendário pessoais
+      </Typography>
+      <Typography>
+        Política personal-v2: o orçamento global também usa America/Sao_Paulo; o
+        fuso solicitado no filtro define somente período e visualização. Próximo
+        início da própria pessoa é considerado entre projetos, inclusive fora da
+        página selecionada; abertos também respeitam meia-noite no fuso do
+        registro e no fuso fixo do orçamento. Intervalos são recortados apenas
+        para visualização do período, sem mudar fatos.
+      </Typography>
+      <Alert severity="info" sx={{ mt: 2 }}>
+        Editar fim ou reabrir registro exige ação e confirmação explícitas.
+        Nenhuma política encerra atividades automaticamente.
+      </Alert>
     </Paper>
   );
 }

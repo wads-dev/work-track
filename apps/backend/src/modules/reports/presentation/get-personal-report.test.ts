@@ -13,7 +13,12 @@ it('only reads authenticated own records and validates bounds/auth/cursor', asyn
   const readPage = vi
     .fn<PersonalReportRepository['readPage']>()
     .mockResolvedValue({ records: [], scannedCount: 0, nextCursor: null });
-  const repo = { readPage };
+  const repo = {
+    readPage,
+    loadContext: vi
+      .fn<PersonalReportRepository['loadContext']>()
+      .mockResolvedValue([]),
+  };
   const input = {
     from: '2026-10-08T00:00:00Z',
     to: '2026-10-09T00:00:00Z',
@@ -37,6 +42,9 @@ it('only reads authenticated own records and validates bounds/auth/cursor', asyn
 });
 it('accepts a31 civil day range spanning fall DST', async () => {
   const repo = {
+    loadContext: vi
+      .fn<PersonalReportRepository['loadContext']>()
+      .mockResolvedValue([]),
     readPage: vi
       .fn<PersonalReportRepository['readPage']>()
       .mockResolvedValue({ records: [], scannedCount: 0, nextCursor: null }),
@@ -51,5 +59,5 @@ it('accepts a31 civil day range spanning fall DST', async () => {
       },
       auth,
     ),
-  ).resolves.toMatchObject({ policy: 'personal-v1' });
+  ).resolves.toMatchObject({ policy: 'personal-v2' });
 });

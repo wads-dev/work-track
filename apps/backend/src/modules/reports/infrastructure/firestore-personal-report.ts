@@ -1,4 +1,5 @@
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
+import { loadGlobalContext } from './firestore-global-context.js';
 import { z } from 'zod';
 import type { PersonalReportRepository } from '../domain/personal-report.js';
 const source = z.object({
@@ -9,6 +10,9 @@ const source = z.object({
 });
 export class FirestorePersonalReportRepository implements PersonalReportRepository {
   constructor(private readonly db: Firestore) {}
+  loadContext(uids: string[]) {
+    return loadGlobalContext(this.db, uids);
+  }
   async readPage(uid: string, limit: number, cursor?: string) {
     let query = this.db
       .collection('users')

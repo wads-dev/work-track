@@ -15,7 +15,8 @@ export interface ReportSourceRecord {
 export interface ProjectReport {
   projectId: string;
   asOf: string;
-  policy: 'project-report-v1';
+  policy: 'project-report-v2';
+  budgetTimeZone: 'America/Sao_Paulo';
   totalMinutes: number;
   byUser: { uid: string; label: string; minutes: number }[];
   byTopic: { topicId: string; label: string; minutes: number }[];
@@ -40,6 +41,7 @@ export interface ReportPage {
   topicLabels: Record<string, string>;
 }
 export interface ProjectReportRepository {
+  loadContext(uids: string[]): Promise<ReportSourceRecord[]>;
   readPage(
     projectId: string,
     limit: number,

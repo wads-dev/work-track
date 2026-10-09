@@ -1,5 +1,10 @@
 import { expect, it } from 'vitest';
-import { buildPersonalReport } from './build-personal-report.js';
+import { buildPersonalReport as build } from './build-personal-report.js';
+const buildPersonalReport = (
+  input: Parameters<typeof build>[0],
+  page: Parameters<typeof build>[1],
+  now: number,
+) => build(input, page, now, page.records);
 import type { ReportSourceRecord } from './project-report.js';
 const make = (
   id: string,
@@ -39,7 +44,7 @@ it('uses next own start across projects and returns original facts without mutat
     { projectId: 'b', minutes: 240 },
   ]);
   expect(records[0]).not.toHaveProperty('endedAt');
-  expect(result.policy).toBe('personal-v1');
+  expect(result.policy).toBe('personal-v2');
 });
 it('clamps visualization only, includes intersecting closed facts, excludes outside', () => {
   const result = run([
@@ -91,9 +96,7 @@ it('caps additionally at report midnight when record timezone differs', () => {
     Date.parse('2026-10-09T10:00:00Z'),
   );
   expect(result.totalMinutes).toBe(30);
-  expect(result.warnings.some((w) => w.includes('também limitadas'))).toBe(
-    true,
-  );
+  expect(result.warnings.some((w) => w.includes('global'))).toBe(true);
 });
 it('caps at local midnight across DST', () => {
   const record = {

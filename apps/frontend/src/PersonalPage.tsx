@@ -17,6 +17,7 @@ import {
   useLocation,
   useSearchParams,
 } from 'react-router-dom';
+import { reportError } from './report-error';
 import { date, text, useRows } from './data';
 import { safeProject, usePrivacy } from './privacy';
 import { hours, pieSlices } from './report-chart';
@@ -42,6 +43,7 @@ type Interval = {
 };
 type PersonalReport = {
   policy: string;
+  budgetTimeZone: string;
   asOf: string;
   from: string;
   to: string;
@@ -122,9 +124,9 @@ export function PersonalPage({
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((failure: unknown) => {
         if (active) {
-          setError('Não foi possível carregar relatório pessoal.');
+          setError(reportError(failure));
           setLoading(false);
         }
       });
@@ -210,9 +212,9 @@ export function PersonalPage({
             </Typography>
             <Typography color="text.secondary">
               Pode somar simultâneas; não são horas líquidas únicas. Referência{' '}
-              {date(report.asOf, zone)} · {report.policy}.{' '}
-              {report.page.scannedCount} registros examinados,{' '}
-              {report.page.excludedCount} fora do período/inválidos.
+              {date(report.asOf, zone)} · {report.policy} · fuso do orçamento:{' '}
+              {report.budgetTimeZone}. {report.page.scannedCount} registros
+              examinados, {report.page.excludedCount} fora do período/inválidos.
             </Typography>
             {(report.page.partial || cursor || report.estimatedCount > 0) && (
               <Alert severity="warning">
@@ -222,8 +224,10 @@ export function PersonalPage({
               </Alert>
             )}
             <Typography>
-              Política pessoal considera próximo início da mesma pessoa entre
-              projetos na página; orçamento de estimativas limitado à página.{' '}
+              Estimativas usam orçamento global de 8 horas por pessoa/dia entre
+              projetos, calculado com contexto completo antes da seleção da
+              página. Fatos fechados consomem a margem sem truncamento. Totais
+              exibidos continuam somente desta página.{' '}
               <Button component={RouterLink} to="/rules">
                 Regras do relatório
               </Button>

@@ -1,4 +1,8 @@
-import { localDay, nextMidnight } from './build-project-report.js';
+import {
+  globalEstimates,
+  recordKey,
+  assertContext,
+} from './global-estimates.js';
 import type {
   PersonalReport,
   PersonalReportInput,
@@ -9,16 +13,19 @@ export function buildPersonalReport(
   input: PersonalReportInput,
   page: PersonalReportPage,
   asOf: number,
+  context: import('./project-report.js').ReportSourceRecord[],
 ): PersonalReport {
+  assertContext(page.records, context);
   const from = Date.parse(input.from),
     to = Date.parse(input.to),
     warnings = new Set<string>([
-      'Política personal-v1: próximo início do próprio usuário em qualquer projeto; contexto e orçamento diário de 8h limitados à página lida.',
+      'Política personal-v2: orçamento global8h pessoa/dia America/Sao_Paulo allprojects/full-context, saldo cronológico start/id e próximo início próprio crossproject.',
       'Estimativas não persistidas; fatos fechados preservados. Intervalos são recortados somente para visualização no período.',
       'Sobreposições são somadas; interrupções não são descontadas automaticamente.',
     ]);
   const result: PersonalReport = {
-    policy: 'personal-v1',
+    policy: 'personal-v2',
+    budgetTimeZone: 'America/Sao_Paulo',
     asOf: new Date(asOf).toISOString(),
     from: input.from,
     to: input.to,
@@ -43,8 +50,9 @@ export function buildPersonalReport(
   const records = [...page.records].sort(
       (a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt),
     ),
-    used = new Map<string, number>(),
+    global = globalEstimates(context, asOf),
     projects = new Map<string, number>();
+  for (const warning of global.warnings) warnings.add(warning);
   for (const record of records) {
     const start = Date.parse(record.startedAt);
     let end =
@@ -58,59 +66,7 @@ export function buildPersonalReport(
       continue;
     }
     const estimated = end === undefined;
-    if (estimated) {
-      try {
-        const next = records.find(
-          (other) =>
-            other.uid === record.uid && Date.parse(other.startedAt) > start,
-        );
-        end = Math.max(
-          start,
-          Math.min(
-            asOf,
-            start + 240 * M,
-            nextMidnight(start, record.timeZone),
-            nextMidnight(start, input.timeZone),
-            next ? Date.parse(next.startedAt) : Infinity,
-          ),
-        );
-        if (record.timeZone !== input.timeZone)
-          warnings.add(
-            'Estimativas também limitadas à meia-noite do fuso do relatório para respeitar orçamento diário.',
-          );
-        // Daily budget uses the requested report timezone consistently across projects.
-        const day = localDay(start, input.timeZone),
-          dayEnd = nextMidnight(start, input.timeZone);
-        let low = start - 48 * 60 * M,
-          high = start;
-        while (high - low > 1) {
-          const mid = Math.floor((low + high) / 2);
-          if (localDay(mid, input.timeZone) === day) high = mid;
-          else low = mid;
-        }
-        const closed = records
-          .filter((r) => r.endedAt !== undefined)
-          .reduce((sum, r) => {
-            const a = Date.parse(r.startedAt),
-              b = Date.parse(r.endedAt ?? '');
-            return (
-              sum +
-              (Number.isFinite(a) && Number.isFinite(b) && b >= a
-                ? Math.max(0, Math.min(b, dayEnd) - Math.max(a, high)) / M
-                : 0)
-            );
-          }, 0);
-        end = Math.min(
-          end,
-          start + Math.max(0, 480 - closed - (used.get(day) ?? 0)) * M,
-        );
-        used.set(day, (used.get(day) ?? 0) + (end - start) / M);
-      } catch {
-        result.page.excludedCount++;
-        warnings.add('Fuso inválido em registro aberto; excluído.');
-        continue;
-      }
-    }
+    if (estimated) end = global.ends.get(recordKey(record));
     const effectiveStart = Math.max(start, from),
       effectiveEnd = Math.min(end ?? start, to);
     if (effectiveEnd <= effectiveStart) {

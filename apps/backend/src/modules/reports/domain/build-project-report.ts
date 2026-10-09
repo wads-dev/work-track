@@ -1,25 +1,11 @@
 import type { ProjectReport, ReportPage } from './project-report.js';
+import {
+  globalEstimates,
+  recordKey,
+  assertContext,
+} from './global-estimates.js';
+export { localDay, nextMidnight } from './report-time.js';
 const MINUTE = 60000;
-export function localDay(instant: number, zone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: zone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(instant));
-}
-// Find the next local date transition rather than assuming every day is 24h.
-export function nextMidnight(instant: number, zone: string): number {
-  const day = localDay(instant, zone);
-  let low = instant,
-    high = instant + 48 * 60 * MINUTE;
-  while (high - low > 1) {
-    const middle = Math.floor((low + high) / 2);
-    if (localDay(middle, zone) === day) low = middle;
-    else high = middle;
-  }
-  return high;
-}
 export function buildProjectReport(
   projectId: string,
   page: ReportPage,
@@ -27,14 +13,16 @@ export function buildProjectReport(
   asOf: number,
   labels: Record<string, string>,
   hasCursor = false,
+  context: import('./project-report.js').ReportSourceRecord[],
 ): ProjectReport {
+  assertContext(page.records, context);
   const warnings = new Set<string>();
   warnings.add(
-    'Limite estimado de 8h por usuário/dia aplica-se apenas ao projeto e à página consultados, não globalmente.',
+    'Orçamento estimado global de8h por pessoa/dia America/Sao_Paulo: todos projetos e páginas, saldo cronológico start/id; fatos preservados e descontados.',
   );
   if (hasCursor || page.nextCursor)
     warnings.add(
-      'Relatório parcial: totais, próximo início e limite diário consideram somente esta página.',
+      'Totais representam somente esta página; estimativas usam contexto global completo e próximo início próprio entre projetos.',
     );
   warnings.add(
     'Estimativas não persistidas; interrupções e sobreposições não são descontadas automaticamente.',
@@ -42,7 +30,8 @@ export function buildProjectReport(
   const result: ProjectReport = {
     projectId,
     asOf: new Date(asOf).toISOString(),
-    policy: 'project-report-v1',
+    policy: 'project-report-v2',
+    budgetTimeZone: 'America/Sao_Paulo',
     totalMinutes: 0,
     byUser: [],
     byTopic: [],
@@ -55,7 +44,8 @@ export function buildProjectReport(
       partial: hasCursor || page.nextCursor !== null,
     },
   };
-  const estimatedDaily = new Map<string, number>();
+  const global = globalEstimates(context, asOf);
+  for (const warning of global.warnings) warnings.add(warning);
   const users = new Map<string, number>(),
     topics = new Map<string, number>();
   const source = [...page.records].sort(
@@ -74,64 +64,7 @@ export function buildProjectReport(
     }
     const estimated = end === undefined;
     if (estimated) {
-      try {
-        const next = source.find(
-          (other) =>
-            other.uid === record.uid &&
-            other.projectId === record.projectId &&
-            Date.parse(other.startedAt) > start,
-        );
-        end = Math.max(
-          start,
-          Math.min(
-            start + 240 * MINUTE,
-            nextMidnight(start, record.timeZone),
-            asOf,
-            next ? Date.parse(next.startedAt) : Infinity,
-          ),
-        );
-        const key = record.uid + ':' + localDay(start, record.timeZone);
-        let dayStart = start - 48 * 60 * MINUTE,
-          right = start;
-        const day = localDay(start, record.timeZone);
-        while (right - dayStart > 1) {
-          const middle = Math.floor((dayStart + right) / 2);
-          if (localDay(middle, record.timeZone) === day) right = middle;
-          else dayStart = middle;
-        }
-        const dayEnd = nextMidnight(start, record.timeZone);
-        const explicitMinutes = source
-          .filter(
-            (other) => other.uid === record.uid && other.endedAt !== undefined,
-          )
-          .reduce((sum, other) => {
-            const a = Date.parse(other.startedAt),
-              b = Date.parse(other.endedAt ?? '');
-            return (
-              sum +
-              (Number.isFinite(a) && Number.isFinite(b) && b >= a
-                ? Math.max(0, Math.min(b, dayEnd) - Math.max(a, right)) / MINUTE
-                : 0)
-            );
-          }, 0);
-        const used = (estimatedDaily.get(key) ?? 0) + explicitMinutes;
-        end = start + Math.min(end - start, Math.max(0, 480 - used) * MINUTE);
-        estimatedDaily.set(
-          key,
-          (estimatedDaily.get(key) ?? 0) + (end - start) / MINUTE,
-        );
-        if (start > asOf) {
-          warnings.add(
-            'Inícios futuros abertos não recebem duração estimada; fim efetivo é o próprio início.',
-          );
-          end = start;
-        }
-      } catch {
-        warnings.add(
-          'Registros abertos com fuso inválido foram excluídos do cálculo.',
-        );
-        continue;
-      }
+      end = global.ends.get(recordKey(record));
       result.estimatedCount++;
     }
     const effectiveEnd = end ?? start;

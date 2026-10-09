@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { Link as RouterLink } from 'react-router-dom';
+import { reportError } from './report-error';
 import { date } from './data';
 import { detailPath } from './routes';
 import { UiIcon } from './UiIcons';
@@ -28,6 +29,7 @@ export type Report = {
   projectId: string;
   asOf: string;
   policy: string;
+  budgetTimeZone: string;
   totalMinutes: number;
   byUser: (Bucket & { uid: string })[];
   byTopic: (Bucket & { topicId: string })[];
@@ -152,11 +154,9 @@ export function ProjectReport({
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((failure: unknown) => {
         if (active) {
-          setError(
-            'Não foi possível carregar o relatório. Confira sua conexão e permissão.',
-          );
+          setError(reportError(failure));
           setLoading(false);
         }
       });
@@ -200,10 +200,13 @@ export function ProjectReport({
       <Typography color="text.secondary" sx={{ mb: 2 }}>
         Pode somar atividades simultâneas; não representa tempo líquido único.
         Referência: {date(report.asOf)} (fuso do navegador). Política:{' '}
-        {report.policy}.
+        {report.policy} · fuso do orçamento: {report.budgetTimeZone}.
       </Typography>
       <Typography sx={{ mb: 2 }}>
-        Estimativas não alteram fatos.{' '}
+        Estimativas não alteram fatos: orçamento global de 8 horas por
+        pessoa/dia entre todos os projetos, com contexto completo. Fatos
+        fechados consomem margem sem truncamento; o total exibido continua desta
+        página.{' '}
         <Link component={RouterLink} to="/rules">
           Consultar regras e limites do relatório
         </Link>
