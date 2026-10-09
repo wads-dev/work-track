@@ -67,6 +67,8 @@ A configuração Google usa o e-mail de suporte victor@wads.dev e os domínios H
 
 ## Verificação
 
+Em 08/10/2026, o deploy foi concluído e o teste real com mcp-remote 0.14.3 completou o login Google, inicializou o MCP, listou ferramentas e chamou whoami com a conta @wads.dev. Os dez testes automatizados passaram. O cliente emitiu avisos SEP-2352 sobre sua persistência de descoberta OAuth; a conexão funcionou, mas esse suporte do cliente precisa ser acompanhado nas atualizações.
+
 Execute `npm run smoke:mcp` para testar o proxy real `npx mcp-remote`. O navegador solicita login; após autorização o teste lista ferramentas e chama `whoami`. Tokens ficam em uma pasta local ignorada pelo Git. Não compartilhe esses arquivos nem os códigos OAuth.
 
 O build usa a conta padrão Compute com `roles/cloudbuild.builds.builder`; o runtime usa `roles/datastore.user` e `roles/firebaseauth.viewer`. Não foi concedido papel Editor. O hook de preparação pula Husky em produção. A limpeza de imagens do Artifact Registry está configurada para um dia.
