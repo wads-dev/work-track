@@ -8,6 +8,34 @@ concurrency:
   group: firebase-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.paths.outputs.backend }}
+      frontend: ${{ steps.paths.outputs.frontend }}
+      firestore: ${{ steps.paths.outputs.firestore }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: paths
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="${BASE:-$BEFORE}"
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git hash-object -t tree /dev/null)"
+          fi
+          git diff --name-only "$base" HEAD > /tmp/changed-paths
+          for target in backend frontend firestore; do
+            case "$target" in
+              backend) pattern='^(apps/backend/|package(-lock)?\.json$|firebase\.json$|\.github/workflows/ci\.yml$)' ;;
+              frontend) pattern='^(apps/frontend/|package(-lock)?\.json$|firebase\.json$|\.github/workflows/ci\.yml$)' ;;
+              firestore) pattern='^(firestore\.(rules|indexes\.json)$|firebase\.json$|\.github/workflows/ci\.yml$)' ;;
+            esac
+            if grep -Eq "$pattern" /tmp/changed-paths; then echo "$target=true" >> "$GITHUB_OUTPUT"; else echo "$target=false" >> "$GITHUB_OUTPUT"; fi
+          done
   check:
     runs-on: ubuntu-latest
     steps:
@@ -19,21 +47,37 @@ jobs:
       - run: npm ci
       - run: npm run check
   deploy:
+    name: Deploy ${{ matrix.target }}
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: check
+    needs: [check, changes]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: backend
+            only: functions
+          - target: frontend
+            only: hosting
+          - target: firestore
+            only: firestore
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs[matrix.target] == 'true'
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs[matrix.target] == 'true'
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+        if: needs.changes.outputs[matrix.target] == 'true'
       - uses: google-github-actions/auth@v3
+        if: needs.changes.outputs[matrix.target] == 'true'
         with:
           workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
           service_account: github-deploy@wadsworktrack.iam.gserviceaccount.com
-      - run: npx -y firebase-tools@latest deploy --only functions,hosting,firestore --project wadsworktrack --non-interactive
+      - run: npx -y firebase-tools@latest deploy --only ${{ matrix.only }} --project wadsworktrack --non-interactive
+        if: needs.changes.outputs[matrix.target] == 'true'

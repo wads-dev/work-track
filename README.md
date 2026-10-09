@@ -46,7 +46,7 @@ Região Functions: southamerica-east1. O banco existente fica em nam5; nenhuma m
 
 ## Arquitetura
 
-Código organizado em core, shared e modules/registration, com camadas domain, application, infrastructure e presentation. Consulte [arquitetura](docs/architecture.md).
+Monorepo npm com apps/backend (Express/MCP) e apps/frontend (React/Vite). Backend organizado em core, shared e modules/registration, com camadas domain, application, infrastructure e presentation. Consulte [arquitetura](docs/architecture.md).
 
 ## Desenvolvimento
 
@@ -54,7 +54,8 @@ Node.js 22 e npm. Execute `npm ci`, depois `npm run check` para formatação, ES
 
 - `npm run format`: Prettier.
 - `npm run lint:fix`: correções de lint.
-- `npm run test:watch`: testes contínuos.
+- `npx vitest` dentro de apps/backend: testes contínuos.
+- `npm run dev --workspace @work-track/frontend`: desenvolvimento React, quando solicitado.
 
 Husky/lint-staged validam commits, e GitHub Actions executa o check completo. Os testes usam identidades falsas exclusivamente em testes; a Function publicada usa Firebase Admin real.
 

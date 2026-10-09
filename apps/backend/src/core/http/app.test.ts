@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { WorkRepository } from '../../modules/registration/domain/work-model.js';
 import request from 'supertest';
 import { InvalidGrantError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { createApp } from './app.js';
@@ -41,7 +42,7 @@ const identity = {
   validAfter: 0,
 };
 const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
-function setup() {
+function setup(repository?: WorkRepository) {
   const identities = {
     verify: (token: string) =>
       Promise.resolve(
@@ -52,10 +53,20 @@ function setup() {
     get: () => Promise.resolve(identity),
   };
   const provider = new WorkTrackOAuth(new MemoryStore(), identities, base);
-  return createApp(provider);
+  return createApp(provider, repository);
 }
 
 describe('remote MCP OAuth', () => {
+  it('serves public health with security headers and no user data', async () => {
+    const response = await request(setup()).get('/health');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok', service: 'work-track' });
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.headers['x-powered-by']).toBeUndefined();
+  });
+
   it('rejects insecure client redirects and untrusted consent requests', async () => {
     const app = setup();
     expect(
@@ -110,7 +121,16 @@ describe('remote MCP OAuth', () => {
     });
   });
   it('supports consent, PKCE, one-use code, MCP initialize and refresh rotation', async () => {
-    const app = setup();
+    const register = vi
+      .fn<WorkRepository['register']>()
+      .mockResolvedValue({ id: 'record-1', uid: identity.uid });
+    const repository: WorkRepository = {
+      listProjects: vi.fn().mockResolvedValue([]),
+      createProject: vi.fn(),
+      createTopic: vi.fn(),
+      register,
+    };
+    const app = setup(repository);
     const registered = await request(app)
       .post('/register')
       .send({
@@ -210,6 +230,58 @@ describe('remote MCP OAuth', () => {
     expect(initialized.body).toMatchObject({
       result: { serverInfo: { name: 'work-track' } },
     });
+    const mcp = (method: string, params?: unknown) =>
+      request(app)
+        .post('/mcp')
+        .set('Authorization', 'Bearer ' + pair.access_token)
+        .set('Accept', 'application/json, text/event-stream')
+        .send({ jsonrpc: '2.0', id: 2, method, params });
+    const listed = await mcp('tools/list');
+    expect(listed.status).toBe(200);
+    const listedBody = listed.body as { result: { tools: { name: string }[] } };
+    // Reports must stay internal until project-wide authorization is defined.
+    expect(
+      listedBody.result.tools.map((tool: { name: string }) => tool.name).sort(),
+    ).toEqual(
+      [
+        'whoami',
+        'search_projects',
+        'create_project',
+        'create_topic',
+        'register',
+      ].sort(),
+    );
+    const whoami = await mcp('tools/call', { name: 'whoami', arguments: {} });
+    expect(whoami.status).toBe(200);
+    const whoamiBody = whoami.body as {
+      result: { content: { type: 'text'; text: string }[] };
+    };
+    expect(whoamiBody.result.content[0]?.type).toBe('text');
+    expect(JSON.parse(whoamiBody.result.content[0]!.text) as unknown).toEqual({
+      uid: identity.uid,
+      email: identity.email,
+    });
+    const input = {
+      projectId: 'project-1',
+      startedAt: '2026-10-08T21:00:00-03:00',
+      timeZone: 'America/Sao_Paulo',
+      originalText: 'Comecei agora',
+      interpretation: 'Início sem fim',
+      requestId: 'request-1',
+    };
+    const saved = await mcp('tools/call', {
+      name: 'register',
+      arguments: { ...input, uid: 'attacker' },
+    });
+    expect(saved.status).toBe(200);
+    const savedBody = saved.body as { result: { isError?: boolean } };
+    expect(savedBody.result.isError).not.toBe(true);
+    expect(register).toHaveBeenCalledExactlyOnceWith(input, identity.uid);
+    const unsupported = await request(app)
+      .get('/mcp')
+      .set('Authorization', 'Bearer ' + pair.access_token);
+    expect(unsupported.status).toBe(405);
+    expect(unsupported.headers.allow).toBe('POST');
     const refresh = {
       client_id: client.client_id,
       grant_type: 'refresh_token',

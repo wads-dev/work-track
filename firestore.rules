@@ -1,8 +1,37 @@
 rules_version = '2';
+// Assumed data model (all mutations are performed by the trusted Admin SDK):
+// projects/{projectId}: id/title/description/createdBy/createdAt strings;
+// topics list of {id,title,description}; recordedAt timestamp; optional
+// updatedBy string and updatedAt timestamp. Shared organizational metadata only;
+// do not store private transcripts, emails or user profiles in projects.
+// users/{uid}/records/{recordId}: uid/projectId/requestId strings; startedAt,
+// optional endedAt/commandAt ISO strings; timeZone/originalText/interpretation
+// strings; topics/interruptions lists; recordedAt timestamp; fingerprint string.
+// Private records are readable only through their owner's exact collection path.
+// oauth_* documents contain credentials and are never accessible to clients.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // A API futura validará Firebase Auth antes de usar o Admin SDK.
-    // Nenhum acesso direto de clientes está liberado nesta base.
+    function isCompanyGoogleUser() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower().matches('^[^@]+@wads[.]dev$')
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    match /projects/{projectId} {
+      allow read: if isCompanyGoogleUser();
+      allow write: if false;
+    }
+
+    match /users/{uid}/records/{recordId} {
+      allow read: if isCompanyGoogleUser() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // No user-profile, OAuth, nested or collection-group grants. Rules are not
+    // filters: cross-user collectionGroup('records') queries remain denied.
+    // Client creates/updates/deletes stay denied; schemas are validated by API.
     match /{document=**} {
       allow read, write: if false;
     }

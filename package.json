@@ -45,6 +45,9 @@
     ],
     "*.{json,md,yml,yaml}": "prettier --write"
   },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.0"
+  },
   "workspaces": [
     "apps/*"
   ]

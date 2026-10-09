@@ -1,0 +1,27 @@
+:root {
+  font-synthesis: none;
+}
+body {
+  margin: 0;
+}
+:focus-visible {
+  outline: 3px solid #2457a7;
+  outline-offset: 4px;
+}
+.skip-link {
+  position: absolute;
+  z-index: 2000;
+  top: 0.5rem;
+  left: 1rem;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  background: #163d78;
+  border-radius: 0.5rem;
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+caption {
+  text-align: left;
+}
