@@ -33,6 +33,8 @@ export function buildPersonalReport(
     totalMinutes: 0,
     estimatedCount: 0,
     byProject: [],
+    byTopic: [],
+    unassignedMinutes: 0,
     intervals: [],
     warnings: [],
     page: {

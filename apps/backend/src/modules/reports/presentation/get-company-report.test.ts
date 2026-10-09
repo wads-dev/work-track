@@ -45,6 +45,7 @@ it('aggregates multipleUIDs but keeps global budgets and archived facts, no tran
       scannedCount: 2,
       nextCursor: null,
     }),
+    readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi.fn().mockResolvedValue(context),
     userLabels: vi.fn().mockResolvedValue({ alice: 'Alice', bob: 'Bob' }),
     archivedProjectIds: vi.fn().mockResolvedValue(['archived']),
@@ -72,6 +73,7 @@ it('rejects invalid auth/range/cursor before read and fails excessiveUID context
     readPage: vi
       .fn<CompanyReportRepository['readPage']>()
       .mockResolvedValue({ records: [], scannedCount: 0, nextCursor: null }),
+    readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi.fn().mockResolvedValue([]),
     userLabels: vi.fn().mockResolvedValue({}),
     archivedProjectIds: vi.fn().mockResolvedValue([]),

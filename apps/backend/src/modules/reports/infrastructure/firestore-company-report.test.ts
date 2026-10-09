@@ -31,6 +31,11 @@ it('bounds canonical collection-group pages and rejects payload ownership mismat
   const repo = new FirestoreCompanyReportRepository(
     {
       collectionGroup,
+      collection: () => ({ doc: (id: string) => ({ id }) }),
+      getAll: () =>
+        Promise.resolve([
+          { id: 'p', exists: true, data: () => ({ type: 'work' }) },
+        ]),
       doc: () => ({ path: 'users/alice/records/zero' }),
     } as unknown as Firestore,
     {} as Auth,

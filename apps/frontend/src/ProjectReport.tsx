@@ -20,6 +20,8 @@ import {
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { reportError } from './report-error';
+import { TopicReport } from './TopicReport';
+import type { ReportTopic } from './topic-report-model';
 import { date } from './data';
 import { detailPath } from './routes';
 import { UiIcon } from './UiIcons';
@@ -32,7 +34,8 @@ export type Report = {
   budgetTimeZone: string;
   totalMinutes: number;
   byUser: (Bucket & { uid: string })[];
-  byTopic: (Bucket & { topicId: string })[];
+  byTopic: ReportTopic[];
+  unassignedMinutes: number;
   records: {
     id: string;
     uid: string;
@@ -107,7 +110,7 @@ function Pie({ title, buckets }: { title: string; buckets: Bucket[] }) {
               cx="100"
               cy="100"
               r="58"
-              sx={{ fill: 'background.paper' }}
+              sx={(theme) => ({ fill: theme.palette.background.paper })}
             />
           </Box>
           <Box
@@ -144,12 +147,14 @@ function Pie({ title, buckets }: { title: string; buckets: Bucket[] }) {
 export function ProjectReport({
   functions,
   hidden,
+  projectLabel = 'Projeto',
   projectId,
   search,
   uid,
 }: {
   functions: Functions;
   hidden: boolean;
+  projectLabel?: string;
   projectId: string;
   search: string;
   uid: string;
@@ -285,11 +290,21 @@ export function ProjectReport({
           {report.page.limit} registros, não todo o projeto.
         </Alert>
       )}
-      {report.warnings.map((warning, index) => (
-        <Alert key={index} severity="warning" sx={{ mb: 1 }}>
-          {warning}
-        </Alert>
-      ))}
+      {report.warnings.length > 0 && (
+        <Box
+          component="details"
+          sx={{ mb: 2, color: 'text.secondary', fontSize: 14 }}
+        >
+          <Box component="summary" sx={{ cursor: 'pointer', py: 1 }}>
+            Notas do cálculo ({report.warnings.length})
+          </Box>
+          <Box component="ul" sx={{ pl: 3 }}>
+            {report.warnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </Box>
+        </Box>
+      )}
       {report.records.length === 0 ? (
         <Alert severity="info">Nenhum registro disponível nesta página.</Alert>
       ) : (
@@ -300,14 +315,30 @@ export function ProjectReport({
             sx={{ my: 3 }}
           >
             <Pie title="Tempo por pessoa" buckets={report.byUser} />
-            <Pie title="Tempo por tópico" buckets={report.byTopic} />
+            <TopicReport
+              unassignedMinutes={report.unassignedMinutes ?? 0}
+              buckets={(report.byTopic ?? []).map((topic) => ({
+                projectId: topic.projectId,
+                topicId: topic.topicId,
+                projectLabel: hidden ? 'Projeto reservado' : projectLabel,
+                topicLabel: hidden
+                  ? 'Assunto reservado'
+                  : topic.label || 'Assunto',
+                minutes: topic.minutes,
+                people: (topic.byUser ?? []).map((person, index) => ({
+                  key: String(index),
+                  label: person.label || 'Pessoa',
+                  minutes: person.minutes,
+                })),
+              }))}
+            />
           </Stack>
           <Stack spacing={1} sx={{ display: { xs: 'flex', sm: 'none' } }}>
             {report.records.map((record) => (
               <Paper key={record.id + record.uid} sx={{ p: 2 }}>
                 <Typography variant="h6">
                   {report.byUser.find((item) => item.uid === record.uid)
-                    ?.label ?? record.uid}
+                    ?.label || 'Pessoa'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {date(record.startedAt)} —{' '}
@@ -356,7 +387,7 @@ export function ProjectReport({
                   <TableRow key={record.id + record.uid}>
                     <TableCell>
                       {report.byUser.find((item) => item.uid === record.uid)
-                        ?.label ?? record.uid}
+                        ?.label || 'Pessoa'}
                       {record.uid === uid && (
                         <Tooltip title="Abrir detalhes do meu registro">
                           <IconButton

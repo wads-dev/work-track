@@ -6,14 +6,21 @@ import {
   type WorkRepository,
 } from '../domain/work-model.js';
 import { searchProjects } from '../domain/project-search.js';
+import { canAccessProject } from '../domain/project-access.js';
 export class RegistrationService {
   constructor(private readonly repository: WorkRepository) {}
-  async search(query: string, limit: number, includeArchived = false) {
+  async search(
+    query: string,
+    limit: number,
+    uid: string,
+    includeArchived = false,
+  ) {
     return {
       projects: searchProjects(
-        (await this.repository.listProjects()).filter(
+        (await this.repository.listProjects(uid)).filter(
           (project) =>
-            includeArchived || (!project.archived && !project.mergedInto),
+            canAccessProject(project, uid) &&
+            (includeArchived || (!project.archived && !project.mergedInto)),
         ),
         query,
         limit,

@@ -180,5 +180,5 @@ it('previews without writes then resumes bounded audited batches and preserves e
   ).toHaveLength(101);
   await expect(
     repo.mergeProjects({ ...execution, targetProjectId: 'other' }, 'alice'),
-  ).rejects.toThrow('requestId');
+  ).rejects.toThrow('Projeto não encontrado.');
 });

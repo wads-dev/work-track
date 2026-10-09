@@ -1,4 +1,9 @@
 import { createHash } from 'node:crypto';
+import {
+  assertProjectAccess,
+  assertProjectMergeAccess,
+  effectiveProjectType,
+} from '../domain/project-access.js';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import {
   assertProjectWritable,
@@ -41,6 +46,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
           'not-found',
           'Projeto não encontrado.',
         );
+      assertProjectAccess(snapshot.data(), uid);
       if (prior.exists) {
         const previous = prior.data() as {
           request: string;
@@ -90,6 +96,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
           'not-found',
           'Projeto não encontrado.',
         );
+      assertProjectAccess(snapshot.data(), uid);
       if (prior.exists) {
         const p = prior.data() as {
           request: string;
@@ -107,6 +114,14 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
       }
       const before = snapshot.data() as ManagedProject;
       assertProjectWritable(before);
+      if (
+        input.type !== undefined &&
+        input.type !== effectiveProjectType(before)
+      )
+        throw new ProjectManagementError(
+          'failed-precondition',
+          'Alteração de escopo exige fluxo explícito; atualização comum não altera pessoal/corporativo.',
+        );
       const { projectId, requestId, reason, ...metadata } = input;
       void requestId;
       const patch: Record<string, unknown> = {
@@ -154,11 +169,9 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
       .collectionGroup('records')
       .where('projectId', '==', input.sourceProjectId);
     if (!input.confirmed) {
-      const [a, b, count] = await Promise.all([
-        sourceRef.get(),
-        targetRef.get(),
-        query.count().get(),
-      ]);
+      const [a, b] = await Promise.all([sourceRef.get(), targetRef.get()]);
+      assertProjectMergeAccess(a.data(), b.data(), uid);
+      const count = await query.count().get();
       if (!a.exists || !b.exists)
         throw new ProjectManagementError(
           'not-found',
@@ -195,6 +208,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
         const snapshot = await tx.get(jobRef),
           a = await tx.get(sourceRef),
           b = await tx.get(targetRef);
+        assertProjectMergeAccess(a.data(), b.data(), uid);
         if (!snapshot.exists)
           throw new ProjectManagementError('not-found', 'Job não encontrado.');
         const job = snapshot.data() as Job;
@@ -239,6 +253,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
       const job = await tx.get(jobRef),
         a = await tx.get(sourceRef),
         b = await tx.get(targetRef);
+      assertProjectMergeAccess(a.data(), b.data(), uid);
       if (job.exists) {
         const prior = job.data() as Job;
         if (
@@ -287,6 +302,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
       const jobSnapshot = await tx.get(jobRef),
         a = await tx.get(sourceRef),
         b = await tx.get(targetRef);
+      assertProjectMergeAccess(a.data(), b.data(), uid);
       const job = jobSnapshot.data() as Job;
       if (job.status === 'cancelled')
         throw new ProjectManagementError(

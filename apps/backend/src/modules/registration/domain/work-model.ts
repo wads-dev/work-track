@@ -4,6 +4,11 @@ const id = z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/);
 const instant = z.iso.datetime({ offset: true });
 export const projectInput = z.object({
   ...metadata,
+  type: z
+    .enum(['personal', 'work'])
+    .describe(
+      'Obrigatório: personal=pessoal, somente proprietário; work=corporativo, compartilhado com a organização. Pergunte à pessoa; nunca infira ou use padrão.',
+    ),
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().min(20).max(6000),
 });
@@ -97,6 +102,10 @@ export const registerInput = z
   });
 export type RegisterInput = z.infer<typeof registerInput>;
 export interface Topic {
+  mergedIntoTopicId?: string;
+  mergedAt?: string;
+  mergedBy?: string;
+  archived?: boolean;
   id: string;
   title: string;
   description: string;
@@ -117,7 +126,7 @@ export interface Project {
   createdAt: string;
 }
 export interface WorkRepository {
-  listProjects(): Promise<Project[]>;
+  listProjects(uid: string): Promise<Project[]>;
   createProject(
     input: z.infer<typeof projectInput>,
     uid: string,

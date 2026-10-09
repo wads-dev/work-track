@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
 import {
+  assertProjectAccess,
+  canAccessProject,
+  effectiveProjectType,
+} from '../domain/project-access.js';
+import { ProjectManagementError } from '../domain/project-management.js';
+import { canonicalizeTopics } from '../domain/topic-management.js';
+import {
   selectPrevious,
   type PreviousRecord,
 } from '../domain/close-previous.js';
@@ -19,9 +26,16 @@ import {
 import { normalize } from '../../../shared/text/normalize.js';
 export class FirestoreWorkRepository implements WorkRepository {
   constructor(private readonly db: Firestore) {}
-  async listProjects(): Promise<Project[]> {
-    const snapshot = await this.db.collection('projects').get();
-    return snapshot.docs.map((doc) => doc.data() as Project);
+  async listProjects(uid: string): Promise<Project[]> {
+    const snapshot = await this.db.collection('projects').limit(1001).get();
+    if (snapshot.docs.length > 1000)
+      throw new ProjectManagementError(
+        'resource-exhausted',
+        'Catálogo excede o limite seguro de consulta.',
+      );
+    return snapshot.docs
+      .map((doc) => ({ ...doc.data(), id: doc.id }) as Project)
+      .filter((p) => canAccessProject(p, uid));
   }
   async createProject(
     raw: Parameters<WorkRepository['createProject']>[0],
@@ -29,13 +43,24 @@ export class FirestoreWorkRepository implements WorkRepository {
   ): Promise<Project> {
     const input = projectInput.parse(raw);
     const key = createHash('sha256')
-      .update(normalize(input.title))
+      .update(
+        input.type === 'personal'
+          ? 'personal:' + uid + ':' + normalize(input.title)
+          : normalize(input.title),
+      )
       .digest('hex');
     const ref = this.db.collection('projects').doc(key);
     return this.db.runTransaction(async (tx) => {
       const existing = await tx.get(ref);
       if (existing.exists) {
         const project = existing.data() as Project;
+        assertProjectAccess(project, uid);
+        if (effectiveProjectType(project) !== input.type)
+          throw new ProjectManagementError(
+            'failed-precondition',
+            'Escopo existente não pode ser alterado.',
+          );
+        assertProjectAccess(project, uid);
         assertProjectWritable(project);
         return project;
       }
@@ -73,11 +98,9 @@ export class FirestoreWorkRepository implements WorkRepository {
     const ref = this.db.collection('projects').doc(input.projectId);
     return this.db.runTransaction(async (tx) => {
       const doc = await tx.get(ref);
-      if (!doc.exists)
-        throw new Error(
-          'Projeto não existe. Use search_projects ou create_project.',
-        );
+      assertProjectAccess(doc.data(), uid);
       const project = doc.data() as Project;
+      assertProjectAccess(project, uid);
       assertProjectWritable(project);
       const existing = project.topics.find(
         (topic) => normalize(topic.title) === normalize(input.title),
@@ -124,6 +147,7 @@ export class FirestoreWorkRepository implements WorkRepository {
         tx.get(ref),
         tx.get(projectRef),
       ]);
+      assertProjectAccess(projectDoc.data(), uid);
       if (existing.exists) {
         const data = existing.data() as Record<string, unknown>;
         if (data.fingerprint !== fingerprint)
@@ -135,10 +159,12 @@ export class FirestoreWorkRepository implements WorkRepository {
           'Projeto não existe. Pesquise ou crie antes de registrar.',
         );
       const project = projectDoc.data() as Project;
+      assertProjectAccess(project, uid);
       assertProjectWritable(project);
-      const topics = input.topics?.length
+      const suppliedTopics = input.topics?.length
         ? input.topics
         : [{ topicId: 'general' }];
+      const topics = canonicalizeTopics(project.topics, suppliedTopics);
       for (const topic of topics)
         if (!project.topics.some((known) => known.id === topic.topicId))
           throw new Error(
@@ -190,6 +216,17 @@ export class FirestoreWorkRepository implements WorkRepository {
         JSON.stringify({
           ...input,
           topics,
+          ...(topics.some((t, i) => t.topicId !== suppliedTopics[i]?.topicId)
+            ? {
+                topicResolution: suppliedTopics.map((t, i) => ({
+                  sourceTopicId: t.topicId,
+                  targetTopicId: topics[i]!.topicId,
+                })),
+                warnings: [
+                  'Tópicos unificados foram resolvidos para os destinos canônicos.',
+                ],
+              }
+            : {}),
           id: key,
           uid,
           receivedAt: new Date().toISOString(),

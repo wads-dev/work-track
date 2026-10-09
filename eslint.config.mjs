@@ -11,6 +11,7 @@ export default tseslint.config(
       'node_modules/**',
       '.npm-cache/**',
       '.firebase/**',
+      '.release/**',
       '.firebase-cli/**',
       '.agents/**',
     ],
@@ -34,7 +35,12 @@ export default tseslint.config(
         { argsIgnorePattern: '^_' },
       ],
     },
-    languageOptions: { parserOptions: { projectService: true } },
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
   },
   {
     files: ['apps/backend/src/modules/**/domain/**/*.ts'],

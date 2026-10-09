@@ -33,6 +33,7 @@ it('persists default topics and isolates idempotent records by user', async () =
   const repo = new FirestoreWorkRepository(db);
   const project = await repo.createProject(
     {
+      type: 'work',
       title: 'Work Track',
       description: 'Registro de atividades pessoais e profissionais.',
     },

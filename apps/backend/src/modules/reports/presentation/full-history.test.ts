@@ -32,6 +32,7 @@ const records = [
 ];
 it('allhistory has no invented bounds, projectfilter preserves global budget, one-sided dates work', async () => {
   const repo: PersonalReportRepository = {
+    readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi.fn().mockResolvedValue(records),
     readPage: vi.fn(),
     archivedProjectIds: vi.fn().mockResolvedValue([]),
@@ -84,6 +85,7 @@ it('company aggregates all internal pages and fails rather than partial if cap e
     });
   const repo = {
     readPage,
+    readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi.fn().mockResolvedValue(records),
     archivedProjectIds: vi.fn().mockResolvedValue([]),
     userLabels: vi.fn().mockResolvedValue({}),

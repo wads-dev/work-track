@@ -22,13 +22,21 @@ describe('ListProjectRecords', () => {
     ];
     listByProject.mockResolvedValue(records);
     await expect(service.execute('project-1')).resolves.toBe(records);
-    expect(listByProject).toHaveBeenCalledExactlyOnceWith('project-1', 100);
+    expect(listByProject).toHaveBeenCalledExactlyOnceWith(
+      'project-1',
+      100,
+      undefined,
+    );
   });
 
   it.each([1, 500])('accepts the limit boundary %s', async (limit) => {
     const { service, listByProject } = setup();
     await expect(service.execute('project_1', limit)).resolves.toEqual([]);
-    expect(listByProject).toHaveBeenCalledExactlyOnceWith('project_1', limit);
+    expect(listByProject).toHaveBeenCalledExactlyOnceWith(
+      'project_1',
+      limit,
+      undefined,
+    );
   });
 
   it.each(['', ' ', 'project/records', '../project', 'á', 'x'.repeat(129)])(
@@ -44,7 +52,11 @@ describe('ListProjectRecords', () => {
     const { service, listByProject } = setup();
     const projectId = 'x'.repeat(128);
     await service.execute(projectId);
-    expect(listByProject).toHaveBeenCalledExactlyOnceWith(projectId, 100);
+    expect(listByProject).toHaveBeenCalledExactlyOnceWith(
+      projectId,
+      100,
+      undefined,
+    );
   });
 
   it.each([0, -1, 501, 1.5, NaN, Infinity])(

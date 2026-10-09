@@ -24,10 +24,15 @@ it('scans only the auth UID path, bounds pages and omits transcripts', async () 
     collection = vi.fn().mockReturnValue({ doc });
   const repo = new FirestorePersonalReportRepository({
     collection,
+    getAll: () =>
+      Promise.resolve([
+        { id: 'project', exists: true, data: () => ({ type: 'work' }) },
+      ]),
   } as unknown as Firestore);
   const page = await repo.readPage('alice', 1, 'previous');
-  expect(collection).toHaveBeenCalledExactlyOnceWith('users');
-  expect(doc).toHaveBeenCalledExactlyOnceWith('alice');
+  expect(collection).toHaveBeenCalledWith('users');
+  expect(collection).toHaveBeenCalledWith('projects');
+  expect(doc).toHaveBeenCalledWith('alice');
   expect(records).toHaveBeenCalledExactlyOnceWith('records');
   expect(limit).toHaveBeenCalledExactlyOnceWith(2);
   expect(startAfter).toHaveBeenCalledExactlyOnceWith('previous');

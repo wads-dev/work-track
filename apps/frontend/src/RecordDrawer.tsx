@@ -1,3 +1,5 @@
+import { useProjects } from './useProjects';
+import { writeUrlTab } from './url-tabs';
 import { UiIcon } from './UiIcons';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -21,7 +23,7 @@ import {
 } from '@mui/material';
 import { doc, onSnapshot, type Firestore } from 'firebase/firestore';
 import { httpsCallable, type Functions } from 'firebase/functions';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { date, object, objects, text, useRows } from './data';
 import { validateEnd, localEndToIso, endToLocal } from './record-edit';
 import { safeReturnTo } from './routes';
@@ -47,7 +49,44 @@ export function RecordDrawer({
   focusEnd?: boolean;
 }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(focusEnd ? 'edit' : 'details');
+  const location = useLocation();
+  const [tabParams] = useSearchParams();
+  const rawTab = tabParams.get('recordTab');
+  const activeTab =
+    rawTab === 'details' || rawTab === 'edit' || rawTab === 'history'
+      ? rawTab
+      : focusEnd
+        ? 'edit'
+        : 'details';
+  useEffect(() => {
+    if (rawTab !== activeTab) {
+      const next = new URLSearchParams(tabParams);
+      next.set('recordTab', activeTab);
+      navigate(
+        {
+          pathname: location.pathname,
+          search: '?' + next.toString(),
+          hash: location.hash,
+        },
+        { replace: true },
+      );
+    }
+  }, [
+    rawTab,
+    activeTab,
+    tabParams,
+    navigate,
+    location.pathname,
+    location.hash,
+  ]);
+  const setActiveTab = (value: string) => {
+    const next = writeUrlTab(tabParams, 'recordTab', value);
+    navigate({
+      pathname: location.pathname,
+      search: '?' + next.toString(),
+      hash: location.hash,
+    });
+  };
   const editOpen = activeTab === 'edit';
   const detailsOpen = activeTab === 'details';
   const mobile = useMediaQuery('(max-width:600px)');
@@ -57,7 +96,7 @@ export function RecordDrawer({
     ? safeReturnTo(requestedReturn)
     : '/records' + search;
   const { revealed } = usePrivacy();
-  const projects = useRows(db, 'projects');
+  const projects = useProjects(functions, uid);
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -173,10 +212,7 @@ export function RecordDrawer({
         display: 'flex',
         flexDirection: 'column',
         height: presentation === 'page' ? 'auto' : '100%',
-        paddingBottom:
-          presentation === 'page'
-            ? undefined
-            : 'calc(16px + var(--emulator-inset, 0px))',
+
         overflow: 'hidden',
         overflowWrap: 'anywhere',
       }}
@@ -452,6 +488,7 @@ export function RecordDrawer({
           <Box
             sx={{
               pt: 1.5,
+              paddingBottom: 'var(--emulator-inset, 0px)',
               borderTop: 1,
               borderColor: 'divider',
               bgcolor: 'background.paper',
@@ -480,6 +517,14 @@ export function RecordDrawer({
         fullScreen={mobile}
         aria-labelledby="registro-titulo"
         maxWidth="sm"
+        slotProps={{
+          paper: {
+            sx: {
+              maxHeight: mobile ? '100%' : 'calc(100% - 64px)',
+              height: mobile ? '100%' : undefined,
+            },
+          },
+        }}
         onClose={() => {
           if (!saving) close();
         }}

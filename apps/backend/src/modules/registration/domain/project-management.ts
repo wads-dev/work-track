@@ -135,7 +135,9 @@ export class ProjectManagementError extends Error {
       | 'not-found'
       | 'invalid-argument'
       | 'failed-precondition'
-      | 'permission-denied',
+      | 'permission-denied'
+      | 'already-exists'
+      | 'resource-exhausted',
     message: string,
   ) {
     super(message);

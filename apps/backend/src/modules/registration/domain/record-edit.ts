@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { canonicalizeTopics } from './topic-management.js';
 import { registerInput } from './work-model.js';
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 export const updateRecordInput = z
@@ -74,7 +75,9 @@ export function applyRecordPatch(
   existing: Record<string, unknown>,
   input: UpdateRecordInput,
   uid: string,
-  project: { topics: { id: string }[] },
+  project: {
+    topics: { id: string; mergedIntoTopicId?: string; archived?: boolean }[];
+  },
 ): Record<string, unknown> {
   if (existing.uid !== uid)
     throw new RecordEditError(
@@ -93,7 +96,8 @@ export function applyRecordPatch(
   if (input.endedAt === null) delete after.endedAt;
   else if (input.endedAt !== undefined) after.endedAt = input.endedAt;
   if (input.projectId !== undefined) after.projectId = input.projectId;
-  if (input.topics !== undefined) after.topics = input.topics;
+  if (input.topics !== undefined)
+    after.topics = canonicalizeTopics(project.topics, input.topics);
   const valid = registerInput.safeParse(after);
   if (!valid.success)
     throw new RecordEditError(

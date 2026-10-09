@@ -1,3 +1,6 @@
+import { useProjects } from './useProjects';
+import { ProjectCreate } from './ProjectCreate';
+import { writeUrlTab } from './url-tabs';
 import { useEffect, useState, type ReactNode } from 'react';
 import { isOpen } from './pending-utils';
 import {
@@ -31,6 +34,7 @@ import { date, object, objects, text, useRows } from './data';
 import {
   Link as RouterLink,
   useLocation,
+  useNavigate,
   useParams,
   useSearchParams,
 } from 'react-router-dom';
@@ -180,7 +184,7 @@ export function Dashboard({
   mode: 'overview' | 'projects' | 'records';
 }) {
   const { revealed } = usePrivacy();
-  const rawProjects = useRows(db, 'projects');
+  const rawProjects = useProjects(functions, uid);
   const rawRecords = useRows(db, 'users/' + uid + '/records');
   const projects = {
     ...rawProjects,
@@ -205,13 +209,44 @@ export function Dashboard({
   };
   const { projectId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const recordId = params.get('record');
-  const [projectTab, setProjectTab] = useState('report');
+  const projectTab = params.get('tab') === 'details' ? 'details' : 'overview';
+  const setProjectTab = (value: string) => {
+    const next = writeUrlTab(params, 'tab', value);
+    navigate({
+      pathname: location.pathname,
+      search: '?' + next.toString(),
+      hash: location.hash,
+    });
+  };
+  useEffect(() => {
+    if (projectId && params.get('tab') !== projectTab) {
+      const next = new URLSearchParams(params);
+      next.set('tab', projectTab);
+      navigate(
+        {
+          pathname: location.pathname,
+          search: '?' + next.toString(),
+          hash: location.hash,
+        },
+        { replace: true },
+      );
+    }
+  }, [
+    projectId,
+    projectTab,
+    params,
+    navigate,
+    location.pathname,
+    location.hash,
+  ]);
   const [localFilter, setLocalFilter] = useState('');
   const filter = revealed ? localFilter : '';
   const projectFilter = params.get('project') ?? '';
   const archiveFilter = params.get('status') ?? 'active';
+  const projectScope = params.get('scope') === 'personal' ? 'personal' : 'work';
   useEffect(() => {
     if (!revealed) setLocalFilter('');
     if (params.has('q')) {
@@ -253,16 +288,40 @@ export function Dashboard({
             'O relatório consulta o projeto diretamente, independente do limite da lista.',
           )}
         </Typography>
+        {!rawProjects.loading &&
+          rawProjects.rows.some((row) => row.id === projectId) && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {rawProjects.rows.find((row) => row.id === projectId)?.data
+                .type === 'personal'
+                ? 'Pessoal · acesso somente ao dono'
+                : 'Compartilhado · usuários autorizados da empresa'}
+            </Typography>
+          )}
         <Tabs
           value={projectTab}
           onChange={(_, value) => setProjectTab(value)}
           aria-label="Seções do projeto"
           sx={{ mt: 2, borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab value="report" label="Visão geral" />
-          <Tab value="settings" label="Detalhes / Editar" />
+          <Tab
+            id="project-tab-overview"
+            aria-controls="project-panel-overview"
+            value="overview"
+            label="Visão geral"
+          />
+          <Tab
+            id="project-tab-details"
+            aria-controls="project-panel-details"
+            value="details"
+            label="Detalhes / Editar"
+          />
         </Tabs>
-        <Box hidden={projectTab !== 'settings'}>
+        <Box
+          role="tabpanel"
+          id="project-panel-details"
+          aria-labelledby="project-tab-details"
+          hidden={projectTab !== 'details'}
+        >
           <ProjectEditor
             functions={functions}
             projectId={projectId}
@@ -275,8 +334,17 @@ export function Dashboard({
             )}
           />
         </Box>
-        <Box hidden={projectTab !== 'report'}>
+        <Box
+          role="tabpanel"
+          id="project-panel-overview"
+          aria-labelledby="project-tab-overview"
+          hidden={projectTab !== 'overview'}
+        >
           <ProjectReport
+            projectLabel={text(
+              projects.rows.find((row) => row.id === projectId)?.data.title,
+              'Projeto reservado',
+            )}
             key={projectId}
             projectId={projectId}
             functions={functions}
@@ -294,6 +362,10 @@ export function Dashboard({
     ...projects,
     rows: projects.rows.filter(
       (row) =>
+        (rawProjects.rows.find((project) => project.id === row.id)?.data
+          .type === 'personal'
+          ? 'personal'
+          : 'work') === projectScope &&
         matchesArchive(
           rawProjects.rows.find((project) => project.id === row.id)?.data,
           archiveFilter,
@@ -328,6 +400,39 @@ export function Dashboard({
   };
   return (
     <>
+      {mode === 'projects' && (
+        <Box sx={{ mb: 2 }}>
+          <Tabs
+            value={projectScope}
+            onChange={(_, value: string) => updateFilter('scope', value)}
+            aria-label="Acesso aos projetos"
+          >
+            <Tab value="work" label="Compartilhados" />
+            <Tab value="personal" label="Meus projetos pessoais" />
+          </Tabs>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {projectScope === 'personal'
+              ? 'Acesso somente ao dono. Outros usuários não podem consultar estes projetos.'
+              : 'Projetos corporativos acessíveis aos usuários autorizados da empresa.'}{' '}
+            Confidencialidade é uma ofuscação visual separada; não modifica o
+            acesso.
+          </Typography>
+        </Box>
+      )}
+      {mode === 'projects' && (
+        <ProjectCreate
+          functions={functions}
+          onCreated={(id, type) => {
+            rawProjects.retry();
+            navigate(
+              '/projects/' +
+                encodeURIComponent(id) +
+                '?tab=details&scope=' +
+                type,
+            );
+          }}
+        />
+      )}
       {recordId && (
         <RecordDrawer
           key={recordId}

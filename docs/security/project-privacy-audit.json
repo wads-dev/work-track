@@ -1,0 +1,46 @@
+{
+  "score": 5,
+  "summary": "Rules avaliadas como seguras para os caminhos modelados no emulador nativo: projeto pessoal somente dono, work compartilhado entre Google corporativo verificado, histórico próprio e auditoria própria preservados; writes e queries amplas negados. Avaliação não é certificação de produção.",
+  "findings": [
+    {
+      "severity": "informational",
+      "description": "Todos os client create/update/delete negados; sem update bypass nem owner/type flip por cliente. Autoridade vem de claims verificadas e createdBy controlado por Admin."
+    },
+    {
+      "severity": "informational",
+      "description": "Rules não filtram coleções. Listagem de projetos e relatórios usam callable autenticada/Admin com ACL própria. ACL Admin revisada/testada separadamente com 28 testes de relatórios e integração local 31 checks."
+    },
+    {
+      "severity": "informational",
+      "description": "Owner can read own canonical orphan history intentionally; reports fail closed for missing/invalid project metadata."
+    },
+    {
+      "severity": "operational",
+      "description": "Catálogo Admin ainda tem teto global1000 documentos antes do filtro ACL e scans de relatórios leem páginas ocultas internamente; não expõem conteúdo, mas terceiros podem contribuir para custo/limites. Otimização por índice/escopo ainda pendente."
+    },
+    {
+      "severity": "limitation",
+      "description": "Provas locais usam claims sintéticas de Auth emulator e mock JWT no rules test. Não demonstram assinatura Google ou transporte OAuth MCP em produção. TOCTOU stress e merge execution completa não validados nesta prova."
+    }
+  ],
+  "evidence": {
+    "rulesNative": {
+      "passed": 250,
+      "failed": 0
+    },
+    "reportPrivacy": {
+      "passed": 28,
+      "failed": 0
+    },
+    "localIntegration": {
+      "checks": 31,
+      "exitCode": 0,
+      "ownedDocsCleaned": 12
+    }
+  },
+  "production": {
+    "accessed": false,
+    "deployed": false,
+    "pushed": false
+  }
+}

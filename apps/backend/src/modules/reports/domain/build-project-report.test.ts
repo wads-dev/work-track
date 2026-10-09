@@ -34,9 +34,8 @@ describe('project-report-v3', () => {
     expect(result.byUser).toEqual([
       { uid: 'alice', label: 'Alice', minutes: 240 },
     ]);
-    expect(result.byTopic).toEqual([
-      { topicId: '__unallocated__', label: 'Não distribuído', minutes: 240 },
-    ]);
+    expect(result.byTopic).toEqual([]);
+    expect(result.unassignedMinutes).toBe(240);
   });
   it('caps at now and next same user/project start, not another user', () => {
     const result = report(
@@ -99,7 +98,6 @@ describe('project-report-v3', () => {
     expect(result.byTopic.map((t) => [t.topicId, t.minutes])).toEqual([
       ['code', 30],
       ['meeting', 20],
-      ['__unallocated__', 70],
     ]);
   });
   it('allocates a single explicitly associated topic without inventing a split', () => {
@@ -109,14 +107,16 @@ describe('project-report-v3', () => {
       ]).byTopic[0]?.topicId,
     ).toBe('code');
   });
-  it('preserves contradictory distributions with a warning', () => {
+  it('preserves contradictory inputs but excludes inflated topic totals with a warning', () => {
     const result = report([
       make('a', '2026-10-08T10:00:00Z', {
         endedAt: '2026-10-08T11:00:00Z',
         topics: [{ topicId: 'code', durationMinutes: 90, percentage: 20 }],
       }),
     ]);
-    expect(result.byTopic[0]?.minutes).toBe(90);
+    expect(result.byTopic).toEqual([]);
+    expect(result.unassignedMinutes).toBe(60);
+    expect(result.records[0]?.topics).toEqual([]);
     expect(result.warnings.some((w) => w.includes('excedem'))).toBe(true);
   });
   it('excludes invalid intervals/timezones and zeroes future open duration', () => {

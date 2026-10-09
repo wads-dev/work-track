@@ -73,6 +73,7 @@ describe('getProjectReport callable adapter', () => {
       'project',
       20,
       'users/alice/records/one',
+      'alice',
     );
     expect(result).toMatchObject({
       policy: 'project-report-v3',

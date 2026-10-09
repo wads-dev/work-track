@@ -39,6 +39,21 @@ export function workTheme(mode: 'light' | 'dark', reduceMotion: boolean) {
         }
       : {},
     components: {
+      MuiTab: {
+        defaultProps: { disableRipple: true },
+        styleOverrides: {
+          root: {
+            '&.Mui-focusVisible': {
+              outline: '2px solid',
+              outlineColor: dark ? '#9EB3FF' : '#3158D5',
+              outlineOffset: -2,
+            },
+          },
+        },
+      },
+      MuiInputBase: {
+        styleOverrides: { input: { colorScheme: dark ? 'dark' : 'light' } },
+      },
       MuiPaper: {
         styleOverrides: {
           root: {

@@ -1,5 +1,6 @@
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { assertProjectWritable } from '../domain/project-management.js';
+import { assertProjectAccess } from '../domain/project-access.js';
 import {
   applyRecordPatch,
   recordSummary,
@@ -29,6 +30,16 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
           'permission-denied',
           'Somente o dono pode editar o registro.',
         );
+      const origin = await tx.get(
+        this.db.collection('projects').doc(before.projectId as string),
+      );
+      assertProjectAccess(origin.data(), uid);
+      if (input.projectId !== undefined) {
+        const destination = await tx.get(
+          this.db.collection('projects').doc(input.projectId),
+        );
+        assertProjectAccess(destination.data(), uid);
+      }
       const priorAudit = await tx.get(audit);
       if (priorAudit.exists) {
         const prior = priorAudit.data() as {

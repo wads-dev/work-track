@@ -73,7 +73,7 @@ const projects = specs.map(([slug, title, description], i) => ({
   ...projectInput.parse({
     title,
     description,
-    category: i === 5 ? 'personal' : 'work',
+    type: i === 5 ? 'personal' : 'work',
     confidential: i === 4,
     publicAlias: i === 4 ? 'Projeto reservado 27' : 'Projeto reservado',
   }),

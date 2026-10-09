@@ -1,6 +1,7 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import { completeSelection } from '../application/complete-selection.js';
 import { z } from 'zod';
+import { buildTopicBreakdown } from '../domain/topic-breakdown.js';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
 import { ReportContextError } from '../domain/global-estimates.js';
 import { buildCompanyReport } from '../domain/build-company-report.js';
@@ -93,6 +94,18 @@ export async function getCompanyReportHandler(
     report.warnings.push(
       'Totais completos da seleção dentro dos limites operacionais; nenhum subtotal de primeira página.',
     );
+    const topics = await repository.readTopics([
+      ...new Set(report.intervals.map((r) => r.projectId)),
+    ]);
+    const breakdown = buildTopicBreakdown(
+      page.records,
+      report.intervals,
+      new Map(Object.entries(topics).map(([id, topics]) => [id, { topics }])),
+      labels,
+    );
+    report.byTopic = breakdown.byTopic;
+    report.unassignedMinutes = breakdown.unassignedMinutes;
+    report.warnings = [...new Set([...report.warnings, ...breakdown.warnings])];
     return report;
   } catch (error) {
     if (error instanceof ReportContextError)

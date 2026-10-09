@@ -18,6 +18,7 @@ it('only reads authenticated own records and validates bounds/auth/cursor', asyn
       .fn<PersonalReportRepository['archivedProjectIds']>()
       .mockResolvedValue([]),
     readPage,
+    readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi
       .fn<PersonalReportRepository['loadContext']>()
       .mockResolvedValue([]),
@@ -49,6 +50,7 @@ it('accepts a62 civil day range spanning fall DST', async () => {
     archivedProjectIds: vi
       .fn<PersonalReportRepository['archivedProjectIds']>()
       .mockResolvedValue([]),
+    readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi
       .fn<PersonalReportRepository['loadContext']>()
       .mockResolvedValue([]),

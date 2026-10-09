@@ -52,7 +52,12 @@ it('bounds a collection-group page, uses document cursor, omits private content 
     }),
   } as unknown as Auth;
   const repo = new FirestoreProjectReportRepository(db, auth);
-  const page = await repo.readPage('project', 1, 'users/alice/records/zero');
+  const page = await repo.readPage(
+    'project',
+    1,
+    'users/alice/records/zero',
+    'alice',
+  );
   expect(collectionGroup).toHaveBeenCalledExactlyOnceWith('records');
   expect(where).toHaveBeenCalledExactlyOnceWith('projectId', '==', 'project');
   expect(startAfter).toHaveBeenCalledExactlyOnceWith({

@@ -1,9 +1,14 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirestoreDailyHoursRepository } from './modules/daily-hours/infrastructure/firestore-daily-hours.js';
 import { getCompanyReportHandler } from './modules/reports/presentation/get-company-report.js';
 import { FirestoreCompanyReportRepository } from './modules/reports/infrastructure/firestore-company-report.js';
 import { getPersonalReportHandler } from './modules/reports/presentation/get-personal-report.js';
 import { FirestorePersonalReportRepository } from './modules/reports/infrastructure/firestore-personal-report.js';
 import { manageProjectHandler } from './modules/registration/presentation/manage-projects.js';
+import { FirestoreTopicManagementRepository } from './modules/registration/infrastructure/firestore-topic-management.js';
+import { manageTopicsHandler } from './modules/registration/presentation/manage-topics.js';
+import { listProjectsHandler } from './modules/registration/presentation/list-projects.js';
+import { createProjectHandler } from './modules/registration/presentation/create-project.js';
 import { FirestoreProjectManagementRepository } from './modules/registration/infrastructure/firestore-project-management.js';
 import { updateRecordHandler } from './modules/registration/presentation/update-record.js';
 import { FirestoreRecordEditingRepository } from './modules/registration/infrastructure/firestore-record-editing.js';
@@ -156,7 +161,71 @@ export const api = onRequest(
     new FirestoreWorkRepository(getFirestore()),
     new FirestoreRecordEditingRepository(getFirestore()),
     new FirestoreProjectManagementRepository(getFirestore()),
+    new FirestoreTopicManagementRepository(getFirestore()),
+    new FirestoreDailyHoursRepository(getFirestore()),
   ),
+);
+export const createProject = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    createProjectHandler(
+      new FirestoreWorkRepository(getFirestore()),
+      request.data as unknown,
+      request.auth,
+    ),
+);
+export const listProjects = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    listProjectsHandler(
+      new FirestoreWorkRepository(getFirestore()),
+      request.data as unknown,
+      request.auth,
+    ),
+);
+export const mergeTopics = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    manageTopicsHandler(
+      new FirestoreTopicManagementRepository(getFirestore()),
+      'merge',
+      request.data as unknown,
+      request.auth,
+    ),
+);
+export const listTopicMerges = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    manageTopicsHandler(
+      new FirestoreTopicManagementRepository(getFirestore()),
+      'history',
+      request.data as unknown,
+      request.auth,
+    ),
 );
 // Public diagnostic endpoint; never returns user data.
 export const health = onRequest(

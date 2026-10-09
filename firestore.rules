@@ -1,13 +1,16 @@
 rules_version = '2';
 // Assumed data model (all mutations are performed by the trusted Admin SDK):
-// projects/{projectId}: id/title/description/createdBy/createdAt strings;
-// topics list of {id,title,description}; recordedAt timestamp; optional
-// updatedBy string and updatedAt timestamp. Shared organizational metadata only;
-// do not store private transcripts, emails or user profiles in projects.
+// projects/{projectId}: id/title/description/createdAt strings; createdBy is the
+// immutable, Admin-controlled owner UID (nonempty string, at most 128 chars).
+// type is 'personal' (owner-only) or 'work' (company-shared). Missing type is
+// legacy work; any other type fails closed. topics is an embedded list of
+// {id,title,description}; recordedAt timestamp; optional updatedBy/updatedAt,
+// archived/confidential/publicAlias/githubUrl. Confidential is presentation only.
 // users/{uid}/records/{recordId}: uid/projectId/requestId strings; startedAt,
 // optional endedAt/commandAt ISO strings; timeZone/originalText/interpretation
 // strings; topics/interruptions lists; recordedAt timestamp; fingerprint string.
-// Company users may read canonical records (explicit organization sharing).
+// Owners can read their entire canonical history, including orphaned records.
+// Other company users can get a record only if its current project is work.
 // Audit entries: authorUid/reason/updatedAt/before/after summaries, private to owner.
 // oauth_* documents contain credentials and are never accessible to clients.
 service cloud.firestore {
@@ -20,25 +23,56 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isWorkProject(data) {
+      // Explicit organizational sharing was the legacy behavior.
+      return !('type' in data) || data.type == 'work';
+    }
+
+    function isPersonalProjectOwner(data) {
+      return 'type' in data && data.type == 'personal'
+        && 'createdBy' in data && data.createdBy is string
+        && data.createdBy.size() > 0 && data.createdBy.size() <= 128
+        && isOwner(data.createdBy);
+    }
+
+    function resolvesToWorkProject(data) {
+      // Never trust a record's type/snapshot/owner as project authorization.
+      return 'projectId' in data && data.projectId is string
+        && data.projectId.matches('^[A-Za-z0-9_-]{1,128}$')
+        && exists(/databases/$(database)/documents/projects/$(data.projectId))
+        && isWorkProject(get(/databases/$(database)/documents/projects/$(data.projectId)).data);
+    }
+
     match /projects/{projectId} {
-      allow read: if isCompanyGoogleUser();
+      allow get: if isCompanyGoogleUser()
+        && (isWorkProject(resource.data) || isPersonalProjectOwner(resource.data));
+      // Rules are not filters: project discovery goes through listProjects.
+      allow list: if false;
       allow write: if false;
     }
 
     match /users/{uid}/records/{recordId} {
-      allow read: if isCompanyGoogleUser();
+      allow get: if isCompanyGoogleUser()
+        && (isOwner(uid) || resolvesToWorkProject(resource.data));
+      allow list: if isCompanyGoogleUser() && isOwner(uid);
       // Owner edits use callable/MCP transaction with audit; client writes denied.
       allow write: if false;
       match /audit/{auditId} {
-        allow read: if isCompanyGoogleUser() && request.auth.uid == uid;
+        allow read: if isCompanyGoogleUser() && isOwner(uid);
         allow write: if false;
       }
     }
 
-    // Only canonical records and owner audit have grants; user profiles/OAuth
-    // and other nested paths remain denied. Rules are not
-    // filters: cross-user collectionGroup('records') queries remain denied.
-    // Client creates/updates/deletes stay denied; schemas are validated by API.
+    // Only project gets, canonical records and record-owner audit have grants.
+    // Project subcollections (topics/audit/merges), user profiles, OAuth and all
+    // other nested paths stay denied; no recursive records grant exists.
+    // All client collectionGroup('records') queries stay denied, even with uid
+    // filters. Client create/update/delete always deny, including owner/type
+    // changes. Trusted Admin SDK bypasses rules and must validate schemas and ACLs.
     match /{document=**} {
       allow read, write: if false;
     }

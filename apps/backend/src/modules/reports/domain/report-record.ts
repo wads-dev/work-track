@@ -7,5 +7,9 @@ export interface ReportRecord {
 }
 // Internal port only; project-wide authorization is not exposed yet.
 export interface ReportRecordsRepository {
-  listByProject(projectId: string, limit: number): Promise<ReportRecord[]>;
+  listByProject(
+    projectId: string,
+    limit: number,
+    viewerUid?: string,
+  ): Promise<ReportRecord[]>;
 }

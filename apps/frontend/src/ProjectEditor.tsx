@@ -14,6 +14,7 @@ import {
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { text } from './data';
 import { ProjectArchive } from './ProjectArchive';
+import { ProjectTopics } from './ProjectTopics';
 export function ProjectEditor({
   functions,
   projectId,
@@ -25,7 +26,6 @@ export function ProjectEditor({
   project?: Record<string, unknown>;
   hidden: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
   if (hidden)
     return (
       <Alert severity="info" sx={{ my: 2 }}>
@@ -47,17 +47,20 @@ export function ProjectEditor({
         projectId={projectId}
         project={project}
       />
-      <Button onClick={() => setEditing((value) => !value)}>
-        {editing ? 'Fechar gerenciamento' : 'Gerenciar projeto'}
-      </Button>
-      {editing && (
+      {
         <ProjectForm
           key={projectId}
           functions={functions}
           projectId={projectId}
           project={project}
         />
-      )}
+      }
+      <ProjectTopics
+        key={projectId}
+        functions={functions}
+        projectId={projectId}
+        project={project}
+      />
     </Box>
   );
 }
@@ -72,7 +75,7 @@ function ProjectForm({
 }) {
   const [title, setTitle] = useState(text(project.title, ''));
   const [description, setDescription] = useState(text(project.description, ''));
-  const [type, setType] = useState(text(project.type, ''));
+  const type = project.type === 'personal' ? 'personal' : 'work';
   const [githubUrl, setGithubUrl] = useState(text(project.githubUrl, ''));
   const [confidential, setConfidential] = useState(
     project.confidential === true,
@@ -139,7 +142,6 @@ function ProjectForm({
         projectId,
         title,
         description,
-        ...(type ? { type } : {}),
         githubUrl: githubUrl || null,
         confidential,
         publicAlias: alias,
@@ -215,12 +217,12 @@ function ProjectForm({
           select
           label="Tipo"
           value={type}
-          onChange={(e) => setType(e.target.value)}
-          disabled={busy}
+          disabled
+          helperText="O tipo de acesso não pode ser convertido nesta edição."
         >
           <MenuItem value="">Não especificado</MenuItem>
-          <MenuItem value="personal">Pessoal</MenuItem>
-          <MenuItem value="work">Trabalho</MenuItem>
+          <MenuItem value="personal">Pessoal · somente o dono</MenuItem>
+          <MenuItem value="work">Compartilhado · empresa</MenuItem>
         </TextField>
         <TextField
           label="GitHub HTTPS"

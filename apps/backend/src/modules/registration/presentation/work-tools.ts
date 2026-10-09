@@ -1,5 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import {
+  mergeTopicsInput,
+  listTopicMergesInput,
+  type TopicManagementRepository,
+} from '../domain/topic-management.js';
 import { instructionPrefix, workInstructions } from './instructions.js';
 import {
   updateProjectInput,
@@ -24,6 +29,7 @@ export function registerWorkTools(
   uid: string,
   editing?: RecordEditingRepository,
   management?: ProjectManagementRepository,
+  topicManagement?: TopicManagementRepository,
 ) {
   server.registerTool(
     'get_instructions',
@@ -87,6 +93,29 @@ export function registerWorkTools(
       (input) => run(() => management.mergeProjects(input, uid)),
     );
   }
+  if (topicManagement) {
+    server.registerTool(
+      'merge_topics',
+      {
+        description:
+          instructionPrefix +
+          'Prévia somente leitura por padrão; unir tópicos do MESMO projeto preserva registros/snapshots e auditoria. Exige origens/destino explícitos, confirmed true, motivo e requestId estável; nunca confirme sem pedido humano. Sem desfazer nesta versão.',
+        inputSchema: mergeTopicsInput,
+      },
+      (input) => run(() => topicManagement.mergeTopics(input, uid)),
+    );
+    server.registerTool(
+      'list_topic_merges',
+      {
+        description:
+          instructionPrefix +
+          'Histórico paginado de unificações de tópicos do projeto, com estados anteriores e posteriores. Somente leitura.',
+        inputSchema: listTopicMergesInput,
+        annotations: { readOnlyHint: true },
+      },
+      (input) => run(() => topicManagement.listTopicMerges(input, uid)),
+    );
+  }
   if (editing) {
     server.registerTool(
       'update_record',
@@ -113,14 +142,14 @@ export function registerWorkTools(
       annotations: { readOnlyHint: true },
     },
     ({ query, limit, includeArchived }) =>
-      run(() => service.search(query, limit, includeArchived)),
+      run(() => service.search(query, limit, uid, includeArchived)),
   );
   server.registerTool(
     'create_project',
     {
       description:
         instructionPrefix +
-        'Crie projeto compartilhado após pesquisar e não encontrar. Exige título e descrição generosa do escopo. Retorna ID e tópico Geral padrão. Reutiliza títulos normalizados iguais.',
+        'Crie projeto com tipo personal (somente proprietário) ou work (corporativo compartilhado) escolhido EXPLICITAMENTE pela pessoa; se ausente pergunte, nunca infira nem use padrão. Após pesquisar e não encontrar. Exige título e descrição generosa do escopo. Retorna ID e tópico Geral padrão. Reutiliza títulos normalizados iguais.',
       inputSchema: projectInput,
     },
     (input) => run(() => service.createProject(input, uid)),

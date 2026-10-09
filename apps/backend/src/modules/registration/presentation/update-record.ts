@@ -1,4 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
+import { ProjectManagementError } from '../domain/project-management.js';
 import {
   authorizeReport,
   type ReportAuth,
@@ -23,7 +24,10 @@ export async function updateRecordHandler(
   try {
     return await repository.updateRecord(input.data, auth!.uid);
   } catch (error) {
-    if (error instanceof RecordEditError)
+    if (
+      error instanceof RecordEditError ||
+      error instanceof ProjectManagementError
+    )
       throw new HttpsError(error.code, error.message);
     throw new HttpsError('internal', 'Não foi possível editar o registro.');
   }

@@ -1,3 +1,6 @@
+import { useProjects } from './useProjects';
+import { TopicReport } from './TopicReport';
+import { topicBuckets, type ReportTopic } from './topic-report-model';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -29,7 +32,7 @@ import { EmptyState } from './Surface';
 import { RecordDrawer } from './RecordDrawer';
 import { contextualRecordPath } from './routes';
 import { CalendarTimeline } from './CalendarTimeline';
-import { date, text, useRows } from './data';
+import { date, text } from './data';
 import { safeProject, usePrivacy } from './privacy';
 import { hours, pieSlices } from './report-chart';
 import {
@@ -66,6 +69,8 @@ type PersonalReport = {
   totalMinutes: number;
   estimatedCount: number;
   byProject: { projectId: string; minutes: number }[];
+  byTopic: ReportTopic[];
+  unassignedMinutes: number;
   byUser?: { uid: string; label: string; minutes: number }[];
   intervals: Interval[];
   warnings: string[];
@@ -94,7 +99,7 @@ export function PersonalPage({
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const { revealed } = usePrivacy();
-  const projects = useRows(db, 'projects');
+  const projects = useProjects(functions, uid, company ? 'work' : 'all');
   const zone = 'America/Sao_Paulo';
   const density =
     params.get('density') ??
@@ -264,7 +269,16 @@ export function PersonalPage({
           direction="row"
           spacing={1}
           useFlexGap
-          sx={{ alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}
+          sx={{
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            minWidth: 0,
+            p: { xs: 2, sm: 2.5 },
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: '12px',
+            bgcolor: 'background.paper',
+          }}
         >
           <Tooltip title="Período anterior">
             <IconButton
@@ -450,7 +464,9 @@ export function PersonalPage({
                         cx="100"
                         cy="100"
                         r="58"
-                        sx={{ fill: 'background.paper' }}
+                        sx={(theme) => ({
+                          fill: theme.palette.background.paper,
+                        })}
                       />
                     </Box>
                     <Box
@@ -529,6 +545,20 @@ export function PersonalPage({
                   </Paper>
                 )}
             </Box>
+            {!calendar && (
+              <Box sx={{ mt: 2 }}>
+                <TopicReport
+                  personal={!company}
+                  buckets={topicBuckets(
+                    report.byTopic ?? [],
+                    (id) => projects.rows.find((row) => row.id === id)?.data,
+                    revealed,
+                    company ? undefined : uid,
+                  )}
+                  unassignedMinutes={report.unassignedMinutes ?? 0}
+                />
+              </Box>
+            )}
             {calendar && density === 'timeline' && (
               <CalendarTimeline
                 items={report.intervals}

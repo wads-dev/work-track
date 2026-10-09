@@ -20,6 +20,8 @@ export function buildCompanyReport(
     totalMinutes: 0,
     estimatedCount: 0,
     byProject: [],
+    byTopic: [],
+    unassignedMinutes: 0,
     byUser: [],
     intervals: [],
     warnings: [
@@ -62,7 +64,11 @@ export function buildCompanyReport(
       );
     }
     if (selected.length)
-      output.byUser.push({ uid, label: labels[uid] || uid, minutes: total });
+      output.byUser.push({
+        uid,
+        label: labels[uid] || 'Participante sem nome',
+        minutes: total,
+      });
   }
   if (!input.includeArchived)
     warnings.add(

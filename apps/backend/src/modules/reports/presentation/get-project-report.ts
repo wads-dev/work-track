@@ -38,7 +38,7 @@ export async function getProjectReportHandler(
 ) {
   authorizeReport(auth);
   try {
-    return await getProjectReport(repository, data, asOf);
+    return await getProjectReport(repository, data, asOf, auth!.uid);
   } catch (error) {
     if (error instanceof ReportContextError)
       throw new HttpsError('resource-exhausted', error.message);

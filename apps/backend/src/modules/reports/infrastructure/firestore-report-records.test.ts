@@ -10,7 +10,15 @@ function setup(
   const where = vi.fn().mockReturnValue({ limit });
   const collectionGroup = vi.fn().mockReturnValue({ where });
   // Mock only the SDK boundary; no Firebase initialization or live database access.
-  const db = { collectionGroup } as unknown as Firestore;
+  const db = {
+    collectionGroup,
+    collection: () => ({
+      doc: () => ({
+        get: () =>
+          Promise.resolve({ exists: true, data: () => ({ type: 'work' }) }),
+      }),
+    }),
+  } as unknown as Firestore;
   return {
     repository: new FirestoreReportRecordsRepository(db),
     collectionGroup,
@@ -21,6 +29,13 @@ function setup(
 }
 
 describe('FirestoreReportRecordsRepository', () => {
+  it('rejects absent viewer identity before a collection-group query', async () => {
+    const { repository, collectionGroup } = setup();
+    await expect(repository.listByProject('project', 1)).rejects.toThrow(
+      'Projeto não encontrado.',
+    );
+    expect(collectionGroup).not.toHaveBeenCalled();
+  });
   it('queries records across users by project with the requested bound and a minimal projection', async () => {
     const startedAt = '2026-10-08T21:00:00-03:00';
     const endedAt = '2026-10-08T22:00:00-03:00';
@@ -46,7 +61,7 @@ describe('FirestoreReportRecordsRepository', () => {
         }),
       },
     ]);
-    const result = await repository.listByProject('project', 25);
+    const result = await repository.listByProject('project', 25, 'alice');
     expect(collectionGroup).toHaveBeenCalledExactlyOnceWith('records');
     expect(where).toHaveBeenCalledExactlyOnceWith('projectId', '==', 'project');
     expect(limit).toHaveBeenCalledExactlyOnceWith(25);
@@ -78,7 +93,7 @@ describe('FirestoreReportRecordsRepository', () => {
           }),
         },
       ]);
-      const records = await repository.listByProject('project', 1);
+      const records = await repository.listByProject('project', 1, 'alice');
       expect(records[0]).not.toHaveProperty('endedAt');
     },
   );
@@ -86,7 +101,7 @@ describe('FirestoreReportRecordsRepository', () => {
   it('returns an empty collection when no records match', async () => {
     const { repository } = setup();
     await expect(
-      repository.listByProject('empty-project', 100),
+      repository.listByProject('empty-project', 100, 'alice'),
     ).resolves.toEqual([]);
   });
 
@@ -94,8 +109,8 @@ describe('FirestoreReportRecordsRepository', () => {
     const { repository, get } = setup();
     const failure = new Error('Missing collection-group index');
     get.mockRejectedValue(failure);
-    await expect(repository.listByProject('project', 100)).rejects.toBe(
-      failure,
-    );
+    await expect(
+      repository.listByProject('project', 100, 'alice'),
+    ).rejects.toBe(failure);
   });
 });

@@ -2,6 +2,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 
 import { ReportContextError } from '../domain/global-estimates.js';
 import { z } from 'zod';
+import { buildTopicBreakdown } from '../domain/topic-breakdown.js';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
 import type { PersonalReportRepository } from '../domain/personal-report.js';
 import { buildPersonalReport } from '../domain/build-personal-report.js';
@@ -101,6 +102,18 @@ export async function getPersonalReportHandler(
         'Seleção ativa exclui projetos arquivados ou ausentes da visualização; orçamento global continua incluindo todos os fatos.',
       );
     }
+    const topics = await repository.readTopics(
+      [...new Set(report.intervals.map((r) => r.projectId))],
+      auth!.uid,
+    );
+    const breakdown = buildTopicBreakdown(
+      page.records,
+      report.intervals.map((r) => ({ ...r, uid: auth!.uid })),
+      new Map(Object.entries(topics).map(([id, topics]) => [id, { topics }])),
+    );
+    report.byTopic = breakdown.byTopic;
+    report.unassignedMinutes = breakdown.unassignedMinutes;
+    report.warnings = [...new Set([...report.warnings, ...breakdown.warnings])];
     return report;
   } catch (error) {
     if (error instanceof ReportContextError)

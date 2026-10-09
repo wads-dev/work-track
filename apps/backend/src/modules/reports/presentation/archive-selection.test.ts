@@ -33,6 +33,7 @@ it('active selection excludes archive totals but archived closed facts still spe
       scannedCount: 2,
       nextCursor: null,
     }),
+    readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi.fn().mockResolvedValue([closed, open]),
     archivedProjectIds: vi.fn().mockResolvedValue(['archived']),
   };

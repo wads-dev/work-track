@@ -28,6 +28,7 @@ export async function getProjectReport(
   repository: ProjectReportRepository,
   data: unknown,
   asOf = Date.now(),
+  viewerUid?: string,
 ) {
   const input = inputSchema.safeParse(data);
   if (!input.success)
@@ -39,6 +40,7 @@ export async function getProjectReport(
     input.data.projectId,
     input.data.limit,
     input.data.cursor,
+    viewerUid,
   );
   if (!page)
     throw new ReportRequestError('not-found', 'Projeto não encontrado.');
@@ -48,16 +50,22 @@ export async function getProjectReport(
       'Projeto arquivado; inclua includeArchived para consultar histórico.',
     );
   const full = await completeSelection(async (cursor) => {
-    const p = await repository.readPage(input.data.projectId, 500, cursor);
+    const p = await repository.readPage(
+      input.data.projectId,
+      500,
+      cursor,
+      viewerUid,
+    );
     if (!p)
       throw new ReportRequestError('not-found', 'Projeto não encontrado.');
     return p;
   });
   page.records = full.records;
   page.nextCursor = null;
-  const context = await repository.loadContext([
-    ...new Set(page.records.map((r) => r.uid)),
-  ]);
+  const context = await repository.loadContext(
+    [...new Set(page.records.map((r) => r.uid))],
+    page.personal ? viewerUid : undefined,
+  );
   const labels = await repository.userLabels([
     ...new Set(page.records.map((record) => record.uid)),
   ]);

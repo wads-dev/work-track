@@ -1,4 +1,5 @@
 import type { ReportSourceRecord } from './project-report.js';
+import type { TopicBreakdown } from './topic-breakdown.js';
 export interface PersonalReportInput {
   includeArchived?: boolean;
   from?: string;
@@ -8,7 +9,10 @@ export interface PersonalReportInput {
   limit?: number;
   cursor?: string;
 }
-export interface PersonalReport {
+export interface PersonalReport extends Pick<
+  TopicBreakdown,
+  'byTopic' | 'unassignedMinutes'
+> {
   scope?: 'all-selected';
   policy: 'personal-v3';
   budgetTimeZone: 'America/Sao_Paulo';
@@ -45,6 +49,12 @@ export interface PersonalReportPage {
   nextCursor: string | null;
 }
 export interface PersonalReportRepository {
+  readTopics(
+    projectIds: string[],
+    uid: string,
+  ): Promise<
+    Record<string, { id: string; title: string; mergedIntoTopicId?: string }[]>
+  >;
   archivedProjectIds(projectIds: string[]): Promise<string[]>;
   loadContext(uids: string[]): Promise<ReportSourceRecord[]>;
   readPage(

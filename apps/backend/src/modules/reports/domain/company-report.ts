@@ -12,6 +12,11 @@ export interface CompanyReport extends Omit<
   intervals: (PersonalReport['intervals'][number] & { uid: string })[];
 }
 export interface CompanyReportRepository {
+  readTopics(
+    projectIds: string[],
+  ): Promise<
+    Record<string, { id: string; title: string; mergedIntoTopicId?: string }[]>
+  >;
   readPage(
     limit: number,
     cursor?: string,

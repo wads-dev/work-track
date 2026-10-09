@@ -1,3 +1,4 @@
+import { useProjects } from './useProjects';
 import { useEffect, useState } from 'react';
 import { isAlertOpen, isOpen } from './pending-utils';
 import { useClock } from './use-clock';
@@ -73,7 +74,7 @@ export function PendingPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
-  const projects = useRows(db, 'projects');
+  const projects = useProjects(functions, uid);
   const { revealed } = usePrivacy();
   useEffect(() => {
     let active = true;
