@@ -52,6 +52,10 @@ import {
 } from 'react-router-dom';
 import { safeReturnTo } from './routes';
 import { PrivacyContext } from './privacy';
+import {
+  readPrivacyPreference,
+  savePrivacyPreference,
+} from './privacy-preference';
 import { PendingBell, PendingPage } from './PendingPage';
 import { RulesPage } from './RulesPage';
 import { UiIcon } from './UiIcons';
@@ -169,7 +173,7 @@ function App() {
             deletionAccount(next?.uid ?? '');
             ownRecordsRepository.account(next?.uid ?? '');
             setUser(next);
-            setRevealed(false);
+            setRevealed(readPrivacyPreference(next?.uid ?? ''));
             setLoading(false);
           },
           (failure) => {
@@ -326,7 +330,11 @@ function App() {
                         : 'Revelar dados confidenciais'
                     }
                     aria-pressed={revealed}
-                    onClick={() => setRevealed((value) => !value)}
+                    onClick={() => {
+                      const next = !revealed;
+                      savePrivacyPreference(user.uid, next);
+                      setRevealed(next);
+                    }}
                   >
                     <UiIcon kind={revealed ? 'eye' : 'eyeoff'} />
                   </IconButton>
