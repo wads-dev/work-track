@@ -22,7 +22,7 @@ export function buildProjectReport(
   );
   if (hasCursor || page.nextCursor)
     warnings.add(
-      'Totais representam somente esta página; estimativas usam contexto global completo e próximo início próprio entre projetos.',
+      'Totais representam somente esta página; estimativas usam contexto global completo e próximo início próprio no mesmo projeto; fechados menores que15min ignorados como corte.',
     );
   warnings.add(
     'Estimativas não persistidas; interrupções e sobreposições não são descontadas automaticamente.',
@@ -30,7 +30,7 @@ export function buildProjectReport(
   const result: ProjectReport = {
     projectId,
     asOf: new Date(asOf).toISOString(),
-    policy: 'project-report-v2',
+    policy: 'project-report-v3',
     budgetTimeZone: 'America/Sao_Paulo',
     totalMinutes: 0,
     byUser: [],

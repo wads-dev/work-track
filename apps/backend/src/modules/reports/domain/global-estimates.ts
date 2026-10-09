@@ -60,7 +60,13 @@ export function globalEstimates(
         );
       if (end === undefined) {
         const next = sorted.find(
-          (other) => other.uid === r.uid && Date.parse(other.startedAt) > start,
+          (other) =>
+            other.uid === r.uid &&
+            other.projectId === r.projectId &&
+            Date.parse(other.startedAt) > start &&
+            (other.endedAt === undefined ||
+              Date.parse(other.endedAt) - Date.parse(other.startedAt) >=
+                15 * 60000),
         );
         let low = start - 48 * 3600000,
           high = start;

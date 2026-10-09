@@ -53,7 +53,7 @@ it('closed6h leaves2h and closed>8h remains fact with zero estimate', () => {
   expect(result.ends.get(recordKey(open))).toBe(Date.parse(open.startedAt));
 });
 it('next outside selected page and timezone filters cannot change estimated ends', () => {
-  const all = [make('a', 4), make('b', 5)],
+  const all = [make('a', 4), make('b', 5, 'a')],
     project = buildProjectReport(
       'a',
       { records: [all[0]!], topicLabels: {}, nextCursor: null },

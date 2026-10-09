@@ -6,7 +6,7 @@ Relatórios projetam intervalos sem modificar início/fim original. Fatos com fi
 
 O limite de oito horas é global para estimativas por pessoa/dia, somando todos os projetos, independentemente da página exibida. O dia do orçamento usa America/Sao_Paulo nos relatórios de projeto e pessoal. Alterar o fuso visual do calendário não cria outro saldo.
 
-Fatos fechados são descontados da margem diária sem truncamento. O saldo restante vai para abertos em ordem de início/ID determinística: até quatro horas por registro, limitado por agora, meia-noite do registro e do orçamento, próximo início da mesma pessoa em qualquer projeto e saldo restante do dia. Não há divisão igual automática entre abertos, nem persistência de fins estimados.
+Fatos fechados são descontados da margem diária sem truncamento. O saldo restante vai para abertos em ordem de início/ID determinística: até quatro horas por registro, limitado por agora, meia-noite do registro e do orçamento, próximo início da mesma pessoa no mesmo projeto (ignorar candidato fechado com duração menor que 15 minutos) e saldo restante do dia. Não há divisão igual automática entre abertos, nem persistência de fins estimados.
 
 ## Contexto completo e paginação
 

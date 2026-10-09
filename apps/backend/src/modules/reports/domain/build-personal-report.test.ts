@@ -38,13 +38,13 @@ it('uses next own start across projects and returns original facts without mutat
     make('two', '2026-10-08T11:00:00Z', 'b'),
   ];
   const result = run(records);
-  expect(result.intervals[0]?.minutes).toBe(60);
+  expect(result.intervals[0]?.minutes).toBe(240);
   expect(result.byProject).toEqual([
-    { projectId: 'a', minutes: 60 },
+    { projectId: 'a', minutes: 240 },
     { projectId: 'b', minutes: 240 },
   ]);
   expect(records[0]).not.toHaveProperty('endedAt');
-  expect(result.policy).toBe('personal-v2');
+  expect(result.policy).toBe('personal-v3');
 });
 it('clamps visualization only, includes intersecting closed facts, excludes outside', () => {
   const result = run([

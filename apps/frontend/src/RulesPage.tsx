@@ -6,7 +6,7 @@ export function RulesPage() {
         Regras do relatório
       </Typography>
       <Typography>
-        Políticas v2: orçamento diário global de estimativas por pessoa,
+        Políticas v3: orçamento diário global de estimativas por pessoa,
         considerando todos os projetos e registros do contexto completo. Nenhum
         fato original é alterado.
       </Typography>
@@ -55,22 +55,30 @@ export function RulesPage() {
         Relatório de projeto
       </Typography>
       <Typography>
-        Política project-report-v2: orçamento global por pessoa/dia em
+        Política project-report-v3: orçamento global por pessoa/dia em
         America/Sao_Paulo, considerando registros de todos os projetos. Próximo
-        início da própria pessoa também considera outros projetos fora da
-        página. Fusos diferentes nos registros geram aviso. O filtro por projeto
-        afeta apenas dados exibidos, não cria orçamento adicional.
+        início da mesma pessoa somente no mesmo projeto é considerado, inclusive
+        fora da página. Projetos diferentes nunca cortam a estimativa. Fusos
+        diferentes nos registros geram aviso. O filtro por projeto afeta apenas
+        dados exibidos, não cria orçamento adicional.
       </Typography>
       <Typography component="h3" variant="h6" sx={{ mt: 3 }}>
         Dashboard e calendário pessoais
       </Typography>
       <Typography>
-        Política personal-v2: o orçamento global também usa America/Sao_Paulo; o
+        Política personal-v3: o orçamento global também usa America/Sao_Paulo; o
         fuso solicitado no filtro define somente período e visualização. Próximo
-        início da própria pessoa é considerado entre projetos, inclusive fora da
-        página selecionada; abertos também respeitam meia-noite no fuso do
-        registro e no fuso fixo do orçamento. Intervalos são recortados apenas
-        para visualização do período, sem mudar fatos.
+        início da própria pessoa é considerado somente no mesmo projeto,
+        inclusive fora da página selecionada; abertos também respeitam
+        meia-noite no fuso do registro e no fuso fixo do orçamento. Intervalos
+        são recortados apenas para visualização do período, sem mudar fatos.
+      </Typography>
+      <Typography sx={{ mt: 2 }}>
+        Candidato ao próximo início com fim explícito e duração menor que 15
+        minutos é ignorado como corte de estimativa, mas seu tempo factual
+        continua consumindo o orçamento global. Exatamente 15 minutos já pode
+        cortar; próximo registro aberto no mesmo projeto também pode cortar.
+        Atividade em outro projeto nunca corta a estimativa.
       </Typography>
       <Alert severity="info" sx={{ mt: 2 }}>
         Editar fim ou reabrir registro exige ação e confirmação explícitas.

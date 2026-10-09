@@ -24,7 +24,7 @@ const report = (records: ReportSourceRecord[], asOf = '2026-10-09T20:00:00Z') =>
     false,
     records,
   );
-describe('project-report-v2', () => {
+describe('project-report-v3', () => {
   it('caps open work at four hours and never persists estimates', () => {
     const input = [make('open', '2026-10-08T10:00:00Z')];
     const result = report(input);

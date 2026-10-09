@@ -18,6 +18,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { reportError } from './report-error';
+import { CalendarTimeline } from './CalendarTimeline';
 import { date, text, useRows } from './data';
 import { safeProject, usePrivacy } from './privacy';
 import { hours, pieSlices } from './report-chart';
@@ -362,13 +363,24 @@ export function PersonalPage({
                 ))}
               </Box>
             )}
-            {calendar && (
+            {calendar && view !== 'month' && (
+              <CalendarTimeline
+                items={report.intervals}
+                day={selected}
+                view={view}
+                zone={zone}
+                label={label}
+                color={color}
+                returnTo={location.pathname + location.search}
+              />
+            )}
+            {calendar && view === 'month' && (
               <Box
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: {
                     xs: '1fr',
-                    sm: view === 'day' ? '1fr' : 'repeat(7,minmax(0,1fr))',
+                    sm: 'repeat(7,minmax(0,1fr))',
                   },
                   gap: 1,
                 }}

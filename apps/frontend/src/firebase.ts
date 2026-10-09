@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import {
-  browserSessionPersistence,
+  browserLocalPersistence,
   connectAuthEmulator,
   getAuth,
   setPersistence,
@@ -43,7 +43,7 @@ export async function initializeServices() {
     connectFirestoreEmulator(db, location.hostname, 8080);
     connectFunctionsEmulator(functions, location.hostname, 5001);
   }
-  await setPersistence(auth, browserSessionPersistence);
+  await setPersistence(auth, browserLocalPersistence);
   return { auth, db, functions };
 }
 export type Services = Awaited<ReturnType<typeof initializeServices>>;

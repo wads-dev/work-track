@@ -15,7 +15,7 @@ export interface ReportSourceRecord {
 export interface ProjectReport {
   projectId: string;
   asOf: string;
-  policy: 'project-report-v2';
+  policy: 'project-report-v3';
   budgetTimeZone: 'America/Sao_Paulo';
   totalMinutes: number;
   byUser: { uid: string; label: string; minutes: number }[];

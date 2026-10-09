@@ -74,7 +74,7 @@ describe('getProjectReport callable adapter', () => {
       'users/alice/records/one',
     );
     expect(result).toMatchObject({
-      policy: 'project-report-v2',
+      policy: 'project-report-v3',
       asOf: '2026-10-08T20:00:00.000Z',
       page: { partial: true },
       totalMinutes: 0,

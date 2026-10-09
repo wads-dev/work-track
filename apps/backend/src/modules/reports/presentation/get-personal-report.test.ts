@@ -59,5 +59,5 @@ it('accepts a31 civil day range spanning fall DST', async () => {
       },
       auth,
     ),
-  ).resolves.toMatchObject({ policy: 'personal-v2' });
+  ).resolves.toMatchObject({ policy: 'personal-v3' });
 });

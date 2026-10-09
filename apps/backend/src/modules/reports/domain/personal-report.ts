@@ -7,7 +7,7 @@ export interface PersonalReportInput {
   cursor?: string;
 }
 export interface PersonalReport {
-  policy: 'personal-v2';
+  policy: 'personal-v3';
   budgetTimeZone: 'America/Sao_Paulo';
   asOf: string;
   from: string;

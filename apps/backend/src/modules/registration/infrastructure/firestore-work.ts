@@ -1,4 +1,8 @@
 import { createHash } from 'node:crypto';
+import {
+  selectPrevious,
+  type PreviousRecord,
+} from '../domain/close-previous.js';
 import { assertProjectWritable } from '../domain/project-management.js';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import type {
@@ -108,8 +112,11 @@ export class FirestoreWorkRepository implements WorkRepository {
       .collection('records')
       .doc(key);
     const projectRef = this.db.collection('projects').doc(input.projectId);
+    const fingerprintInput = { ...input };
+    if (fingerprintInput.closePrevious === false)
+      delete fingerprintInput.closePrevious;
     const fingerprint = createHash('sha256')
-      .update(JSON.stringify(input))
+      .update(JSON.stringify(fingerprintInput))
       .digest('hex');
     return this.db.runTransaction(async (tx) => {
       const [existing, projectDoc] = await Promise.all([
@@ -136,6 +143,48 @@ export class FirestoreWorkRepository implements WorkRepository {
           throw new Error(
             'Tópico não existe neste projeto. Use create_topic primeiro.',
           );
+      let previous:
+        { ref: typeof ref; data: Record<string, unknown> } | undefined;
+      if (input.closePrevious) {
+        const collection = this.db
+          .collection('users')
+          .doc(uid)
+          .collection('records');
+        if (input.closedPreviousRecordId) {
+          const candidateRef = collection.doc(input.closedPreviousRecordId),
+            candidate = await tx.get(candidateRef);
+          if (!candidate.exists)
+            throw new Error('Anterior explícito não encontrado.');
+          const data = candidate.data() as Record<string, unknown>;
+          selectPrevious(
+            [{ ...data, id: candidate.id } as unknown as PreviousRecord],
+            uid,
+            input.projectId,
+            input.startedAt,
+            input.closedPreviousRecordId,
+          );
+          previous = { ref: candidateRef, data };
+        } else {
+          const snapshot = await tx.get(collection.limit(2001));
+          if (snapshot.docs.length > 2000)
+            throw new Error(
+              'Contexto de anteriores excede limite; informe closedPreviousRecordId explícito.',
+            );
+          const candidates = snapshot.docs.map(
+            (doc) => ({ ...doc.data(), id: doc.id }) as PreviousRecord,
+          );
+          const selected = selectPrevious(
+            candidates,
+            uid,
+            input.projectId,
+            input.startedAt,
+          );
+          if (selected) {
+            const doc = snapshot.docs.find((doc) => doc.id === selected.id)!;
+            previous = { ref: doc.ref, data: doc.data() };
+          }
+        }
+      }
       const record = JSON.parse(
         JSON.stringify({
           ...input,
@@ -144,6 +193,7 @@ export class FirestoreWorkRepository implements WorkRepository {
           uid,
           receivedAt: new Date().toISOString(),
           fingerprint,
+          ...(previous ? { closedPreviousRecordId: previous.ref.id } : {}),
           projectSnapshot: {
             title: project.title,
             description: project.description,
@@ -153,8 +203,44 @@ export class FirestoreWorkRepository implements WorkRepository {
           ),
         }),
       ) as Record<string, unknown>;
+      if (previous) {
+        const updatedAt = new Date().toISOString();
+        tx.update(previous.ref, {
+          endedAt: input.startedAt,
+          updatedAt,
+          updatedBy: uid,
+        });
+        tx.create(previous.ref.collection('audit').doc('close_' + key), {
+          authorUid: uid,
+          updatedAt,
+          reason: input.closePreviousReason,
+          action: 'confirmed-switch',
+          nextRecordId: key,
+          before: {
+            startedAt: previous.data.startedAt as string,
+            endedAt: null,
+            projectId: input.projectId,
+          },
+          after: {
+            startedAt: previous.data.startedAt as string,
+            endedAt: input.startedAt,
+            projectId: input.projectId,
+          },
+          recordedAt: FieldValue.serverTimestamp(),
+        });
+      }
       tx.create(ref, { ...record, recordedAt: FieldValue.serverTimestamp() });
-      return { ...record, duplicate: false };
+      return {
+        ...record,
+        duplicate: false,
+        ...(input.closePrevious && !previous
+          ? {
+              warnings: [
+                'Nenhum anterior aberto elegível encontrado; nenhum registro anterior foi encerrado.',
+              ],
+            }
+          : {}),
+      };
     });
   }
 }

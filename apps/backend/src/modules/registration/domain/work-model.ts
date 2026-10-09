@@ -18,6 +18,14 @@ export const registerInput = z
     startedAt: instant.describe(
       'Início efetivo inferido da fala; ISO 8601 com fuso. Nunca use o horário de chegada de uma transcrição atrasada como referência.',
     ),
+    closePrevious: z
+      .boolean()
+      .optional()
+      .describe(
+        'Padrão false. Só true após confirmação humana explícita para encerrar anterior no mesmo projeto.',
+      ),
+    closedPreviousRecordId: id.optional(),
+    closePreviousReason: z.string().trim().min(1).max(1000).optional(),
     endedAt: instant.optional(),
     commandAt: instant
       .optional()
@@ -67,6 +75,13 @@ export const registerInput = z
       Date.parse(value.endedAt) < Date.parse(value.startedAt)
     )
       error('Fim anterior ao início.');
+    if (value.closePrevious && !value.closePreviousReason)
+      error('Encerramento confirmado exige motivo.');
+    if (
+      !value.closePrevious &&
+      (value.closedPreviousRecordId || value.closePreviousReason)
+    )
+      error('Encerramento exige closePrevious true explícito.');
     const topics = value.topics ?? [];
     if (new Set(topics.map((topic) => topic.topicId)).size !== topics.length)
       error('Tópicos duplicados.');

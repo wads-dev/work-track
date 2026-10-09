@@ -8,12 +8,22 @@
 
 ## Próximas entregas planejadas
 
+- [ ] Arquivar/desarquivar projetos e listar arquivados. Ocultar nos relatórios/calendário por padrão sem apagar registros; distinguir arquivamento manual de origem mesclada. Definir efeito no orçamento global sem fabricar saldo. Arquivar não melhora custo sozinho sem queries/indexação.
+
 - [x] Dashboard pessoal: distribuição de tempo por projeto em dia, semana e mês, via relatório calculado e paginação explícita.
 - [x] Calendário pessoal semanal/mensal com atividades coloridas, sobreposições e estimativas identificadas. Visualização responsiva por dia, sem drag-and-drop.
 - [ ] Refinar reconciliação e limites de relatórios para considerar o contexto completo entre projetos/páginas.
 - [ ] Testes completos das regras no Firebase Emulator e execução real do Docker Compose, além da validação estática atual.
 - [ ] Refinamento visual e redução do bundle frontend; ícones consistentes nas ações de detalhe/auditoria.
 - [ ] Edição de início e revisão da política de histórico: horários/projeto precisam histórico; mudança só de tópico não precisa histórico segundo solicitação de Victor. Implementação atual registra todas alterações.
+
+## Performance — evolução futura, não iniciar nesta rodada
+
+- [ ] Medir latência, leituras e custo dos relatórios com volume representativo.
+- [ ] Indexar intervalos com timestamps normalizados por pessoa/período, incluindo fatos que atravessam dias.
+- [ ] Consolidar dias/meses encerrados sem apagar registros originais nem evidências.
+- [ ] Invalidar/recalcular somente períodos afetados por edição, merge ou registro retroativo; versionar políticas.
+- [ ] Avaliar cache/materialização e processamento incremental com garantias de consistência do orçamento global.
 
 ## Futuro — não implementar agora
 

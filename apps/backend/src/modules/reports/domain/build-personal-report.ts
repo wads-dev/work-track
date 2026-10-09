@@ -19,12 +19,12 @@ export function buildPersonalReport(
   const from = Date.parse(input.from),
     to = Date.parse(input.to),
     warnings = new Set<string>([
-      'Política personal-v2: orçamento global8h pessoa/dia America/Sao_Paulo allprojects/full-context, saldo cronológico start/id e próximo início próprio crossproject.',
+      'Política personal-v3: orçamento global8h pessoa/dia America/Sao_Paulo allprojects/full-context, saldo cronológico start/id e próximo início próprio no mesmo projeto; fechados menores que15min ignorados como corte.',
       'Estimativas não persistidas; fatos fechados preservados. Intervalos são recortados somente para visualização no período.',
       'Sobreposições são somadas; interrupções não são descontadas automaticamente.',
     ]);
   const result: PersonalReport = {
-    policy: 'personal-v2',
+    policy: 'personal-v3',
     budgetTimeZone: 'America/Sao_Paulo',
     asOf: new Date(asOf).toISOString(),
     from: input.from,

@@ -105,7 +105,7 @@ export function registerWorkTools(
     'register',
     {
       description:
-        'Registre atividade do usuário autenticado: projeto e início obrigatórios; fim opcional, nunca invente. Resolva tempos relativos ao momento da fala, não ao recebimento de transcrição. Preserve texto e interpretação. Aceita vários tópicos existentes e percentuais/durações somente informados; não reparte automaticamente. Sem tópicos usa Geral. Preserve interrupções e sobreposições; não encerra registros anteriores. Vários projetos: uma chamada por projeto. Reutilize requestId nos retries.',
+        'Registre atividade do usuário autenticado: projeto e início obrigatórios; fim opcional, nunca invente. Resolva tempos relativos ao momento da fala, não ao recebimento de transcrição. Preserve texto e interpretação. Aceita vários tópicos existentes e percentuais/durações somente informados; não reparte automaticamente. Sem tópicos usa Geral. Preserve interrupções e sobreposições; não encerra registros anteriores. Vários projetos: uma chamada por projeto. closePrevious padrão false; pergunte e obtenha confirmação humana explícita antes de true, exige motivo; múltiplos abertos exigem closedPreviousRecordId explícito, nunca adivinhe. Reutilize requestId nos retries.',
       inputSchema: registerInput,
     },
     (input) =>
@@ -121,26 +121,31 @@ export function registerWorkTools(
             ...saved,
             openRecords: previous,
             openRecordsPartial: open.partial,
-            warnings: previous.length
-              ? [
-                  'Há registros ainda abertos. Confirme troca de atividade ou simultaneidade; nada foi encerrado automaticamente.',
-                  ...(open.partial
-                    ? [
-                        'Lista de abertos parcial: até 10 itens de uma leitura limitada a 500 registros.',
-                      ]
-                    : []),
-                ]
-              : open.partial
+            warnings: [
+              ...(Array.isArray(saved.warnings)
+                ? (saved.warnings as string[])
+                : []),
+              ...(previous.length
                 ? [
-                    'Lista de abertos parcial; não é possível afirmar que todos foram conciliados.',
+                    'Há registros ainda abertos. Confirme troca de atividade ou simultaneidade; nada foi encerrado automaticamente.',
+                    ...(open.partial
+                      ? [
+                          'Lista de abertos parcial: até 10 itens de uma leitura limitada a 500 registros.',
+                        ]
+                      : []),
                   ]
-                : [],
+                : open.partial
+                  ? [
+                      'Lista de abertos parcial; não é possível afirmar que todos foram conciliados.',
+                    ]
+                  : []),
+            ],
           };
         } catch {
           return {
             ...saved,
             warnings: [
-              'Registro salvo, mas não foi possível consultar atividades abertas. Nenhuma atividade foi encerrada.',
+              'Registro salvo, mas não foi possível consultar atividades abertas. Verifique closedPreviousRecordId para eventual encerramento confirmado; não houve encerramento automático.',
             ],
             openRecords: [],
             openRecordsPartial: true,
