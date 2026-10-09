@@ -1,14 +1,9 @@
+import { Button } from './components/ui/button';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { Label } from './components/ui/label';
+import { Checkbox } from './components/ui/checkbox';
+import { Input } from './components/ui/input';
 import { useEffect, useReducer, useRef, useState } from 'react';
-import {
-  Alert,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { createProjectDeletion, downloadProjectJson } from './project-deletion';
@@ -88,51 +83,53 @@ export function ProjectDeletion({
   }, [flow, functions, uid]);
   const state = flow.snapshot();
   return (
-    <Paper
-      component="section"
-      aria-label="Exclusão permanente"
-      variant="outlined"
-      sx={{ p: 2, mt: 3, borderColor: 'error.main' }}
+    <section
+      aria-label={'Exclusão permanente'}
+      className="mt-6 rounded-xl border border-destructive bg-card p-4 text-card-foreground"
     >
-      <Stack spacing={2}>
-        <Typography component="h3" variant="h6" color="error">
+      <div className="flex flex-col gap-4">
+        <h3 className="text-lg font-semibold text-destructive">
           Zona de perigo · exclusão permanente
-        </Typography>
-        <Typography variant="body2">
+        </h3>
+        <p className="text-sm">
           Diferente de arquivar: apagar remove definitivamente o projeto e seus
           dados.
-        </Typography>
+        </p>
         {!expanded ? (
           <Button
-            color="error"
             onClick={() => {
               flow.reset();
               setExpanded(true);
             }}
+            variant="destructive"
+            className="min-h-11"
           >
             Preparar exclusão permanente
           </Button>
         ) : (
           <>
-            <Alert severity="error">
-              Esta operação é irreversível. Apaga o projeto, tópicos e registros
-              vinculados, inclusive os de outras pessoas em projetos
-              corporativos. As horas deixam de participar de relatórios e podem
-              alterar o orçamento global diário. O JSON é uma cópia de
-              segurança, não uma restauração automática.
+            <Alert variant="destructive" className="my-2">
+              <AlertDescription>
+                Esta operação é irreversível. Apaga o projeto, tópicos e
+                registros vinculados, inclusive os de outras pessoas em projetos
+                corporativos. As horas deixam de participar de relatórios e
+                podem alterar o orçamento global diário. O JSON é uma cópia de
+                segurança, não uma restauração automática.
+              </AlertDescription>
             </Alert>
-            <Typography variant="body2">
+            <p className="text-sm">
               Primeiro exporte todos os dados e inicie o download do JSON. O
               navegador não consegue verificar se o arquivo foi salvo no disco:
               confira o download e abra o arquivo antes de confirmar. Baixar não
               exclui nada.
-            </Typography>
+            </p>
             <Button
-              variant="outlined"
               disabled={!!state.busy}
               onClick={() => {
                 void flow.download();
               }}
+              variant="outline"
+              className="min-h-11"
             >
               {state.busy === 'export'
                 ? 'Exportando…'
@@ -140,49 +137,75 @@ export function ProjectDeletion({
                   ? 'Exportar e baixar novo JSON'
                   : 'Exportar e baixar JSON completo'}
             </Button>
-            {state.error && <Alert severity="error">{state.error}</Alert>}
+            {state.error && (
+              <Alert variant="destructive" className="my-2">
+                <AlertDescription>{state.error}</AlertDescription>
+              </Alert>
+            )}
             {state.backup && (
               <>
-                <Alert severity="info">
-                  Download iniciado. Confira e salve o JSON. Se os dados mudarem
-                  no servidor, será necessário baixar outro backup.
+                <Alert className="my-2">
+                  <AlertDescription>
+                    Download iniciado. Confira e salve o JSON. Se os dados
+                    mudarem no servidor, será necessário baixar outro backup.
+                  </AlertDescription>
                 </Alert>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={state.saved}
-                      disabled={!!state.busy}
-                      onChange={(_, saved) =>
-                        flow.confirm(saved, state.typed, state.reason)
-                      }
-                    />
-                  }
-                  label="Confirmei que o JSON completo foi salvo e está acessível"
-                />
-                <TextField
-                  label="Digite o nome exato do projeto ou seu ID"
-                  helperText={'Nome: ' + title + ' · ID: ' + projectId}
-                  value={state.typed}
-                  disabled={!!state.busy}
-                  onChange={(event) =>
-                    flow.confirm(state.saved, event.target.value, state.reason)
-                  }
-                />
-                <TextField
-                  label="Motivo da exclusão"
-                  value={state.reason}
-                  disabled={!!state.busy}
-                  onChange={(event) =>
-                    flow.confirm(state.saved, state.typed, event.target.value)
-                  }
-                />
+                <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+                  <Checkbox
+                    checked={state.saved}
+                    disabled={!!state.busy}
+                    onCheckedChange={(checked) =>
+                      flow.confirm(checked === true, state.typed, state.reason)
+                    }
+                  />
+                  <span>
+                    {'Confirmei que o JSON completo foi salvo e está acessível'}
+                  </span>
+                </Label>
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor={'ProjectDeletion-5229'}>
+                    {'Digite o nome exato do projeto ou seu ID'}
+                  </Label>
+                  <Input
+                    value={state.typed}
+                    disabled={!!state.busy}
+                    onChange={(event) =>
+                      flow.confirm(
+                        state.saved,
+                        event.target.value,
+                        state.reason,
+                      )
+                    }
+                    id={'ProjectDeletion-5229'}
+                    aria-describedby={'ProjectDeletion-5229-help'}
+                  ></Input>
+                  <p
+                    id="ProjectDeletion-5229-help"
+                    className="text-xs text-muted-foreground"
+                  >
+                    {'Nome: ' + title + ' · ID: ' + projectId}
+                  </p>
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor={'ProjectDeletion-5633'}>
+                    {'Motivo da exclusão'}
+                  </Label>
+                  <Input
+                    value={state.reason}
+                    disabled={!!state.busy}
+                    onChange={(event) =>
+                      flow.confirm(state.saved, state.typed, event.target.value)
+                    }
+                    id={'ProjectDeletion-5633'}
+                  ></Input>
+                </div>
                 <Button
-                  variant="contained"
-                  color="error"
                   disabled={!flow.canDelete()}
                   onClick={() => {
                     void flow.delete();
                   }}
+                  variant="destructive"
+                  className="min-h-11"
                 >
                   {state.busy === 'delete'
                     ? 'Excluindo…'
@@ -196,12 +219,14 @@ export function ProjectDeletion({
                 flow.reset();
                 setExpanded(false);
               }}
+              variant="ghost"
+              className="min-h-11"
             >
               Cancelar e descartar confirmações
             </Button>
           </>
         )}
-      </Stack>
-    </Paper>
+      </div>
+    </section>
   );
 }

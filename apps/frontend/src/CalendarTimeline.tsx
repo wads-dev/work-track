@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { cn } from './lib/utils';
+import { Button } from './components/ui/button';
 import {
-  Stack,
-  Alert,
-  Box,
-  Button,
-  Paper,
   Tooltip,
-  Typography,
-} from '@mui/material';
+  TooltipTrigger,
+  TooltipContent,
+} from './components/ui/tooltip';
+import { Card } from './components/ui/card';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { useState } from 'react';
+
 import { contextualRecordPath } from './routes';
 import { Link as RouterLink } from 'react-router-dom';
 import {
@@ -103,8 +104,10 @@ export function CalendarTimeline({
   );
   if (!span)
     return (
-      <Alert severity="info">
-        Nenhum intervalo nesta página para exibir na linha do tempo.
+      <Alert>
+        <AlertDescription>
+          Nenhum intervalo nesta página para exibir na linha do tempo.
+        </AlertDescription>
       </Alert>
     );
   const px = 1.1;
@@ -130,82 +133,59 @@ export function CalendarTimeline({
     ':' +
     String(m % 60).padStart(2, '0');
   return (
-    <Box>
-      <Box
-        sx={{ overflowX: 'auto', p: 1 }}
+    <div>
+      <div
         tabIndex={0}
         aria-label="Linha do tempo alinhada; role para ver todos os dias"
+        className={cn('overflow-x-auto p-2')}
       >
-        <Box
-          sx={{
-            display: 'grid',
+        <div
+          className={cn('grid gap-2')}
+          style={{
             gridTemplateColumns:
               view === 'month'
                 ? 'repeat(7,minmax(100px,1fr))'
                 : 'repeat(' + Math.min(days.length, 7) + ',minmax(240px,1fr))',
             minWidth: view === 'month' ? 700 : Math.min(days.length, 7) * 240,
-            gap: 1,
           }}
         >
           {data.map((d) => (
-            <Paper key={d.key} sx={{ p: 1, borderRadius: 2 }}>
-              <Typography
-                component="h3"
-                variant="subtitle2"
-                sx={{
-                  textAlign: 'center',
-                  height: 48,
-                  position: 'relative',
-                  minWidth: 0,
-                }}
+            <Card key={d.key} className={cn('gap-0 p-2 rounded-lg')}>
+              <h3
+                className={cn(
+                  'text-sm font-medium text-center h-12 relative min-w-0',
+                )}
               >
                 {d.key}
-              </Typography>
+              </h3>
               {d.outside && (
-                <Typography
-                  variant="caption"
-                  sx={{
-                    position: 'absolute',
-                    mt: -3,
-                    fontSize: 10,
-                    maxWidth: 210,
-                    overflowWrap: 'anywhere',
-                  }}
+                <span
+                  className={cn(
+                    'text-xs absolute -mt-6 text-[10px] max-w-[210px] [overflow-wrap:anywhere]',
+                  )}
                 >
                   Fora do mês consultado — sem cobertura
-                </Typography>
+                </span>
               )}
-              <Box sx={{ height: height + 30, position: 'relative', pl: 6 }}>
+              <div
+                className={cn('relative pl-12')}
+                style={{ height: height + 30 }}
+              >
                 {ticks.map((minute, i) => (
-                  <Box
+                  <div
                     key={i}
-                    sx={{
-                      position: 'absolute',
-                      top: 15 + projectMinute(minute, segments),
-                      left: 0,
-                      right: 0,
-                    }}
+                    className={cn('absolute left-0 right-0')}
+                    style={{ top: 15 + projectMinute(minute, segments) }}
                   >
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        position: 'absolute',
-                        left: 0,
-                        width: 42,
-                        lineHeight: 1,
-                        transform: 'translateY(-50%)',
-                      }}
+                    <span
+                      className={cn(
+                        'text-xs absolute left-0 w-[42px] leading-none -translate-y-1/2',
+                      )}
                     >
                       {clock(minute)}
-                    </Typography>
-                    <Box
-                      sx={{
-                        ml: 6,
-                        borderTop: '1px solid',
-                        borderColor: 'divider',
-                      }}
-                    />
-                  </Box>
+                    </span>
+                    <div className={cn('ml-12 border-t')} />
+                  </div>
                 ))}
                 {segments
                   .filter((s) =>
@@ -232,31 +212,19 @@ export function CalendarTimeline({
                             : [...expanded, key],
                         });
                       }}
-                      sx={{
-                        position: 'absolute',
-                        top: 15 + s.top,
-                        left: 48,
-                        right: 0,
-                        height: s.collapsed ? 32 : 24,
-                        minHeight: 0,
-                        p: 0,
-                        fontSize: 10,
-                        zIndex: 2,
-                        bgcolor: 'action.hover',
-                      }}
+                      variant="ghost"
+                      className={cn(
+                        'absolute left-12 right-0 min-h-0 p-0 text-[10px] z-[2] bg-muted',
+                      )}
+                      style={{ top: 15 + s.top, height: s.collapsed ? 32 : 24 }}
                     >
                       … {clock(s.start)}–{clock(s.end)} ·{' '}
                       {(s.end - s.start) / 60}h sem atividades
                     </Button>
                   ))}
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 15,
-                    left: 48,
-                    right: 0,
-                    height,
-                  }}
+                <div
+                  className={cn('absolute top-[15px] left-12 right-0')}
+                  style={{ height }}
                 >
                   {d.events.map((e) => {
                     const caption =
@@ -278,108 +246,116 @@ export function CalendarTimeline({
                           e.item.uid || viewerUid,
                           e.item.id,
                         ])}
-                        title={
-                          (e.item.uid ? authorLabel(e.item.uid) + ' · ' : '') +
-                          caption
-                        }
                       >
-                        <Button
-                          component={
-                            e.item.uid && e.item.uid !== viewerUid
-                              ? 'span'
-                              : RouterLink
-                          }
-                          to={
-                            e.item.uid && e.item.uid !== viewerUid
-                              ? undefined
-                              : contextualRecordPath(
-                                  returnTo.split('?')[0],
-                                  returnTo.includes('?')
-                                    ? '?' +
-                                        returnTo.split('?').slice(1).join('?')
-                                    : '',
-                                  e.item.id,
-                                )
-                          }
-                          tabIndex={0}
-                          aria-label={
-                            (e.item.uid
-                              ? authorLabel(e.item.uid) + ' · '
-                              : '') + caption
-                          }
-                          sx={{
-                            position: 'absolute',
-                            top: projectMinute(e.wallStart, segments),
-                            height:
-                              projectMinute(e.wallEnd, segments) -
-                              projectMinute(e.wallStart, segments),
-                            minHeight: 0,
-                            left: (e.column / e.columns) * 100 + '%',
-                            width: 100 / e.columns + '%',
-                            minWidth: 0,
-                            p: 0,
-                            borderRadius: 0.5,
-                            boxSizing: 'border-box',
-                            border: '1px solid',
-                            borderColor: color(e.item.projectId),
-                            borderLeft: '4px solid ' + color(e.item.projectId),
-                            bgcolor: 'background.paper',
-                            color: 'text.primary',
-                            overflow: 'hidden',
-                            textAlign: 'left',
-                            display: 'block',
-                            fontSize: 11,
-                            lineHeight: 1.15,
-                          }}
-                        >
-                          {(e.wallEnd - e.wallStart) * px >= 22 ? (
-                            <Typography
-                              component="span"
-                              sx={{
-                                display: 'block',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                fontSize: 11,
-                                px: 0.5,
-                              }}
-                            >
-                              {e.item.uid
+                        <TooltipTrigger asChild>
+                          <Button
+                            tabIndex={0}
+                            aria-label={
+                              (e.item.uid
                                 ? authorLabel(e.item.uid) + ' · '
-                                : ''}
-                              {time(e.start)} {label(e.item.projectId)}
-                              {e.item.estimated ? ' ◷' : ''}
-                              {e.overlap ? ' ⇆' : ''}
-                            </Typography>
-                          ) : (
-                            <Box
-                              component="span"
-                              aria-hidden="true"
-                              sx={{
-                                display: 'block',
-                                width: '100%',
-                                height: '100%',
-                                bgcolor: color(e.item.projectId),
-                              }}
-                            />
-                          )}
-                        </Button>
+                                : '') + caption
+                            }
+                            asChild
+                            variant="ghost"
+                            className={cn(
+                              'absolute min-h-0 min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-[11px] leading-[1.15]',
+                            )}
+                            style={{
+                              top: projectMinute(e.wallStart, segments),
+                              height:
+                                projectMinute(e.wallEnd, segments) -
+                                projectMinute(e.wallStart, segments),
+                              left: (e.column / e.columns) * 100 + '%',
+                              width: 100 / e.columns + '%',
+                              borderColor: color(e.item.projectId),
+                            }}
+                          >
+                            {e.item.uid && e.item.uid !== viewerUid ? (
+                              <span tabIndex={0}>
+                                {(e.wallEnd - e.wallStart) * px >= 22 ? (
+                                  <span
+                                    className={cn(
+                                      'text-base block whitespace-nowrap overflow-hidden text-ellipsis text-[11px] px-1',
+                                    )}
+                                  >
+                                    {e.item.uid
+                                      ? authorLabel(e.item.uid) + ' · '
+                                      : ''}
+                                    {time(e.start)}
+                                    {label(e.item.projectId)}
+                                    {e.item.estimated ? ' ◷' : ''}
+                                    {e.overlap ? ' ⇆' : ''}
+                                  </span>
+                                ) : (
+                                  <span
+                                    aria-hidden="true"
+                                    className={cn('block w-full h-full')}
+                                    style={{
+                                      backgroundColor: color(e.item.projectId),
+                                    }}
+                                  />
+                                )}
+                              </span>
+                            ) : (
+                              <RouterLink
+                                to={
+                                  contextualRecordPath(
+                                    returnTo.split('?')[0],
+                                    returnTo.includes('?')
+                                      ? '?' +
+                                          returnTo.split('?').slice(1).join('?')
+                                      : '',
+                                    e.item.id,
+                                  ) ?? '#'
+                                }
+                              >
+                                {(e.wallEnd - e.wallStart) * px >= 22 ? (
+                                  <span
+                                    className={cn(
+                                      'text-base block whitespace-nowrap overflow-hidden text-ellipsis text-[11px] px-1',
+                                    )}
+                                  >
+                                    {e.item.uid
+                                      ? authorLabel(e.item.uid) + ' · '
+                                      : ''}
+                                    {time(e.start)}
+                                    {label(e.item.projectId)}
+                                    {e.item.estimated ? ' ◷' : ''}
+                                    {e.overlap ? ' ⇆' : ''}
+                                  </span>
+                                ) : (
+                                  <span
+                                    aria-hidden="true"
+                                    className={cn('block w-full h-full')}
+                                    style={{
+                                      backgroundColor: color(e.item.projectId),
+                                    }}
+                                  />
+                                )}
+                              </RouterLink>
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {(e.item.uid ? authorLabel(e.item.uid) + ' · ' : '') +
+                            caption}
+                        </TooltipContent>
                       </Tooltip>
                     );
                   })}
-                </Box>
-              </Box>
-            </Paper>
+                </div>
+              </div>
+            </Card>
           ))}
-        </Box>
-      </Box>
+        </div>
+      </div>
       {renderProject && (
-        <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', mt: 1 }}>
+        <div className={cn('flex flex-row gap-2 flex-wrap mt-2')}>
           {Array.from(new Set(items.map((i) => i.projectId))).map((id) => (
-            <Box key={id}>{renderProject(id)}</Box>
+            <div key={id}>{renderProject(id)}</div>
           ))}
-        </Stack>
+        </div>
       )}
-    </Box>
+    </div>
   );
 }

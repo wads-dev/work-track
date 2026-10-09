@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Box, Typography } from '@mui/material';
 export function PageHeader({
   title,
   context,
@@ -12,40 +11,18 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <Box
-      component="section"
+    <section
       aria-label={title + ' e filtros'}
-      sx={{
-        mb: 2,
-        p: { xs: 2.5, sm: 3 },
-        bgcolor: 'background.paper',
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: '12px',
-      }}
+      className="mb-4 rounded-xl border bg-card p-5 sm:p-6"
     >
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'minmax(0,1fr)',
-            sm: 'minmax(0,1fr) auto',
-          },
-          gap: 2,
-          alignItems: 'start',
-        }}
-      >
-        <Box>
-          <Typography component="h1" sx={{ fontSize: 22, fontWeight: 650 }}>
-            {title}
-          </Typography>
-          <Typography sx={{ fontSize: 14 }} color="text.secondary">
-            {context}
-          </Typography>
-        </Box>
+      <div className="grid min-w-0 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div>
+          <h1 className="text-[22px] font-semibold">{title}</h1>
+          <p className="text-sm text-muted-foreground">{context}</p>
+        </div>
         {actions}
-      </Box>
+      </div>
       {children}
-    </Box>
+    </section>
   );
 }

@@ -1,6 +1,8 @@
 node_modules/
 .npm-cache/
 lib/
+!apps/frontend/src/lib/
+!apps/frontend/src/lib/**
 dist/
 coverage/
 .firebase/

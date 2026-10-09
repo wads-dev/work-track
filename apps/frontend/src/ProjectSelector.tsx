@@ -1,10 +1,8 @@
-import { useMemo, useState } from 'react';
-import {
-  Autocomplete,
-  TextField,
-  type SxProps,
-  type Theme,
-} from '@mui/material';
+import { useId, useMemo, useState } from 'react';
+import { Input } from './components/ui/input';
+import { Label } from './components/ui/label';
+import { Button } from './components/ui/button';
+import { cn } from './lib/utils';
 import { matchesProject, type ProjectOption } from './project-search';
 export function ProjectSelector({
   projects,
@@ -13,7 +11,7 @@ export function ProjectSelector({
   loading = false,
   error = '',
   label = 'Projeto',
-  sx,
+  className,
   allowAll = true,
   disabled = false,
 }: {
@@ -23,10 +21,11 @@ export function ProjectSelector({
   loading?: boolean;
   error?: string;
   label?: string;
-  sx?: SxProps<Theme>;
+  className?: string;
   allowAll?: boolean;
   disabled?: boolean;
 }) {
+  const id = useId();
   const options = useMemo(
     () =>
       allowAll
@@ -43,49 +42,156 @@ export function ProjectSelector({
     label: string;
     query: string;
   } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
   const inputValue =
     input?.id === projectId && input.label === selected.label
       ? input.query
       : selected.label;
+  const filtered = options.filter((option) =>
+    matchesProject(option, inputValue),
+  );
+  function choose(option: ProjectOption) {
+    setInput(null);
+    setOpen(false);
+    setActive(-1);
+    onChange(option.id);
+  }
   return (
-    <Autocomplete
-      size="small"
-      sx={sx ?? { width: { xs: '100%', sm: 240 }, minWidth: 0 }}
-      options={options}
-      value={selected}
-      inputValue={inputValue}
-      disabled={disabled}
-      getOptionLabel={(option) => option.label}
-      getOptionKey={(option) => option.id}
-      isOptionEqualToValue={(a, b) => a.id === b.id}
-      filterOptions={(items, state) =>
-        items.filter((option) => matchesProject(option, state.inputValue))
-      }
-      onInputChange={(_, value, reason) => {
-        if (reason === 'input')
-          setInput({ id: projectId, label: selected.label, query: value });
-      }}
-      onChange={(_, option, reason) => {
-        if (reason === 'selectOption' || reason === 'clear') {
+    <div
+      className={cn('relative w-full min-w-0 space-y-1.5 sm:w-60', className)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false);
           setInput(null);
-          onChange(option?.id ?? '');
+          setActive(-1);
         }
       }}
-      loading={loading}
-      loadingText="Carregando projetos…"
-      noOptionsText="Nenhum projeto encontrado"
-      clearText="Limpar projeto"
-      openText="Pesquisar projetos"
-      closeText="Fechar projetos"
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          label={label}
+    >
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-1">
+        <Input
+          id={id}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={id + '-list'}
+          aria-activedescendant={
+            open && active >= 0 && filtered[active]
+              ? id + '-option-' + active
+              : undefined
+          }
+          aria-invalid={!!error}
+          aria-describedby={error ? id + '-error' : undefined}
           placeholder="Pesquisar projeto"
-          error={!!error}
-          helperText={error || undefined}
+          disabled={disabled}
+          value={inputValue}
+          onFocus={() => setOpen(true)}
+          onChange={(event) => {
+            setInput({
+              id: projectId,
+              label: selected.label,
+              query: event.target.value,
+            });
+            setOpen(true);
+            setActive(-1);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              setOpen(true);
+              setActive((previous) =>
+                filtered.length
+                  ? event.key === 'ArrowDown'
+                    ? (previous + 1) % filtered.length
+                    : previous <= 0
+                      ? filtered.length - 1
+                      : previous - 1
+                  : -1,
+              );
+            } else if (
+              event.key === 'Enter' &&
+              open &&
+              active >= 0 &&
+              filtered[active]
+            ) {
+              event.preventDefault();
+              choose(filtered[active]);
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              setOpen(false);
+              setInput(null);
+              setActive(-1);
+            }
+          }}
         />
+        {projectId && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Limpar projeto"
+            disabled={disabled}
+            onClick={() => {
+              setInput(null);
+              onChange('');
+            }}
+          >
+            ×
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={open ? 'Fechar projetos' : 'Pesquisar projetos'}
+          disabled={disabled}
+          onClick={() => {
+            setOpen(!open);
+            setActive(-1);
+          }}
+        >
+          ⌄
+        </Button>
+      </div>
+      {open && !disabled && (
+        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+          <ul
+            id={id + '-list'}
+            role="listbox"
+            aria-label={label}
+            aria-busy={loading}
+          >
+            {filtered.map((option, index) => (
+              <li
+                key={option.id}
+                id={id + '-option-' + index}
+                role="option"
+                aria-selected={option.id === projectId}
+                className={cn(
+                  'cursor-pointer rounded-sm px-3 py-2 text-sm [overflow-wrap:anywhere]',
+                  active === index && 'bg-accent text-accent-foreground',
+                )}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseMove={() => setActive(index)}
+                onClick={() => choose(option)}
+              >
+                {option.label}
+              </li>
+            ))}
+          </ul>
+          {!filtered.length && (
+            <p role="status" className="p-3 text-sm text-muted-foreground">
+              {loading ? 'Carregando projetos…' : 'Nenhum projeto encontrado'}
+            </p>
+          )}
+        </div>
       )}
-    />
+      {error && (
+        <p id={id + '-error'} role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

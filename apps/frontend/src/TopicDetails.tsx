@@ -1,19 +1,16 @@
+import { TableHead } from './components/ui/table';
+import { cn } from './lib/utils';
+import { Button } from './components/ui/button';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { TableCell } from './components/ui/table';
+import { TableRow } from './components/ui/table';
+import { TableHeader } from './components/ui/table';
+import { TableBody } from './components/ui/table';
+import { Table } from './components/ui/table';
+import { Card } from './components/ui/card';
+import { Skeleton } from './components/ui/skeleton';
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Button,
-  CircularProgress,
-  Link,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-} from '@mui/material';
+
 import { httpsCallable, type Functions } from 'firebase/functions';
 import {
   Link as RouterLink,
@@ -122,20 +119,35 @@ export function TopicDetails({
   ]);
   const current = state.identity === identity ? state : undefined;
   if (projects.loading)
-    return <CircularProgress aria-label="Carregando assunto" />;
-  if (projects.error) return <Alert severity="error">{projects.error}</Alert>;
+    return (
+      <Skeleton
+        role="status"
+        aria-label="Carregando assunto"
+        className={cn('size-6 rounded-full')}
+      />
+    );
+  if (projects.error)
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{projects.error}</AlertDescription>
+      </Alert>
+    );
   if (hidden)
     return (
-      <Alert severity="info">
-        Assunto reservado ou projeto indisponível. Revele o conteúdo autorizado
-        para consultar detalhes.
+      <Alert>
+        <AlertDescription>
+          Assunto reservado ou projeto indisponível. Revele o conteúdo
+          autorizado para consultar detalhes.
+        </AlertDescription>
       </Alert>
     );
   if (!canonical)
     return (
-      <Alert severity="error">
-        Assunto indisponível ou unificação inconsistente. Nenhum relatório
-        alternativo foi consultado.
+      <Alert variant="destructive">
+        <AlertDescription>
+          Assunto indisponível ou unificação inconsistente. Nenhum relatório
+          alternativo foi consultado.
+        </AlertDescription>
       </Alert>
     );
   const data = current?.data;
@@ -144,107 +156,115 @@ export function TopicDetails({
     'Assunto',
   );
   return (
-    <Stack spacing={2} sx={{ minWidth: 0 }}>
-      <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
-        <Link
-          component={RouterLink}
+    <div className={cn('flex flex-col min-w-0 gap-4')}>
+      <div className={cn('flex flex-row gap-2 flex-wrap')}>
+        <RouterLink
           to={'/projects/' + encodeURIComponent(projectId)}
+          className={cn('text-primary underline-offset-4 hover:underline')}
         >
           {text(project?.title, 'Projeto')}
-        </Link>
-        <Typography>/ {label}</Typography>
-      </Stack>
-      <Typography component="h1" variant="h4" sx={{ overflowWrap: 'anywhere' }}>
-        {label}
-      </Typography>
-      <Button
-        component={RouterLink}
-        to={safeReturnTo(params.get('returnTo'))}
-        sx={{ alignSelf: 'start' }}
+        </RouterLink>
+        <p className={cn('text-base')}>/ {label}</p>
+      </div>
+      <h1
+        className={cn(
+          'text-3xl font-semibold tracking-tight [overflow-wrap:anywhere]',
+        )}
       >
-        Voltar ao contexto
+        {label}
+      </h1>
+      <Button asChild variant="ghost" className={cn('self-start')}>
+        <RouterLink to={safeReturnTo(params.get('returnTo'))}>
+          Voltar ao contexto
+        </RouterLink>
       </Button>
       {topicId !== canonical && (
-        <Alert severity="info">
-          Este assunto foi unificado. Os fatos abaixo pertencem ao assunto
-          canônico{' '}
-          <Link
-            component={RouterLink}
-            to={topicDetailsPath(projectId, canonical) + location.search}
-          >
-            {label}
-          </Link>
-          .
+        <Alert>
+          <AlertDescription>
+            Este assunto foi unificado. Os fatos abaixo pertencem ao assunto
+            canônico{' '}
+            <RouterLink
+              to={topicDetailsPath(projectId, canonical) + location.search}
+              className={cn('text-primary underline-offset-4 hover:underline')}
+            >
+              {label}
+            </RouterLink>
+            .
+          </AlertDescription>
         </Alert>
       )}
       {current?.error ? (
-        <Alert
-          severity="error"
-          action={
-            <Button onClick={() => setAttempt((n) => n + 1)}>
-              Tentar novamente
-            </Button>
-          }
-        >
-          {current.error}
+        <Alert variant="destructive">
+          <AlertDescription>
+            {current.error}
+            <div className="mt-2">
+              <Button onClick={() => setAttempt((n) => n + 1)} variant="ghost">
+                Tentar novamente
+              </Button>
+            </div>
+          </AlertDescription>
         </Alert>
       ) : !data ? (
-        <CircularProgress aria-label="Carregando relatório do assunto" />
+        <Skeleton
+          role="status"
+          aria-label="Carregando relatório do assunto"
+          className={cn('size-6 rounded-full')}
+        />
       ) : (
         <>
-          <Paper sx={{ p: 3 }}>
-            <Stack spacing={1}>
-              <Typography component="h2" variant="h6">
+          <Card className={cn('gap-0 p-6')}>
+            <div className={cn('flex flex-col gap-2')}>
+              <h2 className={cn('text-lg font-semibold')}>
                 Histórico completo autorizado
-              </Typography>
-              <Typography>
+              </h2>
+              <p className={cn('text-base')}>
                 {data.occurrenceCount} registros com este assunto ·{' '}
                 {data.intervals.length} intervalos com horas computáveis
-              </Typography>
-              <Typography>
+              </p>
+              <p className={cn('text-base')}>
                 Primeiro registro iniciado:{' '}
                 {data.firstRecordStartedAt
                   ? date(data.firstRecordStartedAt)
                   : '—'}
-              </Typography>
-              <Typography>
+              </p>
+              <p className={cn('text-base')}>
                 Último registro iniciado:{' '}
                 {data.lastRecordStartedAt
                   ? date(data.lastRecordStartedAt)
                   : '—'}
-              </Typography>
+              </p>
               {data.occurrenceCount === 0 && (
-                <Alert severity="info">
-                  Nenhum registro encontrado para este assunto.
+                <Alert>
+                  <AlertDescription>
+                    Nenhum registro encontrado para este assunto.
+                  </AlertDescription>
                 </Alert>
               )}
-              <Typography>
+              <p className={cn('text-base')}>
                 Tempo atribuído ao assunto: {hours(data.totalMinutes)}
-              </Typography>
-              <Typography>
+              </p>
+              <p className={cn('text-base')}>
                 Fatos encerrados: {hours(data.closedMinutes)} · Estimativas
                 abertas: {hours(data.estimatedMinutes)}
-              </Typography>
-              <Typography>
+              </p>
+              <p className={cn('text-base')}>
                 Intervalos completos dos registros:{' '}
                 {hours(data.fullRecordMinutes)} · Tempo sem divisão informada:{' '}
                 {hours(data.unassignedMinutes)}
-              </Typography>
-              <Typography variant="body2">
+              </p>
+              <p className={cn('text-sm')}>
                 As datas são inícios reais dos registros, inclusive registros
                 sem duração computável. Ocorrências não são horas; nenhuma
                 divisão proporcional é inventada. Estimativas abertas não
                 representam encerramento.
-              </Typography>
-            </Stack>
-          </Paper>
-          <Paper sx={{ p: 3, minWidth: 0 }}>
-            <Typography component="h2" variant="h6">
-              Participantes
-            </Typography>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
+              </p>
+            </div>
+          </Card>
+          <Card className={cn('gap-0 p-6 min-w-0')}>
+            <h2 className={cn('text-lg font-semibold')}>Participantes</h2>
+            <div className={cn('overflow-x-auto rounded-xl border')}>
+              <Table>
+                <TableHeader>
                   <TableRow>
                     {[
                       'Pessoa',
@@ -255,10 +275,10 @@ export function TopicDetails({
                       'Encerrado',
                       'Estimativa aberta',
                     ].map((h) => (
-                      <TableCell key={h}>{h}</TableCell>
+                      <TableHead key={h}>{h}</TableHead>
                     ))}
                   </TableRow>
-                </TableHead>
+                </TableHeader>
                 <TableBody>
                   {data.participants.map((p) => (
                     <TableRow key={p.uid}>
@@ -283,18 +303,20 @@ export function TopicDetails({
                   ))}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </div>
             {data.participants.length === 0 && (
-              <Typography>Sem participantes com registros.</Typography>
+              <p className={cn('text-base')}>
+                Sem participantes com registros.
+              </p>
             )}
-          </Paper>
+          </Card>
           {data.warnings.map((w, i) => (
-            <Alert severity="warning" key={i}>
-              {w}
+            <Alert key={i} className={cn('border-amber-500/50')}>
+              <AlertDescription>{w}</AlertDescription>
             </Alert>
           ))}
         </>
       )}
-    </Stack>
+    </div>
   );
 }

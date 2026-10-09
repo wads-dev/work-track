@@ -1,15 +1,18 @@
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { cn } from './lib/utils';
+import { Label } from './components/ui/label';
 import {
-  Box,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from './components/ui/select';
+import { Card } from './components/ui/card';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+
 import { hours } from './report-chart';
 import { Link as RouterLink } from 'react-router-dom';
-import { Link } from '@mui/material';
+
 import { topicDetailsPath } from './routes';
 
 /** View model only: callers must supply server-calculated allocations and safe labels. */
@@ -52,177 +55,173 @@ export function TopicReport({
   const active = buckets.find((bucket) => topicBucketKey(bucket) === selected);
   const maximum = Math.max(0, ...buckets.map((bucket) => bucket.minutes));
   return (
-    <Paper
-      component="section"
-      aria-label="Tempo por assunto"
-      sx={{ p: { xs: 2, sm: 2.5 }, minWidth: 0 }}
-    >
-      <Stack spacing={2}>
-        <Typography component="h3" variant="h6">
-          Tempo por assunto
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Distribuição informada pelo relatório. Assuntos de projetos diferentes
-          permanecem separados; tempo sem divisão não é repartido
-          automaticamente.
-        </Typography>
-        <Typography>
-          Não distribuído: {hours(unassignedMinutes)}. Tempo sem atribuição
-          válida; não é distribuído por projeto ou pessoa.
-        </Typography>
-        {buckets.length === 0 ? (
-          <Typography color="text.secondary">
-            Nenhum assunto com tempo neste escopo.
-          </Typography>
-        ) : (
-          <>
-            <TextField
-              select
-              label="Assunto e projeto"
-              value={active ? selected : ''}
-              onChange={(event) => setSelected(event.target.value)}
-              fullWidth
-              size="small"
-            >
-              <MenuItem value="">Todos os assuntos</MenuItem>
-              {buckets.map((bucket) => (
-                <MenuItem
-                  key={topicBucketKey(bucket)}
-                  value={topicBucketKey(bucket)}
+    <Card className="gap-0 py-0">
+      <section
+        aria-label="Tempo por assunto"
+        className={cn('p-4 sm:p-5 min-w-0')}
+      >
+        <div className={cn('flex flex-col gap-4')}>
+          <h3 className={cn('text-lg font-semibold')}>Tempo por assunto</h3>
+          <p className={cn('text-sm text-muted-foreground')}>
+            Distribuição informada pelo relatório. Assuntos de projetos
+            diferentes permanecem separados; tempo sem divisão não é repartido
+            automaticamente.
+          </p>
+          <p className={cn('text-base')}>
+            Não distribuído: {hours(unassignedMinutes)}. Tempo sem atribuição
+            válida; não é distribuído por projeto ou pessoa.
+          </p>
+          {buckets.length === 0 ? (
+            <p className={cn('text-base text-muted-foreground')}>
+              Nenhum assunto com tempo neste escopo.
+            </p>
+          ) : (
+            <>
+              <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
+                <span className="text-xs text-muted-foreground">
+                  {'Assunto e projeto'}
+                </span>
+                <Select
+                  value={(active ? selected : '') || '__all__'}
+                  onValueChange={(value) =>
+                    setSelected(value === '__all__' ? '' : value)
+                  }
                 >
-                  {bucket.projectLabel} ·{' '}
-                  {bucket.topicId === null
-                    ? 'Não distribuído'
-                    : bucket.topicLabel}
-                </MenuItem>
-              ))}
-            </TextField>
-            <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
-              {(active ? [active] : buckets).map((bucket) => (
-                <Box
-                  component="li"
-                  key={topicBucketKey(bucket)}
-                  sx={{ py: 1.5, borderBottom: 1, borderColor: 'divider' }}
-                >
-                  <Stack
-                    direction="row"
-                    sx={{ justifyContent: 'space-between', gap: 2 }}
+                  <SelectTrigger aria-label={'Assunto e projeto'}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todos os assuntos</SelectItem>
+                    {buckets.map((bucket) => (
+                      <SelectItem
+                        key={topicBucketKey(bucket)}
+                        value={topicBucketKey(bucket)}
+                      >
+                        {bucket.projectLabel} ·{' '}
+                        {bucket.topicId === null
+                          ? 'Não distribuído'
+                          : bucket.topicLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Label>
+              <ul className={cn('list-none p-0 m-0')}>
+                {(active ? [active] : buckets).map((bucket) => (
+                  <li
+                    key={topicBucketKey(bucket)}
+                    className={cn('py-3 border-b')}
                   >
-                    <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-                      <Typography>
-                        {bucket.topicId === null ? (
-                          'Não distribuído'
-                        ) : bucket.detailsAvailable && bucket.topicId ? (
-                          <Link
-                            component={RouterLink}
-                            onClick={(e) => e.stopPropagation()}
-                            to={
-                              topicDetailsPath(
-                                bucket.projectId,
-                                bucket.topicId,
-                              ) +
-                              '?returnTo=' +
-                              encodeURIComponent(
-                                location.pathname + location.search,
-                              )
-                            }
-                          >
-                            {bucket.topicLabel}
-                          </Link>
-                        ) : (
-                          bucket.topicLabel
+                    <div className={cn('flex flex-row justify-between gap-4')}>
+                      <div className={cn('min-w-0 [overflow-wrap:anywhere]')}>
+                        <p className={cn('text-base')}>
+                          {bucket.topicId === null ? (
+                            'Não distribuído'
+                          ) : bucket.detailsAvailable && bucket.topicId ? (
+                            <RouterLink
+                              onClick={(e) => e.stopPropagation()}
+                              to={
+                                topicDetailsPath(
+                                  bucket.projectId,
+                                  bucket.topicId,
+                                ) +
+                                '?returnTo=' +
+                                encodeURIComponent(
+                                  location.pathname + location.search,
+                                )
+                              }
+                              className={cn(
+                                'text-primary underline-offset-4 hover:underline',
+                              )}
+                            >
+                              {bucket.topicLabel}
+                            </RouterLink>
+                          ) : (
+                            bucket.topicLabel
+                          )}
+                        </p>
+                        <span className={cn('text-xs text-muted-foreground')}>
+                          {bucket.detailsAvailable ? (
+                            <RouterLink
+                              to={
+                                '/projects/' +
+                                encodeURIComponent(bucket.projectId) +
+                                '?returnTo=' +
+                                encodeURIComponent(
+                                  location.pathname + location.search,
+                                )
+                              }
+                              className={cn(
+                                'text-primary underline-offset-4 hover:underline',
+                              )}
+                            >
+                              {bucket.projectLabel}
+                            </RouterLink>
+                          ) : (
+                            bucket.projectLabel
+                          )}
+                        </span>
+                      </div>
+                      <p
+                        className={cn(
+                          'text-base whitespace-nowrap tabular-nums',
                         )}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {bucket.detailsAvailable ? (
-                          <Link
-                            component={RouterLink}
-                            to={
-                              '/projects/' +
-                              encodeURIComponent(bucket.projectId) +
-                              '?returnTo=' +
-                              encodeURIComponent(
-                                location.pathname + location.search,
-                              )
-                            }
-                          >
-                            {bucket.projectLabel}
-                          </Link>
-                        ) : (
-                          bucket.projectLabel
-                        )}
-                      </Typography>
-                    </Box>
-                    <Typography
-                      sx={{
-                        whiteSpace: 'nowrap',
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
+                      >
+                        {hours(bucket.minutes)}
+                      </p>
+                    </div>
+                    <div
+                      aria-hidden="true"
+                      className={cn(
+                        'h-1.5 bg-muted rounded mt-2 overflow-hidden',
+                      )}
                     >
-                      {hours(bucket.minutes)}
-                    </Typography>
-                  </Stack>
-                  <Box
-                    aria-hidden="true"
-                    sx={{
-                      height: 6,
-                      bgcolor: 'action.hover',
-                      borderRadius: 1,
-                      mt: 1,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        height: '100%',
-                        bgcolor: 'primary.main',
-                        width:
-                          (maximum > 0 ? (bucket.minutes / maximum) * 100 : 0) +
-                          '%',
-                      }}
-                    />
-                  </Box>
-                </Box>
-              ))}
-            </Box>
-            {active && (
-              <Box>
-                <Typography component="h4" variant="subtitle1">
-                  {personal
-                    ? 'Meu tempo neste assunto'
-                    : 'Pessoas neste assunto'}
-                </Typography>
-                <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
-                  {active.people.map((person) => (
-                    <Box
-                      component="li"
-                      key={person.key}
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: 2,
-                        py: 1,
-                      }}
-                    >
-                      <Typography sx={{ overflowWrap: 'anywhere' }}>
-                        {person.label}
-                      </Typography>
-                      <Typography sx={{ whiteSpace: 'nowrap' }}>
-                        {hours(person.minutes)}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-                {active.people.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    Detalhamento por pessoa indisponível neste escopo.
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </>
-        )}
-      </Stack>
-    </Paper>
+                      <div
+                        className={cn('h-full bg-primary')}
+                        style={{
+                          width:
+                            (maximum > 0
+                              ? (bucket.minutes / maximum) * 100
+                              : 0) + '%',
+                        }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {active && (
+                <div>
+                  <h4 className={cn('text-base font-medium')}>
+                    {personal
+                      ? 'Meu tempo neste assunto'
+                      : 'Pessoas neste assunto'}
+                  </h4>
+                  <ul className={cn('list-none p-0 m-0')}>
+                    {active.people.map((person) => (
+                      <li
+                        key={person.key}
+                        className={cn('flex justify-between gap-4 py-2')}
+                      >
+                        <p className={cn('text-base [overflow-wrap:anywhere]')}>
+                          {person.label}
+                        </p>
+                        <p className={cn('text-base whitespace-nowrap')}>
+                          {hours(person.minutes)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  {active.people.length === 0 && (
+                    <p className={cn('text-sm text-muted-foreground')}>
+                      Detalhamento por pessoa indisponível neste escopo.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+    </Card>
   );
 }

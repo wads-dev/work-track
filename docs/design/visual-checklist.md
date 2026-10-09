@@ -67,7 +67,7 @@ P1 adicionais: remover emailduplicado nav/header, ícones específicos em vez In
 
 ## Stack e referências
 
-Lead aprovou MUI custom + Geist selfhosted + Lucide uniforme. Referências somente leitura: [GolderUnicorn tokens](/Users/bizup/GitRepos/wads.dev/GolderUnicornFinanceControl/Web/src/components/Vars.css), [web-admin design-system](/Users/bizup/GitRepos/bizup-hub-mobile/web-admin/src/shared/design-system/styles.css) e [mobile-hub tipografia](/Users/bizup/GitRepos/bizup-hub-mobile/mobile-hub/src/global.css). Camadas suaves/escalaespaços e composição consistente inspiram; sem copiar código.
+Base atual: shadcn/ui + Tailwind CSS v4 + Radix, Geist selfhosted e Lucide uniforme. Referências somente leitura: [GolderUnicorn tokens](/Users/bizup/GitRepos/wads.dev/GolderUnicornFinanceControl/Web/src/components/Vars.css), [web-admin design-system](/Users/bizup/GitRepos/bizup-hub-mobile/web-admin/src/shared/design-system/styles.css) e [mobile-hub tipografia](/Users/bizup/GitRepos/bizup-hub-mobile/mobile-hub/src/global.css). Camadas suaves/escalaespaços e composição consistente inspiram; sem copiar código.
 
 ## Fase B — cobertura principal concluída (2026-10-09)
 

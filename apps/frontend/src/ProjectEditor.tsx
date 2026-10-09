@@ -1,17 +1,18 @@
+import { Alert, AlertDescription } from './components/ui/alert';
+import { Label } from './components/ui/label';
+import { Input } from './components/ui/input';
+import { Textarea } from './components/ui/textarea';
+import {
+  SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+} from './components/ui/select';
+import { Checkbox } from './components/ui/checkbox';
+import { Button } from './components/ui/button';
 import { projectMutation } from './project-mutation';
 import { useRef, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
 import { type Functions } from 'firebase/functions';
 import { text } from './data';
 import { ProjectArchive } from './ProjectArchive';
@@ -39,20 +40,24 @@ export function ProjectEditor({
 }) {
   if (hidden)
     return (
-      <Alert severity="info" sx={{ my: 2 }}>
-        Metadados e gerenciamento ocultos na apresentação atual. O alias exibido
-        é neutro; esta ofuscação visual não altera acesso.
+      <Alert className="my-2">
+        <AlertDescription>
+          Metadados e gerenciamento ocultos na apresentação atual. O alias
+          exibido é neutro; esta ofuscação visual não altera acesso.
+        </AlertDescription>
       </Alert>
     );
   if (!project)
     return (
-      <Alert severity="info">
-        Metadados não disponíveis nesta lista limitada. Não é possível editar
-        sem conferir o projeto.
+      <Alert className="my-2">
+        <AlertDescription>
+          Metadados não disponíveis nesta lista limitada. Não é possível editar
+          sem conferir o projeto.
+        </AlertDescription>
       </Alert>
     );
   return (
-    <Box sx={{ my: 3 }}>
+    <div className="my-6 space-y-4">
       <ProjectArchive
         functions={functions}
         projectId={projectId}
@@ -82,7 +87,7 @@ export function ProjectEditor({
           onDeleted={onDeleted}
         />
       )}
-    </Box>
+    </div>
   );
 }
 function ProjectForm({
@@ -214,76 +219,122 @@ function ProjectForm({
     }
   }
   return (
-    <Paper sx={{ p: 3, mt: 2 }}>
-      <Stack spacing={2}>
-        <Typography component="h3" variant="h6">
-          Editar metadados
-        </Typography>
-        {error && <Alert severity="error">{error}</Alert>}
-        {message && <Alert severity="success">{message}</Alert>}
-        <TextField
-          label="Título"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+    <div className="rounded-xl border bg-card p-4 text-card-foreground">
+      <div className="flex flex-col gap-4">
+        <h3 className="text-lg font-semibold">Editar metadados</h3>
+        {error && (
+          <Alert variant="destructive" className="my-2">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {message && (
+          <Alert role="status" className="my-2">
+            <AlertDescription>{message}</AlertDescription>
+          </Alert>
+        )}
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectEditor-6609'}>{'Título'}</Label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            disabled={busy}
+            id={'ProjectEditor-6609'}
+          ></Input>
+        </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectEditor-6767'}>{'Descrição'}</Label>
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={busy}
+            id={'ProjectEditor-6767'}
+            rows={3}
+          ></Textarea>
+        </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectEditor-6982'}>{'Tipo'}</Label>
+          <Select value={type} disabled={true}>
+            <SelectTrigger id={'ProjectEditor-6982'}>
+              <SelectValue placeholder={'Tipo'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={'personal'}>
+                Pessoal · somente o dono
+              </SelectItem>
+              <SelectItem value={'work'}>Compartilhado · empresa</SelectItem>
+            </SelectContent>
+          </Select>
+          <p
+            id="ProjectEditor-6982-help"
+            className="text-xs text-muted-foreground"
+          >
+            {'Gerencie o escopo em Acesso e apresentação no topo.'}
+          </p>
+        </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectEditor-7387'}>{'GitHub HTTPS'}</Label>
+          <Input
+            value={githubUrl}
+            onChange={(e) => setGithubUrl(e.target.value)}
+            disabled={busy}
+            id={'ProjectEditor-7387'}
+          ></Input>
+        </div>
+        <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+          <Checkbox checked={confidential} disabled={true} />
+          <span>
+            {'Confidencialidade: gerencie em Acesso e apresentação no topo'}
+          </span>
+        </Label>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectEditor-7740'}>{'Alias público neutro'}</Label>
+          <Input
+            value={alias}
+            onChange={(e) => setAlias(e.target.value)}
+            disabled={busy}
+            id={'ProjectEditor-7740'}
+            aria-describedby={'ProjectEditor-7740-help'}
+          ></Input>
+          <p
+            id="ProjectEditor-7740-help"
+            className="text-xs text-muted-foreground"
+          >
+            {
+              'Não use nome de cliente, sigla ou termos que revelem o projeto. Modo live usa rótulo genérico seguro.'
+            }
+          </p>
+        </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectEditor-8037'}>{'Motivo'}</Label>
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            disabled={busy || !!job}
+            id={'ProjectEditor-8037'}
+          ></Input>
+        </div>
+        <Button
+          onClick={() => void save()}
           disabled={busy}
-        />
-        <TextField
-          label="Descrição"
-          value={description}
-          multiline
-          minRows={3}
-          onChange={(e) => setDescription(e.target.value)}
-          disabled={busy}
-        />
-        <TextField
-          select
-          label="Tipo"
-          value={type}
-          disabled
-          helperText="Gerencie o escopo em Acesso e apresentação no topo."
+          variant="default"
+          className="min-h-11"
         >
-          <MenuItem value="">Não especificado</MenuItem>
-          <MenuItem value="personal">Pessoal · somente o dono</MenuItem>
-          <MenuItem value="work">Compartilhado · empresa</MenuItem>
-        </TextField>
-        <TextField
-          label="GitHub HTTPS"
-          value={githubUrl}
-          onChange={(e) => setGithubUrl(e.target.value)}
-          disabled={busy}
-        />
-        <FormControlLabel
-          control={<Checkbox checked={confidential} disabled />}
-          label="Confidencialidade: gerencie em Acesso e apresentação no topo"
-        />
-        <TextField
-          label="Alias público neutro"
-          value={alias}
-          onChange={(e) => setAlias(e.target.value)}
-          helperText="Não use nome de cliente, sigla ou termos que revelem o projeto. Modo live usa rótulo genérico seguro."
-          disabled={busy}
-        />
-        <TextField
-          label="Motivo"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          disabled={busy || !!job}
-        />
-        <Button variant="contained" onClick={() => void save()} disabled={busy}>
           Salvar metadados
         </Button>
-        <Typography component="h3" variant="h6">
+        <h3 className="text-lg font-semibold">
           Mesclar projeto — operação explícita
-        </Typography>
-        <Alert severity="warning">
-          Se origem ou destino for confidencial, destino ficará confidencial.
-          Origem: este projeto. Escolha um destino autorizado. Preview não
-          altera dados. Execução migra um lote por clique, preserva originais e
-          arquiva origem ao concluir; não há execução automática.
+        </h3>
+        <Alert className="my-2">
+          <AlertDescription>
+            Se origem ou destino for confidencial, destino ficará confidencial.
+            Origem: este projeto. Escolha um destino autorizado. Preview não
+            altera dados. Execução migra um lote por clique, preserva originais
+            e arquiva origem ao concluir; não há execução automática.
+          </AlertDescription>
         </Alert>
         <ProjectSelector
           key={getAuth(functions.app).currentUser?.uid + String(revealed)}
-          label="Projeto destino"
+          label={'Projeto destino'}
           projects={catalog.rows
             .filter((row) => row.id !== projectId)
             .map((row) => ({
@@ -306,56 +357,76 @@ function ProjectForm({
             setConfirmed(false);
           }}
         />
-        <Button onClick={() => void merge(false)} disabled={busy || !!job}>
+        <Button
+          onClick={() => void merge(false)}
+          disabled={busy || !!job}
+          variant="ghost"
+          className="min-h-11"
+        >
           Consultar preview sem alteração
         </Button>
-        <TextField
-          label="requestId de recuperação (copie antes de executar)"
-          value={mergeId}
-          disabled={busy || !!job}
-          onChange={(e) => setMergeId(e.target.value)}
-          helperText="Guarde este ID, IDs origem/destino e motivo original fora da tela. Após reload, informe os mesmos valores para retomar ou cancelar. Nenhum motivo é salvo no navegador."
-        />
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={recover}
-              onChange={(e) => setRecover(e.target.checked)}
-              disabled={busy || !!job}
-            />
-          }
-          label="Recuperar intenção anterior usando o mesmo requestId, destino e motivo"
-        />
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectEditor-9773'}>
+            {'requestId de recuperação (copie antes de executar)'}
+          </Label>
+          <Input
+            value={mergeId}
+            disabled={busy || !!job}
+            onChange={(e) => setMergeId(e.target.value)}
+            id={'ProjectEditor-9773'}
+            aria-describedby={'ProjectEditor-9773-help'}
+          ></Input>
+          <p
+            id="ProjectEditor-9773-help"
+            className="text-xs text-muted-foreground"
+          >
+            {
+              'Guarde este ID, IDs origem/destino e motivo original fora da tela. Após reload, informe os mesmos valores para retomar ou cancelar. Nenhum motivo é salvo no navegador.'
+            }
+          </p>
+        </div>
+        <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+          <Checkbox
+            checked={recover}
+            disabled={busy || !!job}
+            onCheckedChange={(checked) => setRecover(checked === true)}
+          />
+          <span>
+            {
+              'Recuperar intenção anterior usando o mesmo requestId, destino e motivo'
+            }
+          </span>
+        </Label>
         {(preview || recover) && (
           <>
-            <Typography>
+            <p className="text-sm leading-relaxed">
               Registros previstos: {preview?.count ?? 'Consultar preview'}.
               Mapeamentos de tópicos:{' '}
               {preview?.topicMapping.length ?? 'não consultado'}.
-            </Typography>
+            </p>
             {preview?.topicMapping.map((map, index) => (
-              <Typography key={index} variant="body2">
-                {map.sourceTopicId} → {map.targetTopicId}
-              </Typography>
+              <p key={index} className="text-sm">
+                {map.sourceTopicId}→ {map.targetTopicId}
+              </p>
             ))}
             {preview?.warnings.map((warning, index) => (
-              <Alert key={index} severity="warning">
-                {warning}
+              <Alert key={index} className="my-2">
+                <AlertDescription>{warning}</AlertDescription>
               </Alert>
             ))}
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                  disabled={busy}
-                />
-              }
-              label="Confirmo origem, destino e migração explícita após conferir preview"
-            />
+            <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+              <Checkbox
+                checked={confirmed}
+                disabled={busy}
+                onCheckedChange={(checked) => setConfirmed(checked === true)}
+              />
+              <span>
+                {
+                  'Confirmo origem, destino e migração explícita após conferir preview'
+                }
+              </span>
+            </Label>
             <Button
-              color="warning"
-              variant="contained"
               disabled={
                 busy ||
                 !confirmed ||
@@ -363,6 +434,8 @@ function ProjectForm({
                 job?.status === 'cancelled'
               }
               onClick={() => void merge(true)}
+              variant="default"
+              className="min-h-11"
             >
               {job?.hasMore
                 ? 'Retomar próximo lote'
@@ -372,22 +445,26 @@ function ProjectForm({
         )}
         {(job?.status === 'running' || recover) && (
           <>
-            <Alert severity="warning">
-              Cancelar libera os locks, mas NÃO desfaz lotes já migrados. A
-              migração parcial permanecerá. Job cancelado não pode ser retomado.
+            <Alert className="my-2">
+              <AlertDescription>
+                Cancelar libera os locks, mas NÃO desfaz lotes já migrados. A
+                migração parcial permanecerá. Job cancelado não pode ser
+                retomado.
+              </AlertDescription>
             </Alert>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={cancelConfirmed}
-                  onChange={(e) => setCancelConfirmed(e.target.checked)}
-                  disabled={busy}
-                />
-              }
-              label="Confirmo cancelar sem rollback dos lotes já migrados"
-            />
+            <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+              <Checkbox
+                checked={cancelConfirmed}
+                disabled={busy}
+                onCheckedChange={(checked) =>
+                  setCancelConfirmed(checked === true)
+                }
+              />
+              <span>
+                {'Confirmo cancelar sem rollback dos lotes já migrados'}
+              </span>
+            </Label>
             <Button
-              color="error"
               disabled={
                 busy ||
                 !cancelConfirmed ||
@@ -396,22 +473,30 @@ function ProjectForm({
                 job?.status === 'cancelled'
               }
               onClick={() => void merge(true, true)}
+              variant="destructive"
+              className="min-h-11"
             >
               Cancelar job sem rollback
             </Button>
           </>
         )}
         {job && (
-          <Alert severity={job.status === 'completed' ? 'success' : 'warning'}>
-            Job {job.jobId}: {job.status}; {job.migratedCount} registros
-            migrados.{' '}
-            {job.hasMore
-              ? 'Há mais lotes; retome explicitamente.'
-              : 'Sem lotes restantes informados.'}
+          <Alert className="my-2">
+            <AlertDescription>
+              Job {job.jobId}: {job.status}; {job.migratedCount}registros
+              migrados.{' '}
+              {job.hasMore
+                ? 'Há mais lotes; retome explicitamente.'
+                : 'Sem lotes restantes informados.'}
+            </AlertDescription>
           </Alert>
         )}
-        {busy && <Typography role="status">Aguardando operação…</Typography>}
-      </Stack>
-    </Paper>
+        {busy && (
+          <p role={'status'} className="text-sm leading-relaxed">
+            Aguardando operação…
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

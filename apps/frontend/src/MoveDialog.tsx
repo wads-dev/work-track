@@ -1,18 +1,22 @@
-import { useRef, useState } from 'react';
 import {
-  Alert,
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
   DialogTitle,
-  FormControlLabel,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+  DialogFooter,
+  Dialog,
+  DialogContent,
+} from './components/ui/dialog';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { Button } from './components/ui/button';
+import {
+  SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+} from './components/ui/select';
+import { Label } from './components/ui/label';
+import { Textarea } from './components/ui/textarea';
+import { Checkbox } from './components/ui/checkbox';
+import { useRef, useState } from 'react';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { useProjects } from './useProjects';
 import { ProjectSelector } from './ProjectSelector';
@@ -193,197 +197,233 @@ export function MoveDialog({
       (destination && isHidden(destination, revealed)))
   )
     return (
-      <Dialog open onClose={close} fullWidth maxWidth="sm">
-        <DialogTitle>Transferência indisponível</DialogTitle>
-        <DialogContent>
-          <Alert severity="info">
-            Contexto de transferência oculto ou indisponível. Revele os dados e
-            confira seu acesso para continuar.
-          </Alert>
+      <Dialog
+        open={true}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
+      >
+        <DialogContent
+          aria-describedby={undefined}
+          showCloseButton={false}
+          className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
+        >
+          <DialogTitle>Transferência indisponível</DialogTitle>
+          <div className="space-y-4">
+            <Alert className="my-2">
+              <AlertDescription>
+                Contexto de transferência oculto ou indisponível. Revele os
+                dados e confira seu acesso para continuar.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              disabled={busy}
+              onClick={close}
+              variant="ghost"
+              className="min-h-11"
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button sx={{ minHeight: 44 }} disabled={busy} onClick={close}>
-            Cancelar
-          </Button>
-        </DialogActions>
       </Dialog>
     );
   return (
     <Dialog
-      open
-      onClose={close}
-      fullWidth
-      maxWidth="sm"
-      aria-labelledby="move-title"
+      open={true}
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
     >
-      <DialogTitle id="move-title">
-        {recordId ? 'Mover registro' : 'Transferir assunto'}
-      </DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ pt: 1 }}>
-          <Typography>Origem: {originLabel}</Typography>
-          <Alert severity="info">
-            Somente seus registros ativos serão movidos entre projetos do mesmo
-            escopo. Registros com múltiplos assuntos são bloqueados. Horários,
-            textos e autoria serão preservados; não haverá duplicação de horas.
-            O assunto de origem permanece para histórico e outras pessoas.
-          </Alert>
-          {done ? (
-            <Alert severity="success">
-              Transferência concluída e auditada. Os dados e relatórios serão
-              atualizados.
+      <DialogContent
+        aria-describedby={undefined}
+        showCloseButton={false}
+        aria-labelledby={'move-title'}
+        className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
+      >
+        <DialogTitle id={'move-title'}>
+          {recordId ? 'Mover registro' : 'Transferir assunto'}
+        </DialogTitle>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-4">
+            <p className="text-sm leading-relaxed">Origem: {originLabel}</p>
+            <Alert className="my-2">
+              <AlertDescription>
+                Somente seus registros ativos serão movidos entre projetos do
+                mesmo escopo. Registros com múltiplos assuntos são bloqueados.
+                Horários, textos e autoria serão preservados; não haverá
+                duplicação de horas. O assunto de origem permanece para
+                histórico e outras pessoas.
+              </AlertDescription>
             </Alert>
-          ) : (
-            <>
-              <Stack
-                sx={{
-                  width: '100%',
-                  minWidth: 0,
-                  '& .MuiAutocomplete-root': { width: '100%', minWidth: 0 },
-                  '& .MuiInputBase-root': { minHeight: 44 },
-                }}
-              >
-                <ProjectSelector
-                  label="Projeto de destino"
-                  projects={destinations.map((p) => ({
-                    id: p.id,
-                    label: text(
-                      safeProject(p.data, revealed).title,
-                      'Projeto reservado',
-                    ),
-                    searchText: revealed ? text(p.data.title, '') : '',
-                  }))}
-                  projectId={target}
-                  allowAll={false}
-                  loading={projects.loading}
-                  error={projects.error}
-                  disabled={busy}
-                  onChange={(id) => {
-                    setTarget(id);
-                    setTopic('');
-                    clear();
-                  }}
-                />
-              </Stack>
-              {!projects.loading && !destinations.length && (
-                <Alert severity="info">
-                  Nenhum outro projeto ativo compatível disponível.
-                  Transferências entre Pessoal e Global não são permitidas.
-                </Alert>
-              )}
-              <TextField
-                select
-                label="Assunto no destino"
-                slotProps={{
-                  inputLabel: { shrink: true },
-                  select: {
-                    displayEmpty: true,
-                    renderValue: () =>
-                      topic
-                        ? text(
-                            activeTopics.find((t) => String(t.id) === topic)
-                              ?.title,
-                            'Assunto',
-                          )
-                        : 'Mesmo nome no destino',
-                  },
-                }}
-                value={topic}
-                disabled={busy || !destination}
-                onChange={(e) => {
-                  setTopic(e.target.value);
-                  clear();
-                }}
-                helperText="A prévia confirma se o mesmo nome será reutilizado ou criado."
-              >
-                <MenuItem value="">Mesmo nome no destino</MenuItem>
-                {activeTopics.map((t) => (
-                  <MenuItem key={String(t.id)} value={String(t.id)}>
-                    {text(safeProject(t, revealed).title, 'Assunto reservado')}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                label="Motivo da transferência"
-                multiline
-                minRows={2}
-                value={reason}
-                disabled={busy}
-                onChange={(e) => {
-                  setReason(e.target.value);
-                  clear();
-                }}
-              />
-              {preview && (
-                <>
-                  <Typography>
-                    Prévia: {preview.recordCount} registro(s) para{' '}
-                    {text(
-                      safeProject(destination ?? {}, revealed).title,
-                      'Projeto reservado',
-                    )}{' '}
-                    · {preview.resolvedSubject.title} (
-                    {preview.resolvedSubject.willCreate
-                      ? 'será criado'
-                      : 'será reutilizado'}
-                    ).
-                  </Typography>
-                  {preview.warnings.map((warning, index) => (
-                    <Alert severity="warning" key={index}>
-                      {warning}
-                    </Alert>
-                  ))}
-                  <FormControlLabel
-                    control={
+            {done ? (
+              <Alert role="status" className="my-2">
+                <AlertDescription>
+                  Transferência concluída e auditada. Os dados e relatórios
+                  serão atualizados.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <div className="flex flex-col gap-4">
+                  <ProjectSelector
+                    label={'Projeto de destino'}
+                    projects={destinations.map((p) => ({
+                      id: p.id,
+                      label: text(
+                        safeProject(p.data, revealed).title,
+                        'Projeto reservado',
+                      ),
+                      searchText: revealed ? text(p.data.title, '') : '',
+                    }))}
+                    projectId={target}
+                    allowAll={false}
+                    loading={projects.loading}
+                    error={projects.error}
+                    disabled={busy}
+                    onChange={(id) => {
+                      setTarget(id);
+                      setTopic('');
+                      clear();
+                    }}
+                  />
+                </div>
+                {!projects.loading && !destinations.length && (
+                  <Alert className="my-2">
+                    <AlertDescription>
+                      Nenhum outro projeto ativo compatível disponível.
+                      Transferências entre Pessoal e Global não são permitidas.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor={'MoveDialog-8616'}>
+                    {'Assunto no destino'}
+                  </Label>
+                  <Select
+                    value={topic || '__same_name__'}
+                    disabled={busy || !destination}
+                    onValueChange={(value) => {
+                      setTopic(value === '__same_name__' ? '' : value);
+                      clear();
+                    }}
+                  >
+                    <SelectTrigger id={'MoveDialog-8616'}>
+                      <SelectValue placeholder="Mesmo nome no destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__same_name__">
+                        Mesmo nome no destino
+                      </SelectItem>
+                      {activeTopics.map((t) => (
+                        <SelectItem key={String(t.id)} value={String(t.id)}>
+                          {text(
+                            safeProject(t, revealed).title,
+                            'Assunto reservado',
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p
+                    id="MoveDialog-8616-help"
+                    className="text-xs text-muted-foreground"
+                  >
+                    {
+                      'A prévia confirma se o mesmo nome será reutilizado ou criado.'
+                    }
+                  </p>
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor={'MoveDialog-9872'}>
+                    {'Motivo da transferência'}
+                  </Label>
+                  <Textarea
+                    value={reason}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setReason(e.target.value);
+                      clear();
+                    }}
+                    id={'MoveDialog-9872'}
+                    rows={2}
+                  ></Textarea>
+                </div>
+                {preview && (
+                  <>
+                    <p className="text-sm leading-relaxed">
+                      Prévia: {preview.recordCount}registro(s) para{' '}
+                      {text(
+                        safeProject(destination ?? {}, revealed).title,
+                        'Projeto reservado',
+                      )}{' '}
+                      · {preview.resolvedSubject.title}(
+                      {preview.resolvedSubject.willCreate
+                        ? 'será criado'
+                        : 'será reutilizado'}
+                      ).
+                    </p>
+                    {preview.warnings.map((warning, index) => (
+                      <Alert key={index} className="my-2">
+                        <AlertDescription>{warning}</AlertDescription>
+                      </Alert>
+                    ))}
+                    <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
                       <Checkbox
                         checked={ack}
                         disabled={busy}
-                        onChange={(e) => setAck(e.target.checked)}
+                        onCheckedChange={(checked) => setAck(checked === true)}
                       />
-                    }
-                    label="Conferi origem, destino e impacto. Autorizo esta transferência."
-                  />
-                </>
-              )}
-              {error && <Alert severity="error">{error}</Alert>}
-            </>
-          )}
-        </Stack>
+                      <span>
+                        {
+                          'Conferi origem, destino e impacto. Autorizo esta transferência.'
+                        }
+                      </span>
+                    </Label>
+                  </>
+                )}
+                {error && (
+                  <Alert variant="destructive" className="my-2">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button
+            disabled={busy}
+            onClick={close}
+            variant="ghost"
+            className="min-h-11"
+          >
+            {done ? 'Concluir' : 'Cancelar'}
+          </Button>
+          {!done &&
+            (preview ? (
+              <Button
+                disabled={busy || !ack}
+                onClick={() => void run(true)}
+                variant="default"
+                className="min-h-11"
+              >
+                {busy ? 'Transferindo…' : 'Confirmar transferência'}
+              </Button>
+            ) : (
+              <Button
+                disabled={busy || !target || !reason.trim()}
+                onClick={() => void run(false)}
+                variant="default"
+                className="min-h-11"
+              >
+                {busy ? 'Consultando…' : 'Conferir prévia'}
+              </Button>
+            ))}
+        </DialogFooter>
       </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          p: 2,
-          gap: 1,
-          flexDirection: { xs: 'column', sm: 'row' },
-          '& .MuiButton-root': {
-            minHeight: 44,
-            width: { xs: '100%', sm: 'auto' },
-          },
-        }}
-      >
-        <Button disabled={busy} onClick={close}>
-          {done ? 'Concluir' : 'Cancelar'}
-        </Button>
-        {!done &&
-          (preview ? (
-            <Button
-              variant="contained"
-              disabled={busy || !ack}
-              onClick={() => void run(true)}
-            >
-              {busy ? 'Transferindo…' : 'Confirmar transferência'}
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              disabled={busy || !target || !reason.trim()}
-              onClick={() => void run(false)}
-            >
-              {busy ? 'Consultando…' : 'Conferir prévia'}
-            </Button>
-          ))}
-      </DialogActions>
     </Dialog>
   );
 }

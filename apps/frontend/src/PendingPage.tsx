@@ -1,25 +1,26 @@
+import { cn } from './lib/utils';
+import { Button } from './components/ui/button';
+import { TableCell } from './components/ui/table';
+import { TableHead } from './components/ui/table';
+import { TableRow } from './components/ui/table';
+import { TableHeader } from './components/ui/table';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from './components/ui/tooltip';
+import { TableBody } from './components/ui/table';
+import { Table } from './components/ui/table';
+import { Card } from './components/ui/card';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { Skeleton } from './components/ui/skeleton';
+import { Badge } from './components/ui/badge';
 import { useProjects } from './useProjects';
 import { isDeletedRecord, useDeletionRevision } from './record-deletion';
 import { useEffect, useState } from 'react';
 import { isAlertOpen, isOpen } from './pending-utils';
 import { useClock } from './use-clock';
-import {
-  Alert,
-  Badge,
-  Button,
-  CircularProgress,
-  IconButton,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+
 import {
   collection,
   documentId,
@@ -45,20 +46,43 @@ export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
     .slice(0, 100)
     .filter((row) => isAlertOpen(row.data, now)).length;
   return (
-    <Tooltip title="Abertos há mais de 8 horas nos até 100 registros carregados, não contagem global">
-      <IconButton
-        component={RouterLink}
-        to="/pending"
-        aria-label={
-          'Ver pendências: ' +
-          count +
-          ' abertos há mais de 8 horas nos até 100 registros carregados'
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={
+            'Ver pendências: ' +
+            count +
+            ' abertos há mais de 8 horas nos até 100 registros carregados'
+          }
+          asChild
+          variant="ghost"
+          size="icon"
+          className={cn('shrink-0', 'size-9')}
+        >
+          <RouterLink
+            to={'/pending'}
+            aria-label={
+              'Ver pendências: ' +
+              count +
+              ' abertos há mais de 8 horas nos até 100 registros carregados'
+            }
+          >
+            <span>
+              <span className="relative inline-flex">
+                <UiIcon kind="bell" />
+                <Badge className="absolute -right-3 -top-2 px-1 text-[10px]">
+                  {count}
+                </Badge>
+              </span>
+            </span>
+          </RouterLink>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {
+          'Abertos há mais de 8 horas nos até 100 registros carregados, não contagem global'
         }
-      >
-        <Badge badgeContent={count} color="warning">
-          <UiIcon kind="bell" />
-        </Badge>
-      </IconButton>
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -126,7 +150,7 @@ export function PendingPage({
   }, [db, uid, cursor, attempt, revision]);
   const open = rows.filter((row) => isOpen(row.data));
   return (
-    <Stack spacing={2}>
+    <div className={cn('flex flex-col gap-4')}>
       {recordId && (
         <RecordDrawer
           key={recordId}
@@ -145,35 +169,41 @@ export function PendingPage({
         />
       )}
       {loading ? (
-        <CircularProgress aria-label="Carregando pendências" />
+        <Skeleton
+          role="status"
+          aria-label="Carregando pendências"
+          className={cn('size-6 rounded-full')}
+        />
       ) : error ? (
-        <Alert
-          severity="error"
-          action={
-            <Button onClick={() => setAttempt((v) => v + 1)}>
-              Tentar novamente
-            </Button>
-          }
-        >
-          {error}
+        <Alert variant="destructive">
+          <AlertDescription>
+            {error}
+            <div className="mt-2">
+              <Button onClick={() => setAttempt((v) => v + 1)} variant="ghost">
+                Tentar novamente
+              </Button>
+            </div>
+          </AlertDescription>
         </Alert>
       ) : (
         <>
-          <Typography>
+          <p className={cn('text-base')}>
             {rows.length} registros examinados nesta página; {open.length}{' '}
             abertos encontrados.
-          </Typography>
+          </p>
           {open.length === 0 ? (
-            <Alert severity="info">
-              Nenhum aberto nesta página examinada. Pode haver abertos em outras
-              páginas.
+            <Alert>
+              <AlertDescription>
+                Nenhum aberto nesta página examinada. Pode haver abertos em
+                outras páginas.
+              </AlertDescription>
             </Alert>
           ) : (
             <>
-              <Stack spacing={1.5} sx={{ display: { xs: 'flex', sm: 'none' } }}>
+              <div className={cn('flex flex-col flex sm:hidden gap-3')}>
                 {open.map((row) => (
-                  <Paper key={row.id} sx={{ p: 2 }}>
-                    <Typography variant="h6">
+                  <Card key={row.id} className={cn('gap-0 p-4')}>
+                    <p className={cn('text-lg font-semibold')}>
                       {text(
                         safeProject(
                           projects.rows.find((p) => p.id === row.data.projectId)
@@ -181,39 +211,41 @@ export function PendingPage({
                           revealed,
                         )?.title,
                       )}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    </p>
+                    <p className={cn('text-sm text-muted-foreground')}>
                       {date(row.data.startedAt, row.data.timeZone)}
-                    </Typography>
-                    <Button
-                      component={RouterLink}
-                      to={contextualRecordPath(
-                        '/pending',
-                        '?' + params.toString(),
-                        row.id,
-                      )}
-                    >
-                      Revisar fim
+                    </p>
+                    <Button asChild variant="ghost">
+                      <RouterLink
+                        to={contextualRecordPath(
+                          '/pending',
+                          '?' + params.toString(),
+                          row.id,
+                        )}
+                      >
+                        Revisar fim
+                      </RouterLink>
                     </Button>
-                  </Paper>
+                  </Card>
                 ))}
-              </Stack>
-              <TableContainer
-                sx={{ display: { xs: 'none', sm: 'block' } }}
-                component={Paper}
+              </div>
+              <div
                 tabIndex={0}
                 aria-label="Pendências carregadas"
+                className={cn(
+                  'hidden sm:block overflow-x-auto rounded-xl border',
+                )}
               >
                 <Table>
-                  <TableHead>
+                  <TableHeader>
                     <TableRow>
                       {['Projeto', 'Início', 'Detalhes'].map((label) => (
-                        <TableCell key={label} scope="col">
+                        <TableHead key={label} scope="col">
                           {label}
-                        </TableCell>
+                        </TableHead>
                       ))}
                     </TableRow>
-                  </TableHead>
+                  </TableHeader>
                   <TableBody>
                     {open.map((row) => {
                       const project = projects.rows.find(
@@ -228,22 +260,38 @@ export function PendingPage({
                             {date(row.data.startedAt, row.data.timeZone)}
                           </TableCell>
                           <TableCell>
-                            <Tooltip title="Abrir detalhes do registro">
-                              <IconButton
-                                component={RouterLink}
-                                to={contextualRecordPath(
-                                  '/pending',
-                                  '?' + params.toString(),
-                                  row.id,
-                                )}
-                                aria-label={
-                                  isHidden(project, revealed)
-                                    ? 'Detalhes de registro reservado'
-                                    : 'Abrir detalhes do registro'
-                                }
-                              >
-                                <UiIcon kind="detail" />
-                              </IconButton>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  aria-label={
+                                    isHidden(project, revealed)
+                                      ? 'Detalhes de registro reservado'
+                                      : 'Abrir detalhes do registro'
+                                  }
+                                  asChild
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn('shrink-0', 'size-9')}
+                                >
+                                  <RouterLink
+                                    to={contextualRecordPath(
+                                      '/pending',
+                                      '?' + params.toString(),
+                                      row.id,
+                                    )}
+                                    aria-label={
+                                      isHidden(project, revealed)
+                                        ? 'Detalhes de registro reservado'
+                                        : 'Abrir detalhes do registro'
+                                    }
+                                  >
+                                    <UiIcon kind="detail" />
+                                  </RouterLink>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {'Abrir detalhes do registro'}
+                              </TooltipContent>
                             </Tooltip>
                           </TableCell>
                         </TableRow>
@@ -251,30 +299,33 @@ export function PendingPage({
                     })}
                   </TableBody>
                 </Table>
-              </TableContainer>
+              </div>
             </>
           )}
-          <Stack direction="row" spacing={2}>
+          <div className={cn('flex flex-row gap-4')}>
             {cursor && (
-              <Button onClick={() => setParams({})}>Primeira página</Button>
+              <Button onClick={() => setParams({})} variant="ghost">
+                Primeira página
+              </Button>
             )}
             {rows.length === 100 && (
               <Button
                 onClick={() => setParams({ after: rows[rows.length - 1].id })}
+                variant="ghost"
               >
                 Examinar próxima página
               </Button>
             )}
-            <Button onClick={() => setAttempt((v) => v + 1)}>
+            <Button onClick={() => setAttempt((v) => v + 1)} variant="ghost">
               Atualizar página
             </Button>
-          </Stack>
+          </div>
         </>
       )}
-      <Typography variant="caption" color="text.secondary">
+      <span className={cn('text-xs text-muted-foreground')}>
         Até 100 registros examinados por página; contagem carregada, não global.
         Sino: abertos há mais de 8h.
-      </Typography>
-    </Stack>
+      </span>
+    </div>
   );
 }

@@ -1,3 +1,23 @@
+import { cn } from './lib/utils';
+import { Button } from './components/ui/button';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from './components/ui/tooltip';
+import { Label } from './components/ui/label';
+import { Input } from './components/ui/input';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from './components/ui/select';
+import { Checkbox } from './components/ui/checkbox';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { Card } from './components/ui/card';
+import { Skeleton } from './components/ui/skeleton';
 import { MetadataLink } from './MetadataLink';
 import {
   useProjectAccessRevision,
@@ -18,22 +38,7 @@ import { TopicReport } from './TopicReport';
 import { topicBuckets, type ReportTopic } from './topic-report-model';
 import { useEffect, useState } from 'react';
 import { useDeletionRevision, deletionRevision } from './record-deletion';
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Checkbox,
-  FormControlLabel,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-  Tooltip,
-  IconButton,
-  Collapse,
-} from '@mui/material';
+
 import { httpsCallable, type Functions } from 'firebase/functions';
 import type { Firestore } from 'firebase/firestore';
 import {
@@ -375,17 +380,19 @@ export function PersonalPage({
   }
   if (invalid)
     return (
-      <Alert
-        severity="error"
-        action={
-          <Button onClick={() => setParams({})}>Restaurar filtros</Button>
-        }
-      >
-        {invalid}
+      <Alert variant="destructive">
+        <AlertDescription>
+          {invalid}
+          <div className="mt-2">
+            <Button onClick={() => setParams({})} variant="ghost">
+              Restaurar filtros
+            </Button>
+          </div>
+        </AlertDescription>
       </Alert>
     );
   return (
-    <Stack spacing={2}>
+    <div className={cn('flex flex-col gap-4')}>
       {recordId && (
         <RecordDrawer
           key={uid + recordId}
@@ -425,156 +432,209 @@ export function PersonalPage({
           actions={
             <>
               {' '}
-              <FormControlLabel
-                sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: 12 } }}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={includeArchived}
-                    onChange={(e) =>
-                      update('includeArchived', String(e.target.checked))
-                    }
-                  />
-                }
-                label="Arquivados"
-              />
-              <Tooltip title="Atualizar calendário">
-                <IconButton
-                  aria-label="Atualizar calendário"
-                  onClick={() => setAttempt((v) => v + 1)}
-                >
-                  <UiIcon kind="refresh" />
-                </IconButton>
+              <Label className={cn('m-0 text-xs flex items-center gap-2')}>
+                <Checkbox
+                  aria-label="Incluir arquivados"
+                  checked={includeArchived}
+                  onCheckedChange={(checked) =>
+                    update('includeArchived', String(checked === true))
+                  }
+                />
+                {'Arquivados'}
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="Atualizar calendário"
+                    onClick={() => setAttempt((v) => v + 1)}
+                    variant="ghost"
+                    size="icon"
+                    className={cn('shrink-0', 'size-9')}
+                  >
+                    <UiIcon kind="refresh" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{'Atualizar calendário'}</TooltipContent>
               </Tooltip>
             </>
           }
           secondary={
             <QueryToolbarField>
-              <TextField
-                disabled={allWeeks}
-                size="small"
-                select
-                label="Densidade"
-                value={density}
-                onChange={(e) => update('density', e.target.value)}
-              >
-                {['supercompact', 'compact', 'timeline'].map((d) => (
-                  <MenuItem key={d} value={d}>
-                    {d === 'timeline'
-                      ? 'Régua'
-                      : d === 'compact'
-                        ? 'Compacto'
-                        : 'Supercompacto'}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
+                <span className="text-xs text-muted-foreground">
+                  {'Densidade'}
+                </span>
+                <Select
+                  disabled={allWeeks}
+                  value={density || '__all__'}
+                  onValueChange={(value) =>
+                    update('density', value === '__all__' ? '' : value)
+                  }
+                >
+                  <SelectTrigger aria-label={'Densidade'}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['supercompact', 'compact', 'timeline'].map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d === 'timeline'
+                          ? 'Régua'
+                          : d === 'compact'
+                            ? 'Compacto'
+                            : 'Supercompacto'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Label>
             </QueryToolbarField>
           }
         >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-              width: { xs: '100%', sm: 'auto' },
-              '& [data-query-field]': { width: 160 },
-            }}
+          <div
+            className={cn(
+              'flex items-center gap-2 w-full sm:w-auto [&_[data-query-field]]:w-40',
+            )}
           >
-            <Tooltip title="Período anterior">
-              <IconButton
-                disabled={allWeeks}
-                aria-label="Período anterior"
-                onClick={() =>
-                  update('date', moveReference(selected, view, -1))
-                }
-              >
-                <UiIcon kind="previous" />
-              </IconButton>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  disabled={allWeeks}
+                  aria-label="Período anterior"
+                  onClick={() =>
+                    update('date', moveReference(selected, view, -1))
+                  }
+                  variant="ghost"
+                  size="icon"
+                  className={cn('shrink-0', 'size-9')}
+                >
+                  <UiIcon kind="previous" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{'Período anterior'}</TooltipContent>
             </Tooltip>
             <QueryToolbarField kind="date">
-              <TextField
-                size="small"
-                type="date"
-                value={selected}
-                disabled={allWeeks}
-                label="Referência"
-                slotProps={{ inputLabel: { shrink: true } }}
-                onChange={(e) => update('date', e.target.value)}
-              />
+              <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
+                <span className="text-xs text-muted-foreground">
+                  {'Referência'}
+                </span>
+                <Input
+                  aria-label={'Referência'}
+                  type="date"
+                  value={selected}
+                  disabled={allWeeks}
+                  onChange={(e) => update('date', e.target.value)}
+                />
+              </Label>
             </QueryToolbarField>
-            <Tooltip title="Próximo período">
-              <IconButton
-                disabled={allWeeks}
-                aria-label="Próximo período"
-                onClick={() => update('date', moveReference(selected, view, 1))}
-              >
-                <UiIcon kind="next" />
-              </IconButton>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  disabled={allWeeks}
+                  aria-label="Próximo período"
+                  onClick={() =>
+                    update('date', moveReference(selected, view, 1))
+                  }
+                  variant="ghost"
+                  size="icon"
+                  className={cn('shrink-0', 'size-9')}
+                >
+                  <UiIcon kind="next" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{'Próximo período'}</TooltipContent>
             </Tooltip>
-          </Box>
+          </div>
           <QueryToolbarField>
-            <TextField
-              size="small"
-              select
-              value={view}
-              disabled={allWeeks}
-              label="Visualização"
-              onChange={(e) => update('view', e.target.value)}
-            >
-              {['day', 'week', 'month'].map((v) => (
-                <MenuItem key={v} value={v}>
-                  {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
+              <span className="text-xs text-muted-foreground">
+                {'Visualização'}
+              </span>
+              <Select
+                disabled={allWeeks}
+                value={view || '__all__'}
+                onValueChange={(value) =>
+                  update('view', value === '__all__' ? '' : value)
+                }
+              >
+                <SelectTrigger aria-label={'Visualização'}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['day', 'week', 'month'].map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Label>
           </QueryToolbarField>
           <QueryToolbarField>
-            <TextField
-              select
-              size="small"
-              label="Pessoa"
-              value={person.selected}
-              disabled={loading}
-              sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
-              onChange={(e) =>
-                setParams(updateCalendarPerson(params, e.target.value))
-              }
-            >
-              <MenuItem value={uid}>Meu calendário</MenuItem>
-              {participants.length > 0 && !directory.unavailable && (
-                <MenuItem value="all">Todas as pessoas · até 10</MenuItem>
-              )}
-              {participants
-                .filter((p) => p.uid !== uid)
-                .map((p) => (
-                  <MenuItem key={p.uid} value={p.uid}>
-                    {p.label || 'Pessoa da organização'}
-                  </MenuItem>
-                ))}
-              {person.selected !== uid &&
-                person.selected !== 'all' &&
-                !participants.some((p) => p.uid === person.selected) && (
-                  <MenuItem value={person.selected}>
-                    Pessoa selecionada · projetos globais
-                  </MenuItem>
-                )}
-            </TextField>
+            <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
+              <span className="text-xs text-muted-foreground">{'Pessoa'}</span>
+              <Select
+                disabled={loading}
+                value={person.selected || '__all__'}
+                onValueChange={(value) =>
+                  setParams(
+                    updateCalendarPerson(
+                      params,
+                      value === '__all__' ? '' : value,
+                    ),
+                  )
+                }
+              >
+                <SelectTrigger aria-label={'Pessoa'} className={cn('min-h-11')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={uid}>Meu calendário</SelectItem>
+                  {participants.length > 0 && !directory.unavailable && (
+                    <SelectItem value="all">
+                      Todas as pessoas · até 10
+                    </SelectItem>
+                  )}
+                  {participants
+                    .filter((p) => p.uid !== uid)
+                    .map((p) => (
+                      <SelectItem key={p.uid} value={p.uid}>
+                        {p.label || 'Pessoa da organização'}
+                      </SelectItem>
+                    ))}
+                  {person.selected !== uid &&
+                    person.selected !== 'all' &&
+                    !participants.some((p) => p.uid === person.selected) && (
+                      <SelectItem value={person.selected}>
+                        Pessoa selecionada · projetos globais
+                      </SelectItem>
+                    )}
+                </SelectContent>
+              </Select>
+            </Label>
           </QueryToolbarField>
           <QueryToolbarField>
-            <TextField
-              select
-              size="small"
-              label="Período"
-              value={allWeeks ? 'all' : 'dated'}
-              onChange={(e) =>
-                update('allWeeks', e.target.value === 'all' ? 'true' : '')
-              }
-            >
-              <MenuItem value="dated">Período com data</MenuItem>
-              <MenuItem value="all" disabled={!projectId}>
-                Todas as semanas com atividade
-              </MenuItem>
-            </TextField>
+            <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
+              <span className="text-xs text-muted-foreground">{'Período'}</span>
+              <Select
+                value={allWeeks ? 'all' : 'dated'}
+                onValueChange={(value) =>
+                  update(
+                    'allWeeks',
+                    value === '__all__' ? '' : value === 'all' ? 'true' : '',
+                  )
+                }
+              >
+                <SelectTrigger aria-label={'Período'}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dated">Período com data</SelectItem>
+                  <SelectItem value="all" disabled={!projectId}>
+                    Todas as semanas com atividade
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </Label>
           </QueryToolbarField>
           <QueryToolbarField kind="project">
             <CalendarProjectFilter
@@ -600,20 +660,29 @@ export function PersonalPage({
           </QueryToolbarField>
           {projectId && (
             <QueryToolbarField>
-              <TextField
-                select
-                size="small"
-                label="Assunto"
-                value={subject}
-                onChange={(e) => update('subject', e.target.value)}
-              >
-                <MenuItem value="">Todos os assuntos</MenuItem>
-                {topics.map((t) => (
-                  <MenuItem key={t.id} value={t.id}>
-                    {t.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
+                <span className="text-xs text-muted-foreground">
+                  {'Assunto'}
+                </span>
+                <Select
+                  value={subject || '__all__'}
+                  onValueChange={(value) =>
+                    update('subject', value === '__all__' ? '' : value)
+                  }
+                >
+                  <SelectTrigger aria-label={'Assunto'}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todos os assuntos</SelectItem>
+                    {topics.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Label>
             </QueryToolbarField>
           )}
         </QueryToolbar>
@@ -623,27 +692,32 @@ export function PersonalPage({
         directory.partition === directoryPartition &&
         directory.owner === uid &&
         directory.revision === accessRevision && (
-          <Alert severity="warning">
-            Lista de pessoas indisponível para este escopo. Suas horas estão
-            completas; escolha um projeto para reduzir a consulta e selecionar
-            outra pessoa.
+          <Alert className={cn('border-amber-500/50')}>
+            <AlertDescription>
+              Lista de pessoas indisponível para este escopo. Suas horas estão
+              completas; escolha um projeto para reduzir a consulta e selecionar
+              outra pessoa.
+            </AlertDescription>
           </Alert>
         )}
       {calendar && subject && (
-        <Alert severity="info">
-          Assunto:{' '}
-          <MetadataLink
-            projectId={projectId}
-            project={projects.rows.find((p) => p.id === projectId)?.data}
-            revealed={revealed}
-            topicId={subject}
-          />{' '}
-          . As horas e barras representam os intervalos completos dos registros
-          que contêm este assunto, não uma divisão proporcional entre assuntos.
+        <Alert>
+          <AlertDescription>
+            Assunto:{' '}
+            <MetadataLink
+              projectId={projectId}
+              project={projects.rows.find((p) => p.id === projectId)?.data}
+              revealed={revealed}
+              topicId={subject}
+            />{' '}
+            . As horas e barras representam os intervalos completos dos
+            registros que contêm este assunto, não uma divisão proporcional
+            entre assuntos.
+          </AlertDescription>
         </Alert>
       )}
       {calendar && (
-        <Typography variant="body2">
+        <p className={cn('text-sm')}>
           {person.mode === 'own'
             ? 'Meu calendário'
             : person.selected === 'all'
@@ -655,90 +729,85 @@ export function PersonalPage({
           {person.mode === 'own'
             ? 'Meus registros pessoais e globais'
             : 'Somente projetos globais autorizados, nunca registros pessoais de outras pessoas'}
-        </Typography>
+        </p>
       )}
       {loading ? (
-        <CircularProgress aria-label="Carregando relatório pessoal" />
+        <Skeleton
+          role="status"
+          aria-label="Carregando relatório pessoal"
+          className={cn('size-6 rounded-full')}
+        />
       ) : error ? (
-        <Alert
-          severity="error"
-          action={
-            <Button onClick={() => setAttempt((v) => v + 1)}>
-              Tentar novamente
-            </Button>
-          }
-        >
-          {error}
-          {calendar &&
-            person.mode === 'global' &&
-            ' Escolha uma pessoa ou um projeto se a seleção ultrapassar 10 pessoas; não exibimos totais parciais.'}
+        <Alert variant="destructive">
+          <AlertDescription>
+            {error}
+            {calendar &&
+              person.mode === 'global' &&
+              ' Escolha uma pessoa ou um projeto se a seleção ultrapassar 10 pessoas; não exibimos totais parciais.'}
+            <div className="mt-2">
+              <Button onClick={() => setAttempt((v) => v + 1)} variant="ghost">
+                Tentar novamente
+              </Button>
+            </div>
+          </AlertDescription>
         </Alert>
       ) : (
         report && (
           <>
             {report.page.partial && (
-              <Alert severity="warning">
-                Dados parciais desta página; não é total global.
+              <Alert className={cn('border-amber-500/50')}>
+                <AlertDescription>
+                  Dados parciais desta página; não é total global.
+                </AlertDescription>
               </Alert>
             )}
-            <Collapse in={infoOpen}>
-              <Stack spacing={1}>
-                <Typography>
+            <div hidden={!infoOpen}>
+              <div className={cn('flex flex-col gap-2')}>
+                <p className={cn('text-base')}>
                   Referência {date(report.asOf, zone)} · {report.policy};{' '}
                   {report.page.scannedCount} registros examinados.{' '}
                   {report.estimatedCount} estimados. Tempos podem somar
                   atividades simultâneas.
-                </Typography>
-                <Button component={RouterLink} to="/rules">
-                  Regras de cálculo
+                </p>
+                <Button asChild variant="ghost">
+                  <RouterLink to={'/rules'}>Regras de cálculo</RouterLink>
                 </Button>
                 {revealed ? (
                   report.warnings.map((warning, i) => (
-                    <Alert key={i} severity="warning">
-                      {warning}
+                    <Alert key={i} className={cn('border-amber-500/50')}>
+                      <AlertDescription>{warning}</AlertDescription>
                     </Alert>
                   ))
                 ) : (
-                  <Typography>
+                  <p className={cn('text-base')}>
                     Avisos detalhados ocultos na apresentação atual.
-                  </Typography>
+                  </p>
                 )}
-              </Stack>
-            </Collapse>
+              </div>
+            </div>
             {report.intervals.length === 0 && (
               <EmptyState
                 title="Nenhum registro neste escopo"
                 detail="Ajuste o período ou os filtros para consultar outras atividades."
               />
             )}
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: {
-                  xs: '1fr',
-                  md: company ? 'repeat(2,minmax(0,1fr))' : '1fr',
-                },
-                gap: 2,
-              }}
+            <div
+              className={cn(
+                'grid grid-cols-1 gap-4',
+                company && 'md:grid-cols-2',
+              )}
             >
               {!calendar &&
                 report.byProject.some((project) => project.minutes > 0) && (
-                  <Paper sx={{ p: { xs: 2, sm: 2.5 }, minWidth: 0 }}>
-                    <Typography component="h3" variant="h6">
+                  <Card className={cn('gap-0 p-4 sm:p-5 min-w-0')}>
+                    <h3 className={cn('text-lg font-semibold')}>
                       Tempo por projeto
-                    </Typography>
-                    <Box
-                      component="svg"
+                    </h3>
+                    <svg
                       viewBox="0 0 200 200"
                       role="img"
                       aria-label="Distribuição por projeto; valores na legenda"
-                      sx={{
-                        width: 160,
-                        maxWidth: '100%',
-                        display: 'block',
-                        mx: 'auto',
-                        my: 2,
-                      }}
+                      className={cn('w-40 max-w-full block mx-auto my-4')}
                     >
                       <title>Tempo por projeto</title>
                       {pieSlices(
@@ -759,29 +828,17 @@ export function PersonalPage({
                           <path key={i} d={slice.path} fill={slice.color} />
                         ),
                       )}
-                      <Box
-                        component="circle"
+                      <circle
                         cx="100"
                         cy="100"
                         r="58"
-                        sx={(theme) => ({
-                          fill: theme.palette.background.paper,
-                        })}
+                        className={cn('fill-card')}
                       />
-                    </Box>
-                    <Box
-                      component="ul"
-                      sx={{
-                        listStyle: 'none',
-                        p: 0,
-                        m: 0,
-                        '& li': {
-                          py: 1,
-                          borderBottom: 1,
-                          borderColor: 'divider',
-                          fontSize: 14,
-                        },
-                      }}
+                    </svg>
+                    <ul
+                      className={cn(
+                        'list-none p-0 m-0 [&_li]:py-2 [&_li]:border-b [&_li]:text-sm',
+                      )}
                     >
                       {report.byProject.map((p) => (
                         <li key={p.projectId}>
@@ -795,58 +852,45 @@ export function PersonalPage({
                           do agregado selecionado
                         </li>
                       ))}
-                    </Box>
-                  </Paper>
+                    </ul>
+                  </Card>
                 )}
               {company &&
                 report.byUser?.some((person) => person.minutes > 0) && (
-                  <Paper sx={{ p: { xs: 2, sm: 2.5 }, minWidth: 0 }}>
-                    <Typography component="h2" variant="h6">
+                  <Card className={cn('gap-0 p-4 sm:p-5 min-w-0')}>
+                    <h2 className={cn('text-lg font-semibold')}>
                       Tempo por pessoa
-                    </Typography>
-                    <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
+                    </h2>
+                    <ul className={cn('list-none p-0 m-0')}>
                       {report.byUser.map((person, index) => (
-                        <Box
-                          component="li"
-                          key={person.uid}
-                          sx={{
-                            py: 1.5,
-                            borderBottom: 1,
-                            borderColor: 'divider',
-                          }}
-                        >
+                        <li key={person.uid} className={cn('py-3 border-b')}>
                           {revealed ? person.label : 'Pessoa ' + (index + 1)}:{' '}
                           {hours(person.minutes)}
-                          <Box
+                          <div
                             aria-hidden="true"
-                            sx={{
-                              mt: 1,
-                              height: 6,
-                              bgcolor: 'action.hover',
-                              borderRadius: 1,
-                              overflow: 'hidden',
-                            }}
+                            className={cn(
+                              'mt-2 h-1.5 bg-muted rounded overflow-hidden',
+                            )}
                           >
-                            <Box
-                              sx={{
-                                height: '100%',
+                            <div
+                              className={cn('h-full bg-primary')}
+                              style={{
                                 width:
                                   (report.totalMinutes > 0
                                     ? (person.minutes / report.totalMinutes) *
                                       100
                                     : 0) + '%',
-                                bgcolor: 'primary.main',
                               }}
                             />
-                          </Box>
-                        </Box>
+                          </div>
+                        </li>
                       ))}
-                    </Box>
-                  </Paper>
+                    </ul>
+                  </Card>
                 )}
-            </Box>
+            </div>
             {!calendar && (
-              <Box sx={{ mt: 2 }}>
+              <div className={cn('mt-4')}>
                 <TopicReport
                   personal={!company}
                   buckets={topicBuckets(
@@ -857,7 +901,7 @@ export function PersonalPage({
                   )}
                   unassignedMinutes={report.unassignedMinutes ?? 0}
                 />
-              </Box>
+              </div>
             )}
             {calendar && allWeeks && (
               <CalendarHistory
@@ -894,19 +938,12 @@ export function PersonalPage({
               />
             )}
             {calendar && !allWeeks && density !== 'timeline' && (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: {
-                    xs:
-                      view === 'month'
-                        ? 'repeat(7,minmax(0,1fr))'
-                        : 'minmax(0,1fr)',
-                    sm: view === 'day' ? '1fr' : 'repeat(7,minmax(0,1fr))',
-                  },
-                  gap: { xs: 0.5, sm: 1 },
-                  '& .MuiPaper-root': { minWidth: 0, overflow: 'hidden' },
-                }}
+              <div
+                className={cn(
+                  'grid gap-1 sm:gap-2 [&>*]:min-w-0 [&>*]:overflow-hidden',
+                  view === 'month' ? 'grid-cols-7' : 'grid-cols-1',
+                  view === 'day' ? 'sm:grid-cols-1' : 'sm:grid-cols-7',
+                )}
               >
                 {calendarDays(selected, view).map((day) => {
                   const outside =
@@ -927,33 +964,26 @@ export function PersonalPage({
                       Date.parse(item.effectiveEndedAt) > start,
                   );
                   return (
-                    <Paper
+                    <Card
                       key={day}
-                      sx={{
-                        p: 1,
-                        minHeight: {
-                          xs: view === 'month' ? 80 : entries.length ? 80 : 44,
-                          sm: density === 'supercompact' ? 88 : 116,
-                        },
-                        boxShadow: 'none',
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 2,
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        opacity: outside ? 0.55 : 1,
-                      }}
+                      className={cn(
+                        'p-2 shadow-none border rounded-lg min-w-0 overflow-hidden',
+                        view === 'month' || entries.length
+                          ? 'min-h-20'
+                          : 'min-h-11',
+                        density === 'supercompact'
+                          ? 'sm:min-h-[88px]'
+                          : 'sm:min-h-[116px]',
+                        outside && 'opacity-55',
+                      )}
                     >
-                      <Typography
-                        component="h3"
-                        variant="subtitle2"
-                        sx={{
-                          mb: 0.5,
-                          color: 'text.secondary',
-                          fontSize: { xs: view === 'month' ? 11 : 14, sm: 14 },
-                          whiteSpace: view === 'month' ? 'nowrap' : 'normal',
-                          overflow: 'hidden',
-                        }}
+                      <h3
+                        className={cn(
+                          'text-sm font-medium mb-1 text-muted-foreground overflow-hidden sm:text-sm',
+                          view === 'month'
+                            ? 'text-[11px] whitespace-nowrap'
+                            : 'text-sm whitespace-normal',
+                        )}
                       >
                         {new Intl.DateTimeFormat('pt-BR', {
                           weekday: view === 'month' ? undefined : 'short',
@@ -961,203 +991,250 @@ export function PersonalPage({
                           month: view === 'month' ? undefined : 'short',
                           timeZone: zone,
                         }).format(new Date(day + 'T12:00:00Z'))}
-                      </Typography>
+                      </h3>
                       {outside ? (
-                        <Typography variant="caption">
+                        <span className={cn('text-xs')}>
                           Fora do mês consultado — sem cobertura
-                        </Typography>
+                        </span>
                       ) : entries.length === 0 ? (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            display: {
-                              xs: view === 'month' ? 'none' : 'block',
-                              sm: 'block',
-                            },
-                          }}
+                        <span
+                          className={cn(
+                            'text-xs sm:block',
+                            view === 'month' ? 'hidden' : 'block',
+                          )}
                         >
                           Sem atividades
-                        </Typography>
+                        </span>
                       ) : (
                         entries.map((item) => (
-                          <Box key={JSON.stringify([item.uid || uid, item.id])}>
-                            <Tooltip
-                              title={
-                                label(item.projectId) +
-                                ' · ' +
-                                new Intl.DateTimeFormat('pt-BR', {
-                                  timeZone: zone,
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }).format(new Date(item.effectiveStartedAt)) +
-                                ' — ' +
-                                new Intl.DateTimeFormat('pt-BR', {
-                                  timeZone: zone,
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }).format(new Date(item.effectiveEndedAt)) +
-                                ' · ' +
-                                new Intl.NumberFormat('pt-BR', {
-                                  maximumFractionDigits: 1,
-                                }).format(
-                                  (Date.parse(item.effectiveEndedAt) -
-                                    Date.parse(item.effectiveStartedAt)) /
-                                    60000,
-                                ) +
-                                ' min'
-                              }
-                            >
-                              <Button
-                                tabIndex={0}
-                                component={
-                                  item.uid && item.uid !== uid
-                                    ? 'span'
-                                    : RouterLink
-                                }
-                                to={
-                                  item.uid && item.uid !== uid
-                                    ? undefined
-                                    : contextualRecordPath(
-                                        location.pathname,
-                                        location.search,
-                                        item.id,
-                                      )
-                                }
-                                sx={{
-                                  display: 'block',
-                                  textAlign: 'left',
-                                  borderLeft:
-                                    '4px solid ' + color(item.projectId),
-                                  my: 1,
-                                  width: '100%',
-                                  minWidth: 0,
-                                  maxWidth: '100%',
-                                  whiteSpace:
+                          <div key={JSON.stringify([item.uid || uid, item.id])}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  tabIndex={0}
+                                  asChild
+                                  variant="ghost"
+                                  className={cn(
+                                    'block text-left border-l-4 my-2 w-full min-w-0 max-w-full h-auto',
                                     density === 'supercompact'
-                                      ? 'nowrap'
-                                      : 'normal',
-                                  py: density === 'supercompact' ? 0.25 : 1,
-                                }}
-                              >
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    display: 'block',
-                                    whiteSpace:
-                                      density === 'supercompact'
-                                        ? 'nowrap'
-                                        : 'normal',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
+                                      ? 'whitespace-nowrap py-0.5'
+                                      : 'whitespace-normal py-2',
+                                  )}
+                                  style={{
+                                    borderLeftColor: color(item.projectId),
                                   }}
                                 >
-                                  <Box
-                                    component="span"
-                                    aria-hidden="true"
-                                    sx={{
-                                      display: 'inline-block',
-                                      width: 6,
-                                      height: 6,
-                                      bgcolor: color(item.projectId),
-                                      mr: 0.5,
-                                      borderRadius: '50%',
-                                    }}
-                                  />
-                                  {new Intl.DateTimeFormat('pt-BR', {
+                                  {item.uid && item.uid !== uid ? (
+                                    <span tabIndex={0}>
+                                      <span
+                                        className={cn(
+                                          'text-xs block overflow-hidden text-ellipsis',
+                                          density === 'supercompact'
+                                            ? 'whitespace-nowrap'
+                                            : 'whitespace-normal',
+                                        )}
+                                      >
+                                        <span
+                                          aria-hidden="true"
+                                          className={cn(
+                                            'inline-block size-1.5 mr-1 rounded-full',
+                                          )}
+                                          style={{
+                                            backgroundColor: color(
+                                              item.projectId,
+                                            ),
+                                          }}
+                                        />
+                                        {new Intl.DateTimeFormat('pt-BR', {
+                                          timeZone: zone,
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        }).format(
+                                          new Date(
+                                            Math.max(
+                                              start,
+                                              Date.parse(
+                                                item.effectiveStartedAt,
+                                              ),
+                                            ),
+                                          ),
+                                        )}{' '}
+                                        {item.uid &&
+                                          (participants.find(
+                                            (p) => p.uid === item.uid,
+                                          )?.label || 'Pessoa da organização') +
+                                            ' · '}
+                                        {label(item.projectId)}
+                                        {density !== 'supercompact' && (
+                                          <>
+                                            <br />
+                                            {new Intl.DateTimeFormat('pt-BR', {
+                                              timeZone: zone,
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            }).format(
+                                              new Date(
+                                                Math.min(
+                                                  end,
+                                                  Date.parse(
+                                                    item.effectiveEndedAt,
+                                                  ),
+                                                ),
+                                              ),
+                                            )}
+                                            {item.estimated
+                                              ? ' · Estimado'
+                                              : ''}
+                                            {report.intervals.some(
+                                              (other) =>
+                                                other.id !== item.id &&
+                                                overlaps(item, other),
+                                            )
+                                              ? ' · Sobreposição'
+                                              : ''}
+                                          </>
+                                        )}
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    <RouterLink
+                                      to={
+                                        contextualRecordPath(
+                                          location.pathname,
+                                          location.search,
+                                          item.id,
+                                        ) ?? '#'
+                                      }
+                                    >
+                                      <span
+                                        className={cn(
+                                          'text-xs block overflow-hidden text-ellipsis',
+                                          density === 'supercompact'
+                                            ? 'whitespace-nowrap'
+                                            : 'whitespace-normal',
+                                        )}
+                                      >
+                                        <span
+                                          aria-hidden="true"
+                                          className={cn(
+                                            'inline-block size-1.5 mr-1 rounded-full',
+                                          )}
+                                          style={{
+                                            backgroundColor: color(
+                                              item.projectId,
+                                            ),
+                                          }}
+                                        />
+                                        {new Intl.DateTimeFormat('pt-BR', {
+                                          timeZone: zone,
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        }).format(
+                                          new Date(
+                                            Math.max(
+                                              start,
+                                              Date.parse(
+                                                item.effectiveStartedAt,
+                                              ),
+                                            ),
+                                          ),
+                                        )}{' '}
+                                        {item.uid &&
+                                          (participants.find(
+                                            (p) => p.uid === item.uid,
+                                          )?.label || 'Pessoa da organização') +
+                                            ' · '}
+                                        {label(item.projectId)}
+                                        {density !== 'supercompact' && (
+                                          <>
+                                            <br />
+                                            {new Intl.DateTimeFormat('pt-BR', {
+                                              timeZone: zone,
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            }).format(
+                                              new Date(
+                                                Math.min(
+                                                  end,
+                                                  Date.parse(
+                                                    item.effectiveEndedAt,
+                                                  ),
+                                                ),
+                                              ),
+                                            )}
+                                            {item.estimated
+                                              ? ' · Estimado'
+                                              : ''}
+                                            {report.intervals.some(
+                                              (other) =>
+                                                other.id !== item.id &&
+                                                overlaps(item, other),
+                                            )
+                                              ? ' · Sobreposição'
+                                              : ''}
+                                          </>
+                                        )}
+                                      </span>
+                                    </RouterLink>
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {label(item.projectId) +
+                                  ' · ' +
+                                  new Intl.DateTimeFormat('pt-BR', {
                                     timeZone: zone,
                                     hour: '2-digit',
                                     minute: '2-digit',
+                                  }).format(new Date(item.effectiveStartedAt)) +
+                                  ' — ' +
+                                  new Intl.DateTimeFormat('pt-BR', {
+                                    timeZone: zone,
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  }).format(new Date(item.effectiveEndedAt)) +
+                                  ' · ' +
+                                  new Intl.NumberFormat('pt-BR', {
+                                    maximumFractionDigits: 1,
                                   }).format(
-                                    new Date(
-                                      Math.max(
-                                        start,
-                                        Date.parse(item.effectiveStartedAt),
-                                      ),
-                                    ),
-                                  )}{' '}
-                                  {item.uid &&
-                                    (participants.find(
-                                      (p) => p.uid === item.uid,
-                                    )?.label || 'Pessoa da organização') +
-                                      ' · '}
-                                  {label(item.projectId)}
-                                  {density !== 'supercompact' && (
-                                    <>
-                                      <br />
-                                      {new Intl.DateTimeFormat('pt-BR', {
-                                        timeZone: zone,
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      }).format(
-                                        new Date(
-                                          Math.min(
-                                            end,
-                                            Date.parse(item.effectiveEndedAt),
-                                          ),
-                                        ),
-                                      )}
-                                      {item.estimated ? ' · Estimado' : ''}
-                                      {report.intervals.some(
-                                        (other) =>
-                                          other.id !== item.id &&
-                                          overlaps(item, other),
-                                      )
-                                        ? ' · Sobreposição'
-                                        : ''}
-                                    </>
-                                  )}
-                                </Typography>
-                              </Button>
+                                    (Date.parse(item.effectiveEndedAt) -
+                                      Date.parse(item.effectiveStartedAt)) /
+                                      60000,
+                                  ) +
+                                  ' min'}
+                              </TooltipContent>
                             </Tooltip>
-                            <Typography
-                              variant="caption"
-                              sx={{ display: 'block', px: 1 }}
-                            >
+                            <span className={cn('text-xs block px-2')}>
                               {projectLink(item.projectId)}
-                            </Typography>
-                          </Box>
+                            </span>
+                          </div>
                         ))
                       )}
-                    </Paper>
+                    </Card>
                   );
                 })}
-              </Box>
+              </div>
             )}
             {calendar && (
-              <Box
-                component="ul"
+              <ul
                 aria-label="Legenda dos projetos"
-                sx={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 2,
-                  listStyle: 'none',
-                  m: 0,
-                  p: 0,
-                  fontSize: 12,
-                }}
+                className={cn('flex flex-wrap gap-4 list-none m-0 p-0 text-xs')}
               >
                 {report.byProject.map((p) => (
                   <li key={p.projectId}>
-                    <Box
-                      component="span"
+                    <span
                       aria-hidden="true"
-                      sx={{
-                        display: 'inline-block',
-                        width: 12,
-                        height: 12,
-                        bgcolor: color(p.projectId),
-                        mr: 1,
-                      }}
+                      className={cn('inline-block size-3 mr-2')}
+                      style={{ backgroundColor: color(p.projectId) }}
                     />
                     {projectLink(p.projectId)} · {hours(p.minutes)}
                   </li>
                 ))}
-              </Box>
+              </ul>
             )}
           </>
         )
       )}
-    </Stack>
+    </div>
   );
 }

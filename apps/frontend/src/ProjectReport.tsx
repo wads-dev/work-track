@@ -1,27 +1,26 @@
+import { cn } from './lib/utils';
+import { Button } from './components/ui/button';
+import { Card } from './components/ui/card';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { TableCell } from './components/ui/table';
+import { TableHead } from './components/ui/table';
+import { TableRow } from './components/ui/table';
+import { TableHeader } from './components/ui/table';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from './components/ui/tooltip';
+import { TableBody } from './components/ui/table';
+import { Table } from './components/ui/table';
+import { Skeleton } from './components/ui/skeleton';
 import {
   useProjectAccessRevision,
   projectAccessRevision,
 } from './project-access-revision';
 import { useEffect, useState } from 'react';
 import { useDeletionRevision, deletionRevision } from './record-deletion';
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Link,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-  IconButton,
-  Tooltip,
-} from '@mui/material';
+
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { reportError } from './report-error';
@@ -60,93 +59,64 @@ export type Report = {
 function Pie({ title, buckets }: { title: string; buckets: Bucket[] }) {
   const slices = pieSlices(buckets);
   return (
-    <Paper
-      component="section"
-      aria-label={title}
-      sx={{ p: 3, flex: 1, minWidth: 0 }}
-    >
-      <Typography component="h3" variant="h6">
-        {title}
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Fatias proporcionais à soma dos valores desta distribuição:{' '}
-        {hours(buckets.reduce((sum, bucket) => sum + bucket.minutes, 0))}. A
-        soma dos tópicos pode diferir do tempo agregado quando as durações
-        informadas excedem o total; avisos abaixo explicam ambiguidades.
-      </Typography>
-      {slices.length === 0 ? (
-        <Typography>Nenhum tempo disponível nesta página.</Typography>
-      ) : (
-        <>
-          <Box
-            component="svg"
-            viewBox="0 0 200 200"
-            role="img"
-            aria-label={title + ' — valores na legenda abaixo'}
-            sx={{
-              width: 160,
-              maxWidth: '100%',
-              display: 'block',
-              mx: 'auto',
-              my: 2,
-            }}
-          >
-            <title>{title}</title>
-            {slices.map((slice, index) =>
-              slice.full ? (
-                <circle
-                  key={index}
-                  cx="100"
-                  cy="100"
-                  r="85"
-                  fill={slice.color}
-                />
-              ) : (
-                <path
-                  key={index}
-                  d={slice.path}
-                  fill={slice.color}
-                  stroke="white"
-                />
-              ),
-            )}
-            <Box
-              component="circle"
-              cx="100"
-              cy="100"
-              r="58"
-              sx={(theme) => ({ fill: theme.palette.background.paper })}
-            />
-          </Box>
-          <Box
-            component="ul"
-            sx={{
-              listStyle: 'none',
-              p: 0,
-              m: 0,
-              '& li': { py: 1, borderBottom: 1, borderColor: 'divider' },
-            }}
-          >
-            {slices.map((slice, index) => (
-              <li key={index}>
-                <Box
-                  component="span"
-                  aria-hidden="true"
-                  sx={{
-                    display: 'inline-block',
-                    width: 12,
-                    height: 12,
-                    bgcolor: slice.color,
-                    mr: 1,
-                  }}
-                />
-                {slice.label}: {hours(slice.minutes)}
-              </li>
-            ))}
-          </Box>
-        </>
-      )}
-    </Paper>
+    <Card className="gap-0 py-0">
+      <section aria-label={title} className={cn('p-6 flex-1 min-w-0')}>
+        <h3 className={cn('text-lg font-semibold')}>{title}</h3>
+        <p className={cn('text-sm text-muted-foreground')}>
+          Fatias proporcionais à soma dos valores desta distribuição:{' '}
+          {hours(buckets.reduce((sum, bucket) => sum + bucket.minutes, 0))}. A
+          soma dos tópicos pode diferir do tempo agregado quando as durações
+          informadas excedem o total; avisos abaixo explicam ambiguidades.
+        </p>
+        {slices.length === 0 ? (
+          <p className={cn('text-base')}>
+            Nenhum tempo disponível nesta página.
+          </p>
+        ) : (
+          <>
+            <svg
+              viewBox="0 0 200 200"
+              role="img"
+              aria-label={title + ' — valores na legenda abaixo'}
+              className={cn('w-40 max-w-full block mx-auto my-4')}
+            >
+              <title>{title}</title>
+              {slices.map((slice, index) =>
+                slice.full ? (
+                  <circle
+                    key={index}
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill={slice.color}
+                  />
+                ) : (
+                  <path
+                    key={index}
+                    d={slice.path}
+                    fill={slice.color}
+                    stroke="white"
+                  />
+                ),
+              )}
+              <circle cx="100" cy="100" r="58" className={cn('fill-card')} />
+            </svg>
+            <ul className={cn('list-none p-0 m-0 [&_li]:py-2 [&_li]:border-b')}>
+              {slices.map((slice, index) => (
+                <li key={index}>
+                  <span
+                    aria-hidden="true"
+                    className={cn('inline-block size-3 mr-2')}
+                    style={{ backgroundColor: slice.color }}
+                  />
+                  {slice.label}: {hours(slice.minutes)}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+    </Card>
   );
 }
 export function ProjectReport({
@@ -238,46 +208,53 @@ export function ProjectReport({
   ]);
   if (loading)
     return (
-      <Stack direction="row" spacing={2} role="status">
-        <CircularProgress size={24} />
-        <Typography>Carregando relatório do projeto…</Typography>
-      </Stack>
+      <div role="status" className={cn('flex flex-row gap-4')}>
+        <Skeleton role="status" className={cn('size-6 rounded-full')} />
+        <p className={cn('text-base')}>Carregando relatório do projeto…</p>
+      </div>
     );
   if (error)
     return (
-      <Alert
-        severity="error"
-        action={
-          <Button onClick={() => setAttempt((value) => value + 1)}>
-            Tentar novamente
-          </Button>
-        }
-      >
-        {error}
-        {!includeArchived && !hidden && (
-          <Button
-            onClick={() => {
-              const next = new URLSearchParams(params);
-              next.set('includeArchived', 'true');
+      <Alert variant="destructive">
+        <AlertDescription>
+          {error}
+          {!includeArchived && !hidden && (
+            <Button
+              onClick={() => {
+                const next = new URLSearchParams(params);
+                next.set('includeArchived', 'true');
 
-              setParams(next);
-            }}
-          >
-            Consultar histórico de projeto arquivado
-          </Button>
-        )}
+                setParams(next);
+              }}
+              variant="ghost"
+            >
+              Consultar histórico de projeto arquivado
+            </Button>
+          )}
+          <div className="mt-2">
+            <Button
+              onClick={() => setAttempt((value) => value + 1)}
+              variant="ghost"
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        </AlertDescription>
       </Alert>
     );
   if (!report) return null;
   if (hidden)
     return (
-      <Alert severity="info" sx={{ mt: 2 }}>
-        Relatório, tópicos e avisos ocultos na apresentação atual. Revele dados
-        no topo para visualizar. Esta ofuscação não altera permissões de acesso.
+      <Alert className={cn('mt-4')}>
+        <AlertDescription>
+          Relatório, tópicos e avisos ocultos na apresentação atual. Revele
+          dados no topo para visualizar. Esta ofuscação não altera permissões de
+          acesso.
+        </AlertDescription>
       </Alert>
     );
   return (
-    <Box component="section" aria-label="Relatório do projeto" sx={{ mt: 3 }}>
+    <section aria-label="Relatório do projeto" className={cn('mt-6')}>
       <Button
         onClick={() => {
           const next = new URLSearchParams(params);
@@ -285,77 +262,75 @@ export function ProjectReport({
 
           setParams(next);
         }}
+        variant="ghost"
       >
         {includeArchived
           ? 'Voltar à seleção ativa'
           : 'Permitir histórico arquivado nesta consulta'}
       </Button>
-      <Paper sx={{ p: 2, my: 2 }}>
-        <Typography variant="caption" color="text.secondary">
+      <Card className={cn('gap-0 p-4 my-4')}>
+        <span className={cn('text-xs text-muted-foreground')}>
           Tempo registrado · seleção atual
-        </Typography>
-        <Typography
-          component="h2"
-          variant="h4"
-          sx={{ fontVariantNumeric: 'tabular-nums' }}
+        </span>
+        <h2
+          className={cn('text-3xl font-semibold tracking-tight tabular-nums')}
         >
           {hours(report.totalMinutes)}
-        </Typography>
-      </Paper>
-      <Typography color="text.secondary" sx={{ mb: 2 }}>
+        </h2>
+      </Card>
+      <p className={cn('text-base mb-4 text-muted-foreground')}>
         Pode somar atividades simultâneas; não representa tempo líquido único.
         Referência: {date(report.asOf)}. Política: {report.policy}.
-      </Typography>
-      <Typography sx={{ mb: 2 }}>
+      </p>
+      <p className={cn('text-base mb-4')}>
         Estimativas não alteram fatos: orçamento global de 8 horas por
         pessoa/dia entre todos os projetos, com contexto completo. Fatos
         fechados consomem margem sem truncamento; o total exibido considera
         todos os registros selecionados.{' '}
-        <Link component={RouterLink} to="/rules">
+        <RouterLink
+          to="/rules"
+          className={cn('text-primary underline-offset-4 hover:underline')}
+        >
           Consultar regras e limites do relatório
-        </Link>
+        </RouterLink>
         .
-      </Typography>
+      </p>
       {report.page.partial && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Relatório parcial
-          {report.estimatedCount > 0
-            ? ' com ' + report.estimatedCount + ' registro(s) estimado(s)'
-            : ''}
-          . Totais e gráficos representam somente esta página de até{' '}
-          {report.page.limit} registros, não todo o projeto.
+        <Alert className={cn('mb-4 border-amber-500/50')}>
+          <AlertDescription>
+            Relatório parcial
+            {report.estimatedCount > 0
+              ? ' com ' + report.estimatedCount + ' registro(s) estimado(s)'
+              : ''}
+            . Totais e gráficos representam somente esta página de até{' '}
+            {report.page.limit}registros, não todo o projeto.
+          </AlertDescription>
         </Alert>
       )}
       {report.warnings.length > 0 && (
-        <Box
-          component="details"
-          sx={{ mb: 2, color: 'text.secondary', fontSize: 14 }}
-        >
-          <Box component="summary" sx={{ cursor: 'pointer', py: 1 }}>
+        <details className={cn('mb-4 text-muted-foreground text-sm')}>
+          <summary className={cn('cursor-pointer py-2')}>
             Notas do cálculo ({report.warnings.length})
-          </Box>
-          <Box component="ul" sx={{ pl: 3 }}>
+          </summary>
+          <ul className={cn('pl-6')}>
             {report.warnings.map((warning, index) => (
               <li key={index}>{warning}</li>
             ))}
-          </Box>
-        </Box>
+          </ul>
+        </details>
       )}
       {report.records.length === 0 ? (
-        <Alert severity="info">Nenhum registro disponível nesta página.</Alert>
+        <Alert>
+          <AlertDescription>
+            Nenhum registro disponível nesta página.
+          </AlertDescription>
+        </Alert>
       ) : (
         <>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: 'minmax(0, 1fr)',
-                md: 'repeat(2, minmax(0, 1fr))',
-              },
-              gap: 2,
-              my: 3,
-              '& > *': { minWidth: 0 },
-            }}
+          <div
+            className={cn(
+              'grid grid-cols-1 md:grid-cols-2 gap-4 my-6 [&>*]:min-w-0',
+            )}
           >
             <Pie title="Tempo por pessoa" buckets={report.byUser} />
             <TopicReport
@@ -376,56 +351,54 @@ export function ProjectReport({
                 })),
               }))}
             />
-          </Box>
-          <Stack spacing={1} sx={{ display: { xs: 'flex', sm: 'none' } }}>
+          </div>
+          <div className={cn('flex flex-col flex sm:hidden gap-2')}>
             {report.records.map((record) => (
-              <Paper key={record.id + record.uid} sx={{ p: 2 }}>
-                <Typography variant="h6">
+              <Card key={record.id + record.uid} className={cn('gap-0 p-4')}>
+                <p className={cn('text-lg font-semibold')}>
                   {report.byUser.find((item) => item.uid === record.uid)
                     ?.label || 'Pessoa'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
+                </p>
+                <p className={cn('text-sm text-muted-foreground')}>
                   {date(record.startedAt)} —{' '}
                   {date(record.endedAt ?? record.effectiveEndedAt)}
-                </Typography>
-                <Typography sx={{ mt: 1 }}>
+                </p>
+                <p className={cn('text-base mt-2')}>
                   {hours(record.minutes)}{' '}
                   {record.estimated
                     ? '· Estimado; fim original não informado'
                     : '· Factual'}
-                </Typography>
+                </p>
                 {record.uid === uid && (
-                  <Button
-                    component={RouterLink}
-                    to={detailPath('records', record.id, search)}
-                  >
-                    Detalhes
+                  <Button asChild variant="ghost">
+                    <RouterLink to={detailPath('records', record.id, search)}>
+                      Detalhes
+                    </RouterLink>
                   </Button>
                 )}
-              </Paper>
+              </Card>
             ))}
-          </Stack>
-          <TableContainer
-            sx={{ display: { xs: 'none', sm: 'block' } }}
-            component={Paper}
+          </div>
+          <div
             tabIndex={0}
             aria-label="Registros resumidos do projeto"
+            className={cn('hidden sm:block overflow-x-auto rounded-xl border')}
           >
-            <Table sx={{ minWidth: 650 }}>
+            <Table className={cn('min-w-[650px]')}>
               <caption>
                 Registros selecionados — sem texto privado ou contexto
               </caption>
-              <TableHead>
+              <TableHeader>
                 <TableRow>
                   {['Pessoa', 'Tópicos', 'Início', 'Fim', 'Tempo'].map(
                     (label) => (
-                      <TableCell key={label} scope="col">
+                      <TableHead key={label} scope="col">
                         {label}
-                      </TableCell>
+                      </TableHead>
                     ),
                   )}
                 </TableRow>
-              </TableHead>
+              </TableHeader>
               <TableBody>
                 {report.records.map((record) => (
                   <TableRow key={record.id + record.uid}>
@@ -433,14 +406,26 @@ export function ProjectReport({
                       {report.byUser.find((item) => item.uid === record.uid)
                         ?.label || 'Pessoa'}
                       {record.uid === uid && (
-                        <Tooltip title="Abrir detalhes do meu registro">
-                          <IconButton
-                            component={RouterLink}
-                            to={detailPath('records', record.id, search)}
-                            aria-label="Abrir detalhes do meu registro"
-                          >
-                            <UiIcon kind="detail" />
-                          </IconButton>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              aria-label="Abrir detalhes do meu registro"
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              className={cn('shrink-0', 'size-9')}
+                            >
+                              <RouterLink
+                                to={detailPath('records', record.id, search)}
+                                aria-label={'Abrir detalhes do meu registro'}
+                              >
+                                <UiIcon kind="detail" />
+                              </RouterLink>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {'Abrir detalhes do meu registro'}
+                          </TooltipContent>
                         </Tooltip>
                       )}
                     </TableCell>
@@ -458,9 +443,9 @@ export function ProjectReport({
                     <TableCell>
                       {date(record.endedAt ?? record.effectiveEndedAt)}
                       {record.estimated && (
-                        <Typography variant="caption" sx={{ display: 'block' }}>
+                        <span className={cn('text-xs block')}>
                           Estimado; fim original não informado
-                        </Typography>
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>{hours(record.minutes)}</TableCell>
@@ -468,14 +453,17 @@ export function ProjectReport({
                 ))}
               </TableBody>
             </Table>
-          </TableContainer>
+          </div>
         </>
       )}
-      <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-        <Button onClick={() => setAttempt((value) => value + 1)}>
+      <div className={cn('flex flex-row mt-4 gap-4')}>
+        <Button
+          onClick={() => setAttempt((value) => value + 1)}
+          variant="ghost"
+        >
           Atualizar relatório
         </Button>
-      </Stack>
-    </Box>
+      </div>
+    </section>
   );
 }

@@ -1,23 +1,22 @@
+import { Button } from './components/ui/button';
+import {
+  SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+} from './components/ui/select';
+import { Label } from './components/ui/label';
+import { Checkbox } from './components/ui/checkbox';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { Input } from './components/ui/input';
 import { useRef, useState } from 'react';
 import { MoveDialog } from './MoveDialog';
 import { getAuth } from 'firebase/auth';
 import { projectMutation } from './project-mutation';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
 import { date, objects, text } from './data';
-import { Link } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { topicDetailsPath } from './routes';
 import { isHidden, usePrivacy } from './privacy';
@@ -157,15 +156,12 @@ export function ProjectTopics({
     }
   };
   return (
-    <Paper
-      component="section"
-      sx={{ p: 2, mt: 2 }}
-      aria-label="Gerenciar assuntos"
+    <section
+      aria-label={'Gerenciar assuntos'}
+      className="rounded-xl border bg-card p-4 text-card-foreground"
     >
-      <Stack spacing={2}>
-        <Typography component="h3" variant="h6">
-          Assuntos do projeto
-        </Typography>
+      <div className="flex flex-col gap-4">
+        <h3 className="text-lg font-semibold">Assuntos do projeto</h3>
         {movingTopic && (
           <MoveDialog
             functions={functions}
@@ -176,32 +172,24 @@ export function ProjectTopics({
             onClose={() => setMovingTopic(null)}
           />
         )}
-        <Box component="ul" sx={{ pl: 0, listStyle: 'none' }}>
+        <ul className="space-y-2">
           {catalog.map((t, i) => (
-            <Box
-              component="li"
+            <li
               key={i}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                flexWrap: 'wrap',
-                mb: 1,
-                overflowWrap: 'anywhere',
-              }}
+              className="flex flex-wrap items-center gap-2 break-words"
             >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              <div className="min-w-0 flex-1">
                 {!isHidden(project, revealed) && text(t.id, '') ? (
-                  <Link
-                    component={RouterLink}
+                  <RouterLink
                     to={
                       topicDetailsPath(projectId, text(t.id)) +
                       '?returnTo=' +
                       encodeURIComponent(location.pathname + location.search)
                     }
+                    className="text-primary underline underline-offset-4"
                   >
                     {text(t.title, 'Assunto')}
-                  </Link>
+                  </RouterLink>
                 ) : (
                   'Assunto reservado'
                 )}
@@ -211,147 +199,169 @@ export function ProjectTopics({
                   : t.archived
                     ? ' · arquivado'
                     : ''}
-              </Box>
+              </div>
               {!t.archived && !t.mergedIntoTopicId && (
                 <Button
-                  variant="outlined"
                   disabled={busy || !!movingTopic}
-                  sx={{ minHeight: 44, flexShrink: 0 }}
                   aria-label={'Transferir assunto ' + text(t.title)}
                   onClick={() => setMovingTopic(t)}
+                  variant="outline"
+                  className="min-h-11"
                 >
                   Transferir
                 </Button>
               )}
-            </Box>
+            </li>
           ))}
-        </Box>
-        <Typography variant="body2">
+        </ul>
+        <p className="text-sm">
           Mescle assuntos sem reescrever registros ou snapshots. Geral não pode
           ser origem; pode ser destino. Não há desfazer.
-        </Typography>
-        <TextField
-          select
-          label="Assuntos de origem"
-          value={sources}
-          slotProps={{ select: { multiple: true } }}
-          onChange={(e) =>
-            update(
-              'mergeSources',
-              typeof e.target.value === 'string'
-                ? e.target.value
-                : (e.target.value as string[]).join(','),
-            )
-          }
-          disabled={busy || !!message}
-        >
-          {active
-            .filter((t) => t.id !== 'general' && t.id !== target)
-            .map((t, i) => (
-              <MenuItem key={i} value={text(t.id, '')}>
-                {text(t.title, 'Assunto')}
-              </MenuItem>
-            ))}
-        </TextField>
-        <TextField
-          select
-          label="Assunto de destino"
-          value={target}
-          onChange={(e) => update('mergeTarget', e.target.value)}
-          disabled={busy || !!message}
-        >
-          <MenuItem value="">Escolha o destino</MenuItem>
-          {active
-            .filter((t) => !sources.includes(text(t.id, '')))
-            .map((t, i) => (
-              <MenuItem key={i} value={text(t.id, '')}>
-                {text(t.title, 'Assunto')}
-              </MenuItem>
-            ))}
-        </TextField>
+        </p>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectTopics-7680'}>{'Assuntos de origem'}</Label>
+          <div className="space-y-2 rounded-md border p-3">
+            {active
+              .filter((t) => t.id !== 'general' && t.id !== target)
+              .map((t) => (
+                <label key={text(t.id, '')} className="flex items-center gap-2">
+                  <Checkbox
+                    checked={sources.includes(text(t.id, ''))}
+                    disabled={busy || !!message}
+                    onCheckedChange={(checked) =>
+                      update(
+                        'mergeSources',
+                        (checked === true
+                          ? [...sources, text(t.id, '')]
+                          : sources.filter((id) => id !== text(t.id, ''))
+                        ).join(','),
+                      )
+                    }
+                  />
+                  <span>{text(t.title, 'Assunto')}</span>
+                </label>
+              ))}
+          </div>
+        </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectTopics-8399'}>{'Assunto de destino'}</Label>
+          <Select
+            value={target}
+            disabled={busy || !!message}
+            onValueChange={(value) => update('mergeTarget', value)}
+          >
+            <SelectTrigger id={'ProjectTopics-8399'}>
+              <SelectValue placeholder={'Assunto de destino'} />
+            </SelectTrigger>
+            <SelectContent>
+              {active
+                .filter((t) => !sources.includes(text(t.id, '')))
+                .map((t, i) => (
+                  <SelectItem key={i} value={text(t.id, '')}>
+                    {text(t.title, 'Assunto')}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           onClick={() => void run(false)}
           disabled={!valid || busy || !!message}
-          variant="outlined"
+          variant="outline"
+          className="min-h-11"
         >
           Consultar preview
         </Button>
         {currentPreview && (
           <>
-            <Typography>
+            <p className="text-sm leading-relaxed">
               Origens:{' '}
               {currentPreview.sourceTopics
                 .map((t) => text(t.title, 'Assunto'))
                 .join(', ')}{' '}
               → {text(currentPreview.targetTopic.title, 'Assunto')}
-            </Typography>
-            <Alert severity="info">
-              Registros não varridos no preview. Quantidade impactada
-              desconhecida; não significa zero. Originais preservados.
+            </p>
+            <Alert className="my-2">
+              <AlertDescription>
+                Registros não varridos no preview. Quantidade impactada
+                desconhecida; não significa zero. Originais preservados.
+              </AlertDescription>
             </Alert>
             {currentPreview.warnings.map((w, i) => (
-              <Alert severity="warning" key={i}>
-                {w}
+              <Alert key={i} className="my-2">
+                <AlertDescription>{w}</AlertDescription>
               </Alert>
             ))}
-            <TextField
-              required
-              label="Motivo da mesclagem"
-              value={reason}
-              onChange={(e) => {
-                setReason(e.target.value);
-                setConfirmed(false);
-              }}
-              disabled={busy}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                  disabled={busy}
-                />
-              }
-              label="Confirmo origens, destino e mesclagem sem desfazer"
-            />
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor={'ProjectTopics-9816'}>
+                {'Motivo da mesclagem'}
+              </Label>
+              <Input
+                required={true}
+                value={reason}
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  setConfirmed(false);
+                }}
+                disabled={busy}
+                id={'ProjectTopics-9816'}
+              ></Input>
+            </div>
+            <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+              <Checkbox
+                checked={confirmed}
+                disabled={busy}
+                onCheckedChange={(checked) => setConfirmed(checked === true)}
+              />
+              <span>
+                {'Confirmo origens, destino e mesclagem sem desfazer'}
+              </span>
+            </Label>
             <Button
-              color="warning"
-              variant="contained"
               disabled={busy || !confirmed || !reason.trim()}
               onClick={() => void run(true)}
+              variant="default"
+              className="min-h-11"
             >
               Executar mesclagem confirmada
             </Button>
           </>
         )}
-        {message && <Alert severity="success">{message}</Alert>}
-        {error && <Alert severity="error">{error}</Alert>}
-        <Button disabled={busy} onClick={() => void loadHistory()}>
+        {message && (
+          <Alert role="status" className="my-2">
+            <AlertDescription>{message}</AlertDescription>
+          </Alert>
+        )}
+        {error && (
+          <Alert variant="destructive" className="my-2">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <Button
+          disabled={busy}
+          onClick={() => void loadHistory()}
+          variant="ghost"
+          className="min-h-11"
+        >
           Consultar histórico de mesclagens
         </Button>
         {loaded && (
           <>
-            <Typography variant="caption">
+            <p className="text-xs text-muted-foreground">
               Paginado por ID, não em ordem cronológica global. Autoria não
               exibida.
-            </Typography>
+            </p>
             {history.length === 0 ? (
-              <Typography>Nenhuma mesclagem nesta consulta.</Typography>
+              <p className="text-sm leading-relaxed">
+                Nenhuma mesclagem nesta consulta.
+              </p>
             ) : (
               history.map((item) => (
-                <Box
-                  key={item.id}
-                  sx={{
-                    p: 2,
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: '8px',
-                  }}
-                >
-                  <Typography>
-                    {date(item.recordedAt)} · {item.reason}
-                  </Typography>
-                  <Typography variant="body2">
+                <div key={item.id} className="rounded-lg border p-4">
+                  <p className="text-sm leading-relaxed">
+                    {date(item.recordedAt)}· {item.reason}
+                  </p>
+                  <p className="text-sm">
                     {item.sourceTopicIds
                       .map((id) =>
                         text(
@@ -366,19 +376,28 @@ export function ProjectTopics({
                         ?.title,
                       'Assunto',
                     )}
-                  </Typography>
-                </Box>
+                  </p>
+                </div>
               ))
             )}
             {cursor && (
-              <Button disabled={busy} onClick={() => void loadHistory(true)}>
+              <Button
+                disabled={busy}
+                onClick={() => void loadHistory(true)}
+                variant="ghost"
+                className="min-h-11"
+              >
                 Carregar mais histórico
               </Button>
             )}
           </>
         )}
-        {busy && <Typography role="status">Aguardando operação…</Typography>}
-      </Stack>
-    </Paper>
+        {busy && (
+          <p role={'status'} className="text-sm leading-relaxed">
+            Aguardando operação…
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

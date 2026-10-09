@@ -1,4 +1,4 @@
-import { Box, Paper, Typography } from '@mui/material';
+import { Card } from './components/ui/card';
 import type { ReactNode } from 'react';
 export function Surface({
   title,
@@ -8,14 +8,10 @@ export function Surface({
   children: ReactNode;
 }) {
   return (
-    <Paper sx={{ p: { xs: 2, sm: 2.5 }, minWidth: 0 }}>
-      {title && (
-        <Typography component="h2" variant="h6" sx={{ mb: 2 }}>
-          {title}
-        </Typography>
-      )}
+    <Card className="min-w-0 p-4 sm:p-5">
+      {title && <h2 className="mb-4 text-lg font-semibold">{title}</h2>}
       {children}
-    </Paper>
+    </Card>
   );
 }
 export function EmptyState({
@@ -26,15 +22,9 @@ export function EmptyState({
   detail?: string;
 }) {
   return (
-    <Box sx={{ py: 5, textAlign: 'center', color: 'text.secondary' }}>
-      <Typography variant="h6" color="text.primary">
-        {title}
-      </Typography>
-      {detail && (
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          {detail}
-        </Typography>
-      )}
-    </Box>
+    <div className="py-10 text-center text-muted-foreground">
+      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+      {detail && <p className="mt-2 text-sm">{detail}</p>}
+    </div>
   );
 }

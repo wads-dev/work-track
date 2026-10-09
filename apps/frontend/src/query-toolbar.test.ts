@@ -28,7 +28,7 @@ describe('shared query toolbar', () => {
       expect(source(name)).toContain('<QueryToolbar');
     const toolbar = source('QueryToolbar.tsx');
     expect(toolbar).toContain('aria-label={label}');
-    expect(toolbar).toContain("flexWrap: 'wrap'");
+    expect(toolbar).toContain('flex-wrap');
     expect(toolbar).toContain('{actions}');
   });
   it('does not impose calendar domain controls or navigation on other routes', () => {
@@ -48,8 +48,8 @@ describe('shared filter structure', () => {
       'data-query-slot="actions"',
     ])
       expect(toolbar).toContain(slot);
-    expect(toolbar).toContain("kind === 'date' ? 'calc(50% - 6px)' : '100%'");
-    expect(toolbar).toContain('xs: 44, sm: 40');
+    expect(toolbar).toContain('w-[calc(50%-6px)] sm:w-40');
+    expect(toolbar).toContain('[&_input]:h-11 sm:[&_input]:h-10');
     const records = source('Dashboard.tsx')
       .split('<QueryToolbar')[1]
       .split('</QueryToolbar>')[0];
@@ -63,17 +63,17 @@ describe('shared filter structure', () => {
   it('constructs identical date controls for records and reports with small size and same labels', () => {
     const toolbar = source('QueryToolbar.tsx');
     expect(toolbar).toContain('export function QueryPeriodControls');
-    expect(toolbar).toContain('label="Inicial"');
-    expect(toolbar).toContain('label="Final"');
+    expect(toolbar).toContain('>Inicial</Label>');
+    expect(toolbar).toContain('>Final</Label>');
     expect(toolbar.match(/kind="date"/g)).toHaveLength(2);
   });
 });
 describe('mobile toolbar regression', () => {
   it('gives summary and controls their own rows and moves actions after secondary filters', () => {
     const toolbar = source('QueryToolbar.tsx');
-    expect(toolbar).toContain("flexBasis: { xs: '100%', sm: 'auto' }");
-    expect(toolbar).toContain("flex: { xs: '1 0 100%', sm: 1 }");
-    expect(toolbar).toContain('order: { xs: 3, sm: 0 }');
-    expect(toolbar).toContain('order: { xs: 2, sm: 1 }');
+    expect(toolbar).toContain('basis-full sm:w-auto sm:basis-auto');
+    expect(toolbar).toContain('flex-[1_0_100%]');
+    expect(toolbar).toContain('order-3');
+    expect(toolbar).toContain('order-2');
   });
 });

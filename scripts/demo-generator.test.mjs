@@ -7,7 +7,10 @@ test('Vite demo bootstrap is dev-only and only intercepts exact init endpoint', 
   assert.equal(viteDevConfig.server.port, 5173);
   assert.equal(viteDevConfig.server.strictPort, true);
   assert.equal(viteDevConfig.server.watch.usePolling, true);
-  const plugin = viteDevConfig.plugins[0];
+  const plugin = viteDevConfig.plugins
+    .flat()
+    .find((plugin) => plugin.name === 'local-demo-firebase-bootstrap');
+  assert(plugin, 'development bootstrap plugin must remain present');
   assert.equal(plugin.apply, 'serve');
   let middleware;
   plugin.configureServer({

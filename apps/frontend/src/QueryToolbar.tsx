@@ -1,13 +1,9 @@
-import { Box, TextField, type SxProps, type Theme } from '@mui/material';
 import type { ReactNode } from 'react';
-const rowSx = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 1.5,
-  minWidth: 0,
-} as const;
-/** Shared compact structure and sizing. Consumers supply domain controls, never local grids. */
+import { useId } from 'react';
+import { Input } from './components/ui/input';
+import { Label } from './components/ui/label';
+import { cn } from './lib/utils';
+/** Shared compact structure and sizing. Consumers supply domain controls. */
 export function QueryToolbarField({
   children,
   kind = 'standard',
@@ -15,24 +11,22 @@ export function QueryToolbarField({
   children: ReactNode;
   kind?: 'date' | 'project' | 'search' | 'standard';
 }) {
-  const width = { date: 160, project: 240, search: 260, standard: 180 }[kind];
+  const widths = {
+    date: 'w-[calc(50%-6px)] sm:w-40',
+    project: 'w-full sm:w-60',
+    search: 'w-full sm:w-[260px]',
+    standard: 'w-full sm:w-[180px]',
+  };
   return (
-    <Box
+    <div
       data-query-field={kind}
-      sx={{
-        width: { xs: kind === 'date' ? 'calc(50% - 6px)' : '100%', sm: width },
-        minWidth: 0,
-        flexShrink: 0,
-        '& > *': { width: '100% !important', minWidth: '0 !important' },
-        '& .MuiInputBase-root': { height: { xs: 44, sm: 40 } },
-        '& .MuiInputBase-input': { fontSize: 14 },
-        '& .MuiAutocomplete-inputRoot': { flexWrap: 'nowrap' },
-        '& .MuiFormControlLabel-root': { m: 0, minHeight: 40 },
-        '& .MuiFormControlLabel-label': { fontSize: 13 },
-      }}
+      className={cn(
+        'min-w-0 shrink-0 [&>*]:w-full [&>*]:min-w-0 [&_input]:h-11 sm:[&_input]:h-10 [&_input]:text-sm',
+        widths[kind],
+      )}
     >
       {children}
-    </Box>
+    </div>
   );
 }
 export function QueryToolbar({
@@ -41,98 +35,56 @@ export function QueryToolbar({
   summary,
   secondary,
   actions,
-  sx,
+  className,
 }: {
   label: string;
   children: ReactNode;
   summary?: ReactNode;
   secondary?: ReactNode;
   actions?: ReactNode;
-  sx?: SxProps<Theme>;
+  className?: string;
 }) {
   return (
-    <Box
-      component="section"
+    <section
       aria-label={label}
-      sx={[
-        {
-          ...rowSx,
-          p: 2,
-          border: 1,
-          borderColor: 'divider',
-          borderRadius: '12px',
-          bgcolor: 'background.paper',
-          '& .MuiIconButton-root': {
-            width: { xs: 44, sm: 40 },
-            height: { xs: 44, sm: 40 },
-          },
-          '& .MuiButton-root': { minHeight: { xs: 44, sm: 40 } },
-          '& .MuiFormControlLabel-root': {
-            m: 0,
-            minHeight: { xs: 44, sm: 40 },
-          },
-          '& .MuiFormControlLabel-label': {
-            fontSize: 13,
-            whiteSpace: 'nowrap',
-          },
-        },
-        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
-      ]}
+      className={cn(
+        'flex min-w-0 flex-wrap items-center gap-3 rounded-xl border bg-card p-4 [&_button:not([role=checkbox])]:min-h-11 sm:[&_button:not([role=checkbox])]:min-h-10',
+        className,
+      )}
     >
-      <Box data-query-row="primary" sx={{ display: 'contents' }}>
+      <div data-query-row="primary" className="contents">
         {summary && (
-          <Box
+          <div
             data-query-slot="summary"
-            sx={{
-              minWidth: 130,
-              width: { xs: '100%', sm: 'auto' },
-              flexBasis: { xs: '100%', sm: 'auto' },
-            }}
+            className="w-full min-w-[130px] basis-full sm:w-auto sm:basis-auto"
           >
             {summary}
-          </Box>
+          </div>
         )}
-        <Box
+        <div
           data-query-slot="controls"
-          sx={{
-            ...rowSx,
-            flex: { xs: '1 0 100%', sm: 1 },
-            width: { xs: '100%', sm: 'auto' },
-          }}
+          className="flex w-full min-w-0 flex-[1_0_100%] flex-wrap items-center gap-3 sm:w-auto sm:flex-1"
         >
           {children}
-        </Box>
+        </div>
         {actions && (
-          <Box
+          <div
             data-query-slot="actions"
-            sx={{
-              ...rowSx,
-              justifyContent: 'flex-end',
-              order: { xs: 3, sm: 0 },
-              ml: { sm: 'auto' },
-              width: { xs: '100%', sm: 'auto' },
-            }}
+            className="order-3 flex w-full min-w-0 flex-wrap items-center justify-end gap-3 sm:order-0 sm:ml-auto sm:w-auto"
           >
             {actions}
-          </Box>
+          </div>
         )}
-      </Box>
+      </div>
       {secondary && (
-        <Box
+        <div
           data-query-row="secondary"
-          sx={{
-            ...rowSx,
-            width: '100%',
-            order: { xs: 2, sm: 1 },
-            pt: 1.5,
-            borderTop: 1,
-            borderColor: 'divider',
-          }}
+          className="order-2 flex w-full min-w-0 flex-wrap items-center gap-3 border-t pt-3 sm:order-1"
         >
           {secondary}
-        </Box>
+        </div>
       )}
-    </Box>
+    </section>
   );
 }
 export function QueryPeriodControls({
@@ -146,27 +98,30 @@ export function QueryPeriodControls({
   onFromChange: (value: string) => void;
   onToChange: (value: string) => void;
 }) {
+  const id = useId();
   return (
     <>
       <QueryToolbarField kind="date">
-        <TextField
-          size="small"
-          type="date"
-          label="Inicial"
-          value={fromDate}
-          onChange={(e) => onFromChange(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor={id + '-from'}>Inicial</Label>
+          <Input
+            id={id + '-from'}
+            type="date"
+            value={fromDate}
+            onChange={(e) => onFromChange(e.target.value)}
+          />
+        </div>
       </QueryToolbarField>
       <QueryToolbarField kind="date">
-        <TextField
-          size="small"
-          type="date"
-          label="Final"
-          value={toDate}
-          onChange={(e) => onToChange(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor={id + '-to'}>Final</Label>
+          <Input
+            id={id + '-to'}
+            type="date"
+            value={toDate}
+            onChange={(e) => onToChange(e.target.value)}
+          />
+        </div>
       </QueryToolbarField>
     </>
   );

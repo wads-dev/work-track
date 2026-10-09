@@ -4,30 +4,31 @@ import { useEffect, useState } from 'react';
 import { projectRepository } from './project-repository';
 import { TopicDetails } from './TopicDetails';
 import { createRoot } from 'react-dom/client';
+import { Button } from './components/ui/button';
+import { Card, CardContent } from './components/ui/card';
+import { Alert, AlertDescription } from './components/ui/alert';
 import {
-  Alert,
-  AppBar,
-  Drawer,
-  IconButton,
+  TooltipProvider,
   Tooltip,
-  Menu,
-  MenuItem,
-  List,
-  ListItemButton,
-  ListItemText,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Container,
-  CssBaseline,
-  Stack,
-  ThemeProvider,
-  Toolbar,
-  Typography,
-  useMediaQuery,
-} from '@mui/material';
+  TooltipTrigger,
+  TooltipContent,
+} from './components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from './components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+} from './components/ui/sheet';
+import { cn } from './lib/utils';
+import { useMediaQuery } from './theme';
+
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -39,7 +40,6 @@ import { initializeServices, type Services } from './firebase';
 import { RecordDrawer } from './RecordDrawer';
 import { Dashboard } from './Dashboard';
 import '@fontsource-variable/geist';
-import { workTheme } from './theme';
 import './styles.css';
 import {
   BrowserRouter,
@@ -97,55 +97,36 @@ function RecordPage({ services, uid }: { services: Services; uid: string }) {
 function App() {
   const [revealed, setRevealed] = useState(false);
   const systemDark = useMediaQuery('(prefers-color-scheme: dark)');
-  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const [themeOverride, setThemeOverride] = useState<'light' | 'dark' | null>(
     null,
   );
   const mode = themeOverride ?? (systemDark ? 'dark' : 'light');
-  const theme = workTheme(mode, reducedMotion);
-  const desktop = useMediaQuery('(min-width:1200px)');
-  const [themeAnchor, setThemeAnchor] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', mode === 'dark');
+    document.documentElement.style.colorScheme = mode;
+  }, [mode]);
   const toggleTheme = (
-    <>
-      <IconButton
-        aria-label="Escolher tema"
-        id="theme-menu-trigger"
-        aria-controls={themeAnchor ? 'theme-menu' : undefined}
-        aria-haspopup="menu"
-        aria-expanded={Boolean(themeAnchor)}
-        onClick={(event) => setThemeAnchor(event.currentTarget)}
-      >
-        <UiIcon kind={mode === 'dark' ? 'sun' : 'moon'} />
-      </IconButton>
-      <Menu
-        id="theme-menu"
-        slotProps={{ list: { 'aria-labelledby': 'theme-menu-trigger' } }}
-        anchorEl={themeAnchor}
-        open={Boolean(themeAnchor)}
-        onClose={() => setThemeAnchor(null)}
-      >
-        {(
-          [
-            { value: null, label: 'Sistema' },
-            { value: 'light', label: 'Claro' },
-            { value: 'dark', label: 'Escuro' },
-          ] as const
-        ).map(({ value, label }) => (
-          <MenuItem
-            key={label}
-            role="menuitemradio"
-            aria-checked={themeOverride === value}
-            selected={themeOverride === value}
-            onClick={() => {
-              setThemeOverride(value);
-              setThemeAnchor(null);
-            }}
-          >
-            {label}
-          </MenuItem>
-        ))}
-      </Menu>
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Escolher tema">
+          <UiIcon kind={mode === 'dark' ? 'sun' : 'moon'} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuRadioGroup
+          value={themeOverride ?? 'system'}
+          onValueChange={(value) =>
+            setThemeOverride(
+              value === 'system' ? null : (value as 'light' | 'dark'),
+            )
+          }
+        >
+          <DropdownMenuRadioItem value="system">Sistema</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="light">Claro</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="dark">Escuro</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
   const location = useLocation();
   const returnTo = safeReturnTo(
@@ -244,86 +225,117 @@ function App() {
   }
   if (!loading && authorized && location.pathname === '/')
     return <Navigate replace to={returnTo} />;
+  const navigation = (
+    <nav
+      id="menu-principal"
+      aria-label="Menu principal"
+      className="flex h-full flex-col gap-2 p-5"
+    >
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold tracking-tight">Work Track</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Projetos, tempo e contexto
+        </p>
+      </div>
+      <p className="px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        Trabalho e gestão
+      </p>
+      <div className="flex flex-1 flex-col gap-1">
+        {(
+          [
+            ['/app', 'Dashboard', 'home'],
+            ['/me', 'Meu relatório', 'chart'],
+            ['/calendar', 'Calendário', 'calendar'],
+            ['/projects', 'Projetos', 'projects'],
+            ['/records', 'Meus registros', 'records'],
+            ['/pending', 'Pendências', 'bell'],
+            ['/rules', 'Regras', 'rules'],
+          ] as const
+        ).map(([to, label, kind]) => {
+          const active =
+            location.pathname === to || location.pathname.startsWith(to + '/');
+          return (
+            <RouterLink
+              key={to}
+              to={to}
+              aria-current={active ? 'page' : undefined}
+              onClick={() => setMenuOpen(false)}
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground',
+                active && 'bg-accent text-accent-foreground',
+              )}
+            >
+              <UiIcon kind={kind} />
+              {label}
+            </RouterLink>
+          );
+        })}
+      </div>
+      <p className="break-all px-3 text-xs text-muted-foreground">
+        {user?.email}
+      </p>
+      <Button variant="outline" disabled={busy} onClick={() => void logout()}>
+        Sair
+      </Button>
+    </nav>
+  );
   return (
     <PrivacyContext.Provider value={{ revealed }}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <TooltipProvider>
         <a className="skip-link" href="#conteudo">
           Ir para o conteúdo
         </a>
         {authorized && services ? (
           <>
-            <AppBar
-              position="static"
-              elevation={0}
-              sx={{ ml: { lg: '280px' }, width: { lg: 'calc(100% - 280px)' } }}
-            >
-              <Toolbar
-                sx={{
-                  gap: { xs: 0.25, sm: 1 },
-                  minHeight: { xs: 60, sm: 64 },
-                  px: { xs: 1, sm: 2 },
-                  flexWrap: 'nowrap',
-                }}
+            <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r bg-sidebar text-sidebar-foreground lg:block">
+              {navigation}
+            </aside>
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetContent side="left" className="w-64 p-0">
+                <SheetTitle className="sr-only">Navegação</SheetTitle>
+                <SheetDescription className="sr-only">
+                  Menu principal do Work Track
+                </SheetDescription>
+                {navigation}
+              </SheetContent>
+            </Sheet>
+            <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b bg-background/95 px-6 backdrop-blur lg:ml-64">
+              <Button
+                className="lg:hidden"
+                variant="ghost"
+                size="icon"
+                aria-label="Abrir menu de navegação"
+                aria-expanded={menuOpen}
+                aria-controls="menu-principal"
+                onClick={() => setMenuOpen(true)}
               >
-                <IconButton
-                  sx={{ display: { lg: 'none' } }}
-                  color="inherit"
-                  aria-label="Abrir menu de navegação"
-                  aria-expanded={menuOpen}
-                  aria-controls={menuOpen ? 'menu-principal' : undefined}
-                  onClick={() => setMenuOpen(true)}
-                >
-                  <UiIcon kind="menu" />
-                </IconButton>
-                <Typography
-                  component="h1"
-                  variant="h6"
-                  noWrap
-                  sx={{
-                    flexGrow: 1,
-                    minWidth: 0,
-                    fontSize: { xs: 17, sm: 19 },
-                    fontWeight: 600,
-                  }}
-                >
-                  <Box
-                    component="span"
-                    sx={{
-                      display: { xs: 'none', sm: 'inline' },
-                      color: 'text.secondary',
-                      fontWeight: 400,
-                    }}
-                  >
-                    Work Track{' '}
-                    <Box component="span" sx={{ mx: 1 }}>
-                      ›
-                    </Box>
-                  </Box>
-                  {location.pathname.startsWith('/projects')
-                    ? 'Projetos'
-                    : location.pathname.startsWith('/records')
-                      ? 'Meus registros'
-                      : location.pathname === '/calendar'
-                        ? 'Calendário'
-                        : location.pathname === '/pending'
-                          ? 'Pendências'
-                          : location.pathname === '/rules'
-                            ? 'Regras'
-                            : location.pathname === '/me'
-                              ? 'Meu relatório'
-                              : 'Dashboard'}
-                </Typography>
-                {toggleTheme}
-                <PendingBell db={services.db} uid={user.uid} />
-                <Tooltip
-                  title={
-                    revealed
-                      ? 'Ocultar dados confidenciais'
-                      : 'Revelar dados confidenciais'
-                  }
-                >
-                  <IconButton
+                <UiIcon kind="menu" />
+              </Button>
+              <h1 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
+                <span className="mr-3 font-normal text-muted-foreground">
+                  Work Track <span className="ml-2">›</span>
+                </span>
+                {location.pathname.startsWith('/projects')
+                  ? 'Projetos'
+                  : location.pathname.startsWith('/records')
+                    ? 'Meus registros'
+                    : location.pathname === '/calendar'
+                      ? 'Calendário'
+                      : location.pathname === '/pending'
+                        ? 'Pendências'
+                        : location.pathname === '/rules'
+                          ? 'Regras'
+                          : location.pathname === '/me'
+                            ? 'Meu relatório'
+                            : 'Dashboard'}
+              </h1>
+              {toggleTheme}
+              <PendingBell db={services.db} uid={user.uid} />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     aria-label={
                       revealed
                         ? 'Ocultar dados confidenciais'
@@ -337,124 +349,19 @@ function App() {
                     }}
                   >
                     <UiIcon kind={revealed ? 'eye' : 'eyeoff'} />
-                  </IconButton>
-                </Tooltip>
-              </Toolbar>
-            </AppBar>
-            <Drawer
-              variant={desktop ? 'permanent' : 'temporary'}
-              open={desktop || menuOpen}
-              onClose={() => setMenuOpen(false)}
-              slotProps={{ paper: { sx: { width: 280, borderRadius: 0 } } }}
-            >
-              <Box
-                component="nav"
-                id="menu-principal"
-                aria-label="Menu principal"
-                sx={{
-                  width: 280,
-                  maxWidth: '85vw',
-                  p: 2,
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}
-              >
-                <Typography variant="h6">Work Track</Typography>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: 'text.secondary',
-                    overflowWrap: 'anywhere',
-                    mb: 2,
-                  }}
-                >
-                  Projetos, tempo e contexto
-                </Typography>
-                {!desktop && (
-                  <IconButton
-                    aria-label="Fechar menu"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <UiIcon kind="close" />
-                  </IconButton>
-                )}
-                <Typography
-                  variant="overline"
-                  color="text.secondary"
-                  sx={{ px: 2, mt: 2 }}
-                >
-                  Trabalho e gestão
-                </Typography>
-                <List sx={{ flex: 1 }}>
-                  {[
-                    ['/app', 'Dashboard'],
-                    ['/me', 'Meu relatório'],
-                    ['/calendar', 'Calendário'],
-                    ['/projects', 'Projetos'],
-                    ['/records', 'Meus registros'],
-                    ['/pending', 'Pendências'],
-                    ['/rules', 'Regras'],
-                  ].map(([to, label]) => (
-                    <ListItemButton
-                      key={to}
-                      component={RouterLink}
-                      to={to}
-                      selected={
-                        location.pathname === to ||
-                        location.pathname.startsWith(to + '/')
-                      }
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <UiIcon
-                        kind={
-                          to === '/app'
-                            ? 'home'
-                            : to === '/projects'
-                              ? 'projects'
-                              : to === '/pending'
-                                ? 'bell'
-                                : to === '/rules'
-                                  ? 'rules'
-                                  : to === '/calendar'
-                                    ? 'calendar'
-                                    : to === '/records'
-                                      ? 'records'
-                                      : 'chart'
-                        }
-                      />
-                      <ListItemText primary={label} sx={{ ml: 2 }} />
-                    </ListItemButton>
-                  ))}
-                </List>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ px: 2, overflowWrap: 'anywhere', mb: 1 }}
-                >
-                  {user.email}
-                </Typography>
-                <Button disabled={busy} onClick={() => void logout()}>
-                  Sair
-                </Button>
-              </Box>
-            </Drawer>
-            <Container
-              component="main"
-              id="conteudo"
-              tabIndex={-1}
-              maxWidth="xl"
-              sx={{
-                py: { xs: 2, sm: 3 },
-                px: { xs: 2, sm: 3 },
-                ml: { lg: '280px' },
-                width: { lg: 'calc(100% - 280px)' },
-                minWidth: 0,
-              }}
-            >
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {revealed
+                    ? 'Ocultar dados confidenciais'
+                    : 'Revelar dados confidenciais'}
+                </TooltipContent>
+              </Tooltip>
+            </header>
+            <main id="conteudo" tabIndex={-1} className="min-w-0 p-6 lg:ml-64">
               {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
               <Routes>
@@ -558,111 +465,62 @@ function App() {
                 <Route
                   path="*"
                   element={
-                    <Alert severity="info">
+                    <Alert>
                       Página não encontrada. Use a navegação para voltar.
                     </Alert>
                   }
                 />
               </Routes>
-            </Container>
+            </main>
           </>
         ) : (
-          <Box
-            component="main"
+          <main
             id="conteudo"
             tabIndex={-1}
-            sx={{
-              minHeight: '100dvh',
-              display: 'grid',
-              placeItems: 'center',
-              p: 3,
-            }}
+            className="relative flex min-h-screen items-center justify-center p-6"
           >
-            <Card sx={{ width: '100%', maxWidth: 440 }}>
-              <CardContent
-                sx={{
-                  p: { xs: 2.5, sm: 4 },
-                  '&:last-child': { pb: { xs: 2.5, sm: 4 } },
-                }}
-              >
-                <Stack direction="row" sx={{ justifyContent: 'end' }}>
-                  {toggleTheme}
-                </Stack>
-                <Stack spacing={3}>
-                  <Box
-                    sx={{
-                      width: 44,
-                      height: 44,
-                      display: 'grid',
-                      placeItems: 'center',
-                      bgcolor: 'action.selected',
-                      color: 'primary.main',
-                      borderRadius: 2,
-                    }}
-                  >
-                    <UiIcon kind="projects" />
-                  </Box>
-                  <Typography
-                    component="h1"
-                    variant="h4"
-                    sx={{ fontWeight: 700 }}
-                  >
+            <div className="absolute right-6 top-4">{toggleTheme}</div>
+            <Card className="w-full max-w-md">
+              <CardContent className="space-y-6 pt-6">
+                <div>
+                  <h1 className="text-3xl font-semibold tracking-tight">
                     Work Track
-                  </Typography>
-                  <Typography color="text.secondary">
-                    Acesse projetos e seus registros com sua conta Google
-                    verificada @wads.dev.
-                  </Typography>
-                  {loading && (
-                    <Stack direction="row" sx={{ gap: 2 }} role="status">
-                      <CircularProgress
-                        size={24}
-                        aria-label="Carregando sessão"
-                      />
-                      <span>Carregando sessão…</span>
-                    </Stack>
-                  )}
-                  {error && <Alert severity="error">{error}</Alert>}
-                  {!loading && user && !authorized && (
-                    <Alert severity="warning">
-                      Esta conta não tem acesso. Saia para entrar com uma conta
-                      Google verificada @wads.dev.
-                    </Alert>
-                  )}
-                  {!loading &&
-                    (user ? (
-                      <Button
-                        variant="contained"
-                        onClick={() => void logout()}
-                        disabled={busy}
-                      >
-                        Sair e trocar conta
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="contained"
-                        size="large"
-                        onClick={() => void login()}
-                        disabled={!services || busy}
-                      >
-                        {busy ? 'Aguardando Google…' : 'Entrar com Google'}
-                      </Button>
-                    ))}
-                  {!loading && !services && (
-                    <Button onClick={() => window.location.reload()}>
-                      Recarregar configuração
-                    </Button>
-                  )}
-                  <Typography variant="body2" color="text.secondary">
-                    Este acesso é independente da autorização MCP em /login.
-                    Nenhum registro é criado ao entrar.
-                  </Typography>
-                </Stack>
+                  </h1>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Projetos, tempo e contexto da WADS.
+                  </p>
+                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                {loading ? (
+                  <div
+                    role="status"
+                    aria-label="Carregando autenticação"
+                    className="flex justify-center py-4"
+                  >
+                    <span className="size-6 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full"
+                    disabled={busy || !services}
+                    onClick={() => void login()}
+                  >
+                    {busy ? 'Entrando…' : 'Entrar com Google'}
+                  </Button>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Use sua conta Google corporativa @wads.dev. Nenhum registro é
+                  criado ao entrar.
+                </p>
               </CardContent>
             </Card>
-          </Box>
+          </main>
         )}
-      </ThemeProvider>
+      </TooltipProvider>
     </PrivacyContext.Provider>
   );
 }

@@ -1,4 +1,3 @@
-import { Link, Typography } from '@mui/material';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { isHidden } from './privacy';
 import { objects, text } from './data';
@@ -42,20 +41,17 @@ export function MetadataLink({
   const location = useLocation();
   const value = metadataNavigation(projectId, project, revealed, topicId);
   return value.path ? (
-    <Link
-      component={RouterLink}
+    <RouterLink
       to={
         value.path +
         '?returnTo=' +
         encodeURIComponent(location.pathname + location.search)
       }
-      sx={{ overflowWrap: 'anywhere' }}
+      className="text-primary underline-offset-4 hover:underline [overflow-wrap:anywhere]"
     >
       {value.label}
-    </Link>
+    </RouterLink>
   ) : (
-    <Typography component="span" sx={{ fontSize: 'inherit' }}>
-      {value.label}
-    </Typography>
+    <span>{value.label}</span>
   );
 }

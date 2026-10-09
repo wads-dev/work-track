@@ -20,10 +20,21 @@ describe('privacy query lifetime regressions', () => {
   });
   it('never clears selection due to programmatic reset', () => {
     const selector = source('ProjectSelector.tsx');
-    expect(selector).toContain("reason === 'input'");
     expect(selector).toContain(
-      "reason === 'selectOption' || reason === 'clear'",
+      'input?.id === projectId && input.label === selected.label',
     );
-    expect(selector).toContain('a.id === b.id');
+    expect(selector).toContain(
+      'options.find((option) => option.id === projectId)',
+    );
+    expect(selector).toContain('onChange(option.id)');
+    expect(selector).toContain("onChange('')");
+    const typing = selector
+      .split('onChange={(event) => {')[1]
+      .split('onKeyDown=')[0];
+    expect(typing).toContain('setInput');
+    expect(typing).not.toContain('onChange(');
+    const blur = selector.split('onBlur={(event) => {')[1].split('<Label')[0];
+    expect(blur).toContain('setInput(null)');
+    expect(blur).not.toContain('onChange(');
   });
 });

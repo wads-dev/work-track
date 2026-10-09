@@ -2,7 +2,7 @@
 
 ## Direção: workspace operacional calmo
 
-A aplicação deve parecer uma ferramenta de trabalho coesa, não uma coleção de formulários MUI. A primeira leitura de cada tela é **onde estou → período/escopo → dado principal → ação**. Nada de superfícies enormes com conteúdo isolado, botões textuais soltos, títulos repetidos ou alertas de rotina. Biblioteca não resolve hierarquia: Lead aprovou MUI custom, Geist self-hosted e Lucide uniforme, com tokens/overrides e componentes compostos centralizados.
+A aplicação deve parecer uma ferramenta de trabalho coesa, não uma coleção de formulários sem hierarquia. A primeira leitura de cada tela é **onde estou → período/escopo → dado principal → ação**. Nada de superfícies enormes com conteúdo isolado, botões textuais soltos, títulos repetidos ou alertas de rotina. Biblioteca não resolve hierarquia: Base atual: shadcn/ui real (new-york), Tailwind CSS v4 e Radix, Geist self-hosted e Lucide uniforme, com tokens CSS claro/escuro e componentes compostos centralizados.
 
 ## Diagnóstico visual inicial (imagens realmente vistas)
 

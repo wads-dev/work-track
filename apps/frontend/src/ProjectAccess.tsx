@@ -1,19 +1,22 @@
-import { useRef, useState } from 'react';
+import { Alert, AlertDescription } from './components/ui/alert';
 import {
-  Alert,
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
+  SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+} from './components/ui/select';
+import { Label } from './components/ui/label';
+import {
   DialogTitle,
-  FormControlLabel,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+  DialogFooter,
+  Dialog,
+  DialogContent,
+} from './components/ui/dialog';
+import { Textarea } from './components/ui/textarea';
+import { Checkbox } from './components/ui/checkbox';
+import { Button } from './components/ui/button';
+import { useRef, useState } from 'react';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { projectRepository } from './project-repository';
 import {
@@ -38,9 +41,11 @@ export function ProjectAccess({
 }) {
   if (hidden)
     return (
-      <Alert severity="info" sx={{ mt: 2 }}>
-        Acesso e apresentação ocultos. Revele os dados no topo para gerenciar
-        este projeto. Confidencialidade não restringe acesso.
+      <Alert className="my-2">
+        <AlertDescription>
+          Acesso e apresentação ocultos. Revele os dados no topo para gerenciar
+          este projeto. Confidencialidade não restringe acesso.
+        </AlertDescription>
       </Alert>
     );
   if (!project) return null;
@@ -199,203 +204,245 @@ function AccessForm({
     setError('');
   };
   return (
-    <Paper
-      component="section"
-      aria-label="Acesso e apresentação"
-      variant="outlined"
-      sx={{ p: 2, mt: 2, borderRadius: 3 }}
+    <section
+      aria-label={'Acesso e apresentação'}
+      className="rounded-xl border bg-card p-4 text-card-foreground"
     >
-      <Typography component="h3" variant="subtitle1" sx={{ mb: 1.5 }}>
-        Acesso e apresentação
-      </Typography>
+      <h3 className="text-lg font-semibold">Acesso e apresentação</h3>
       {message && (
-        <Alert severity="success" sx={{ mb: 1.5 }}>
-          {message}
+        <Alert role="status" className="my-2">
+          <AlertDescription>{message}</AlertDescription>
         </Alert>
       )}
       {error && !target && confidentialTarget === null && (
-        <Alert severity="error">{error}</Alert>
+        <Alert variant="destructive" className="my-2">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-        <TextField
-          select
-          size="small"
-          label="Escopo"
-          value={scope}
-          disabled={busy || !!disabledReason}
-          onChange={(e) => {
-            setTarget(e.target.value as ProjectScope);
-            setReason('');
-            setPreview(null);
-            setAck(false);
-            setError('');
-            scopeIntent.current = null;
-          }}
-          helperText={
-            disabledReason ||
-            (scope === 'personal'
-              ? 'Somente você'
-              : 'Pessoas autorizadas da organização; não é público na internet.')
-          }
-          sx={{ flex: 1, minWidth: 0, '& .MuiInputBase-root': { height: 44 } }}
-        >
-          <MenuItem value="">Não identificado</MenuItem>
-          <MenuItem value="personal">Pessoal</MenuItem>
-          <MenuItem value="work">
-            {project.type === undefined
-              ? 'Global · organização (legado)'
-              : 'Global · organização'}
-          </MenuItem>
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label="Apresentação"
-          value={String(confidential)}
-          disabled={busy}
-          onChange={(e) => {
-            setConfidentialTarget(e.target.value === 'true');
-            setError('');
-            confidentialIntent.current = null;
-          }}
-          helperText="Oculta dados na apresentação; não restringe acesso."
-          sx={{ flex: 1, minWidth: 0, '& .MuiInputBase-root': { height: 44 } }}
-        >
-          <MenuItem value="true">Confidencial</MenuItem>
-          <MenuItem value="false">Não confidencial</MenuItem>
-        </TextField>
-      </Stack>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectAccess-6251'}>{'Escopo'}</Label>
+          <Select
+            value={scope}
+            disabled={busy || !!disabledReason}
+            onValueChange={(value) => {
+              setTarget(value as ProjectScope);
+              setReason('');
+              setPreview(null);
+              setAck(false);
+              setError('');
+              scopeIntent.current = null;
+            }}
+          >
+            <SelectTrigger id={'ProjectAccess-6251'}>
+              <SelectValue placeholder={'Escopo'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={'personal'}>Pessoal</SelectItem>
+              <SelectItem value={'work'}>
+                {project.type === undefined
+                  ? 'Global · organização (legado)'
+                  : 'Global · organização'}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p
+            id="ProjectAccess-6251-help"
+            className="text-xs text-muted-foreground"
+          >
+            {disabledReason ||
+              (scope === 'personal'
+                ? 'Somente você'
+                : 'Pessoas autorizadas da organização; não é público na internet.')}
+          </p>
+        </div>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={'ProjectAccess-7272'}>{'Apresentação'}</Label>
+          <Select
+            value={String(confidential)}
+            disabled={busy}
+            onValueChange={(value) => {
+              setConfidentialTarget(value === 'true');
+              setError('');
+              confidentialIntent.current = null;
+            }}
+          >
+            <SelectTrigger id={'ProjectAccess-7272'}>
+              <SelectValue placeholder={'Apresentação'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={'true'}>Confidencial</SelectItem>
+              <SelectItem value={'false'}>Não confidencial</SelectItem>
+            </SelectContent>
+          </Select>
+          <p
+            id="ProjectAccess-7272-help"
+            className="text-xs text-muted-foreground"
+          >
+            {'Oculta dados na apresentação; não restringe acesso.'}
+          </p>
+        </div>
+      </div>
       <Dialog
         open={target !== null}
-        onClose={close}
-        fullWidth
-        maxWidth="sm"
-        aria-labelledby="scope-dialog-title"
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
       >
-        <DialogTitle id="scope-dialog-title">
-          Alterar escopo do projeto
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <Typography>
-              {String(project.title ?? 'Projeto')} ·{' '}
-              {scope === 'personal' ? 'Pessoal' : 'Global'} →{' '}
-              {target === 'personal' ? 'Pessoal' : 'Global · organização'}
-            </Typography>
-            <Alert severity="warning">
-              {target === 'work'
-                ? 'Global compartilha o projeto, tópicos, textos dos registros e histórico de auditoria com pessoas autorizadas da organização. Não é público na internet. Confidencialidade não impede esse acesso.'
-                : 'Pessoal limita o acesso ao criador. A operação será bloqueada se houver registros de outras pessoas, inclusive históricos removidos.'}
-            </Alert>
-            <TextField
-              label="Motivo da alteração"
-              value={reason}
-              disabled={busy || !!preview}
-              onChange={(e) => setReason(e.target.value)}
-              fullWidth
-              multiline
-              minRows={2}
-            />
-            {preview && (
-              <>
-                <Typography>
-                  Prévia: {preview.recordCount} registros associados. Nenhum
-                  horário, texto ou autoria será reescrito.
-                </Typography>
-                {preview.warnings.map((warning, index) => (
-                  <Alert key={index} severity="warning">
-                    {warning}
-                  </Alert>
-                ))}
-                {preview.requiresSharingAcknowledgement && (
-                  <FormControlLabel
-                    control={
+        <DialogContent
+          aria-describedby={undefined}
+          showCloseButton={false}
+          aria-labelledby={'scope-dialog-title'}
+          className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
+        >
+          <DialogTitle id={'scope-dialog-title'}>
+            Alterar escopo do projeto
+          </DialogTitle>
+          <div className="space-y-4">
+            <div className="flex flex-col gap-4">
+              <p className="text-sm leading-relaxed">
+                {String(project.title ?? 'Projeto')}·{' '}
+                {scope === 'personal' ? 'Pessoal' : 'Global'}→{' '}
+                {target === 'personal' ? 'Pessoal' : 'Global · organização'}
+              </p>
+              <Alert className="my-2">
+                <AlertDescription>
+                  {target === 'work'
+                    ? 'Global compartilha o projeto, tópicos, textos dos registros e histórico de auditoria com pessoas autorizadas da organização. Não é público na internet. Confidencialidade não impede esse acesso.'
+                    : 'Pessoal limita o acesso ao criador. A operação será bloqueada se houver registros de outras pessoas, inclusive históricos removidos.'}
+                </AlertDescription>
+              </Alert>
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor={'ProjectAccess-8976'}>
+                  {'Motivo da alteração'}
+                </Label>
+                <Textarea
+                  value={reason}
+                  disabled={busy || !!preview}
+                  onChange={(e) => setReason(e.target.value)}
+                  id={'ProjectAccess-8976'}
+                  rows={2}
+                ></Textarea>
+              </div>
+              {preview && (
+                <>
+                  <p className="text-sm leading-relaxed">
+                    Prévia: {preview.recordCount}registros associados. Nenhum
+                    horário, texto ou autoria será reescrito.
+                  </p>
+                  {preview.warnings.map((warning, index) => (
+                    <Alert key={index} className="my-2">
+                      <AlertDescription>{warning}</AlertDescription>
+                    </Alert>
+                  ))}
+                  {preview.requiresSharingAcknowledgement && (
+                    <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
                       <Checkbox
                         checked={ack}
                         disabled={busy}
-                        onChange={(e) => setAck(e.target.checked)}
+                        onCheckedChange={(checked) => setAck(checked === true)}
                       />
-                    }
-                    label="Entendo e autorizo compartilhar todos esses dados com a organização."
-                  />
-                )}
-              </>
+                      <span>
+                        {
+                          'Entendo e autorizo compartilhar todos esses dados com a organização.'
+                        }
+                      </span>
+                    </Label>
+                  )}
+                </>
+              )}
+              {error && (
+                <Alert variant="destructive" className="my-2">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              disabled={busy}
+              onClick={close}
+              variant="ghost"
+              className="min-h-11"
+            >
+              Cancelar
+            </Button>
+            {preview ? (
+              <Button
+                disabled={
+                  busy || (preview.requiresSharingAcknowledgement && !ack)
+                }
+                onClick={() => void changeScope(true)}
+                variant="default"
+                className="min-h-11"
+              >
+                {busy
+                  ? 'Atualizando…'
+                  : target === 'work'
+                    ? 'Confirmar mudança para Global'
+                    : 'Confirmar mudança para Pessoal'}
+              </Button>
+            ) : (
+              <Button
+                disabled={busy || !reason.trim()}
+                onClick={() => void changeScope(false)}
+                variant="default"
+                className="min-h-11"
+              >
+                {busy ? 'Consultando…' : 'Conferir prévia'}
+              </Button>
             )}
-            {error && <Alert severity="error">{error}</Alert>}
-          </Stack>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions
-          sx={{
-            '& .MuiButton-root': { minHeight: 44 },
-            flexWrap: 'wrap',
-            gap: 1,
-            p: 2,
-          }}
-        >
-          <Button disabled={busy} onClick={close}>
-            Cancelar
-          </Button>
-          {preview ? (
-            <Button
-              variant="contained"
-              disabled={
-                busy || (preview.requiresSharingAcknowledgement && !ack)
-              }
-              onClick={() => void changeScope(true)}
-            >
-              {busy
-                ? 'Atualizando…'
-                : target === 'work'
-                  ? 'Confirmar mudança para Global'
-                  : 'Confirmar mudança para Pessoal'}
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              disabled={busy || !reason.trim()}
-              onClick={() => void changeScope(false)}
-            >
-              {busy ? 'Consultando…' : 'Conferir prévia'}
-            </Button>
-          )}
-        </DialogActions>
       </Dialog>
       <Dialog
         open={confidentialTarget !== null}
-        onClose={close}
-        fullWidth
-        maxWidth="xs"
-        aria-labelledby="confidential-dialog-title"
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
       >
-        <DialogTitle id="confidential-dialog-title">
-          {confidentialTarget
-            ? 'Marcar como confidencial?'
-            : 'Remover confidencialidade?'}
-        </DialogTitle>
-        <DialogContent>
-          <Typography>
-            Esta opção oculta dados na apresentação e não altera quem tem acesso
-            ao projeto. A mudança será auditada com motivo automático.
-          </Typography>
-          {error && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {error}
-            </Alert>
-          )}
+        <DialogContent
+          aria-describedby={undefined}
+          showCloseButton={false}
+          aria-labelledby={'confidential-dialog-title'}
+          className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
+        >
+          <DialogTitle id={'confidential-dialog-title'}>
+            {confidentialTarget
+              ? 'Marcar como confidencial?'
+              : 'Remover confidencialidade?'}
+          </DialogTitle>
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed">
+              Esta opção oculta dados na apresentação e não altera quem tem
+              acesso ao projeto. A mudança será auditada com motivo automático.
+            </p>
+            {error && (
+              <Alert variant="destructive" className="my-2">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              disabled={busy}
+              onClick={close}
+              variant="ghost"
+              className="min-h-11"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={() => void changeConfidential()}
+              variant="default"
+              className="min-h-11"
+            >
+              {busy ? 'Atualizando…' : 'Confirmar apresentação'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ '& .MuiButton-root': { minHeight: 44 } }}>
-          <Button disabled={busy} onClick={close}>
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            disabled={busy}
-            onClick={() => void changeConfidential()}
-          >
-            {busy ? 'Atualizando…' : 'Confirmar apresentação'}
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Paper>
+    </section>
   );
 }

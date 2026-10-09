@@ -1,3 +1,12 @@
+import { Button } from './components/ui/button';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { TabsTrigger, Tabs, TabsList } from './components/ui/tabs';
+import { Label } from './components/ui/label';
+import { Input } from './components/ui/input';
+import { Checkbox } from './components/ui/checkbox';
+import { Textarea } from './components/ui/textarea';
+import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
+import { Sheet, SheetContent, SheetTitle } from './components/ui/sheet';
 import { MoveDialog } from './MoveDialog';
 import { useProjects } from './useProjects';
 import { canFinishNow, createFinishNowCommand } from './finish-now';
@@ -5,25 +14,6 @@ import { isDeletedRecord, createDeletionObserver } from './record-deletion';
 import { writeUrlTab } from './url-tabs';
 import { UiIcon } from './UiIcons';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  CircularProgress,
-  Drawer,
-  Dialog,
-  Collapse,
-  FormControlLabel,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-  Tabs,
-  Tab,
-  IconButton,
-  useMediaQuery,
-} from '@mui/material';
 import { doc, onSnapshot, type Firestore } from 'firebase/firestore';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -92,7 +82,6 @@ export function RecordDrawer({
   };
   const editOpen = activeTab === 'edit';
   const detailsOpen = activeTab === 'details';
-  const mobile = useMediaQuery('(max-width:600px)');
   const close = () => {
     if (mutationBusy.current || moveOpen) return;
     if (onClose) onClose();
@@ -296,51 +285,53 @@ export function RecordDrawer({
     );
   };
   const content = (
-    <Box
-      role={presentation === 'drawer' ? 'dialog' : undefined}
-      aria-modal={presentation === 'drawer' ? true : undefined}
-      aria-labelledby="registro-titulo"
-      sx={{
-        width: presentation === 'drawer' ? { xs: '100vw', sm: 560 } : '100%',
-        p: { xs: 2, sm: 3 },
-        display: 'flex',
-        flexDirection: 'column',
-        height: presentation === 'page' ? 'auto' : '100%',
-
-        overflow: 'hidden',
-        overflowWrap: 'anywhere',
-      }}
+    <div
+      className={
+        presentation === 'page'
+          ? 'flex w-full flex-col break-words p-4 sm:p-6'
+          : 'flex h-full min-h-0 w-full flex-col overflow-hidden break-words p-4 sm:p-6'
+      }
     >
-      <Stack
-        direction="row"
-        sx={{ justifyContent: 'space-between', alignItems: 'center' }}
-      >
-        <Typography id="registro-titulo" component="h2" variant="h5">
+      <div className="flex items-center justify-between gap-4">
+        <h2 id={'registro-titulo'} className="text-lg font-semibold">
           Detalhes do registro
-        </Typography>
-        <IconButton
-          aria-label="Fechar"
+        </h2>
+        <Button
+          aria-label={'Fechar'}
           disabled={finishing || saving || moving || moveOpen}
           onClick={close}
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
         >
-          <UiIcon kind="close" />
-        </IconButton>
-      </Stack>
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', py: 1 }}>
+          <UiIcon kind={'close'} />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto py-2">
         {loading && (
-          <CircularProgress aria-label="Carregando registro" sx={{ mt: 3 }} />
+          <div
+            aria-label={'Carregando registro'}
+            role="status"
+            className="my-4 animate-pulse text-sm text-muted-foreground"
+          >
+            Carregando…
+          </div>
         )}
         {error && revealed && (
-          <Alert severity="error" sx={{ my: 2 }}>
-            {error}
+          <Alert variant="destructive" className="my-2">
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
         {!loading && !record && !error && (
-          <Alert severity="info">Registro não disponível nesta conta.</Alert>
+          <Alert className="my-2">
+            <AlertDescription>
+              Registro não disponível nesta conta.
+            </AlertDescription>
+          </Alert>
         )}
         {success && revealed && (
-          <Alert severity="success" role="status" sx={{ my: 2 }}>
-            {success}
+          <Alert role="status" className="my-2">
+            <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
         {record &&
@@ -348,9 +339,11 @@ export function RecordDrawer({
             projects.rows.find((item) => item.id === record.projectId)?.data,
             revealed,
           ) && (
-            <Alert severity="info">
-              Detalhes, edição e auditoria ocultos no apresentação com dados
-              ocultos. Revele dados no topo para continuar.
+            <Alert className="my-2">
+              <AlertDescription>
+                Detalhes, edição e auditoria ocultos no apresentação com dados
+                ocultos. Revele dados no topo para continuar.
+              </AlertDescription>
             </Alert>
           )}
         {record &&
@@ -359,45 +352,38 @@ export function RecordDrawer({
             revealed,
           ) && (
             <>
-              <Typography variant="h6">
+              <p className="text-lg font-semibold">
                 {text(
                   object(record.projectSnapshot).title,
                   text(record.projectId),
                 )}
-              </Typography>
-              <Typography>
-                {date(record.startedAt, 'America/Sao_Paulo')} —{' '}
+              </p>
+              <p className="text-sm leading-relaxed">
+                {date(record.startedAt, 'America/Sao_Paulo')}—{' '}
                 {record.endedAt
                   ? date(record.endedAt, 'America/Sao_Paulo')
                   : 'Aberto'}
-              </Typography>
+              </p>
               {finishError && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                  {finishError}
+                <Alert variant="destructive" className="my-2">
+                  <AlertDescription>{finishError}</AlertDescription>
                 </Alert>
               )}
               {finishSuccess && (
-                <Alert severity="success" sx={{ mt: 2 }}>
-                  Registro finalizado. Os dados e o histórico serão atualizados
-                  automaticamente.
+                <Alert role="status" className="my-2">
+                  <AlertDescription>
+                    Registro finalizado. Os dados e o histórico serão
+                    atualizados automaticamente.
+                  </AlertDescription>
                 </Alert>
               )}
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1}
-                sx={{ mt: 1, flexWrap: 'wrap' }}
-              >
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
                 {!finishSuccess && canFinishNow(record, uid) && (
                   <Button
-                    variant="contained"
                     disabled={finishing || saving || moving || moveOpen}
                     onClick={finishNow}
-                    sx={{
-                      mt: 1,
-                      minHeight: 44,
-                      width: { xs: '100%', sm: 'auto' },
-                      alignSelf: 'flex-start',
-                    }}
+                    variant="default"
+                    className="min-h-11"
                   >
                     {finishing
                       ? 'Finalizando…'
@@ -410,15 +396,15 @@ export function RecordDrawer({
                   (record.deletedAt === null ||
                     record.deletedAt === undefined) && (
                     <Button
-                      variant="outlined"
                       disabled={saving || finishing || moving || moveOpen}
-                      sx={{ minHeight: 44, width: { xs: '100%', sm: 'auto' } }}
                       onClick={() => setMoveOpen(true)}
+                      variant="outline"
+                      className="min-h-11"
                     >
                       Mover registro
                     </Button>
                   )}
-              </Stack>
+              </div>
               {moveOpen && (
                 <MoveDialog
                   key={uid + '/' + recordId}
@@ -438,291 +424,319 @@ export function RecordDrawer({
               )}
               <Tabs
                 value={activeTab}
-                onChange={(_, value) => setActiveTab(value)}
-                aria-label="Seções do registro"
-                variant="fullWidth"
-                sx={{ my: 2, borderBottom: 1, borderColor: 'divider' }}
+                onValueChange={setActiveTab}
+                className="my-4"
               >
-                <Tab
-                  id="record-tab-details"
-                  aria-controls="record-panel-details"
-                  value="details"
-                  label="Detalhes"
-                />
-                <Tab
-                  id="record-tab-edit"
-                  aria-controls="record-panel-edit"
-                  value="edit"
-                  label="Editar"
-                />
-                <Tab
-                  id="record-tab-history"
-                  aria-controls="record-panel-history"
-                  value="history"
-                  label="Histórico"
-                />
-              </Tabs>
-              <Collapse
-                role="tabpanel"
-                id="record-panel-details"
-                aria-labelledby="record-tab-details"
-                in={detailsOpen}
-              >
-                <Box
-                  component="dl"
-                  sx={{
-                    '& dt': { fontWeight: 700, mt: 2 },
-                    '& dd': { m: 0, whiteSpace: 'pre-wrap' },
-                  }}
+                <TabsList
+                  className="grid w-full grid-cols-3"
+                  aria-label={'Seções do registro'}
                 >
-                  <dt>ID</dt>
-                  <dd>{recordId}</dd>
-                  <dt>Projeto</dt>
-                  <dd>
-                    {text(
-                      object(record.projectSnapshot).title,
-                      text(record.projectId),
-                    )}
-                  </dd>
-                  <dt>Tópicos</dt>
-                  <dd>
-                    {objects(record.topicSnapshots)
-                      .map((topic) => text(topic.title))
-                      .join(', ') || 'Não informado'}
-                  </dd>
-                  <dt>Início original</dt>
-                  <dd>{date(record.startedAt, 'America/Sao_Paulo')}</dd>
-                  <dt>Fim atualmente registrado</dt>
-                  <dd>{date(record.endedAt, 'America/Sao_Paulo')}</dd>
-                  <dt>Texto original</dt>
-                  <dd>{text(record.originalText)}</dd>
-                  <dt>Contexto</dt>
-                  <dd>{text(record.interpretation)}</dd>
-                  <dt>Gravado em</dt>
-                  <dd>{date(record.recordedAt)}</dd>
-                </Box>
-              </Collapse>
-              <Collapse
-                role="tabpanel"
-                id="record-panel-edit"
-                aria-labelledby="record-tab-edit"
-                in={editOpen}
-              >
-                <Paper
-                  component="form"
-                  id="record-edit-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void save();
-                  }}
-                  sx={{ p: 0, my: 1, border: 0 }}
+                  <TabsTrigger
+                    id={'record-tab-details'}
+                    aria-controls={'record-panel-details'}
+                    value={'details'}
+                  >
+                    {'Detalhes'}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    id={'record-tab-edit'}
+                    aria-controls={'record-panel-edit'}
+                    value={'edit'}
+                  >
+                    {'Editar'}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    id={'record-tab-history'}
+                    aria-controls={'record-panel-history'}
+                    value={'history'}
+                  >
+                    {'Histórico'}
+                  </TabsTrigger>
+                </TabsList>
+                <div
+                  role={'tabpanel'}
+                  id={'record-panel-details'}
+                  aria-labelledby={'record-tab-details'}
+                  hidden={!detailsOpen}
                 >
-                  <Typography component="h3" variant="h6" sx={{ mb: 2 }}>
-                    Editar fim
-                  </Typography>
-                  <Stack spacing={2}>
-                    <TextField
-                      autoFocus={focusEnd}
-                      type="datetime-local"
-                      label="Fim efetivo"
-                      slotProps={{ inputLabel: { shrink: true } }}
-                      value={end}
-                      disabled={
-                        finishing || saving || moving || moveOpen || removeEnd
-                      }
-                      onChange={(event) => {
-                        editorDirty.current = true;
-                        setEnd(event.target.value);
-                        setConfirmed(false);
-                      }}
-                      helperText="Informe a data e hora efetivas. Nenhum horário é preenchido automaticamente."
-                      fullWidth
-                    />
-                    {!!record.endedAt && (
-                      <>
-                        <FormControlLabel
-                          control={
+                  <dl className="[&_dt]:mt-4 [&_dt]:font-semibold [&_dd]:m-0 [&_dd]:whitespace-pre-wrap">
+                    <dt>ID</dt>
+                    <dd>{recordId}</dd>
+                    <dt>Projeto</dt>
+                    <dd>
+                      {text(
+                        object(record.projectSnapshot).title,
+                        text(record.projectId),
+                      )}
+                    </dd>
+                    <dt>Tópicos</dt>
+                    <dd>
+                      {objects(record.topicSnapshots)
+                        .map((topic) => text(topic.title))
+                        .join(', ') || 'Não informado'}
+                    </dd>
+                    <dt>Início original</dt>
+                    <dd>{date(record.startedAt, 'America/Sao_Paulo')}</dd>
+                    <dt>Fim atualmente registrado</dt>
+                    <dd>{date(record.endedAt, 'America/Sao_Paulo')}</dd>
+                    <dt>Texto original</dt>
+                    <dd>{text(record.originalText)}</dd>
+                    <dt>Contexto</dt>
+                    <dd>{text(record.interpretation)}</dd>
+                    <dt>Gravado em</dt>
+                    <dd>{date(record.recordedAt)}</dd>
+                  </dl>
+                </div>
+                <div
+                  role={'tabpanel'}
+                  id={'record-panel-edit'}
+                  aria-labelledby={'record-tab-edit'}
+                  hidden={!editOpen}
+                >
+                  <form
+                    id={'record-edit-form'}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void save();
+                    }}
+                    className="rounded-xl border bg-card p-4 text-card-foreground"
+                  >
+                    <h3 className="text-lg font-semibold">Editar fim</h3>
+                    <div className="flex flex-col gap-4">
+                      <div className="min-w-0 space-y-2">
+                        <Label htmlFor={'RecordDrawer-17410'}>
+                          {'Fim efetivo'}
+                        </Label>
+                        <Input
+                          autoFocus={focusEnd}
+                          type={'datetime-local'}
+                          value={end}
+                          disabled={
+                            finishing ||
+                            saving ||
+                            moving ||
+                            moveOpen ||
+                            removeEnd
+                          }
+                          onChange={(event) => {
+                            editorDirty.current = true;
+                            setEnd(event.target.value);
+                            setConfirmed(false);
+                          }}
+                          id={'RecordDrawer-17410'}
+                          aria-describedby={'RecordDrawer-17410-help'}
+                        ></Input>
+                        <p
+                          id="RecordDrawer-17410-help"
+                          className="text-xs text-muted-foreground"
+                        >
+                          {
+                            'Informe a data e hora efetivas. Nenhum horário é preenchido automaticamente.'
+                          }
+                        </p>
+                      </div>
+                      {!!record.endedAt && (
+                        <>
+                          <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
                             <Checkbox
                               checked={removeEnd}
                               disabled={
                                 finishing || saving || moving || moveOpen
                               }
-                              onChange={(event) => {
+                              onCheckedChange={(checked) => {
                                 editorDirty.current = true;
-                                setRemoveEnd(event.target.checked);
+                                setRemoveEnd(checked === true);
                                 setConfirmed(false);
                               }}
                             />
-                          }
-                          label="Remover fim e reabrir explicitamente"
-                        />
-                      </>
-                    )}
-                    <TextField
-                      label="Motivo da alteração"
-                      value={reason}
-                      disabled={finishing || saving || moving || moveOpen}
-                      onChange={(event) => setReason(event.target.value)}
-                      multiline
-                      minRows={2}
-                      slotProps={{ htmlInput: { maxLength: 1000 } }}
-                      required
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                      {removeEnd
-                        ? 'Reabrir explicitamente'
-                        : 'Fim efetivo: ' + (end || 'não informado')}
-                    </Typography>
-                    <FormControlLabel
-                      control={
+                            <span>
+                              {'Remover fim e reabrir explicitamente'}
+                            </span>
+                          </Label>
+                        </>
+                      )}
+                      <div className="min-w-0 space-y-2">
+                        <Label htmlFor={'RecordDrawer-19047'}>
+                          {'Motivo da alteração'}
+                        </Label>
+                        <Textarea
+                          value={reason}
+                          disabled={finishing || saving || moving || moveOpen}
+                          onChange={(event) => setReason(event.target.value)}
+                          required={true}
+                          id={'RecordDrawer-19047'}
+                          rows={2}
+                          maxLength={1000}
+                        ></Textarea>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {removeEnd
+                          ? 'Reabrir explicitamente'
+                          : 'Fim efetivo: ' + (end || 'não informado')}
+                      </p>
+                      <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
                         <Checkbox
                           checked={confirmed}
                           disabled={finishing || saving || moving || moveOpen}
-                          onChange={(event) =>
-                            setConfirmed(event.target.checked)
+                          onCheckedChange={(checked) =>
+                            setConfirmed(checked === true)
                           }
                         />
-                      }
-                      label="Confirmo o horário e esta alteração explícita"
-                    />
-                  </Stack>
-                </Paper>
-              </Collapse>
-              <Collapse
-                role="tabpanel"
-                id="record-panel-history"
-                aria-labelledby="record-tab-history"
-                in={activeTab === 'history'}
-              >
-                {!revealed ? (
-                  <Alert severity="info">
-                    Auditoria oculta na apresentação atual, pois pode conter
-                    referências históricas confidenciais.
-                  </Alert>
-                ) : (
-                  <>
-                    <Typography component="h3" variant="h6">
-                      Histórico de auditoria
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Até 20 eventos disponíveis; ordem não representa os mais
-                      recentes.
-                    </Typography>
-                    {audit.loading ? (
-                      <CircularProgress aria-label="Carregando auditoria" />
-                    ) : audit.error ? (
-                      <Alert
-                        severity="error"
-                        action={
-                          <Button onClick={audit.retry}>
-                            Tentar novamente
-                          </Button>
-                        }
-                      >
-                        {audit.error}
-                      </Alert>
-                    ) : audit.rows.length === 0 ? (
-                      <Typography>
-                        Nenhuma alteração auditada disponível.
-                      </Typography>
-                    ) : (
-                      audit.rows.map((row) => (
-                        <Paper key={row.id} sx={{ p: 2, my: 2 }}>
-                          <Typography>
-                            {date(row.data.updatedAt)} · {text(row.data.reason)}
-                          </Typography>
-                          <Typography variant="body2">Autor: Pessoa</Typography>
-                          <Typography variant="body2">
-                            {['move_subject', 'move_record'].includes(
-                              String(row.data.action),
-                            ) && (
-                              <>
-                                Ação:{' '}
-                                {row.data.action === 'move_subject'
-                                  ? 'Transferência de assunto'
-                                  : 'Mover registro'}
-                                <br />
-                                Origem: {movementSide(row.data.before)}
-                                <br />
-                                Destino: {movementSide(row.data.after)}
-                                <br />
-                              </>
-                            )}
-                            Fim antes: {text(object(row.data.before).endedAt)}
-                            <br />
-                            Fim depois: {text(object(row.data.after).endedAt)}
-                          </Typography>
-                        </Paper>
-                      ))
-                    )}
-                  </>
-                )}
-              </Collapse>
+                        <span>
+                          {'Confirmo o horário e esta alteração explícita'}
+                        </span>
+                      </Label>
+                    </div>
+                  </form>
+                </div>
+                <div
+                  role={'tabpanel'}
+                  id={'record-panel-history'}
+                  aria-labelledby={'record-tab-history'}
+                  hidden={!(activeTab === 'history')}
+                >
+                  {!revealed ? (
+                    <Alert className="my-2">
+                      <AlertDescription>
+                        Auditoria oculta na apresentação atual, pois pode conter
+                        referências históricas confidenciais.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-semibold">
+                        Histórico de auditoria
+                      </h3>
+                      <p className="text-sm">
+                        Até 20 eventos disponíveis; ordem não representa os mais
+                        recentes.
+                      </p>
+                      {audit.loading ? (
+                        <div
+                          aria-label={'Carregando auditoria'}
+                          role="status"
+                          className="my-4 animate-pulse text-sm text-muted-foreground"
+                        >
+                          Carregando…
+                        </div>
+                      ) : audit.error ? (
+                        <Alert variant="destructive" className="my-2">
+                          <AlertDescription>
+                            {audit.error}
+                            {
+                              <Button onClick={audit.retry}>
+                                Tentar novamente
+                              </Button>
+                            }
+                          </AlertDescription>
+                        </Alert>
+                      ) : audit.rows.length === 0 ? (
+                        <p className="text-sm leading-relaxed">
+                          Nenhuma alteração auditada disponível.
+                        </p>
+                      ) : (
+                        audit.rows.map((row) => (
+                          <div
+                            key={row.id}
+                            className="rounded-xl border bg-card p-4 text-card-foreground"
+                          >
+                            <p className="text-sm leading-relaxed">
+                              {date(row.data.updatedAt)}·{' '}
+                              {text(row.data.reason)}
+                            </p>
+                            <p className="text-sm">Autor: Pessoa</p>
+                            <p className="text-sm">
+                              {['move_subject', 'move_record'].includes(
+                                String(row.data.action),
+                              ) && (
+                                <>
+                                  Ação:{' '}
+                                  {row.data.action === 'move_subject'
+                                    ? 'Transferência de assunto'
+                                    : 'Mover registro'}
+                                  <br />
+                                  Origem: {movementSide(row.data.before)}
+                                  <br />
+                                  Destino: {movementSide(row.data.after)}
+                                  <br />
+                                </>
+                              )}
+                              Fim antes: {text(object(row.data.before).endedAt)}
+                              <br />
+                              Fim depois: {text(object(row.data.after).endedAt)}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )}
+                </div>
+              </Tabs>
             </>
           )}
-      </Box>
+      </div>
       {editOpen &&
         record &&
         !isHidden(
           projects.rows.find((item) => item.id === record.projectId)?.data,
           revealed,
         ) && (
-          <Box
-            sx={{
-              pt: 1.5,
-              paddingBottom: 'var(--emulator-inset, 0px)',
-              borderTop: 1,
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
-              flexShrink: 0,
-            }}
-          >
+          <div className="shrink-0 border-t bg-background pt-3 pb-[var(--emulator-inset,0px)]">
             <Button
-              fullWidth
-              type="submit"
-              form="record-edit-form"
-              variant="contained"
+              type={'submit'}
+              form={'record-edit-form'}
               disabled={finishing || saving || moving || moveOpen || !confirmed}
+              variant="default"
+              className="min-h-11 w-full"
             >
               {saving ? 'Salvando…' : 'Salvar alteração'}
             </Button>
-          </Box>
+          </div>
         )}
-    </Box>
+    </div>
   );
   if (presentation === 'page') return content;
   if (presentation === 'dialog')
     return (
       <Dialog
-        open
-        fullWidth
-        fullScreen={mobile}
-        aria-labelledby="registro-titulo"
-        maxWidth="sm"
-        slotProps={{
-          paper: {
-            sx: {
-              maxHeight: mobile ? '100%' : 'calc(100% - 64px)',
-              height: mobile ? '100%' : undefined,
-            },
-          },
-        }}
-        onClose={() => {
-          if (!saving && !finishing) close();
+        open={true}
+        onOpenChange={(open) => {
+          if (!open)
+            (() => {
+              if (!saving && !finishing) close();
+            })();
         }}
       >
-        {content}
+        <DialogContent
+          aria-describedby={undefined}
+          showCloseButton={false}
+          aria-labelledby={'registro-titulo'}
+          className="flex h-[100dvh] max-h-[100dvh] w-screen flex-col gap-0 rounded-none p-0 sm:h-[85dvh] sm:max-h-[85dvh] sm:max-w-xl sm:rounded-lg"
+        >
+          <DialogTitle className="sr-only">Detalhes do registro</DialogTitle>
+          {content}
+        </DialogContent>
       </Dialog>
     );
   return (
-    <Drawer
-      anchor="right"
+    <Sheet
       open
-      onClose={() => {
-        if (!saving && !finishing) close();
+      onOpenChange={(open) => {
+        if (!open)
+          (() => {
+            if (!saving && !finishing) close();
+          })();
       }}
     >
-      {content}
-    </Drawer>
+      <SheetContent
+        aria-describedby={undefined}
+        showCloseButton={false}
+        side="right"
+        className="flex h-full w-full flex-col p-0 sm:max-w-[560px]"
+      >
+        <SheetTitle className="sr-only">Detalhes do registro</SheetTitle>
+        {content}
+      </SheetContent>
+    </Sheet>
   );
 }

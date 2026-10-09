@@ -1,20 +1,16 @@
+import { Button } from './components/ui/button';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from './components/ui/tooltip';
+import { Alert, AlertDescription } from './components/ui/alert';
+import { Label } from './components/ui/label';
+import { Textarea } from './components/ui/textarea';
+import { Checkbox } from './components/ui/checkbox';
 import { projectMutation } from './project-mutation';
 import { useRef, useState } from 'react';
 import { UiIcon } from './UiIcons';
-import {
-  Alert,
-  Box,
-  IconButton,
-  Tooltip,
-  Collapse,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
 import { type Functions } from 'firebase/functions';
 import { archivedProject } from './project-archive';
 export function ProjectArchive({
@@ -72,63 +68,88 @@ export function ProjectArchive({
     }
   }
   return (
-    <Box sx={{ my: 1 }}>
-      <Tooltip title={archived ? 'Desarquivar projeto' : 'Arquivar projeto'}>
-        <IconButton
-          aria-label={archived ? 'Desarquivar projeto' : 'Arquivar projeto'}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          <UiIcon kind="archive" />
-        </IconButton>
+    <div className="my-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            aria-label={archived ? 'Desarquivar projeto' : 'Arquivar projeto'}
+            aria-expanded={expanded}
+            aria-controls="project-archive-panel"
+            onClick={() => setExpanded((value) => !value)}
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+          >
+            <UiIcon kind={'archive'} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {archived ? 'Desarquivar projeto' : 'Arquivar projeto'}
+        </TooltipContent>
       </Tooltip>
-      <Collapse in={expanded}>
-        <Paper sx={{ p: 2, mt: 1 }}>
-          <Stack spacing={2}>
-            <Typography component="h3" variant="h6">
+      <div id="project-archive-panel" hidden={!expanded}>
+        <div className="rounded-xl border bg-card p-4 text-card-foreground">
+          <div className="flex flex-col gap-4">
+            <h3 className="text-lg font-semibold">
               {archived ? 'Projeto arquivado' : 'Projeto ativo'}
-            </Typography>
-            <Alert severity="info">
-              Arquivamento oculta o projeto das seleções padrão sem apagar
-              registros ou evidências. Tempos continuam participando do
-              orçamento global diário.
+            </h3>
+            <Alert className="my-2">
+              <AlertDescription>
+                Arquivamento oculta o projeto das seleções padrão sem apagar
+                registros ou evidências. Tempos continuam participando do
+                orçamento global diário.
+              </AlertDescription>
             </Alert>
             {merged && (
-              <Alert severity="warning">
-                Origem de mesclagem não pode ser desarquivada genericamente.
-                Histórico permanece disponível.
+              <Alert className="my-2">
+                <AlertDescription>
+                  Origem de mesclagem não pode ser desarquivada genericamente.
+                  Histórico permanece disponível.
+                </AlertDescription>
               </Alert>
             )}
-            {error && <Alert severity="error">{error}</Alert>}
-            {success && <Alert severity="success">{success}</Alert>}
-            <TextField
-              label="Motivo do arquivamento/desarquivamento"
-              value={reason}
-              onChange={(e) => {
-                setReason(e.target.value);
-                setConfirmed(false);
-              }}
-              disabled={busy || merged}
-              multiline
-              slotProps={{ htmlInput: { maxLength: 1000 } }}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={confirmed}
-                  disabled={busy || merged}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                />
-              }
-              label={
-                archived
+            {error && (
+              <Alert variant="destructive" className="my-2">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            {success && (
+              <Alert role="status" className="my-2">
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor={'ProjectArchive-3226'}>
+                {'Motivo do arquivamento/desarquivamento'}
+              </Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  setConfirmed(false);
+                }}
+                disabled={busy || merged}
+                id={'ProjectArchive-3226'}
+                maxLength={1000}
+              ></Textarea>
+            </div>
+            <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+              <Checkbox
+                checked={confirmed}
+                disabled={busy || merged}
+                onCheckedChange={(checked) => setConfirmed(checked === true)}
+              />
+              <span>
+                {archived
                   ? 'Confirmo desarquivar este projeto'
-                  : 'Confirmo arquivar este projeto sem apagar seus registros'
-              }
-            />
+                  : 'Confirmo arquivar este projeto sem apagar seus registros'}
+              </span>
+            </Label>
             <Button
-              variant="contained"
               disabled={busy || merged || !confirmed || !reason.trim()}
               onClick={() => void save()}
+              variant="default"
+              className="min-h-11"
             >
               {busy
                 ? 'Salvando…'
@@ -136,9 +157,9 @@ export function ProjectArchive({
                   ? 'Desarquivar projeto'
                   : 'Arquivar projeto'}
             </Button>
-          </Stack>
-        </Paper>
-      </Collapse>
-    </Box>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

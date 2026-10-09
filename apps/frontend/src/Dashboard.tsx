@@ -13,29 +13,34 @@ import { ProjectSelector } from './ProjectSelector';
 import { writeUrlTab } from './url-tabs';
 import { useEffect, useState, type ReactNode } from 'react';
 import { isOpen } from './pending-utils';
+import { Alert } from './components/ui/alert';
+import { Button } from './components/ui/button';
+import { Badge } from './components/ui/badge';
+import { Card } from './components/ui/card';
+import { Input } from './components/ui/input';
+import { Label } from './components/ui/label';
 import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Paper,
-  Stack,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
+  TableHeader,
   TableRow,
-  Typography,
-  TextField,
-  Link,
-  IconButton,
+} from './components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
+import {
   Tooltip,
-  MenuItem,
-  Tabs,
-  Tab,
-} from '@mui/material';
+  TooltipContent,
+  TooltipTrigger,
+} from './components/ui/tooltip';
+import { Skeleton } from './components/ui/skeleton';
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
 import { ProjectReport } from './ProjectReport';
@@ -78,60 +83,49 @@ function DataTable({
   render: (data: Record<string, unknown>, id: string) => ReactNode[];
 }) {
   return (
-    <Box component="section" aria-label={title} sx={{ mb: 4 }}>
-      {!hideHeading && (
-        <Typography component="h2" variant="h5" sx={{ mb: 2 }}>
-          {title}
-        </Typography>
-      )}
+    <section aria-label={title} className="mb-8">
+      {!hideHeading && <h2 className="text-2xl font-semibold mb-4">{title}</h2>}
       {state.loading ? (
-        <Stack direction="row" sx={{ gap: 2 }} role="status">
-          <CircularProgress size={24} aria-label="Carregando" />
+        <div role="status" className="flex flex-row p-4 gap-4">
+          <Skeleton className="h-6 w-6 rounded-full" aria-label="Carregando" />
           <span>Carregando {title.toLowerCase()}…</span>
-        </Stack>
+        </div>
       ) : state.error ? (
-        <Alert
-          severity="error"
-          action={
-            <Button color="inherit" onClick={state.retry}>
-              Tentar novamente
-            </Button>
-          }
-        >
+        <Alert variant="destructive">
           {state.error}
+          <Button onClick={state.retry}>Tentar novamente</Button>
         </Alert>
       ) : state.rows.length === 0 ? (
-        <Alert severity="info">
+        <Alert>
           {historical && !complete
             ? 'Sem resultados nos dados locais disponíveis. Aguarde a sincronização para consultar todo o histórico.'
             : 'Nenhum dado disponível em ' + title.toLowerCase() + '.'}
         </Alert>
       ) : (
         <>
-          <Stack sx={{ display: { xs: 'flex', sm: 'none' } }} spacing={1.5}>
+          <div className="flex flex-col gap-3 sm:hidden">
             {state.rows.map((row) => (
-              <Paper key={row.id} sx={{ p: 2 }}>
+              <Card key={row.id} className="p-4">
                 {render(row.data, row.id).map((cell, index) => (
-                  <Box
+                  <div
                     key={headers[index]}
-                    sx={{ mb: 1, overflowWrap: 'anywhere' }}
+                    className="mb-2 [overflow-wrap:anywhere]"
                   >
-                    <Typography variant="caption" color="text.secondary">
+                    <p className="text-xs text-muted-foreground">
                       {headers[index]}
-                    </Typography>
-                    <Box sx={{ fontSize: 14 }}>{cell}</Box>
-                  </Box>
+                    </p>
+                    <div className="text-sm">{cell}</div>
+                  </div>
                 ))}
-              </Paper>
+              </Card>
             ))}
-          </Stack>
-          <TableContainer
-            sx={{ display: { xs: 'none', sm: 'block' } }}
-            component={Paper}
+          </div>
+          <div
             tabIndex={0}
             aria-label={title + ' — role para ver todas as colunas'}
+            className="overflow-x-auto rounded-xl border bg-card hidden sm:block"
           >
-            <Table sx={{ minWidth: 720 }}>
+            <Table className="min-w-[720px]">
               <caption>
                 {title}
                 {title === 'Projetos'
@@ -143,28 +137,22 @@ function DataTable({
                   ? '. Mais recentes primeiro; datas inválidas ao final.'
                   : '. A ordem não representa os mais recentes.'}
               </caption>
-              <TableHead>
+              <TableHeader>
                 <TableRow>
                   {headers.map((header) => (
-                    <TableCell key={header} scope="col">
+                    <TableHead key={header} scope="col">
                       {header}
-                    </TableCell>
+                    </TableHead>
                   ))}
                 </TableRow>
-              </TableHead>
+              </TableHeader>
               <TableBody>
                 {state.rows.map((row) => (
                   <TableRow key={row.id}>
                     {render(row.data, row.id).map((cell, index) => (
                       <TableCell
                         key={headers[index]}
-                        sx={{
-                          verticalAlign: 'top',
-                          minWidth: 150,
-                          maxWidth: 360,
-                          overflowWrap: 'anywhere',
-                          whiteSpace: 'pre-wrap',
-                        }}
+                        className="[overflow-wrap:anywhere] whitespace-pre-wrap align-top min-w-[150px] max-w-[360px]"
                       >
                         {cell}
                       </TableCell>
@@ -173,16 +161,16 @@ function DataTable({
                 ))}
               </TableBody>
             </Table>
-          </TableContainer>
+          </div>
           {!historical && title !== 'Projetos' && state.rows.length === 100 && (
-            <Alert severity="info" sx={{ mt: 1 }}>
+            <Alert className="mt-2">
               Limite de 100 itens atingido. Esta visão não representa
               necessariamente todos os dados.
             </Alert>
           )}
         </>
       )}
-    </Box>
+    </section>
   );
 }
 function topicLabels(data: Record<string, unknown>) {
@@ -313,43 +301,39 @@ export function Dashboard({
   }
   if (projectId)
     return (
-      <Box component="section" aria-label="Projeto">
+      <section aria-label="Projeto">
         {params.has('returnTo') && (
-          <Button
-            component={RouterLink}
-            to={safeReturnTo(params.get('returnTo'))}
-            sx={{ mb: 2 }}
-          >
-            Voltar ao contexto
+          <Button asChild className="mb-4">
+            <RouterLink to={safeReturnTo(params.get('returnTo'))}>
+              Voltar ao contexto
+            </RouterLink>
           </Button>
         )}
-        <Button
-          component={RouterLink}
-          to={'/projects' + location.search}
-          sx={{ mb: 2 }}
-        >
-          Voltar aos projetos
+        <Button asChild className="mb-4">
+          <RouterLink to={'/projects' + location.search}>
+            Voltar aos projetos
+          </RouterLink>
         </Button>
-        <Typography component="h2" variant="h5">
+        <h2 className="text-2xl font-semibold">
           {text(
             projects.rows.find((item) => item.id === projectId)?.data.title,
             'Projeto indisponível',
           )}
-        </Typography>
-        <Typography color="text.secondary">
+        </h2>
+        <p className="text-muted-foreground">
           {text(
             projects.rows.find((item) => item.id === projectId)?.data
               .description,
             'O relatório consulta o projeto diretamente, independente do limite da lista.',
           )}
-        </Typography>
+        </p>
         {!rawProjects.loading &&
           rawProjects.rows.some((row) => row.id === projectId) && (
-            <Typography variant="body2" sx={{ mt: 1 }}>
+            <p className="text-sm mt-2">
               {rawProjectsById.get(projectId)?.data.type === 'personal'
                 ? 'Pessoal · acesso somente ao dono'
                 : 'Compartilhado · usuários autorizados da empresa'}
-            </Typography>
+            </p>
           )}
         <ProjectAccess
           functions={functions}
@@ -358,65 +342,66 @@ export function Dashboard({
           project={rawProjectsById.get(projectId)?.data}
           hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
         />
-        <Tabs
-          value={projectTab}
-          onChange={(_, value) => setProjectTab(value)}
-          aria-label="Seções do projeto"
-          sx={{ mt: 2, borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Tab
-            id="project-tab-overview"
-            aria-controls="project-panel-overview"
-            value="overview"
-            label="Visão geral"
-          />
-          <Tab
-            id="project-tab-details"
-            aria-controls="project-panel-details"
+        <Tabs value={projectTab} onValueChange={setProjectTab} className="mt-4">
+          <TabsList aria-label="Seções do projeto">
+            <TabsTrigger
+              id="project-tab-overview"
+              aria-controls="project-panel-overview"
+              value="overview"
+            >
+              Visão geral
+            </TabsTrigger>
+            <TabsTrigger
+              id="project-tab-details"
+              aria-controls="project-panel-details"
+              value="details"
+            >
+              Detalhes / Editar
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent
+            forceMount
             value="details"
-            label="Detalhes / Editar"
-          />
+            id="project-panel-details"
+            aria-labelledby="project-tab-details"
+            hidden={projectTab !== 'details'}
+          >
+            <ProjectEditor
+              uid={uid}
+              onDeleted={() => navigate('/projects', { replace: true })}
+              functions={functions}
+              projectId={projectId}
+              project={rawProjectsById.get(projectId)?.data}
+              hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
+            />
+          </TabsContent>
+          <TabsContent
+            forceMount
+            value="overview"
+            id="project-panel-overview"
+            aria-labelledby="project-tab-overview"
+            hidden={projectTab !== 'overview'}
+          >
+            <ProjectReport
+              projectLabel={text(
+                projects.rows.find((row) => row.id === projectId)?.data.title,
+                'Projeto reservado',
+              )}
+              key={
+                projectId +
+                String(rawProjectsById.get(projectId)?.data.type) +
+                String(rawProjectsById.get(projectId)?.data.updatedAt) +
+                String(rawProjectsById.has(projectId))
+              }
+              projectId={projectId}
+              functions={functions}
+              hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
+              search={location.search}
+              uid={uid}
+            />
+          </TabsContent>
         </Tabs>
-        <Box
-          role="tabpanel"
-          id="project-panel-details"
-          aria-labelledby="project-tab-details"
-          hidden={projectTab !== 'details'}
-        >
-          <ProjectEditor
-            uid={uid}
-            onDeleted={() => navigate('/projects', { replace: true })}
-            functions={functions}
-            projectId={projectId}
-            project={rawProjectsById.get(projectId)?.data}
-            hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
-          />
-        </Box>
-        <Box
-          role="tabpanel"
-          id="project-panel-overview"
-          aria-labelledby="project-tab-overview"
-          hidden={projectTab !== 'overview'}
-        >
-          <ProjectReport
-            projectLabel={text(
-              projects.rows.find((row) => row.id === projectId)?.data.title,
-              'Projeto reservado',
-            )}
-            key={
-              projectId +
-              String(rawProjectsById.get(projectId)?.data.type) +
-              String(rawProjectsById.get(projectId)?.data.updatedAt) +
-              String(rawProjectsById.has(projectId))
-            }
-            projectId={projectId}
-            functions={functions}
-            hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
-            search={location.search}
-            uid={uid}
-          />
-        </Box>
-      </Box>
+      </section>
     );
   const filteredProjects = {
     ...projects,
@@ -490,34 +475,26 @@ export function Dashboard({
   };
   const topicOptions = objects(rawProjectsById.get(projectFilter)?.data.topics);
   return (
-    <Box
-      sx={{
-        pb:
-          mode === 'projects' ? 'calc(104px + env(safe-area-inset-bottom))' : 0,
-      }}
+    <div
+      className={
+        mode === 'projects'
+          ? 'pb-[calc(104px+env(safe-area-inset-bottom))]'
+          : undefined
+      }
     >
       {mode === 'projects' && (
-        <Box>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: 'minmax(0,1fr)',
-                sm: 'minmax(0,1fr)',
-              },
-              gap: 2,
-              alignItems: 'start',
-              mb: 2,
-            }}
-          >
+        <div>
+          <div className="mb-4 grid grid-cols-1 items-center gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
             <Tabs
               value={projectScope}
-              onChange={(_, value: string) => updateFilter('scope', value)}
-              aria-label="Acesso aos projetos"
-              sx={{ minWidth: 0, '& .MuiTab-root': { minWidth: 0, px: 2 } }}
+              onValueChange={(value) => updateFilter('scope', value)}
             >
-              <Tab value="work" label="Compartilhados" />
-              <Tab value="personal" label="Meus projetos pessoais" />
+              <TabsList aria-label="Acesso aos projetos">
+                <TabsTrigger value="work">Compartilhados</TabsTrigger>
+                <TabsTrigger value="personal">
+                  Meus projetos pessoais
+                </TabsTrigger>
+              </TabsList>
             </Tabs>
             <ProjectCreate
               functions={functions}
@@ -530,51 +507,39 @@ export function Dashboard({
                 );
               }}
             />
-          </Box>
-          <Box
-            component="section"
+          </div>
+          <section
             aria-label="Filtros de projetos"
-            sx={{
-              mb: 2,
-              p: { xs: 2, sm: 3 },
-              bgcolor: 'background.paper',
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: '12px',
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: 'minmax(0,1fr)',
-                md: 'repeat(3,minmax(0,1fr))',
-              },
-              gap: 2,
-              alignItems: 'start',
-            }}
+            className="mb-4 grid grid-cols-1 items-start gap-4 md:grid-cols-3 rounded-xl border bg-card p-4 sm:p-6"
           >
             {mode === 'projects' && (
-              <TextField
-                select
-                label="Estado dos projetos"
-                value={archiveFilter}
-                onChange={(e) => updateFilter('status', e.target.value)}
-                size="small"
-                sx={{ minWidth: 0, gridColumn: { md: 2 }, gridRow: { md: 1 } }}
-              >
-                <MenuItem value="active">Ativos</MenuItem>
-                <MenuItem value="archived">Arquivados</MenuItem>
-                <MenuItem value="all">Todos</MenuItem>
-              </TextField>
+              <div className="min-w-0 space-y-1.5">
+                <Label>Estado dos projetos</Label>
+                <Select
+                  value={archiveFilter || '__all__'}
+                  onValueChange={(value) =>
+                    updateFilter('status', value === '__all__' ? '' : value)
+                  }
+                >
+                  <SelectTrigger aria-label="Estado dos projetos">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Ativos</SelectItem>
+                    <SelectItem value="archived">Arquivados</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
-
-            <TextField
-              label="Pesquisar projetos"
-              value={filter}
-              onChange={(event) => updateFilter('q', event.target.value)}
-              fullWidth
-              sx={{ gridColumn: { md: 1 }, gridRow: { md: 1 } }}
-            />
-
+            <Label className="grid min-w-0 gap-1.5">
+              Pesquisar projetos
+              <Input
+                value={filter}
+                onChange={(event) => updateFilter('q', event.target.value)}
+              />
+            </Label>
             <Button
-              sx={{ whiteSpace: 'nowrap', minHeight: { xs: 44, md: 40 } }}
               onClick={() => {
                 const next = new URLSearchParams(params);
                 setLocalFilter('');
@@ -583,11 +548,12 @@ export function Dashboard({
                 next.delete('status');
                 setParams(next);
               }}
+              className="whitespace-nowrap"
             >
               Limpar filtros
             </Button>
-          </Box>
-        </Box>
+          </section>
+        </div>
       )}
       {recordId && (
         <RecordDrawer
@@ -605,10 +571,10 @@ export function Dashboard({
         />
       )}
       {mode !== 'projects' && records.rows.some((row) => isOpen(row.data)) && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
+        <Alert className="mb-4">
           Há registros abertos entre os itens carregados. Confira detalhes antes
           de encerrar; nada será encerrado automaticamente.
-          <Box component="ul">
+          <ul>
             {records.rows
               .filter((row) => isOpen(row.data))
               .slice(0, 5)
@@ -623,23 +589,21 @@ export function Dashboard({
                     revealed={revealed}
                   />
                   {' · '}
-                  <Link
-                    component={RouterLink}
+                  <RouterLink
                     to={detailPath('records', row.id, location.search)}
                   >
                     Registro iniciado{' '}
                     {date(row.data.startedAt, row.data.timeZone)}
-                  </Link>
+                  </RouterLink>
                 </li>
               ))}
-          </Box>
+          </ul>
           Até 5 registros abertos exibidos neste resumo.
         </Alert>
       )}
       {mode !== 'projects' && (
         <QueryToolbar
           label="Filtros de registros"
-          sx={{ mb: 2 }}
           actions={
             <>
               {' '}
@@ -647,7 +611,7 @@ export function Dashboard({
                 <Button onClick={rawRecords.retry}>Tentar novamente</Button>
               )}
               <Button
-                sx={{ whiteSpace: 'nowrap' }}
+                className="whitespace-nowrap"
                 onClick={() => {
                   const next = new URLSearchParams(params);
                   setLocalFilter('');
@@ -673,61 +637,81 @@ export function Dashboard({
               {' '}
               <QueryToolbarField kind="search">
                 {' '}
-                <TextField
-                  size="small"
-                  label="Pesquisar registros"
-                  value={filter}
-                  onChange={(event) => updateFilter('q', event.target.value)}
-                />
+                <Label className="grid gap-1.5">
+                  Pesquisar registros
+                  <Input
+                    value={filter}
+                    onChange={(event) => updateFilter('q', event.target.value)}
+                  />
+                </Label>
               </QueryToolbarField>
               <QueryToolbarField kind="standard">
                 {' '}
-                <TextField
-                  size="small"
-                  select
-                  label="Assunto / tópico"
-                  value={topicFilter}
-                  disabled={!projectFilter}
-                  onChange={(e) => updateFilter('topic', e.target.value)}
-                >
-                  <MenuItem value="">Todos os assuntos</MenuItem>
-                  {topicOptions.map((topic) => (
-                    <MenuItem key={text(topic.id)} value={text(topic.id)}>
-                      {isHidden(
-                        rawProjectsById.get(projectFilter)?.data,
-                        revealed,
+                <div className="space-y-1.5">
+                  <Label>Assunto / tópico</Label>
+                  <Select
+                    value={topicFilter || '__all__'}
+                    disabled={!projectFilter}
+                    onValueChange={(value) =>
+                      updateFilter('topic', value === '__all__' ? '' : value)
+                    }
+                  >
+                    <SelectTrigger aria-label="Assunto / tópico">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todos os assuntos</SelectItem>
+                      {topicOptions.map((topic) => (
+                        <SelectItem key={text(topic.id)} value={text(topic.id)}>
+                          {isHidden(
+                            rawProjectsById.get(projectFilter)?.data,
+                            revealed,
+                          )
+                            ? 'Assunto reservado'
+                            : text(topic.title)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </QueryToolbarField>
+              <QueryToolbarField kind="standard">
+                {' '}
+                <Label className="grid gap-1.5">
+                  Fuso do período
+                  <Input
+                    value={zone}
+                    onChange={(e) => updateFilter('timeZone', e.target.value)}
+                  />
+                </Label>
+              </QueryToolbarField>
+              <QueryToolbarField kind="standard">
+                {' '}
+                <div className="space-y-1.5">
+                  <Label>Estado do registro</Label>
+                  <Select
+                    value={(params.get('recordStatus') ?? 'all') || '__all__'}
+                    onValueChange={(value) =>
+                      updateFilter(
+                        'recordStatus',
+                        value === '__all__' ? '' : value,
                       )
-                        ? 'Assunto reservado'
-                        : text(topic.title)}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </QueryToolbarField>
-              <QueryToolbarField kind="standard">
-                {' '}
-                <TextField
-                  size="small"
-                  label="Fuso do período"
-                  value={zone}
-                  onChange={(e) => updateFilter('timeZone', e.target.value)}
-                />
-              </QueryToolbarField>
-              <QueryToolbarField kind="standard">
-                {' '}
-                <TextField
-                  size="small"
-                  select
-                  label="Estado do registro"
-                  value={params.get('recordStatus') ?? 'all'}
-                  onChange={(e) => updateFilter('recordStatus', e.target.value)}
-                >
-                  <MenuItem value="all">Todos</MenuItem>
-                  <MenuItem value="open">Em aberto</MenuItem>
-                  <MenuItem value="closed">Encerrados</MenuItem>
-                </TextField>
+                    }
+                  >
+                    <SelectTrigger aria-label="Estado do registro">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="open">Em aberto</SelectItem>
+                      <SelectItem value="closed">Encerrados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </QueryToolbarField>{' '}
             </>
           }
+          className="mb-4"
         >
           <QueryPeriodControls
             fromDate={fromDate}
@@ -758,12 +742,12 @@ export function Dashboard({
         </QueryToolbar>
       )}
       {mode !== 'projects' && (
-        <Typography variant="caption" color="text.secondary">
+        <p className="text-xs text-muted-foreground">
           {rawRecords.complete
             ? 'Histórico completo sincronizado.'
             : 'Dados locais podem estar incompletos; aguardando sincronização com o servidor.'}{' '}
           Mais recentes primeiro; datas inválidas ao final.
-        </Typography>
+        </p>
       )}
       {mode !== 'records' && (
         <DataTable
@@ -778,41 +762,41 @@ export function Dashboard({
               revealed={revealed}
             />,
             text(data.description),
-            <Stack sx={{ gap: 1 }}>
+            <div className="flex flex-col gap-2">
               {objects(data.topics).length === 0 && 'Não informado'}
               {objects(data.topics).map((topic, index) => (
-                <Chip
+                <Badge
                   key={text(topic.id, String(index))}
-                  component={
-                    text(topic.id, '') &&
+                  variant="secondary"
+                  className="max-w-full self-start whitespace-normal"
+                  asChild={
+                    !!text(topic.id, '') &&
                     !isHidden(
                       rawProjects.rows.find((p) => p.id === id)?.data,
                       revealed,
                     )
-                      ? RouterLink
-                      : 'span'
                   }
-                  {...(text(topic.id, '') &&
+                >
+                  {text(topic.id, '') &&
                   !isHidden(
                     rawProjects.rows.find((p) => p.id === id)?.data,
                     revealed,
-                  )
-                    ? {
-                        to:
-                          topicDetailsPath(id, text(topic.id)) +
-                          '?returnTo=' +
-                          encodeURIComponent(
-                            location.pathname + location.search,
-                          ),
-                        clickable: true,
+                  ) ? (
+                    <RouterLink
+                      to={
+                        topicDetailsPath(id, text(topic.id)) +
+                        '?returnTo=' +
+                        encodeURIComponent(location.pathname + location.search)
                       }
-                    : {})}
-                  label={text(topic.title)}
-                  size="small"
-                  sx={{ alignSelf: 'start', maxWidth: '100%' }}
-                />
+                    >
+                      {text(topic.title)}
+                    </RouterLink>
+                  ) : (
+                    <span>{text(topic.title)}</span>
+                  )}
+                </Badge>
               ))}
-            </Stack>,
+            </div>,
             date(data.createdAt),
           ]}
         />
@@ -834,7 +818,7 @@ export function Dashboard({
                 }
                 revealed={revealed}
               />
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+              <p className="whitespace-pre-wrap text-sm">
                 {objects(data.topics).map((t, index) => (
                   <span key={index}>
                     {index > 0 ? ' · ' : ''}
@@ -853,7 +837,7 @@ export function Dashboard({
                     )}
                   </span>
                 ))}
-              </Typography>
+              </p>
             </>,
             <>
               {date(data.startedAt, data.timeZone)}
@@ -862,54 +846,54 @@ export function Dashboard({
                 ? date(data.endedAt, data.timeZone)
                 : 'Fim não informado'}
             </>,
-            <Tooltip title="Abrir detalhes e auditoria">
-              <IconButton
-                component={RouterLink}
-                to={contextualRecordPath(
-                  location.pathname,
-                  location.search,
-                  id,
-                )}
-                aria-label="Abrir detalhes e auditoria do registro"
-              >
-                <UiIcon kind="detail" />
-              </IconButton>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" asChild>
+                  <RouterLink
+                    to={contextualRecordPath(
+                      location.pathname,
+                      location.search,
+                      id,
+                    )}
+                    aria-label="Abrir detalhes e auditoria do registro"
+                  >
+                    <UiIcon kind="detail" />
+                  </RouterLink>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Abrir detalhes e auditoria</TooltipContent>
             </Tooltip>,
           ]}
         />
       )}
       {mode === 'records' && (
         <>
-          <Typography variant="caption">
+          <p className="text-xs">
             Período: sobreposição para encerrados; data de início para abertos,
             sem estimar horas.
-          </Typography>
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{ mt: 2, alignItems: 'center' }}
-          >
+          </p>
+          <div className="flex flex-row gap-4 mt-4 items-center">
             <Button
               disabled={page === 0}
               onClick={() => setPageState({ key: pageKey, page: page - 1 })}
             >
               Anterior
             </Button>
-            <Typography role="status">
-              Página {page + 1} ·{' '}
+            <p role="status">
+              Página {page + 1}·{' '}
               {rawRecords.complete
                 ? matchingSafeRecords.length + ' registros encontrados'
                 : 'resultado parcial'}
-            </Typography>
+            </p>
             <Button
               disabled={(page + 1) * pageSize >= matchingSafeRecords.length}
               onClick={() => setPageState({ key: pageKey, page: page + 1 })}
             >
               Próxima
             </Button>
-          </Stack>
+          </div>
         </>
       )}
-    </Box>
+    </div>
   );
 }

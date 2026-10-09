@@ -6,7 +6,14 @@ export const demoConfig = Object.freeze({
   storageBucket: 'demo-work-track.appspot.com',
   appId: 'demo-work-track-dashboard',
 });
+import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath, URL } from 'node:url';
 export default {
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('../../apps/frontend/src', import.meta.url)),
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
@@ -14,6 +21,7 @@ export default {
     watch: { usePolling: true, interval: 200 },
   },
   plugins: [
+    tailwindcss(),
     {
       name: 'local-demo-firebase-bootstrap',
       apply: 'serve',

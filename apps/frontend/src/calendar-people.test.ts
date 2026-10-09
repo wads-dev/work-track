@@ -152,7 +152,10 @@ describe('calendar people default and safe scope', () => {
     expect(source).toContain(
       'calendarRequest(params, uid, from, to, zone, includeArchived)',
     );
-    expect(source).toMatch(/item.uid !== uid\s*\? 'span'\s*: RouterLink/);
+    expect(source).toMatch(/item.uid && item.uid !== uid\s*\? \(/);
+    expect(
+      source.split('item.uid && item.uid !== uid ? (')[1].split(') : (')[0],
+    ).not.toContain('<RouterLink');
     expect(source).toContain('reportQuery === queryIdentity');
     expect(source).toContain('privacyBlocked');
     expect(source).toContain('directory.owner === uid');
@@ -162,9 +165,12 @@ describe('calendar people default and safe scope', () => {
       new URL('./CalendarTimeline.tsx', import.meta.url),
       'utf8',
     );
-    expect(timeline).toMatch(
-      /e.item.uid !== viewerUid\s*\? 'span'\s*: RouterLink/,
-    );
+    expect(timeline).toMatch(/e.item.uid && e.item.uid !== viewerUid\s*\? \(/);
+    expect(
+      timeline
+        .split('e.item.uid && e.item.uid !== viewerUid ? (')[1]
+        .split(') : (')[0],
+    ).not.toContain('<RouterLink');
     expect(timeline).toMatch(
       /JSON.stringify\(\[\s*e.item.uid \|\| viewerUid,\s*e.item.id,/,
     );

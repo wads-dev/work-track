@@ -3,14 +3,15 @@ import {
   QueryToolbarField,
   QueryPeriodControls,
 } from './QueryToolbar';
+import { Button } from './components/ui/button';
+import { Checkbox } from './components/ui/checkbox';
+import { Label } from './components/ui/label';
 import {
-  IconButton,
   Tooltip,
-  Typography,
-  Box,
-  Checkbox,
-  FormControlLabel,
-} from '@mui/material';
+  TooltipContent,
+  TooltipTrigger,
+} from './components/ui/tooltip';
+import { useId } from 'react';
 import { UiIcon } from './UiIcons';
 import { ProjectSelector } from './ProjectSelector';
 import { usePrivacy } from './privacy';
@@ -37,55 +38,74 @@ export function ReportToolbar({
   includeArchived?: boolean;
 }) {
   const { revealed } = usePrivacy();
+  const archivedId = useId();
   return (
     <QueryToolbar
       label="Filtros do relatório"
       summary={
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            Tempo registrado
-          </Typography>
-          <Typography variant="h5" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-            {total}
-          </Typography>
-        </Box>
+        <div>
+          <p className="text-xs text-muted-foreground">Tempo registrado</p>
+          <p className="text-2xl tabular-nums">{total}</p>
+        </div>
       }
       actions={
         <>
           {' '}
           {(fromDate || toDate || projectId) && (
-            <Tooltip title="Limpar filtros">
-              <IconButton
-                aria-label="Limpar filtros"
-                onClick={() => onFilter('clear', '')}
-              >
-                <UiIcon kind="eyeoff" />
-              </IconButton>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Limpar filtros"
+                  title="Limpar filtros"
+                  onClick={() => onFilter('clear', '')}
+                >
+                  <UiIcon kind="eyeoff" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Limpar filtros</TooltipContent>
             </Tooltip>
           )}
           {includeArchived !== undefined && (
-            <FormControlLabel
-              sx={{ m: 0 }}
-              control={
-                <Checkbox
-                  checked={includeArchived}
-                  onChange={(e) =>
-                    onFilter('includeArchived', String(e.target.checked))
-                  }
-                />
-              }
-              label="Arquivados"
-            />
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={archivedId}
+                checked={includeArchived}
+                onCheckedChange={(checked) =>
+                  onFilter('includeArchived', String(checked === true))
+                }
+              />
+              <Label htmlFor={archivedId}>Arquivados</Label>
+            </div>
           )}
-          <Tooltip title="Atualizar">
-            <IconButton aria-label="Atualizar" onClick={onRefresh}>
-              <UiIcon kind="refresh" />
-            </IconButton>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Atualizar"
+                title="Atualizar"
+                onClick={onRefresh}
+              >
+                <UiIcon kind="refresh" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Atualizar</TooltipContent>
           </Tooltip>
-          <Tooltip title="Detalhes do cálculo">
-            <IconButton aria-label="Detalhes do cálculo" onClick={onInfo}>
-              <UiIcon kind="detail" />
-            </IconButton>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Detalhes do cálculo"
+                title="Detalhes do cálculo"
+                onClick={onInfo}
+              >
+                <UiIcon kind="detail" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Detalhes do cálculo</TooltipContent>
           </Tooltip>
         </>
       }
