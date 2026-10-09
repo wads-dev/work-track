@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../domain/record-lifecycle.js';
 import { createHash } from 'node:crypto';
 import {
   assertProjectAccess,
@@ -181,9 +182,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
     if (!input.confirmed) {
       const [a, b] = await Promise.all([sourceRef.get(), targetRef.get()]);
       assertProjectMergeAccess(a.data(), b.data(), uid);
-      const count = await recordsQuery(a.data() as ManagedProject)
-        .count()
-        .get();
+      const count = await recordsQuery(a.data() as ManagedProject).get();
       if (!a.exists || !b.exists)
         throw new ProjectManagementError(
           'not-found',
@@ -198,7 +197,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
         mode: 'preview' as const,
         sourceProjectId: input.sourceProjectId,
         targetProjectId: input.targetProjectId,
-        count: count.data().count,
+        count: count.docs.filter((doc) => !isDeletedRecord(doc.data())).length,
         topicMapping: Object.entries(mapping).map(
           ([sourceTopicId, targetTopicId]) => ({
             sourceTopicId,
@@ -334,10 +333,9 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
           'failed-precondition',
           'Locks da mesclagem inconsistentes.',
         );
-      const page = await tx.get(
-        recordsQuery(a.data() as ManagedProject).limit(101),
-      );
-      const docs = page.docs.slice(0, 100);
+      const page = await tx.get(recordsQuery(a.data() as ManagedProject));
+      const active = page.docs.filter((doc) => !isDeletedRecord(doc.data()));
+      const docs = active.slice(0, 100);
       const target = b.data() as ManagedProject;
       const changes = docs.map((doc) => {
         const data = doc.data(),
@@ -403,7 +401,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
           after: { projectId: input.targetProjectId, topics: mapped },
         });
       }
-      const completed = page.docs.length <= 100,
+      const completed = active.length <= 100,
         migratedCount = job.migratedCount + docs.length;
       tx.update(jobRef, {
         migratedCount,

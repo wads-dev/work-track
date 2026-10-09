@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import {
@@ -77,6 +78,7 @@ export class FirestoreDailyHoursRepository implements DailyHoursRepository {
           );
           for (const doc of page.docs) {
             const raw: unknown = doc.data();
+            if (isDeletedRecord(raw)) continue;
             if (
               !raw ||
               typeof raw !== 'object' ||

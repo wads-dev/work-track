@@ -1,4 +1,5 @@
 import { useProjects } from './useProjects';
+import { isDeletedRecord, useDeletionRevision } from './record-deletion';
 import { useEffect, useState } from 'react';
 import { isAlertOpen, isOpen } from './pending-utils';
 import { useClock } from './use-clock';
@@ -30,16 +31,19 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
-import { date, text, type Row, useRows } from './data';
+import { date, text, type Row } from './data';
+import { useOwnRecords } from './useOwnRecords';
 import { isHidden, safeProject, usePrivacy } from './privacy';
 import { RecordDrawer } from './RecordDrawer';
 import { contextualRecordPath } from './routes';
 import type { Functions } from 'firebase/functions';
 import { UiIcon } from './UiIcons';
 export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
-  const state = useRows(db, 'users/' + uid + '/records');
+  const state = useOwnRecords(db, uid);
   const now = useClock();
-  const count = state.rows.filter((row) => isAlertOpen(row.data, now)).length;
+  const count = state.rows
+    .slice(0, 100)
+    .filter((row) => isAlertOpen(row.data, now)).length;
   return (
     <Tooltip title="Abertos há mais de 8 horas nos até 100 registros carregados, não contagem global">
       <IconButton
@@ -68,6 +72,7 @@ export function PendingPage({
   functions: Functions;
 }) {
   const [params, setParams] = useSearchParams();
+  const revision = useDeletionRevision(uid);
   const cursor = params.get('after') ?? '';
   const recordId = params.get('record');
   const [rows, setRows] = useState<Row[]>([]);
@@ -81,22 +86,31 @@ export function PendingPage({
     setLoading(true);
     setError('');
     const ref = collection(db, 'users', uid, 'records');
-    void getDocs(
-      query(
-        ref,
-        orderBy(documentId()),
-        ...(cursor ? [startAfter(cursor)] : []),
-        limit(100),
-      ),
-    )
-      .then((snapshot) => {
+    void (async () => {
+      const activeRows: Row[] = [];
+      let after = cursor;
+      while (active && activeRows.length < 100) {
+        const snapshot = await getDocs(
+          query(
+            ref,
+            orderBy(documentId()),
+            ...(after ? [startAfter(after)] : []),
+            limit(100),
+          ),
+        );
+        for (const doc of snapshot.docs) {
+          if (!isDeletedRecord(doc.data()))
+            activeRows.push({ id: doc.id, data: doc.data() });
+          if (activeRows.length === 100) break;
+        }
+        if (snapshot.size < 100 || activeRows.length === 100) break;
+        after = snapshot.docs[snapshot.docs.length - 1].id;
+      }
+      return activeRows;
+    })()
+      .then((activeRows) => {
         if (active) {
-          setRows(
-            snapshot.docs.map((doc) => ({
-              id: doc.id,
-              data: doc.data() as Record<string, unknown>,
-            })),
-          );
+          setRows(activeRows);
           setLoading(false);
         }
       })
@@ -109,7 +123,7 @@ export function PendingPage({
     return () => {
       active = false;
     };
-  }, [db, uid, cursor, attempt]);
+  }, [db, uid, cursor, attempt, revision]);
   const open = rows.filter((row) => isOpen(row.data));
   return (
     <Stack spacing={2}>

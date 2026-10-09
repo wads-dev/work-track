@@ -1,4 +1,5 @@
 import { useProjects } from './useProjects';
+import { isDeletedRecord, createDeletionObserver } from './record-deletion';
 import { writeUrlTab } from './url-tabs';
 import { UiIcon } from './UiIcons';
 import { useEffect, useRef, useState } from 'react';
@@ -119,24 +120,34 @@ export function RecordDrawer({
   useEffect(() => {
     setLoading(true);
     setError('');
-    return onSnapshot(
+    const observeDeletion = createDeletionObserver(uid);
+    let alive = true;
+    const stop = onSnapshot(
       doc(db, 'users', uid, 'records', recordId),
       (snapshot) => {
+        if (!alive) return;
         const data = snapshot.exists()
           ? (snapshot.data() as Record<string, unknown>)
           : null;
-        setRecord(data);
+        if (data) observeDeletion([{ id: recordId, data }]);
+        const activeRecord = data && !isDeletedRecord(data) ? data : null;
+        setRecord(activeRecord);
         setLoading(false);
-        if (data) {
-          setEnd(endToLocal(data.endedAt));
+        if (activeRecord) {
+          setEnd(endToLocal(activeRecord.endedAt));
           setConfirmed(false);
         }
       },
       () => {
+        if (!alive) return;
         setLoading(false);
         setError('Não foi possível consultar este registro privado.');
       },
     );
+    return () => {
+      alive = false;
+      stop();
+    };
   }, [db, uid, recordId]);
   async function save() {
     if (!record || !confirmed) return;

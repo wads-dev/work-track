@@ -1,4 +1,8 @@
 import express from 'express';
+import type { RemovalRepository } from '../../modules/removal/domain/removal.js';
+import { registerRemovalTool } from '../../modules/removal/presentation/removal-tool.js';
+import type { SplitRepository } from '../../modules/split/domain/split.js';
+import { registerSplitTool } from '../../modules/split/presentation/split-tool.js';
 import type { PauseRepository } from '../../modules/pause/domain/pause.js';
 import { registerPauseTool } from '../../modules/pause/presentation/pause-tool.js';
 import type { DailyHoursRepository } from '../../modules/daily-hours/domain/daily-hours.js';
@@ -23,6 +27,8 @@ export function createApp(
   topicManagementRepository?: TopicManagementRepository,
   dailyHoursRepository?: DailyHoursRepository,
   pauseRepository?: PauseRepository,
+  splitRepository?: SplitRepository,
+  removalRepository?: RemovalRepository,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -127,6 +133,18 @@ export function createApp(
         /^[A-Za-z0-9_-]{1,128}$/.test(uid)
       )
         registerPauseTool(server, pauseRepository, uid);
+      if (
+        splitRepository &&
+        typeof uid === 'string' &&
+        /^[A-Za-z0-9_-]{1,128}$/.test(uid)
+      )
+        registerSplitTool(server, splitRepository, uid);
+      if (
+        removalRepository &&
+        typeof uid === 'string' &&
+        /^[A-Za-z0-9_-]{1,128}$/.test(uid)
+      )
+        registerRemovalTool(server, removalRepository, uid);
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });

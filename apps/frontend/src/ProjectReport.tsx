@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useDeletionRevision, deletionRevision } from './record-deletion';
 import {
   Alert,
   Box,
@@ -161,7 +162,12 @@ export function ProjectReport({
 }) {
   const [params, setParams] = useSearchParams();
   const includeArchived = params.get('includeArchived') === 'true';
-  const [report, setReport] = useState<Report | null>(null);
+  const revision = useDeletionRevision(uid);
+  const [reportOwner, setReportOwner] = useState('');
+  const [reportRevision, setReportRevision] = useState(-1);
+  const [cachedReport, setReport] = useState<Report | null>(null);
+  const report =
+    reportRevision === revision && reportOwner === uid ? cachedReport : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -186,12 +192,15 @@ export function ProjectReport({
     })
       .then((result) => {
         if (active) {
+          if (deletionRevision(uid) !== revision) return;
+          setReportOwner(uid);
+          setReportRevision(revision);
           setReport(result.data);
           setLoading(false);
         }
       })
       .catch((failure: unknown) => {
-        if (active) {
+        if (active && deletionRevision(uid) === revision) {
           setError(reportError(failure));
           setLoading(false);
         }
@@ -199,7 +208,7 @@ export function ProjectReport({
     return () => {
       active = false;
     };
-  }, [functions, projectId, attempt, includeArchived]);
+  }, [functions, projectId, attempt, includeArchived, revision, uid]);
   if (loading)
     return (
       <Stack direction="row" spacing={2} role="status">

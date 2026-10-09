@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import { z } from 'zod';
 import {
   safeId,
@@ -69,6 +70,11 @@ export function validateSource(
   uid: string,
   now: number,
 ) {
+  if (isDeletedRecord(source))
+    throw new PauseError(
+      'failed-precondition',
+      'Registro removido; pausa não permitida.',
+    );
   const speech = validateSpeech(input, now);
   if (source.projectId !== project?.id)
     throw new PauseError(

@@ -13,6 +13,15 @@ it('previews without writes then resumes bounded audited batches and preserves e
   values.set('projects/source', { ...base, id: 'source', confidential: true });
   values.set('projects/target', { ...base, id: 'target' });
   for (let i = 0; i < 101; i++)
+    values.set('users/alice/records/deleted' + i, {
+      uid: 'alice',
+      projectId: 'source',
+      deletedAt: false,
+      topics: 'malformed',
+      deleteOperationId: 'keep',
+      originalText: 'preserved',
+    });
+  for (let i = 0; i < 101; i++)
     values.set('users/alice/records/r' + i, {
       uid: 'alice',
       projectId: 'source',
@@ -42,7 +51,21 @@ it('previews without writes then resumes bounded audited batches and preserves e
     collection: (n) => ({ doc: (id) => ref(path + '/' + n + '/' + id) }),
     get: () => Promise.resolve(snapshot(path)),
   });
+  let queriedProject = 'source';
   const query = {
+    query: true,
+    n: Number.MAX_SAFE_INTEGER,
+    get: () =>
+      Promise.resolve({
+        docs: [...values]
+          .filter(
+            ([path, data]) =>
+              path.startsWith('users/') &&
+              path.split('/').length === 4 &&
+              data.projectId === queriedProject,
+          )
+          .map(([path]) => ({ ref: ref(path), data: () => values.get(path) })),
+      }),
     limit: (n: number) => ({ query: true, n }),
     count: () => ({
       get: () =>
@@ -52,7 +75,7 @@ it('previews without writes then resumes bounded audited batches and preserves e
               ([path, data]) =>
                 path.startsWith('users/') &&
                 path.split('/').length === 4 &&
-                data.projectId === 'source',
+                data.projectId === queriedProject,
             ).length,
           }),
         }),
@@ -61,7 +84,12 @@ it('previews without writes then resumes bounded audited batches and preserves e
   let writes = 0;
   const db = {
     collection: (n: string) => ({ doc: (id: string) => ref(n + '/' + id) }),
-    collectionGroup: () => ({ where: () => query }),
+    collectionGroup: () => ({
+      where: (_field: string, _op: string, value: string) => {
+        queriedProject = value;
+        return query;
+      },
+    }),
     runTransaction: async (work: (tx: unknown) => Promise<unknown>) => {
       let written = false;
       const tx = {
@@ -73,7 +101,8 @@ it('previews without writes then resumes bounded audited batches and preserves e
               docs: [...values]
                 .filter(
                   ([path, data]) =>
-                    path.split('/').length === 4 && data.projectId === 'source',
+                    path.split('/').length === 4 &&
+                    data.projectId === queriedProject,
                 )
                 .slice(0, value.n)
                 .map(([path]) => ({
@@ -178,6 +207,47 @@ it('previews without writes then resumes bounded audited batches and preserves e
   expect(
     [...values.keys()].filter((path) => path.includes('/audit/merge_')),
   ).toHaveLength(101);
+  expect(values.get('users/alice/records/deleted0')).toEqual({
+    uid: 'alice',
+    projectId: 'source',
+    deletedAt: false,
+    topics: 'malformed',
+    deleteOperationId: 'keep',
+    originalText: 'preserved',
+  });
+  for (const id of ['empty-source', 'empty-target'])
+    values.set('projects/' + id, { ...base, id });
+  values.set('users/alice/records/only-deleted', {
+    uid: 'alice',
+    projectId: 'empty-source',
+    deletedAt: 0,
+    originalText: 'preserved',
+  });
+  const empty = {
+    sourceProjectId: 'empty-source',
+    targetProjectId: 'empty-target',
+    confirmed: false,
+  };
+  await expect(repo.mergeProjects(empty, 'alice')).resolves.toMatchObject({
+    count: 0,
+  });
+  await expect(
+    repo.mergeProjects(
+      {
+        ...empty,
+        confirmed: true,
+        requestId: 'all-deleted',
+        reason: 'explicit merge',
+      },
+      'alice',
+    ),
+  ).resolves.toMatchObject({ status: 'completed', migratedCount: 0 });
+  expect(values.get('users/alice/records/only-deleted')).toEqual({
+    uid: 'alice',
+    projectId: 'empty-source',
+    deletedAt: 0,
+    originalText: 'preserved',
+  });
   await expect(
     repo.mergeProjects({ ...execution, targetProjectId: 'other' }, 'alice'),
   ).rejects.toThrow('Projeto não encontrado.');

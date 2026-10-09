@@ -7,7 +7,7 @@ function setup(
 ) {
   const get = vi.fn().mockResolvedValue({ docs });
   const limit = vi.fn().mockReturnValue({ get });
-  const where = vi.fn().mockReturnValue({ limit });
+  const where = vi.fn().mockReturnValue({ limit, get });
   const collectionGroup = vi.fn().mockReturnValue({ where });
   // Mock only the SDK boundary; no Firebase initialization or live database access.
   const db = {
@@ -29,6 +29,21 @@ function setup(
 }
 
 describe('FirestoreReportRecordsRepository', () => {
+  it('limits active outputs only after >100 malformed tombstones', async () => {
+    const { repository } = setup([
+      ...Array.from({ length: 101 }, (_, i) => ({
+        id: 'deleted' + i,
+        data: () => ({ deletedAt: false, startedAt: null }),
+      })),
+      {
+        id: 'active',
+        data: () => ({ projectId: 'project', uid: 'alice', startedAt: 'now' }),
+      },
+    ]);
+    expect(
+      (await repository.listByProject('project', 1, 'alice')).map((r) => r.id),
+    ).toEqual(['active']);
+  });
   it('rejects absent viewer identity before a collection-group query', async () => {
     const { repository, collectionGroup } = setup();
     await expect(repository.listByProject('project', 1)).rejects.toThrow(
@@ -64,7 +79,7 @@ describe('FirestoreReportRecordsRepository', () => {
     const result = await repository.listByProject('project', 25, 'alice');
     expect(collectionGroup).toHaveBeenCalledExactlyOnceWith('records');
     expect(where).toHaveBeenCalledExactlyOnceWith('projectId', '==', 'project');
-    expect(limit).toHaveBeenCalledExactlyOnceWith(25);
+    expect(limit).not.toHaveBeenCalled();
     expect(get).toHaveBeenCalledExactlyOnceWith();
     expect(result).toEqual([
       { id: 'alice-record', projectId: 'project', uid: 'alice', startedAt },

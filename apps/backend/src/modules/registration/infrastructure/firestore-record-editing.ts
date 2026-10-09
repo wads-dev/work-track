@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../domain/record-lifecycle.js';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { assertProjectWritable } from '../domain/project-management.js';
 import { assertProjectAccess } from '../domain/project-access.js';
@@ -25,6 +26,11 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
       if (!snapshot.exists)
         throw new RecordEditError('not-found', 'Registro não encontrado.');
       const before = snapshot.data() as Record<string, unknown>;
+      if (isDeletedRecord(before))
+        throw new RecordEditError(
+          'not-found',
+          'Registro removido; edição não permitida.',
+        );
       if (before.uid !== uid)
         throw new RecordEditError(
           'permission-denied',
@@ -123,16 +129,18 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
     });
   }
   async listOpenRecords(uid: string, limit: number) {
-    // Legacy open records omit endedAt: Firestore equality-to-null cannot match
-    // missing fields. Bound the scan explicitly, report partial instead of lying.
+    // Legacy missing fields cannot use equality-to-null or != tombstone filters.
+    // Scan complete snapshot; exclude tombstones before active result limits.
     const snapshot = await this.db
       .collection('users')
       .doc(uid)
       .collection('records')
-      .limit(501)
       .get();
     const open = snapshot.docs
-      .filter((doc) => doc.data().endedAt === undefined)
+      .filter(
+        (doc) =>
+          !isDeletedRecord(doc.data()) && doc.data().endedAt === undefined,
+      )
       .map((doc) => {
         const data = doc.data();
         return {
@@ -143,7 +151,7 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
       });
     return {
       records: open.slice(0, limit),
-      partial: snapshot.docs.length > 500 || open.length > limit,
+      partial: open.length > limit,
     };
   }
 }

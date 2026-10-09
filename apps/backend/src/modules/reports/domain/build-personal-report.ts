@@ -1,3 +1,4 @@
+import { activeRecords } from '../../registration/domain/record-lifecycle.js';
 import {
   globalEstimates,
   recordKey,
@@ -15,6 +16,8 @@ export function buildPersonalReport(
   asOf: number,
   context: import('./project-report.js').ReportSourceRecord[],
 ): PersonalReport {
+  page = { ...page, records: activeRecords(page.records) };
+  context = activeRecords(context);
   assertContext(page.records, context);
   const from = input.from ? Date.parse(input.from) : -Infinity,
     to = input.to ? Date.parse(input.to) : Infinity,

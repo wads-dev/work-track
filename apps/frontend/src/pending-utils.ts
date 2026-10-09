@@ -1,5 +1,6 @@
+import { isDeletedRecord } from './record-deletion';
 export function isOpen(record: Record<string, unknown>) {
-  return !record.endedAt;
+  return !isDeletedRecord(record) && !record.endedAt;
 }
 export function isAlertOpen(record: Record<string, unknown>, now = new Date()) {
   if (!isOpen(record) || typeof record.startedAt !== 'string') return false;

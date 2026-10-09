@@ -1,3 +1,4 @@
+import { activeRecords } from '../../registration/domain/record-lifecycle.js';
 import { z } from 'zod';
 import {
   globalEstimates,
@@ -143,7 +144,7 @@ export function buildDailyHours(
 ) {
   const { start, end } = dailyBounds(input.date, input.timeZone);
   // Defense in depth: exclude inaccessible stale project references BEFORE parsing dates or estimating.
-  const records = context.records.filter(
+  const records = activeRecords(context.records).filter(
     (r) =>
       r.uid === uid &&
       canReadDailyProject(context.projects.get(r.projectId), uid),

@@ -1,3 +1,4 @@
+import { activeRecords } from '../../registration/domain/record-lifecycle.js';
 import type { ReportSourceRecord } from './project-report.js';
 import { localDay, nextMidnight } from './report-time.js';
 export class ReportContextError extends Error {}
@@ -6,6 +7,8 @@ export function assertContext(
   selected: ReportSourceRecord[],
   context: ReportSourceRecord[],
 ) {
+  selected = activeRecords(selected);
+  context = activeRecords(context);
   const map = new Map(context.map((r) => [recordKey(r), r]));
   for (const r of selected) {
     const current = map.get(recordKey(r));
@@ -26,6 +29,7 @@ export function globalEstimates(
   asOf: number,
   reportZone = 'America/Sao_Paulo',
 ) {
+  records = activeRecords(records);
   const sorted = [...records].sort(
     (a, b) =>
       Date.parse(a.startedAt) - Date.parse(b.startedAt) ||

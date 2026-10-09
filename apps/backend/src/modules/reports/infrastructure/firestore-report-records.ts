@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
   canAccessProject,
@@ -22,10 +23,11 @@ export class FirestoreReportRecordsRepository implements ReportRecordsRepository
     const snapshot = await this.db
       .collectionGroup('records')
       .where('projectId', '==', projectId)
-      .limit(limit)
       .get();
     return snapshot.docs
+      .filter((doc) => !isDeletedRecord(doc.data()))
       .filter((doc) => !personal || doc.data().uid === viewerUid)
+      .slice(0, limit)
       .map((doc) => {
         const data = doc.data();
         return {

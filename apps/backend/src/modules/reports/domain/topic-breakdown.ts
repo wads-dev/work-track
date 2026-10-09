@@ -1,3 +1,7 @@
+import {
+  activeRecords,
+  isDeletedRecord,
+} from '../../registration/domain/record-lifecycle.js';
 import type { ReportSourceRecord } from './project-report.js';
 
 type TopicMetadata = {
@@ -74,6 +78,11 @@ export function buildTopicBreakdown(
   catalog: Map<string, { topics: TopicMetadata[] }>,
   labels: Record<string, string> = {},
 ): TopicBreakdown {
+  const deletedKeys = new Set(records.filter(isDeletedRecord).map(sourceKey));
+  records = activeRecords(records);
+  intervals = activeRecords(intervals).filter(
+    (interval) => !deletedKeys.has(sourceKey(interval)),
+  );
   const warnings = new Set<string>();
   const sources = new Map<string, ReportSourceRecord | null>();
   for (const record of records) {

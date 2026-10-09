@@ -1,3 +1,4 @@
+import { activeRecords } from '../../registration/domain/record-lifecycle.js';
 import type { ProjectReport, ReportPage } from './project-report.js';
 import { buildTopicBreakdown } from './topic-breakdown.js';
 import {
@@ -16,6 +17,8 @@ export function buildProjectReport(
   hasCursor = false,
   context: import('./project-report.js').ReportSourceRecord[],
 ): ProjectReport {
+  page = { ...page, records: activeRecords(page.records) };
+  context = activeRecords(context);
   assertContext(page.records, context);
   const warnings = new Set<string>();
   warnings.add(

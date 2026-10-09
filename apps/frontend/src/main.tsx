@@ -1,3 +1,5 @@
+import { ownRecordsRepository } from './own-records-repository';
+import { deletionAccount } from './record-deletion';
 import { useEffect, useState } from 'react';
 import { projectRepository } from './project-repository';
 import { createRoot } from 'react-dom/client';
@@ -163,6 +165,8 @@ function App() {
           (next) => {
             if (!active) return;
             projectRepository.account(next?.uid ?? '');
+            deletionAccount(next?.uid ?? '');
+            ownRecordsRepository.account(next?.uid ?? '');
             setUser(next);
             setRevealed(false);
             setLoading(false);
@@ -199,6 +203,8 @@ function App() {
       const result = await signInWithPopup(services.auth, provider);
       if (!allowed(result.user)) {
         projectRepository.account('');
+        deletionAccount('');
+        ownRecordsRepository.account('');
         await signOut(services.auth);
         setError('Use uma conta Google verificada @wads.dev.');
       }

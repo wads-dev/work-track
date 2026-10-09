@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../domain/record-lifecycle.js';
 import { createHash } from 'node:crypto';
 import {
   assertProjectAccess,
@@ -150,6 +151,10 @@ export class FirestoreWorkRepository implements WorkRepository {
       assertProjectAccess(projectDoc.data(), uid);
       if (existing.exists) {
         const data = existing.data() as Record<string, unknown>;
+        if (isDeletedRecord(data))
+          throw new Error(
+            'Registro removido; requestId preservado, nenhuma atividade criada ou reaberta.',
+          );
         if (data.fingerprint !== fingerprint)
           throw new Error('requestId já utilizado com dados diferentes.');
         return { ...data, duplicate: true };
@@ -192,8 +197,11 @@ export class FirestoreWorkRepository implements WorkRepository {
           );
           previous = { ref: candidateRef, data };
         } else {
-          const snapshot = await tx.get(collection.limit(2001));
-          if (snapshot.docs.length > 2000)
+          const snapshot = await tx.get(collection);
+          if (
+            snapshot.docs.filter((doc) => !isDeletedRecord(doc.data())).length >
+            2000
+          )
             throw new Error(
               'Contexto de anteriores excede limite; informe closedPreviousRecordId explícito.',
             );

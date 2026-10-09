@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import type { Auth } from 'firebase-admin/auth';
 import { z } from 'zod';
@@ -69,6 +70,7 @@ export class FirestoreCompanyReportRepository implements CompanyReportRepository
       ),
     );
     const records = docs
+      .filter((doc) => !isDeletedRecord(doc.data()))
       .filter((doc) => {
         const project = catalog.get(doc.data().projectId as string);
         return project && effectiveProjectType(project) === 'work';

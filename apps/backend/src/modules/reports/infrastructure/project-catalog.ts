@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import type { Firestore } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import {
@@ -67,6 +68,7 @@ export function selectReportRecords(
   scope: { viewerUid: string } | { companyOnly: true },
 ): ReportSourceRecord[] {
   return records.filter((record) => {
+    if (isDeletedRecord(record)) return false;
     const project = catalog.get(record.projectId);
     return (
       project !== undefined &&

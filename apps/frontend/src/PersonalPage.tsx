@@ -1,7 +1,9 @@
+import { QueryToolbar } from './QueryToolbar';
 import { useProjects } from './useProjects';
 import { TopicReport } from './TopicReport';
 import { topicBuckets, type ReportTopic } from './topic-report-model';
 import { useEffect, useState } from 'react';
+import { useDeletionRevision, deletionRevision } from './record-deletion';
 import {
   Alert,
   Box,
@@ -138,7 +140,12 @@ export function PersonalPage({
   const to =
     validated?.to ??
     (!invalid && lastDate ? midnight(addDays(lastDate, 1), zone) : '');
-  const [report, setReport] = useState<PersonalReport | null>(null);
+  const revision = useDeletionRevision(uid);
+  const [reportOwner, setReportOwner] = useState('');
+  const [reportRevision, setReportRevision] = useState(-1);
+  const [cachedReport, setReport] = useState<PersonalReport | null>(null);
+  const report =
+    reportRevision === revision && reportOwner === uid ? cachedReport : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -175,12 +182,15 @@ export function PersonalPage({
     })
       .then((result) => {
         if (active) {
+          if (deletionRevision(uid) !== revision) return;
+          setReportOwner(uid);
+          setReportRevision(revision);
           setReport(result.data);
           setLoading(false);
         }
       })
       .catch((failure: unknown) => {
-        if (active) {
+        if (active && deletionRevision(uid) === revision) {
           setError(reportError(failure));
           setLoading(false);
         }
@@ -194,6 +204,8 @@ export function PersonalPage({
     to,
     zone,
     attempt,
+    revision,
+    uid,
     includeArchived,
     company,
     projectId,
@@ -258,21 +270,7 @@ export function PersonalPage({
           onInfo={() => setInfoOpen((v) => !v)}
         />
       ) : (
-        <Stack
-          direction="row"
-          spacing={1}
-          useFlexGap
-          sx={{
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            minWidth: 0,
-            p: { xs: 2, sm: 2.5 },
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: '12px',
-            bgcolor: 'background.paper',
-          }}
-        >
+        <QueryToolbar label="Filtros do calendário">
           <Tooltip title="Período anterior">
             <IconButton
               aria-label="Período anterior"
@@ -364,7 +362,7 @@ export function PersonalPage({
               <UiIcon kind="refresh" />
             </IconButton>
           </Tooltip>
-        </Stack>
+        </QueryToolbar>
       )}
       {loading ? (
         <CircularProgress aria-label="Carregando relatório pessoal" />

@@ -1,3 +1,4 @@
+import { isDeletedRecord } from './record-lifecycle.js';
 import { z } from 'zod';
 import { canonicalizeTopics } from './topic-management.js';
 import { registerInput } from './work-model.js';
@@ -79,6 +80,11 @@ export function applyRecordPatch(
     topics: { id: string; mergedIntoTopicId?: string; archived?: boolean }[];
   },
 ): Record<string, unknown> {
+  if (isDeletedRecord(existing))
+    throw new RecordEditError(
+      'not-found',
+      'Registro removido; edição não permitida.',
+    );
   if (existing.uid !== uid)
     throw new RecordEditError(
       'permission-denied',

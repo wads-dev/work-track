@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirestoreRemovalRepository } from './modules/removal/infrastructure/firestore-removal.js';
+import { FirestoreSplitRepository } from './modules/split/infrastructure/firestore-split.js';
 import { FirestoreDailyHoursRepository } from './modules/daily-hours/infrastructure/firestore-daily-hours.js';
 import { getCompanyReportHandler } from './modules/reports/presentation/get-company-report.js';
 import { FirestoreCompanyReportRepository } from './modules/reports/infrastructure/firestore-company-report.js';
@@ -165,6 +167,8 @@ export const api = onRequest(
     new FirestoreTopicManagementRepository(getFirestore()),
     new FirestoreDailyHoursRepository(getFirestore()),
     new FirestorePauseRepository(getFirestore()),
+    new FirestoreSplitRepository(getFirestore()),
+    new FirestoreRemovalRepository(getFirestore()),
   ),
 );
 export const createProject = onCall(

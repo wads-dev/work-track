@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isDeletedRecord, createDeletionObserver } from './record-deletion';
 import {
   collection,
   limit,
@@ -47,19 +48,31 @@ export function useRows(db: Firestore, path: string, maxRows = 100) {
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     setState({ rows: [], loading: true, error: '' });
-    return onSnapshot(
-      query(collection(db, path), limit(maxRows)),
+    const records = path.endsWith('/records');
+    const observeDeletion = createDeletionObserver(path.split('/')[1]);
+    let alive = true;
+    const stop = onSnapshot(
+      query(collection(db, path), ...(records ? [] : [limit(maxRows)])),
       (snapshot) => {
+        if (!alive) return;
+        if (records)
+          observeDeletion(
+            snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() })),
+          );
         setState({
-          rows: snapshot.docs.map((doc) => ({
-            id: doc.id,
-            data: doc.data() as Record<string, unknown>,
-          })),
+          rows: snapshot.docs
+            .map((doc) => ({
+              id: doc.id,
+              data: doc.data() as Record<string, unknown>,
+            }))
+            .filter((row) => !records || !isDeletedRecord(row.data))
+            .slice(0, maxRows),
           loading: false,
           error: '',
         });
       },
       () => {
+        if (!alive) return;
         setState({
           rows: [],
           loading: false,
@@ -68,6 +81,10 @@ export function useRows(db: Firestore, path: string, maxRows = 100) {
         });
       },
     );
+    return () => {
+      alive = false;
+      stop();
+    };
   }, [db, path, attempt, maxRows]);
   return { ...state, retry: () => setAttempt((value) => value + 1) };
 }

@@ -211,6 +211,55 @@ const HIDDEN_PROJECTS = [
 ] as const;
 
 describe('company reports use only current work-project metadata', () => {
+  it('all report adapters discard malformed tombstones before parsing and retain physical cursors', async () => {
+    const rows = [
+      record('alice', 'a-deleted', 'work', {
+        deletedAt: false,
+        startedAt: null,
+        endedAt: 42,
+        timeZone: null,
+        topics: 'bad',
+      }),
+      record('alice', 'b-deleted', 'work', { deletedAt: 0, startedAt: null }),
+      record('alice', 'z-active', 'work'),
+    ];
+    const mock = sdk(rows),
+      company = new FirestoreCompanyReportRepository(mock.db, mock.auth),
+      personal = new FirestorePersonalReportRepository(mock.db),
+      project = new FirestoreProjectReportRepository(mock.db, mock.auth);
+    const cp = await company.readPage(1);
+    expect(cp.records).toEqual([]);
+    expect(cp.nextCursor).toBeTruthy();
+    expect(
+      (await company.readPage(10, cp.nextCursor!)).records.map((r) => r.id),
+    ).toEqual(['z-active']);
+    const pp = await personal.readPage('alice', 1);
+    expect(pp.records).toEqual([]);
+    expect(pp.nextCursor).toBeTruthy();
+    expect(
+      (await personal.readPage('alice', 10, pp.nextCursor!)).records.map(
+        (r) => r.id,
+      ),
+    ).toEqual(['z-active']);
+    const pr = await project.readPage('work', 1, undefined, 'alice');
+    if (!pr) throw new Error('expected accessible work project');
+    expect(pr.records).toEqual([]);
+    expect(pr.nextCursor).toBeTruthy();
+    expect(
+      (await project.readPage(
+        'work',
+        10,
+        pr.nextCursor!,
+        'alice',
+      ))!.records.map((r) => r.id),
+    ).toEqual(['z-active']);
+    expect((await company.loadContext(['alice'])).map((r) => r.id)).toEqual([
+      'z-active',
+    ]);
+    expect((await personal.loadContext(['alice'])).map((r) => r.id)).toEqual([
+      'z-active',
+    ]);
+  });
   it('excludes all personal projects, including both owners, before counting', async () => {
     const rows = UIDS.flatMap((uid) => [
       record(uid, 'a-work', 'work'),

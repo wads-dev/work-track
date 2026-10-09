@@ -65,6 +65,20 @@ it('personal merge never reads or migrates foreign canonical or spoofed owner fa
     get: () => Promise.resolve(snapshot(path)),
   });
   const query = {
+    query: true,
+    n: Number.MAX_SAFE_INTEGER,
+    get: () =>
+      Promise.resolve({
+        docs: [...values]
+          .filter(
+            ([path, data]) =>
+              path.startsWith('users/alice/records/') &&
+              data.uid === 'alice' &&
+              path.split('/').length === 4 &&
+              data.projectId === 'source',
+          )
+          .map(([path]) => ({ ref: ref(path), data: () => values.get(path) })),
+      }),
     where: (field: string, op: string, value: string) => {
       expect([field, op, value]).toEqual(['uid', '==', 'alice']);
       return query;

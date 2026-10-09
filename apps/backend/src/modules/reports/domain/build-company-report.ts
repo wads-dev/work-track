@@ -1,3 +1,4 @@
+import { activeRecords } from '../../registration/domain/record-lifecycle.js';
 import type { CompanyReport, CompanyReportInput } from './company-report.js';
 import type { PersonalReportPage } from './personal-report.js';
 import type { ReportSourceRecord } from './project-report.js';
@@ -10,6 +11,8 @@ export function buildCompanyReport(
   labels: Record<string, string>,
   archived: string[],
 ): CompanyReport {
+  page = { ...page, records: activeRecords(page.records) };
+  context = activeRecords(context);
   const output: CompanyReport = {
     policy: 'company-v3',
     budgetTimeZone: 'America/Sao_Paulo',

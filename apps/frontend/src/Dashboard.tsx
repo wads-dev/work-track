@@ -1,3 +1,6 @@
+import { useOwnRecords } from './useOwnRecords';
+import { filterRecords, recordPage } from './record-filters';
+import { QueryToolbar } from './QueryToolbar';
 import { useProjects } from './useProjects';
 import { ProjectCreate } from './ProjectCreate';
 import { ProjectSelector } from './ProjectSelector';
@@ -47,12 +50,16 @@ import { matchesArchive } from './project-archive';
 
 function DataTable({
   hideHeading = false,
+  historical = false,
+  complete = true,
   title,
   headers,
   state,
   render,
 }: {
   hideHeading?: boolean;
+  historical?: boolean;
+  complete?: boolean;
   title: string;
   headers: string[];
   state: ReturnType<typeof useRows>;
@@ -83,7 +90,9 @@ function DataTable({
         </Alert>
       ) : state.rows.length === 0 ? (
         <Alert severity="info">
-          Nenhum dado disponível em {title.toLowerCase()}.
+          {historical && !complete
+            ? 'Sem resultados nos dados locais disponíveis. Aguarde a sincronização para consultar todo o histórico.'
+            : 'Nenhum dado disponível em ' + title.toLowerCase() + '.'}
         </Alert>
       ) : (
         <>
@@ -115,8 +124,12 @@ function DataTable({
                 {title}
                 {title === 'Projetos'
                   ? ' — catálogo autorizado'
-                  : ' — até 100 itens'}
-                . A ordem não representa os mais recentes.
+                  : historical
+                    ? ' — página do histórico'
+                    : ' — até 100 itens'}
+                {historical
+                  ? '. Mais recentes primeiro; datas inválidas ao final.'
+                  : '. A ordem não representa os mais recentes.'}
               </caption>
               <TableHead>
                 <TableRow>
@@ -149,7 +162,7 @@ function DataTable({
               </TableBody>
             </Table>
           </TableContainer>
-          {title !== 'Projetos' && state.rows.length === 100 && (
+          {!historical && title !== 'Projetos' && state.rows.length === 100 && (
             <Alert severity="info" sx={{ mt: 1 }}>
               Limite de 100 itens atingido. Esta visão não representa
               necessariamente todos os dados.
@@ -193,9 +206,8 @@ export function Dashboard({
 }) {
   const { revealed } = usePrivacy();
   const rawProjects = useProjects(functions, uid);
-  const rawRecords = useRows(db, 'users/' + uid + '/records');
+  const rawRecords = useOwnRecords(db, uid, mode !== 'projects');
   const rawProjectsById = new Map(rawProjects.rows.map((row) => [row.id, row]));
-  const rawRecordsById = new Map(rawRecords.rows.map((row) => [row.id, row]));
   const projects = {
     ...rawProjects,
     rows: rawProjects.rows.map((row) => ({
@@ -258,6 +270,14 @@ export function Dashboard({
   const filter =
     query.uid === uid && query.revealed === revealed ? query.text : '';
   const setLocalFilter = (text: string) => setQuery({ uid, revealed, text });
+  const [pageState, setPageState] = useState({ key: '', page: 0 });
+  const topicFilter = params.get('topic') ?? '';
+  const fromDate = params.get('fromDate') ?? '';
+  const toDate = params.get('toDate') ?? '';
+  const zone = params.get('timeZone') ?? 'America/Sao_Paulo';
+  const [pageSize] = useState(50);
+  const pageKey = JSON.stringify([uid, revealed, filter, params.toString()]);
+  const activePage = pageState.key === pageKey ? pageState.page : 0;
   const projectFilter = params.get('project') ?? '';
   const archiveFilter = params.get('status') ?? 'active';
   const projectScope = params.get('scope') === 'personal' ? 'personal' : 'work';
@@ -270,6 +290,7 @@ export function Dashboard({
   }, [params, setParams]);
   function updateFilter(key: string, value: string) {
     const next = new URLSearchParams(params);
+    if (key === 'project') next.delete('topic');
     if (key === 'q') {
       setLocalFilter(value);
       return;
@@ -383,23 +404,56 @@ export function Dashboard({
         ),
     ),
   };
+  let recordFilterError = '';
+  let matchingRecords: typeof rawRecords.rows;
+  try {
+    matchingRecords = filterRecords(
+      rawRecords.rows,
+      {
+        project: projectFilter,
+        topic: topicFilter,
+        query: '',
+        fromDate,
+        toDate,
+        zone,
+        status: params.get('recordStatus') ?? 'all',
+      },
+      objects(rawProjectsById.get(projectFilter)?.data.topics),
+    );
+  } catch (error) {
+    recordFilterError =
+      error instanceof Error ? error.message : 'Período inválido';
+    matchingRecords = [];
+  }
+  const safeRecordsById = new Map(records.rows.map((row) => [row.id, row]));
+  const matchingSafeRecords = matchingRecords
+    .map((row) => safeRecordsById.get(row.id))
+    .filter((row): row is (typeof records.rows)[number] => row !== undefined)
+    .filter((row) =>
+      matchesFilter(
+        [
+          row.id,
+          row.data.originalText,
+          row.data.interpretation,
+          object(row.data.projectSnapshot).title,
+          topicLabels(row.data),
+        ],
+        filter,
+      ),
+    );
+  const page = Math.min(
+    activePage,
+    Math.max(0, Math.ceil(matchingSafeRecords.length / pageSize) - 1),
+  );
   const filteredRecords = {
     ...records,
-    rows: records.rows.filter(
-      (row) =>
-        (!projectFilter || row.data.projectId === projectFilter) &&
-        matchesFilter(
-          [
-            row.id,
-            rawRecordsById.get(row.id)?.data.originalText,
-            rawRecordsById.get(row.id)?.data.interpretation,
-            object(rawRecordsById.get(row.id)?.data.projectSnapshot).title,
-            topicLabels(rawRecordsById.get(row.id)?.data ?? {}),
-          ],
-          filter,
-        ),
-    ),
+    error: recordFilterError || records.error,
+    rows:
+      mode === 'records'
+        ? recordPage(matchingSafeRecords, page, pageSize)
+        : matchingSafeRecords,
   };
+  const topicOptions = objects(rawProjectsById.get(projectFilter)?.data.topics);
   return (
     <Box
       sx={{
@@ -455,7 +509,7 @@ export function Dashboard({
               display: 'grid',
               gridTemplateColumns: {
                 xs: 'minmax(0,1fr)',
-                md: 'minmax(280px,1fr) 280px auto',
+                md: 'repeat(3,minmax(0,1fr))',
               },
               gap: 2,
               alignItems: 'start',
@@ -538,21 +592,15 @@ export function Dashboard({
                 </li>
               ))}
           </Box>
-          Até 5 abertos exibidos desta lista limitada; não é uma contagem
-          global.
+          Até 5 registros abertos exibidos neste resumo.
         </Alert>
       )}
       {mode !== 'projects' && (
-        <Box
-          component="section"
-          aria-label="Filtros de registros"
+        <QueryToolbar
+          label="Filtros de registros"
           sx={{
             mb: 2,
             p: { xs: 2, sm: 3 },
-            bgcolor: 'background.paper',
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: '12px',
             display: 'grid',
             gridTemplateColumns: {
               xs: 'minmax(0,1fr)',
@@ -588,23 +636,84 @@ export function Dashboard({
               onChange={(id) => updateFilter('project', id)}
             />
           </>
+          <TextField
+            select
+            label="Assunto / tópico"
+            value={topicFilter}
+            disabled={!projectFilter}
+            onChange={(e) => updateFilter('topic', e.target.value)}
+            sx={{ minWidth: 200 }}
+          >
+            <MenuItem value="">Todos os assuntos</MenuItem>
+            {topicOptions.map((topic) => (
+              <MenuItem key={text(topic.id)} value={text(topic.id)}>
+                {isHidden(rawProjectsById.get(projectFilter)?.data, revealed)
+                  ? 'Assunto reservado'
+                  : text(topic.title)}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            type="date"
+            label="De"
+            value={fromDate}
+            slotProps={{ inputLabel: { shrink: true } }}
+            onChange={(e) => updateFilter('fromDate', e.target.value)}
+          />
+          <TextField
+            type="date"
+            label="Até"
+            value={toDate}
+            slotProps={{ inputLabel: { shrink: true } }}
+            onChange={(e) => updateFilter('toDate', e.target.value)}
+          />
+          <TextField
+            label="Fuso do período"
+            value={zone}
+            onChange={(e) => updateFilter('timeZone', e.target.value)}
+          />
+          <TextField
+            select
+            label="Estado do registro"
+            value={params.get('recordStatus') ?? 'all'}
+            onChange={(e) => updateFilter('recordStatus', e.target.value)}
+          >
+            <MenuItem value="all">Todos</MenuItem>
+            <MenuItem value="open">Em aberto</MenuItem>
+            <MenuItem value="closed">Encerrados</MenuItem>
+          </TextField>
+          {rawRecords.error && (
+            <Button onClick={rawRecords.retry}>Tentar novamente</Button>
+          )}
+
           <Button
             sx={{ whiteSpace: 'nowrap', minHeight: 44 }}
             onClick={() => {
               const next = new URLSearchParams(params);
               setLocalFilter('');
               next.delete('q');
-              next.delete('project');
+              for (const key of [
+                'project',
+                'topic',
+                'fromDate',
+                'toDate',
+                'recordStatus',
+                'timeZone',
+              ])
+                next.delete(key);
               setParams(next);
             }}
           >
             Limpar filtros
           </Button>
-        </Box>
+        </QueryToolbar>
       )}
-      {mode !== 'projects' && records.rows.length === 100 && (
+      {mode !== 'projects' && (
         <Typography variant="caption" color="text.secondary">
-          Até 100 registros carregados. A busca considera esta lista.
+          {rawRecords.complete
+            ? 'Histórico completo sincronizado.'
+            : 'Dados locais podem estar incompletos; aguardando sincronização com o servidor.'}{' '}
+          Mais recentes primeiro; datas inválidas ao final.
         </Typography>
       )}
       {mode !== 'records' && (
@@ -639,6 +748,8 @@ export function Dashboard({
       {mode !== 'projects' && (
         <DataTable
           hideHeading={mode === 'records'}
+          historical
+          complete={rawRecords.complete}
           title="Meus registros"
           headers={['Projeto / tópicos', 'Início / fim', 'Detalhes']}
           state={filteredRecords}
@@ -680,6 +791,38 @@ export function Dashboard({
             </Tooltip>,
           ]}
         />
+      )}
+      {mode === 'records' && (
+        <>
+          <Typography variant="caption">
+            Período: sobreposição para encerrados; data de início para abertos,
+            sem estimar horas.
+          </Typography>
+          <Stack
+            direction="row"
+            spacing={2}
+            sx={{ mt: 2, alignItems: 'center' }}
+          >
+            <Button
+              disabled={page === 0}
+              onClick={() => setPageState({ key: pageKey, page: page - 1 })}
+            >
+              Anterior
+            </Button>
+            <Typography role="status">
+              Página {page + 1} ·{' '}
+              {rawRecords.complete
+                ? matchingSafeRecords.length + ' registros encontrados'
+                : 'resultado parcial'}
+            </Typography>
+            <Button
+              disabled={(page + 1) * pageSize >= matchingSafeRecords.length}
+              onClick={() => setPageState({ key: pageKey, page: page + 1 })}
+            >
+              Próxima
+            </Button>
+          </Stack>
+        </>
       )}
     </Box>
   );

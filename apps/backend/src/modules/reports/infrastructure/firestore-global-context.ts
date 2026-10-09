@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import {
@@ -66,7 +67,7 @@ export async function loadGlobalContext(
                       scope,
                     ).length > 0,
                 )
-              : page.docs;
+              : page.docs.filter((doc) => !isDeletedRecord(doc.data()));
           if (count + visible.length > 2000)
             throw new ReportContextError(
               'Limite operacional de contexto global excedido (2000 registros por pessoa); contate suporte para otimização da consulta, sem apagar histórico.',

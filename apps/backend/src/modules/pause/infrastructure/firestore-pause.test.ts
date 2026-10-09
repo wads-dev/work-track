@@ -15,6 +15,7 @@ interface Ref {
   collection: (name: string) => Collection;
 }
 interface Collection {
+  query: string;
   path: string;
   doc: (id: string) => Ref;
   limit: () => { query: string };
@@ -54,6 +55,7 @@ function fixture() {
     data: () => data.get(r.path),
   });
   const collection = (path: string): Collection => ({
+    query: path,
     path,
     doc: (id: string) => ref(path + '/' + id),
     limit: () => ({ query: path }),
@@ -92,6 +94,18 @@ function fixture() {
   } as unknown as Firestore;
   return { data, source, tx, repo: new FirestorePauseRepository(db) };
 }
+it('more than1000 malformed tombstones cannot starve or inflate implicit eligible limits', async () => {
+  const f = fixture();
+  for (let i = 0; i < 1001; i++)
+    f.data.set('users/a/records/deleted' + i, {
+      uid: 'a',
+      deletedAt: false,
+      startedAt: 'bad',
+    });
+  await expect(f.repo.registerPause(input, 'a', now)).resolves.toMatchObject({
+    sourceRecordId: 'source',
+  });
+});
 it('atomically preserves source evidence, resumes same context and retries exact intent', async () => {
   const f = fixture();
   const result = await f.repo.registerPause(input, 'a', now);

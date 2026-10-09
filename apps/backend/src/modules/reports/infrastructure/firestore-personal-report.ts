@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { canAccessProject } from '../../registration/domain/project-access.js';
 import { loadGlobalContext } from './firestore-global-context.js';
@@ -69,6 +70,7 @@ export class FirestorePersonalReportRepository implements PersonalReportReposito
       ),
     );
     const records = docs
+      .filter((doc) => !isDeletedRecord(doc.data()))
       .filter((doc) =>
         canAccessProject(catalog.get(doc.data().projectId as string), uid),
       )

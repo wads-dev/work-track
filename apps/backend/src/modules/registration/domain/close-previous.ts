@@ -1,3 +1,4 @@
+import { isDeletedRecord } from './record-lifecycle.js';
 export interface PreviousRecord {
   id: string;
   uid: string;
@@ -15,6 +16,7 @@ export function selectPrevious(
   const eligible = records
     .filter(
       (r) =>
+        !isDeletedRecord(r) &&
         r.uid === uid &&
         r.projectId === projectId &&
         r.endedAt === undefined &&

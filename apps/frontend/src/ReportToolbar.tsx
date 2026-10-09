@@ -1,6 +1,6 @@
+import { QueryToolbar } from './QueryToolbar';
 import {
   IconButton,
-  Stack,
   TextField,
   Tooltip,
   Typography,
@@ -35,22 +35,15 @@ export function ReportToolbar({
 }) {
   const { revealed } = usePrivacy();
   return (
-    <Stack
-      direction="row"
-      spacing={1}
-      useFlexGap
+    <QueryToolbar
+      label="Filtros do relatório"
       sx={{
         alignItems: 'center',
         flexWrap: 'wrap',
         p: { xs: 1.5, sm: 2 },
-        bgcolor: 'background.paper',
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: '12px',
         display: { xs: 'grid', sm: 'flex' },
         gridTemplateColumns: 'repeat(2,minmax(0,1fr))',
         '& > :first-child': { gridColumn: { xs: '1 / -1', sm: 'auto' } },
-        minWidth: 0,
       }}
     >
       <Box sx={{ mr: { sm: 2 }, minWidth: 130 }}>
@@ -124,6 +117,6 @@ export function ReportToolbar({
           <UiIcon kind="detail" />
         </IconButton>
       </Tooltip>
-    </Stack>
+    </QueryToolbar>
   );
 }

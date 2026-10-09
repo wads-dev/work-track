@@ -68,6 +68,21 @@ const source = (id: string, value: Record<string, unknown> = {}) => ({
   },
 });
 describe('read-only daily-hours own canonical repository', () => {
+  it('skips malformed tombstones before parsing and advances physical all-deleted pages', async () => {
+    const mock = setup([
+      Array.from({ length: 500 }, (_, i) =>
+        source('deleted' + i, {
+          deletedAt: false,
+          startedAt: null,
+          timeZone: null,
+        }),
+      ),
+      [source('active')],
+    ]);
+    const result = await mock.repository.loadOwnHistory('alice');
+    expect(result.records.map((r) => r.id)).toEqual(['active']);
+    expect(mock.reads).toBe(2);
+  });
   it('rejects empty/path UID and malformed project before any database read', async () => {
     const mock = setup([]);
     for (const uid of ['', 'alice/foreign', '.', '..', 'x'.repeat(129)])

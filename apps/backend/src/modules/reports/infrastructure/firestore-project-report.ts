@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { loadGlobalContext } from './firestore-global-context.js';
 import type { Auth } from 'firebase-admin/auth';
@@ -74,6 +75,7 @@ export class FirestoreProjectReportRepository implements ProjectReportRepository
     const snapshot = await query.limit(limit + 1).get();
     const docs = snapshot.docs.slice(0, limit);
     const records = docs
+      .filter((doc) => !isDeletedRecord(doc.data()))
       .filter((doc) => !personal || doc.ref.path.split('/')[1] === viewerUid)
       .map((doc) => {
         const value = recordSchema.parse(doc.data());

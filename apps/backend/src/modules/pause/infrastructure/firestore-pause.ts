@@ -1,3 +1,4 @@
+import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
 import { createHash } from 'node:crypto';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
@@ -87,8 +88,11 @@ export class FirestorePauseRepository implements PauseRepository {
       const speech = validateSpeech(input, now);
       let sourceRef = input.recordId ? records.doc(input.recordId) : undefined;
       if (!sourceRef) {
-        const scanned = await tx.get(records.limit(1001));
-        if (scanned.docs.length > 1000)
+        const scanned = await tx.get(records);
+        if (
+          scanned.docs.filter((doc) => !isDeletedRecord(doc.data())).length >
+          1000
+        )
           throw new PauseError(
             'resource-exhausted',
             'Contexto excede limite; informe recordId explícito.',
@@ -98,6 +102,7 @@ export class FirestorePauseRepository implements PauseRepository {
           const started =
             typeof r.startedAt === 'string' ? Date.parse(r.startedAt) : NaN;
           return (
+            !isDeletedRecord(r) &&
             r.uid === uid &&
             (r.endedAt === undefined || r.endedAt === null) &&
             Number.isFinite(started) &&
