@@ -5,8 +5,13 @@ import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import type { WorkTrackOAuth } from './oauth-provider.js';
 import { z } from 'zod';
+import type { WorkRepository } from './work-model.js';
+import { registerWorkTools } from './work-tools.js';
 
-export function createApp(provider: WorkTrackOAuth) {
+export function createApp(
+  provider: WorkTrackOAuth,
+  repository?: WorkRepository,
+) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -92,6 +97,9 @@ export function createApp(provider: WorkTrackOAuth) {
           content: [{ type: 'text', text: JSON.stringify(req.auth?.extra) }],
         }),
       );
+      const uid = req.auth?.extra?.uid;
+      if (repository && typeof uid === 'string')
+        registerWorkTools(server, repository, uid);
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });

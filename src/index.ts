@@ -7,6 +7,7 @@ import { createApp } from './app.js';
 import { WorkTrackOAuth } from './oauth-provider.js';
 import { FirebaseIdentityService } from './firebase-identity.js';
 import { FirestoreOAuthStore } from './firestore-oauth-store.js';
+import { FirestoreWorkRepository } from './firestore-work.js';
 
 initializeApp();
 const provider = new WorkTrackOAuth(
@@ -22,7 +23,7 @@ export const api = onRequest(
     timeoutSeconds: 60,
     memory: '256MiB',
   },
-  createApp(provider),
+  createApp(provider, new FirestoreWorkRepository(getFirestore())),
 );
 // Public diagnostic endpoint; never returns user data.
 export const health = onRequest(

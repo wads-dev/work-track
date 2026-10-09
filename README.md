@@ -1,6 +1,6 @@
 # Work Track
 
-Servidor MCP remoto em TypeScript para o projeto Firebase `wadsworktrack`. Esta etapa implementa autenticação; Search Projects e Register serão adicionados depois.
+Servidor MCP remoto em TypeScript para o projeto Firebase `wadsworktrack`. Implementa autenticação Google, projetos compartilhados, tópicos e registros pessoais de atividades.
 
 ## Conectar
 
@@ -25,7 +25,7 @@ Configuração de um cliente MCP baseado em stdio:
 
 O cliente descobre o OAuth, registra seu callback, abre o navegador e solicita login Google. Confira o nome do cliente e o endereço de retorno antes de autorizar. Somente usuários com e-mail verificado @wads.dev e login Google recebem acesso ao MCP.
 
-A ferramenta temporária `whoami` permite confirmar a identidade autenticada. Ela não registra trabalho. Nenhuma ferramenta de projetos ou registros está implementada nesta etapa.
+A ferramenta temporária `whoami` permite confirmar a identidade autenticada. Ela não registra trabalho. Estão disponíveis search_projects, create_project, create_topic e register. Projetos são compartilhados; registros ficam separados por usuário. Todo projeto nasce com tópico Geral. A busca V1 usa similaridade textual, não embeddings. O registro preserva texto, interpretação, início, fim opcional, momento da fala opcional e timestamp do servidor. Não divide tempo automaticamente nem encerra outros registros. requestId evita duplicações em retries.
 
 ## Arquitetura e segurança
 

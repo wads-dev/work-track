@@ -21,6 +21,14 @@ try {
   console.log('MCP_TOOLS', JSON.stringify(tools));
   const identity = await client.callTool({ name: 'whoami', arguments: {} });
   console.log('MCP_IDENTITY', JSON.stringify(identity));
+  if (tools.tools.some((tool) => tool.name === 'search_projects')) {
+    const projects = await client.callTool({
+      name: 'search_projects',
+      arguments: { query: '', limit: 20 },
+    });
+    if (projects.isError) throw new Error(JSON.stringify(projects));
+    console.log('MCP_PROJECT_SEARCH', JSON.stringify(projects));
+  }
 } finally {
   await client.close();
   await transport.close();
