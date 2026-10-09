@@ -1,6 +1,6 @@
 # Gerenciamento de projetos e modo live
 
-Metadados incluem título, descrição, categoria pessoal/trabalho, URL GitHub HTTPS validada e marca confidencial. Projetos antigos sem marca são ocultados na interface até classificação explícita: comportamento fail-closed.
+Metadados incluem título, descrição, categoria pessoal/trabalho, URL GitHub HTTPS validada e marca confidencial. Projetos conhecidos sem marca são públicos por padrão, compatível com documentos antigos. Enquanto metadados do projeto não carregaram, a interface oculta os textos até conhecê-los.
 
 Modo live inicia fechado em cada sessão. Abrir o olho só revela na memória; não modifica permissões ou impede acesso via SDK por usuário corporativo autorizado. Nomes, contextos, textos e histórico potencialmente sensível não devem ser renderizados quando ocultos.
 

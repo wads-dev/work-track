@@ -45,6 +45,7 @@ import { PrivacyContext } from './privacy';
 import { PendingBell, PendingPage } from './PendingPage';
 import { RulesPage } from './RulesPage';
 import { UiIcon } from './UiIcons';
+import { PersonalPage } from './PersonalPage';
 
 function allowed(user: User) {
   return (
@@ -275,6 +276,7 @@ function App() {
                     ['/records', 'Meus registros'],
                     ['/pending', 'Pendências'],
                     ['/rules', 'Regras do relatório'],
+                    ['/calendar', 'Calendário'],
                   ].map(([to, label]) => (
                     <ListItemButton
                       key={to}
@@ -338,12 +340,21 @@ function App() {
                 <Route
                   path="/app"
                   element={
-                    <Dashboard
+                    <PersonalPage
                       key={user.uid}
                       db={services.db}
                       functions={services.functions}
-                      uid={user.uid}
-                      mode="overview"
+                    />
+                  }
+                />
+                <Route
+                  path="/calendar"
+                  element={
+                    <PersonalPage
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      calendar
                     />
                   }
                 />

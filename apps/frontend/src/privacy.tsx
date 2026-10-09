@@ -5,13 +5,13 @@ export function isHidden(
   project: Record<string, unknown> | undefined,
   revealed: boolean,
 ) {
-  return !revealed && (!project || project.confidential === true);
+  return !project || (!revealed && project.confidential === true);
 }
 export function safeProject(
   project: Record<string, unknown> | undefined,
   revealed: boolean,
 ): Record<string, unknown> {
-  if (!isHidden(project, revealed)) return project!;
+  if (project && !isHidden(project, revealed)) return project;
   return {
     id: project?.id,
     title: 'Projeto reservado',

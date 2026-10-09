@@ -39,7 +39,7 @@
     "@modelcontextprotocol/sdk": "^1.32.1"
   },
   "lint-staged": {
-    "*.{ts,js,mjs}": [
+    "*.{ts,tsx,js,jsx,mjs}": [
       "eslint --fix",
       "prettier --write"
     ],

@@ -45,6 +45,18 @@ export function RulesPage() {
         A política atual considera próximo início no mesmo projeto, não entre
         projetos diferentes. Não há conciliação automática cross-project.
       </Alert>
+      <Typography component="h3" variant="h6" sx={{ mt: 3 }}>
+        Política pessoal personal-v1
+      </Typography>
+      <Typography>
+        Dashboard e calendário pessoais consideram próximo início da mesma
+        pessoa entre projetos na página carregada. O orçamento diário usa o fuso
+        solicitado no filtro; abertos limitam-se também à meia-noite do registro
+        e à meia-noite nesse fuso. Intervalos são recortados visualmente ao
+        período solicitado, sem alterar fatos. Totais de páginas substituem
+        dados, não representam todo o histórico; podem somar atividades
+        simultâneas.
+      </Typography>
     </Paper>
   );
 }

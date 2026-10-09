@@ -154,7 +154,7 @@ export function PendingPage({ db, uid }: { db: Firestore; uid: string }) {
                     return (
                       <TableRow key={row.id}>
                         <TableCell>
-                          {text(safeProject(project, revealed).title)}
+                          {text(safeProject(project, revealed)?.title)}
                         </TableCell>
                         <TableCell>
                           {date(row.data.startedAt, row.data.timeZone)}
