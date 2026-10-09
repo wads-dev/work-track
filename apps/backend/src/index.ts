@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { updateRecordHandler } from './modules/registration/presentation/update-record.js';
+import { FirestoreRecordEditingRepository } from './modules/registration/infrastructure/firestore-record-editing.js';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
@@ -12,6 +14,21 @@ import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
+export const updateRecord = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    updateRecordHandler(
+      new FirestoreRecordEditingRepository(getFirestore()),
+      request.data as unknown,
+      request.auth,
+    ),
+);
 export const getProjectReport = onCall(
   {
     region: 'southamerica-east1',
@@ -50,7 +67,11 @@ export const api = onRequest(
     timeoutSeconds: 60,
     memory: '256MiB',
   },
-  createApp(provider, new FirestoreWorkRepository(getFirestore())),
+  createApp(
+    provider,
+    new FirestoreWorkRepository(getFirestore()),
+    new FirestoreRecordEditingRepository(getFirestore()),
+  ),
 );
 // Public diagnostic endpoint; never returns user data.
 export const health = onRequest(

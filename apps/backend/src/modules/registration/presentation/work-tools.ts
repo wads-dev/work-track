@@ -1,5 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import {
+  updateRecordInput,
+  type RecordEditingRepository,
+} from '../domain/record-edit.js';
 import type { WorkRepository } from '../domain/work-model.js';
 import {
   projectInput,
@@ -11,6 +15,7 @@ export function registerWorkTools(
   server: McpServer,
   repository: WorkRepository,
   uid: string,
+  editing?: RecordEditingRepository,
 ) {
   const service = new RegistrationService(repository);
   const output = (data: unknown) => ({
@@ -28,6 +33,17 @@ export function registerWorkTools(
       };
     }
   };
+  if (editing) {
+    server.registerTool(
+      'update_record',
+      {
+        description:
+          'Edite registro próprio com ID explícito e motivo. endedAt null reabre explicitamente; não infira horário.',
+        inputSchema: updateRecordInput,
+      },
+      (input) => run(() => editing.updateRecord(input, uid)),
+    );
+  }
   server.registerTool(
     'search_projects',
     {
@@ -66,6 +82,44 @@ export function registerWorkTools(
         'Registre atividade do usuário autenticado: projeto e início obrigatórios; fim opcional, nunca invente. Resolva tempos relativos ao momento da fala, não ao recebimento de transcrição. Preserve texto e interpretação. Aceita vários tópicos existentes e percentuais/durações somente informados; não reparte automaticamente. Sem tópicos usa Geral. Preserve interrupções e sobreposições; não encerra registros anteriores. Vários projetos: uma chamada por projeto. Reutilize requestId nos retries.',
       inputSchema: registerInput,
     },
-    (input) => run(() => service.register(input, uid)),
+    (input) =>
+      run(async () => {
+        const saved = await service.register(input, uid);
+        if (!editing) return saved;
+        try {
+          const open = await editing.listOpenRecords(uid, 10);
+          const previous = open.records.filter(
+            (record) => record.id !== saved.id,
+          );
+          return {
+            ...saved,
+            openRecords: previous,
+            openRecordsPartial: open.partial,
+            warnings: previous.length
+              ? [
+                  'Há registros ainda abertos. Confirme troca de atividade ou simultaneidade; nada foi encerrado automaticamente.',
+                  ...(open.partial
+                    ? [
+                        'Lista de abertos parcial: até 10 itens de uma leitura limitada a 500 registros.',
+                      ]
+                    : []),
+                ]
+              : open.partial
+                ? [
+                    'Lista de abertos parcial; não é possível afirmar que todos foram conciliados.',
+                  ]
+                : [],
+          };
+        } catch {
+          return {
+            ...saved,
+            warnings: [
+              'Registro salvo, mas não foi possível consultar atividades abertas. Nenhuma atividade foi encerrada.',
+            ],
+            openRecords: [],
+            openRecordsPartial: true,
+          };
+        }
+      }),
   );
 }

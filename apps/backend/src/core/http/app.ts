@@ -1,4 +1,5 @@
 import express from 'express';
+import type { RecordEditingRepository } from '../../modules/registration/domain/record-edit.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
@@ -11,6 +12,7 @@ import { registerWorkTools } from '../../modules/registration/presentation/work-
 export function createApp(
   provider: WorkTrackOAuth,
   repository?: WorkRepository,
+  editingRepository?: RecordEditingRepository,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -99,7 +101,7 @@ export function createApp(
       );
       const uid = req.auth?.extra?.uid;
       if (repository && typeof uid === 'string')
-        registerWorkTools(server, repository, uid);
+        registerWorkTools(server, repository, uid, editingRepository);
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });

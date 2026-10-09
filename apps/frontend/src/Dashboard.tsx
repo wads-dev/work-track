@@ -20,6 +20,7 @@ import {
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
 import { ProjectReport } from './ProjectReport';
+import { RecordDrawer } from './RecordDrawer';
 import { date, object, objects, text, useRows } from './data';
 import {
   Link as RouterLink,
@@ -157,9 +158,6 @@ export function Dashboard({
   const [params, setParams] = useSearchParams();
   const filter = params.get('q') ?? '';
   const projectFilter = params.get('project') ?? '';
-  const selected = projectId ? projects : records;
-  const selectedId = projectId ?? recordId;
-  const row = selected.rows.find((item) => item.id === selectedId);
   function updateFilter(key: string, value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -198,96 +196,6 @@ export function Dashboard({
         />
       </Box>
     );
-  if (selectedId)
-    return (
-      <Box component="section" aria-label="Detalhes">
-        <Button
-          component={RouterLink}
-          to={(projectId ? '/projects' : '/records') + location.search}
-          sx={{ mb: 2 }}
-        >
-          Voltar à lista
-        </Button>
-        <Typography component="h2" variant="h5" sx={{ mb: 2 }}>
-          {projectId ? 'Projeto' : 'Meu registro'} · {selectedId}
-        </Typography>
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Compartilhar esta URL não concede acesso. Registros são acessíveis
-          somente ao seu dono.
-        </Alert>
-        {selected.loading ? (
-          <CircularProgress aria-label="Carregando detalhes" />
-        ) : selected.error ? (
-          <Alert
-            severity="error"
-            action={<Button onClick={selected.retry}>Tentar novamente</Button>}
-          >
-            {selected.error}
-          </Alert>
-        ) : !row ? (
-          <Alert severity="info">
-            Item não disponível entre os até 100 documentos carregados. Ele pode
-            estar fora do limite, não existir ou não pertencer à sua conta.
-            Nenhum dado foi inferido.
-          </Alert>
-        ) : (
-          <Paper sx={{ p: 3, overflowWrap: 'anywhere' }}>
-            <Box
-              component="dl"
-              sx={{
-                m: 0,
-                '& dt': { fontWeight: 700, mt: 2 },
-                '& dd': { m: 0, whiteSpace: 'pre-wrap' },
-              }}
-            >
-              {projectId ? (
-                <>
-                  <dt>Título</dt>
-                  <dd>{text(row.data.title)}</dd>
-                  <dt>Descrição</dt>
-                  <dd>{text(row.data.description)}</dd>
-                  <dt>Tópicos</dt>
-                  <dd>
-                    {objects(row.data.topics)
-                      .map(
-                        (topic) =>
-                          text(topic.title) + ' — ' + text(topic.description),
-                      )
-                      .join('\n') || 'Não informado'}
-                  </dd>
-                  <dt>Criado em</dt>
-                  <dd>{date(row.data.createdAt)}</dd>
-                </>
-              ) : (
-                <>
-                  <dt>Projeto</dt>
-                  <dd>
-                    {text(
-                      object(row.data.projectSnapshot).title,
-                      text(row.data.projectId),
-                    )}
-                  </dd>
-                  <dt>Tópicos</dt>
-                  <dd>{topicLabels(row.data)}</dd>
-                  <dt>Início</dt>
-                  <dd>{date(row.data.startedAt, row.data.timeZone)}</dd>
-                  <dt>Fim</dt>
-                  <dd>{date(row.data.endedAt, row.data.timeZone)}</dd>
-                  <dt>Fuso da atividade</dt>
-                  <dd>{text(row.data.timeZone)}</dd>
-                  <dt>Texto original</dt>
-                  <dd>{text(row.data.originalText)}</dd>
-                  <dt>Contexto</dt>
-                  <dd>{text(row.data.interpretation)}</dd>
-                  <dt>Gravado em (fuso do navegador)</dt>
-                  <dd>{date(row.data.recordedAt)}</dd>
-                </>
-              )}
-            </Box>
-          </Paper>
-        )}
-      </Box>
-    );
   const filteredProjects = {
     ...projects,
     rows: projects.rows.filter((row) =>
@@ -321,6 +229,43 @@ export function Dashboard({
   };
   return (
     <>
+      {recordId && (
+        <RecordDrawer
+          key={recordId}
+          db={db}
+          functions={functions}
+          uid={uid}
+          recordId={recordId}
+          search={location.search}
+        />
+      )}
+      {mode !== 'projects' && records.rows.some((row) => !row.data.endedAt) && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Há registros abertos entre os itens carregados. Confira detalhes antes
+          de encerrar; nada será encerrado automaticamente.
+          <Box component="ul">
+            {records.rows
+              .filter((row) => !row.data.endedAt)
+              .slice(0, 5)
+              .map((row) => (
+                <li key={row.id}>
+                  <Link
+                    component={RouterLink}
+                    to={detailPath('records', row.id, location.search)}
+                  >
+                    {text(
+                      object(row.data.projectSnapshot).title,
+                      text(row.data.projectId),
+                    )}{' '}
+                    · {date(row.data.startedAt, row.data.timeZone)}
+                  </Link>
+                </li>
+              ))}
+          </Box>
+          Até 5 abertos exibidos desta lista limitada; não é uma contagem
+          global.
+        </Alert>
+      )}
       <Alert severity="info" sx={{ mb: 3 }}>
         Consulta somente leitura. Apenas seus próprios registros são exibidos.
         Filtros atuam sobre até 100 itens carregados por lista, não sobre todo o

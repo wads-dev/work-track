@@ -20,6 +20,7 @@ import {
   Toolbar,
   Typography,
   createTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   GoogleAuthProvider,
@@ -41,14 +42,6 @@ import {
 } from 'react-router-dom';
 import { safeReturnTo } from './routes';
 
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: '#2457a7' },
-    background: { default: '#f3f6fa' },
-  },
-  shape: { borderRadius: 12 },
-});
 function allowed(user: User) {
   return (
     user.emailVerified &&
@@ -70,6 +63,59 @@ function errorMessage(error: unknown): string {
     : 'Não foi possível concluir a operação. Tente novamente.';
 }
 function App() {
+  const systemDark = useMediaQuery('(prefers-color-scheme: dark)');
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const [themeOverride, setThemeOverride] = useState<'light' | 'dark' | null>(
+    null,
+  );
+  const mode = themeOverride ?? (systemDark ? 'dark' : 'light');
+  const theme = createTheme({
+    palette: {
+      mode,
+      primary: { main: mode === 'dark' ? '#adc6ff' : '#2457a7' },
+      background: {
+        default: mode === 'dark' ? '#11151d' : '#f3f6fa',
+        paper: mode === 'dark' ? '#1b2230' : '#ffffff',
+      },
+    },
+    shape: { borderRadius: 18 },
+    transitions: {
+      duration: reducedMotion
+        ? {
+            shortest: 0,
+            shorter: 0,
+            short: 0,
+            standard: 0,
+            complex: 0,
+            enteringScreen: 0,
+            leavingScreen: 0,
+          }
+        : {},
+    },
+    components: {
+      MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
+      MuiAppBar: {
+        styleOverrides: {
+          root: {
+            background:
+              mode === 'dark' ? 'rgba(27,34,48,.9)' : 'rgba(255,255,255,.9)',
+            color: mode === 'dark' ? '#e2e8f0' : '#172338',
+            backdropFilter: 'blur(12px)',
+            borderBottom:
+              '1px solid ' + (mode === 'dark' ? '#354055' : '#dce3ef'),
+          },
+        },
+      },
+    },
+  });
+  const toggleTheme = (
+    <IconButton
+      aria-label={mode === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+      onClick={() => setThemeOverride(mode === 'dark' ? 'light' : 'dark')}
+    >
+      <span aria-hidden="true">{mode === 'dark' ? '☀' : '☾'}</span>
+    </IconButton>
+  );
   const location = useLocation();
   const returnTo = safeReturnTo(
     new URLSearchParams(location.search).get('returnTo'),
@@ -177,6 +223,7 @@ function App() {
               >
                 <span aria-hidden="true">☰</span>
               </IconButton>
+              {toggleTheme}
               <Typography sx={{ flexGrow: 1, fontWeight: 700 }}>
                 Work Track
               </Typography>
@@ -203,6 +250,9 @@ function App() {
                 Work Track
               </Typography>
               <Button onClick={() => setMenuOpen(false)}>Fechar menu</Button>
+              <Button onClick={() => setThemeOverride(null)}>
+                Tema do sistema
+              </Button>
               <List>
                 {[
                   ['/app', 'Visão geral'],
@@ -356,6 +406,12 @@ function App() {
         >
           <Card sx={{ width: '100%', maxWidth: 440 }}>
             <CardContent sx={{ p: 4 }}>
+              <Stack direction="row" sx={{ justifyContent: 'end' }}>
+                {toggleTheme}
+                <Button onClick={() => setThemeOverride(null)}>
+                  Tema do sistema
+                </Button>
+              </Stack>
               <Stack spacing={3}>
                 <Typography
                   component="h1"

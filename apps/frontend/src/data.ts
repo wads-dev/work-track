@@ -38,7 +38,7 @@ export function date(value: unknown, zone?: unknown): string {
     return 'Data ou fuso inválido';
   }
 }
-export function useRows(db: Firestore, path: string) {
+export function useRows(db: Firestore, path: string, maxRows = 100) {
   const [state, setState] = useState<{
     rows: Row[];
     loading: boolean;
@@ -48,7 +48,7 @@ export function useRows(db: Firestore, path: string) {
   useEffect(() => {
     setState({ rows: [], loading: true, error: '' });
     return onSnapshot(
-      query(collection(db, path), limit(100)),
+      query(collection(db, path), limit(maxRows)),
       (snapshot) => {
         setState({
           rows: snapshot.docs.map((doc) => ({
@@ -68,6 +68,6 @@ export function useRows(db: Firestore, path: string) {
         });
       },
     );
-  }, [db, path, attempt]);
+  }, [db, path, attempt, maxRows]);
   return { ...state, retry: () => setAttempt((value) => value + 1) };
 }
