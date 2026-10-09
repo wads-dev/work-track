@@ -309,10 +309,17 @@ export function ProjectReport({
         <Alert severity="info">Nenhum registro disponível nesta página.</Alert>
       ) : (
         <>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={2}
-            sx={{ my: 3 }}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                md: 'repeat(2, minmax(0, 1fr))',
+              },
+              gap: 2,
+              my: 3,
+              '& > *': { minWidth: 0 },
+            }}
           >
             <Pie title="Tempo por pessoa" buckets={report.byUser} />
             <TopicReport
@@ -332,7 +339,7 @@ export function ProjectReport({
                 })),
               }))}
             />
-          </Stack>
+          </Box>
           <Stack spacing={1} sx={{ display: { xs: 'flex', sm: 'none' } }}>
             {report.records.map((record) => (
               <Paper key={record.id + record.uid} sx={{ p: 2 }}>
