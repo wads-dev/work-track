@@ -22,4 +22,4 @@ A auditoria desta ferramenta fica em `users/{uid}/pauseAudits/{id}` para o backe
 
 ## Validação e publicação
 
-12 testes cobrindo contrato, transação simulada, idempotência, ACL, metadados malformados e catálogo MCP autenticado; lint, typecheck e diff check passaram. Ainda sem prova runtime Firestore da nova pausa. Implementação em commit separado; NÃO integra a release pendente congelada `708fbba`, e NÃO foi publicada em produção.
+12 testes cobrindo contrato, transação simulada, idempotência, ACL, metadados malformados e catálogo MCP autenticado; lint, typecheck e diff check passaram. A [prova SDK no emulator](security/pause-emulator-proof.md) validou fechamento às 11h, retomada às 12h, contexto preservado, auditoria, repetição exata e rejeição de origem antiga, com limpeza dos cinco documentos temporários. Isso não prova OAuth ou execução de produção. Implementação em commit separado; NÃO integra a release pendente `4d42a63` e NÃO foi publicada em produção.
