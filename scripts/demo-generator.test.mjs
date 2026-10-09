@@ -1,6 +1,53 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import viteDevConfig, { demoConfig } from '../docker/firebase/vite.config.mjs';
+test('Vite demo bootstrap is dev-only and only intercepts exact init endpoint', () => {
+  assert.equal(viteDevConfig.server.port, 5173);
+  assert.equal(viteDevConfig.server.strictPort, true);
+  assert.equal(viteDevConfig.server.watch.usePolling, true);
+  const plugin = viteDevConfig.plugins[0];
+  assert.equal(plugin.apply, 'serve');
+  let middleware;
+  plugin.configureServer({
+    middlewares: {
+      use(fn) {
+        middleware = fn;
+      },
+    },
+  });
+  let next = 0,
+    body;
+  const headers = {};
+  const response = {
+    setHeader(k, v) {
+      headers[k] = v;
+    },
+    end(v) {
+      body = v;
+    },
+  };
+  middleware({ url: '/__/firebase/init.json?local=1' }, response, () => next++);
+  assert.equal(next, 0);
+  assert.equal(headers['Content-Type'], 'application/json');
+  assert.deepEqual(JSON.parse(body), demoConfig);
+  assert.equal(demoConfig.projectId, 'demo-work-track');
+  for (const url of [
+    '/__/auth/handler',
+    '/__/firebase/init.json/extra',
+    '/other',
+  ])
+    middleware({ url }, response, () => next++);
+  assert.equal(next, 3);
+  const config = JSON.parse(readFileSync('firebase.emulators.json', 'utf8'));
+  assert(!config.hosting);
+  assert(!config.emulators.hosting);
+  const startup = readFileSync('docker/firebase/start-emulators.sh', 'utf8');
+  assert(startup.includes('npm run build --workspace @work-track/backend'));
+  assert(startup.includes('--only auth,firestore,functions'));
+  assert(!startup.includes('functions,hosting'));
+});
 const run = (args = [], env = {}) =>
   spawnSync(process.execPath, ['scripts/design-demo.mjs', ...args], {
     encoding: 'utf8',

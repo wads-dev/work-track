@@ -1,4 +1,23 @@
 services:
+  frontend:
+    image: node:22
+    working_dir: /workspace
+    init: true
+    command: >-
+      sh -c "npm ci --ignore-scripts --no-audit --no-fund &&
+      npm run dev --workspace @work-track/frontend --
+      --config /workspace/docker/firebase/vite.config.mjs"
+    environment:
+      npm_config_cache: /cache/npm
+    ports:
+      - '127.0.0.1:5173:5173' # Vite frontend + HMR
+    volumes:
+      - .:/workspace
+      - vite_root_dependencies:/workspace/node_modules
+      - vite_backend_dependencies:/workspace/apps/backend/node_modules
+      - vite_frontend_dependencies:/workspace/apps/frontend/node_modules
+      - vite_npm_cache:/cache/npm
+
   firebase:
     build:
       context: ./docker/firebase
@@ -16,7 +35,6 @@ services:
       - '127.0.0.1:9099:9099' # Auth
       - '127.0.0.1:8081:8081' # Firestore
       - '127.0.0.1:5001:5001' # Functions
-      - '127.0.0.1:5000:5000' # Hosting
       - '127.0.0.1:${FIREBASE_UI_PORT:-4001}:4000' # Emulator UI (host configurable)
     volumes:
       - ./package.json:/input/package.json:ro
@@ -26,10 +44,6 @@ services:
       - ./apps/backend/tsconfig.build.json:/input/apps/backend/tsconfig.build.json:ro
       - ./apps/backend/src:/input/apps/backend/src:ro
       - ./apps/frontend/package.json:/input/apps/frontend/package.json:ro
-      - ./apps/frontend/tsconfig.json:/input/apps/frontend/tsconfig.json:ro
-      - ./apps/frontend/index.html:/input/apps/frontend/index.html:ro
-      - ./apps/frontend/src:/input/apps/frontend/src:ro
-      - ./apps/frontend/public:/input/apps/frontend/public:ro
       - ./firebase.emulators.json:/input/firebase.emulators.json:ro
       - ./firestore.rules:/input/firestore.rules:ro
       - ./firestore.indexes.json:/input/firestore.indexes.json:ro
@@ -37,7 +51,6 @@ services:
       - ./docker/firebase/demo-data:/input/docker/firebase/demo-data:ro
       - root_dependencies:/workspace/node_modules
       - backend_dependencies:/workspace/apps/backend/node_modules
-      - frontend_dependencies:/workspace/apps/frontend/node_modules
       - firebase_cache:/cache
       - emulator_data:/data
     stop_grace_period: 60s
@@ -45,6 +58,9 @@ services:
 volumes:
   root_dependencies:
   backend_dependencies:
-  frontend_dependencies:
+  vite_root_dependencies:
+  vite_backend_dependencies:
+  vite_frontend_dependencies:
+  vite_npm_cache:
   firebase_cache:
   emulator_data:
