@@ -114,7 +114,15 @@ export function createOwnRecordsRepository() {
         entry.start();
       }
       entry.listeners.add(notify);
-      return () => entry.listeners.delete(notify);
+      return () => {
+        entry.listeners.delete(notify);
+        if (entry.listeners.size === 0) {
+          entry.stop();
+          entry.state = emptyRecords;
+          active.delete(entry);
+          map.delete(uid);
+        }
+      };
     },
     snapshot(owner: object, uid: string) {
       return uid === account

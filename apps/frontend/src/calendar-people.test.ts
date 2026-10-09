@@ -144,9 +144,10 @@ describe('calendar people default and safe scope', () => {
       'utf8',
     );
     expect(source).toContain("'getCalendarReport'");
-    expect(source).toContain(
-      "company ? 'getCompanyReport' : 'getPersonalReport'",
-    );
+    expect(source).toContain("'getCompanyReport'");
+    expect(source).not.toContain("'getPersonalReport'");
+    expect(source).toContain('executePersonalReport(');
+    expect(source).toContain('subscribePersonalReport(');
     expect(source).toContain('uid={uid}');
     expect(source).not.toContain('projectId: projectId || undefined');
     expect(source).toContain(

@@ -25,6 +25,7 @@ import {
   collection,
   documentId,
   getDocs,
+  onSnapshot,
   limit,
   orderBy,
   query,
@@ -33,16 +34,47 @@ import {
 } from 'firebase/firestore';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { date, text, type Row } from './data';
-import { useOwnRecords } from './useOwnRecords';
 import { isHidden, safeProject, usePrivacy } from './privacy';
 import { RecordDrawer } from './RecordDrawer';
 import { contextualRecordPath } from './routes';
 import type { Functions } from 'firebase/functions';
 import { UiIcon } from './UiIcons';
 export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
-  const state = useOwnRecords(db, uid);
+  // This header is mounted on every route. Its deliberately partial counter
+  // must not connect the entire history repository just to use its first 100.
+  const [snapshot, setSnapshot] = useState<{ uid: string; rows: Row[] }>({
+    uid: '',
+    rows: [],
+  });
+  useEffect(() => {
+    let active = true;
+    const stop = onSnapshot(
+      query(
+        collection(db, 'users', uid, 'records'),
+        orderBy(documentId()),
+        limit(100),
+      ),
+      { includeMetadataChanges: true },
+      (s) => {
+        if (active)
+          setSnapshot({
+            uid,
+            rows: s.docs
+              .map((d) => ({ id: d.id, data: d.data() }))
+              .filter((r) => !isDeletedRecord(r.data)),
+          });
+      },
+      () => {
+        if (active) setSnapshot({ uid, rows: [] });
+      },
+    );
+    return () => {
+      active = false;
+      stop();
+    };
+  }, [db, uid]);
   const now = useClock();
-  const count = state.rows
+  const count = (snapshot.uid === uid ? snapshot.rows : [])
     .slice(0, 100)
     .filter((row) => isAlertOpen(row.data, now)).length;
   return (

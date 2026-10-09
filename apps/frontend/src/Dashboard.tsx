@@ -395,6 +395,10 @@ export function Dashboard({
               }
               projectId={projectId}
               functions={functions}
+              db={db}
+              personal={
+                rawProjectsById.get(projectId)?.data.type === 'personal'
+              }
               hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
               search={location.search}
               uid={uid}

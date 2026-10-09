@@ -22,6 +22,10 @@ import { useEffect, useState } from 'react';
 import { useDeletionRevision, deletionRevision } from './record-deletion';
 
 import { httpsCallable, type Functions } from 'firebase/functions';
+import type { Firestore } from 'firebase/firestore';
+import { subscribePersonalReport } from './personal-report-source';
+import { personalProjectReportRepository } from './personal-project-report-repository';
+import { getProjectReport } from '../../backend/src/modules/reports/application/get-project-report';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { reportError } from './report-error';
 import { TopicReport } from './TopicReport';
@@ -59,6 +63,8 @@ export type Report = {
 
 export function ProjectReport({
   functions,
+  db,
+  personal = false,
   hidden,
   projectLabel = 'Projeto',
   projectId,
@@ -66,6 +72,8 @@ export function ProjectReport({
   uid,
 }: {
   functions: Functions;
+  db: Firestore;
+  personal?: boolean;
   hidden: boolean;
   projectLabel?: string;
   projectId: string;
@@ -89,11 +97,66 @@ export function ProjectReport({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [provisional, setProvisional] = useState(false);
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
     setReport(null);
+    if (personal) {
+      let generation = 0;
+      const stop = subscribePersonalReport(
+        db,
+        uid,
+        (snapshot) => {
+          const current = ++generation;
+          setReport(null);
+          setLoading(true);
+          void getProjectReport(
+            personalProjectReportRepository(snapshot.repository, uid),
+            { projectId, limit: 200, includeArchived },
+            Date.now(),
+            uid,
+          )
+            .then((result) => {
+              if (
+                !active ||
+                current !== generation ||
+                deletionRevision(uid) !== revision ||
+                projectAccessRevision() !== accessRevision
+              )
+                return;
+              setReportAccessRevision(accessRevision);
+              setReportOwner(uid);
+              setReportRevision(revision);
+              setReport(result);
+              setProvisional(snapshot.fromCache || snapshot.hasPendingWrites);
+              setError('');
+              setLoading(false);
+            })
+            .catch((failure) => {
+              if (!active || current !== generation) return;
+              setReport(null);
+              setError(reportError(failure));
+              setLoading(false);
+            });
+        },
+        (failure) => {
+          if (!active) return;
+          generation++;
+          setReport(null);
+          setError(reportError(failure));
+          setLoading(false);
+        },
+        [projectId],
+      );
+      return () => {
+        active = false;
+        generation++;
+        stop();
+      };
+    }
+    setProvisional(false);
     const callable = httpsCallable<
       {
         projectId: string;
@@ -136,6 +199,8 @@ export function ProjectReport({
       active = false;
     };
   }, [
+    db,
+    personal,
     functions,
     projectId,
     attempt,
@@ -193,6 +258,14 @@ export function ProjectReport({
     );
   return (
     <section aria-label="Relatório do projeto" className={cn('mt-6')}>
+      {provisional && (
+        <Alert role="status">
+          <AlertDescription>
+            Dados locais provisórios; sincronizando com o Firestore. Os totais
+            podem mudar após confirmação do servidor.
+          </AlertDescription>
+        </Alert>
+      )}
       <Button
         onClick={() => {
           const next = new URLSearchParams(params);

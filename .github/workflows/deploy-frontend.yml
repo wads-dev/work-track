@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'apps/frontend/**'
+      - 'apps/backend/src/modules/reports/**'
+      - 'firestore.indexes.json'
+      - 'scripts/wait-firestore-indexes*.mjs'
       - 'package.json'
       - 'package-lock.json'
       - 'firebase.json'
@@ -25,9 +28,14 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run lint && npm run build --workspace @work-track/frontend
+      - run: npm run check
+      - run: node --test scripts/wait-firestore-indexes.test.mjs
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
           service_account: github-deploy@wadsworktrack.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Wait for required Firestore indexes before publishing Hosting
+        timeout-minutes: 22
+        run: node scripts/wait-firestore-indexes.mjs wadsworktrack
       - run: npx -y firebase-tools@latest deploy --only hosting --project wadsworktrack --non-interactive

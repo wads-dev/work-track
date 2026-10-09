@@ -2,10 +2,9 @@ import { HttpsError } from 'firebase-functions/v2/https';
 
 import { ReportContextError } from '../domain/global-estimates.js';
 import { z } from 'zod';
-import { buildTopicBreakdown } from '../domain/topic-breakdown.js';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
 import type { PersonalReportRepository } from '../domain/personal-report.js';
-import { buildPersonalReport } from '../domain/build-personal-report.js';
+import { executePersonalReport } from '../application/get-personal-report.js';
 const schema = z
   .object({
     from: z.iso.datetime({ offset: true }).optional(),
@@ -59,62 +58,7 @@ export async function getPersonalReportHandler(
       'Período, fuso, limite ou cursor inválido.',
     );
   try {
-    const context = await repository.loadContext([auth!.uid]);
-    const selected = context.filter(
-      (r) => !input.data.projectId || r.projectId === input.data.projectId,
-    );
-    const page = {
-      records: selected,
-      scannedCount: context.length,
-      nextCursor: null,
-    };
-    const report = buildPersonalReport(
-      { ...input.data, cursor: undefined },
-      page,
-      asOf,
-      context,
-    );
-    report.scope = 'all-selected';
-    report.page.partial = false;
-    report.page.limit = 2000;
-    if (!input.data.includeArchived) {
-      const archived = new Set(
-        await repository.archivedProjectIds([
-          ...new Set(page.records.map((r) => r.projectId)),
-        ]),
-      );
-      const removed = report.intervals.filter((r) => archived.has(r.projectId));
-      report.intervals = report.intervals.filter(
-        (r) => !archived.has(r.projectId),
-      );
-      report.byProject = report.byProject.filter(
-        (r) => !archived.has(r.projectId),
-      );
-      report.totalMinutes = report.intervals.reduce(
-        (sum, r) => sum + r.minutes,
-        0,
-      );
-      report.estimatedCount = report.intervals.filter(
-        (r) => r.estimated,
-      ).length;
-      report.page.excludedCount += removed.length;
-      report.warnings.push(
-        'Seleção ativa exclui projetos arquivados ou ausentes da visualização; orçamento global continua incluindo todos os fatos.',
-      );
-    }
-    const topics = await repository.readTopics(
-      [...new Set(report.intervals.map((r) => r.projectId))],
-      auth!.uid,
-    );
-    const breakdown = buildTopicBreakdown(
-      page.records,
-      report.intervals.map((r) => ({ ...r, uid: auth!.uid })),
-      new Map(Object.entries(topics).map(([id, topics]) => [id, { topics }])),
-    );
-    report.byTopic = breakdown.byTopic;
-    report.unassignedMinutes = breakdown.unassignedMinutes;
-    report.warnings = [...new Set([...report.warnings, ...breakdown.warnings])];
-    return report;
+    return await executePersonalReport(repository, input.data, auth!.uid, asOf);
   } catch (error) {
     if (error instanceof ReportContextError)
       throw new HttpsError('resource-exhausted', error.message);

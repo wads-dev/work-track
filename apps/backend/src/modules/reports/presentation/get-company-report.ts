@@ -1,10 +1,8 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import { completeSelection } from '../application/complete-selection.js';
+import { executeCompanyReport } from '../application/get-company-report.js';
 import { z } from 'zod';
-import { buildTopicBreakdown } from '../domain/topic-breakdown.js';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
 import { ReportContextError } from '../domain/global-estimates.js';
-import { buildCompanyReport } from '../domain/build-company-report.js';
 import type { CompanyReportRepository } from '../domain/company-report.js';
 const schema = z
   .object({
@@ -62,51 +60,7 @@ export async function getCompanyReportHandler(
       'Período, fuso, limite ou cursor inválido.',
     );
   try {
-    const page = await completeSelection((cursor) =>
-        repository.readPage(100, cursor, input.data.projectId),
-      ),
-      uids = [...new Set(page.records.map((r) => r.uid))];
-    if (uids.length > 10)
-      throw new ReportContextError(
-        'Página contém mais de10 pessoas; reduza limit para consultar contexto global completo.',
-      );
-    const context = await repository.loadContext(uids),
-      archived = input.data.includeArchived
-        ? []
-        : await repository.archivedProjectIds([
-            ...new Set(page.records.map((r) => r.projectId)),
-          ]),
-      labels = await repository.userLabels(uids);
-    const report = buildCompanyReport(
-      { ...input.data, cursor: undefined },
-      page,
-      context,
-      asOf,
-      labels,
-      archived,
-    );
-    report.scope = 'all-selected';
-    report.page.partial = false;
-    report.page.limit = 2000;
-    report.warnings = report.warnings.filter(
-      (w) => !w.includes('página selecionada'),
-    );
-    report.warnings.push(
-      'Totais completos da seleção dentro dos limites operacionais; nenhum subtotal de primeira página.',
-    );
-    const topics = await repository.readTopics([
-      ...new Set(report.intervals.map((r) => r.projectId)),
-    ]);
-    const breakdown = buildTopicBreakdown(
-      page.records,
-      report.intervals,
-      new Map(Object.entries(topics).map(([id, topics]) => [id, { topics }])),
-      labels,
-    );
-    report.byTopic = breakdown.byTopic;
-    report.unassignedMinutes = breakdown.unassignedMinutes;
-    report.warnings = [...new Set([...report.warnings, ...breakdown.warnings])];
-    return report;
+    return await executeCompanyReport(repository, input.data, asOf);
   } catch (error) {
     if (error instanceof ReportContextError)
       throw new HttpsError('resource-exhausted', error.message);
