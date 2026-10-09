@@ -18,6 +18,8 @@ import {
   Link,
 } from '@mui/material';
 import type { Firestore } from 'firebase/firestore';
+import type { Functions } from 'firebase/functions';
+import { ProjectReport } from './ProjectReport';
 import { date, object, objects, text, useRows } from './data';
 import {
   Link as RouterLink,
@@ -139,10 +141,12 @@ function topicLabels(data: Record<string, unknown>) {
 }
 export function Dashboard({
   db,
+  functions,
   uid,
   mode,
 }: {
   db: Firestore;
+  functions: Functions;
   uid: string;
   mode: 'overview' | 'projects' | 'records';
 }) {
@@ -162,6 +166,38 @@ export function Dashboard({
     else next.delete(key);
     setParams(next, { replace: true });
   }
+  if (projectId)
+    return (
+      <Box component="section" aria-label="Projeto">
+        <Button
+          component={RouterLink}
+          to={'/projects' + location.search}
+          sx={{ mb: 2 }}
+        >
+          Voltar aos projetos
+        </Button>
+        <Typography component="h2" variant="h5">
+          {text(
+            projects.rows.find((item) => item.id === projectId)?.data.title,
+            projectId,
+          )}
+        </Typography>
+        <Typography color="text.secondary">
+          {text(
+            projects.rows.find((item) => item.id === projectId)?.data
+              .description,
+            'O relatório consulta o projeto diretamente, independente do limite da lista.',
+          )}
+        </Typography>
+        <ProjectReport
+          key={projectId}
+          projectId={projectId}
+          functions={functions}
+          search={location.search}
+          uid={uid}
+        />
+      </Box>
+    );
   if (selectedId)
     return (
       <Box component="section" aria-label="Detalhes">
@@ -353,13 +389,7 @@ export function Dashboard({
       {mode !== 'projects' && (
         <DataTable
           title="Meus registros"
-          headers={[
-            'Projeto / tópicos',
-            'Início / fim',
-            'Texto original',
-            'Contexto',
-            'Gravado em',
-          ]}
+          headers={['Projeto / tópicos', 'Início / fim', 'Detalhes']}
           state={filteredRecords}
           render={(data, id) => [
             <>
@@ -383,14 +413,12 @@ export function Dashboard({
                 {text(data.timeZone, 'Fuso do navegador')}
               </Typography>
             </>,
-            text(data.originalText),
-            text(data.interpretation),
-            <>
-              {date(data.recordedAt)}
-              <Typography variant="caption" sx={{ display: 'block' }}>
-                Fuso do navegador · gravação, não início da atividade
-              </Typography>
-            </>,
+            <Link
+              component={RouterLink}
+              to={detailPath('records', id, location.search)}
+            >
+              Ver auditoria do registro
+            </Link>,
           ]}
         />
       )}

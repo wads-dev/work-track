@@ -3,6 +3,11 @@ import { createRoot } from 'react-dom/client';
 import {
   Alert,
   AppBar,
+  Drawer,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
   Box,
   Button,
   Card,
@@ -74,6 +79,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | undefined;
@@ -162,6 +168,15 @@ function App() {
         <>
           <AppBar position="static" elevation={0}>
             <Toolbar sx={{ gap: 2, flexWrap: 'wrap', py: 1 }}>
+              <IconButton
+                color="inherit"
+                aria-label="Abrir menu de navegação"
+                aria-expanded={menuOpen}
+                aria-controls={menuOpen ? 'menu-principal' : undefined}
+                onClick={() => setMenuOpen(true)}
+              >
+                <span aria-hidden="true">☰</span>
+              </IconButton>
               <Typography sx={{ flexGrow: 1, fontWeight: 700 }}>
                 Work Track
               </Typography>
@@ -177,6 +192,39 @@ function App() {
               </Button>
             </Toolbar>
           </AppBar>
+          <Drawer open={menuOpen} onClose={() => setMenuOpen(false)}>
+            <Box
+              component="nav"
+              id="menu-principal"
+              aria-label="Menu principal"
+              sx={{ width: 280, maxWidth: '85vw', p: 2 }}
+            >
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Work Track
+              </Typography>
+              <Button onClick={() => setMenuOpen(false)}>Fechar menu</Button>
+              <List>
+                {[
+                  ['/app', 'Visão geral'],
+                  ['/projects', 'Projetos'],
+                  ['/records', 'Meus registros'],
+                ].map(([to, label]) => (
+                  <ListItemButton
+                    key={to}
+                    component={RouterLink}
+                    to={to}
+                    selected={
+                      location.pathname === to ||
+                      location.pathname.startsWith(to + '/')
+                    }
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <ListItemText primary={label} />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Box>
+          </Drawer>
           <Container
             component="main"
             id="conteudo"
@@ -229,6 +277,7 @@ function App() {
                   <Dashboard
                     key={user.uid}
                     db={services.db}
+                    functions={services.functions}
                     uid={user.uid}
                     mode="overview"
                   />
@@ -240,6 +289,7 @@ function App() {
                   <Dashboard
                     key={user.uid}
                     db={services.db}
+                    functions={services.functions}
                     uid={user.uid}
                     mode="projects"
                   />
@@ -251,6 +301,7 @@ function App() {
                   <Dashboard
                     key={user.uid}
                     db={services.db}
+                    functions={services.functions}
                     uid={user.uid}
                     mode="projects"
                   />
@@ -262,6 +313,7 @@ function App() {
                   <Dashboard
                     key={user.uid}
                     db={services.db}
+                    functions={services.functions}
                     uid={user.uid}
                     mode="records"
                   />
@@ -273,6 +325,7 @@ function App() {
                   <Dashboard
                     key={user.uid}
                     db={services.db}
+                    functions={services.functions}
                     uid={user.uid}
                     mode="records"
                   />

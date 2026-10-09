@@ -1,0 +1,309 @@
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Link,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+} from '@mui/material';
+import { httpsCallable, type Functions } from 'firebase/functions';
+import { Link as RouterLink } from 'react-router-dom';
+import { date } from './data';
+import { detailPath } from './routes';
+
+import { hours, pieSlices, type Bucket } from './report-chart';
+export type Report = {
+  projectId: string;
+  asOf: string;
+  policy: string;
+  totalMinutes: number;
+  byUser: (Bucket & { uid: string })[];
+  byTopic: (Bucket & { topicId: string })[];
+  records: {
+    id: string;
+    uid: string;
+    projectId: string;
+    startedAt: string;
+    endedAt?: string;
+    effectiveEndedAt: string;
+    estimated: boolean;
+    minutes: number;
+    topics: { topicId: string; minutes: number }[];
+  }[];
+  estimatedCount: number;
+  warnings: string[];
+  page: { limit: number; nextCursor: string | null; partial: boolean };
+};
+
+function Pie({ title, buckets }: { title: string; buckets: Bucket[] }) {
+  const slices = pieSlices(buckets);
+  return (
+    <Paper
+      component="section"
+      aria-label={title}
+      sx={{ p: 3, flex: 1, minWidth: 0 }}
+    >
+      <Typography component="h3" variant="h6">
+        {title}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Fatias proporcionais à soma dos valores desta distribuição:{' '}
+        {hours(buckets.reduce((sum, bucket) => sum + bucket.minutes, 0))}. A
+        soma dos tópicos pode diferir do tempo agregado quando as durações
+        informadas excedem o total; avisos abaixo explicam ambiguidades.
+      </Typography>
+      {slices.length === 0 ? (
+        <Typography>Nenhum tempo disponível nesta página.</Typography>
+      ) : (
+        <>
+          <Box
+            component="svg"
+            viewBox="0 0 200 200"
+            role="img"
+            aria-label={title + ' — valores na legenda abaixo'}
+            sx={{ width: '100%', maxWidth: 240, display: 'block', mx: 'auto' }}
+          >
+            <title>{title}</title>
+            {slices.map((slice, index) =>
+              slice.full ? (
+                <circle
+                  key={index}
+                  cx="100"
+                  cy="100"
+                  r="85"
+                  fill={slice.color}
+                />
+              ) : (
+                <path
+                  key={index}
+                  d={slice.path}
+                  fill={slice.color}
+                  stroke="white"
+                />
+              ),
+            )}
+          </Box>
+          <Box component="ul" sx={{ pl: 2 }}>
+            {slices.map((slice, index) => (
+              <li key={index}>
+                <Box
+                  component="span"
+                  aria-hidden="true"
+                  sx={{
+                    display: 'inline-block',
+                    width: 12,
+                    height: 12,
+                    bgcolor: slice.color,
+                    mr: 1,
+                  }}
+                />
+                {slice.label}: {hours(slice.minutes)}
+              </li>
+            ))}
+          </Box>
+        </>
+      )}
+    </Paper>
+  );
+}
+export function ProjectReport({
+  functions,
+  projectId,
+  search,
+  uid,
+}: {
+  functions: Functions;
+  projectId: string;
+  search: string;
+  uid: string;
+}) {
+  const [report, setReport] = useState<Report | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const [cursor, setCursor] = useState<string | undefined>();
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    setReport(null);
+    const callable = httpsCallable<
+      { projectId: string; limit: number; cursor?: string },
+      Report
+    >(functions, 'getProjectReport');
+    void callable({ projectId, limit: 200, ...(cursor ? { cursor } : {}) })
+      .then((result) => {
+        if (active) {
+          setReport(result.data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError(
+            'Não foi possível carregar o relatório. Confira sua conexão e permissão.',
+          );
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [functions, projectId, cursor, attempt]);
+  if (loading)
+    return (
+      <Stack direction="row" spacing={2} role="status">
+        <CircularProgress size={24} />
+        <Typography>Carregando relatório do projeto…</Typography>
+      </Stack>
+    );
+  if (error)
+    return (
+      <Alert
+        severity="error"
+        action={
+          <Button onClick={() => setAttempt((value) => value + 1)}>
+            Tentar novamente
+          </Button>
+        }
+      >
+        {error}
+      </Alert>
+    );
+  if (!report) return null;
+  return (
+    <Box component="section" aria-label="Relatório do projeto" sx={{ mt: 3 }}>
+      <Typography component="h2" variant="h5">
+        Tempo agregado nesta página: {hours(report.totalMinutes)}
+      </Typography>
+      <Typography color="text.secondary" sx={{ mb: 2 }}>
+        Pode somar atividades simultâneas; não representa tempo líquido único.
+        Referência: {date(report.asOf)} (fuso do navegador). Política:{' '}
+        {report.policy}.
+      </Typography>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Estimativas não alteram registros originais. Abertos: até o menor entre
+        agora, início + 4 horas, meia-noite no fuso da atividade e próximo
+        início da mesma pessoa/projeto. Limite de 8 horas somente para
+        estimativas por pessoa/dia/projeto nesta página, não global para o dia
+        da pessoa. Tempos com fim explícito consomem o orçamento das estimativas
+        nessa página, mas são preservados sem truncamento, mesmo acima de 8
+        horas.
+      </Alert>
+      {(report.estimatedCount > 0 || report.page.partial || cursor) && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Relatório parcial
+          {report.estimatedCount > 0
+            ? ' com ' + report.estimatedCount + ' registro(s) estimado(s)'
+            : ''}
+          . Totais e gráficos representam somente esta página de até{' '}
+          {report.page.limit} registros, não todo o projeto.
+        </Alert>
+      )}
+      {report.warnings.map((warning, index) => (
+        <Alert key={index} severity="warning" sx={{ mb: 1 }}>
+          {warning}
+        </Alert>
+      ))}
+      {report.records.length === 0 ? (
+        <Alert severity="info">Nenhum registro disponível nesta página.</Alert>
+      ) : (
+        <>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            sx={{ my: 3 }}
+          >
+            <Pie title="Tempo por pessoa" buckets={report.byUser} />
+            <Pie title="Tempo por tópico" buckets={report.byTopic} />
+          </Stack>
+          <TableContainer
+            component={Paper}
+            tabIndex={0}
+            aria-label="Registros resumidos do projeto"
+          >
+            <Table sx={{ minWidth: 650 }}>
+              <caption>
+                Registros desta página — sem texto privado ou contexto
+              </caption>
+              <TableHead>
+                <TableRow>
+                  {['Pessoa', 'Tópicos', 'Início', 'Fim', 'Tempo'].map(
+                    (label) => (
+                      <TableCell key={label} scope="col">
+                        {label}
+                      </TableCell>
+                    ),
+                  )}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {report.records.map((record) => (
+                  <TableRow key={record.id + record.uid}>
+                    <TableCell>
+                      {report.byUser.find((item) => item.uid === record.uid)
+                        ?.label ?? record.uid}
+                      {record.uid === uid && (
+                        <Link
+                          component={RouterLink}
+                          to={detailPath('records', record.id, search)}
+                          sx={{ display: 'block' }}
+                        >
+                          Detalhes do meu registro
+                        </Link>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {record.topics
+                        .map(
+                          (topic) =>
+                            report.byTopic.find(
+                              (item) => item.topicId === topic.topicId,
+                            )?.label ?? topic.topicId,
+                        )
+                        .join(', ') || 'Não distribuído'}
+                    </TableCell>
+                    <TableCell>{date(record.startedAt)}</TableCell>
+                    <TableCell>
+                      {date(record.endedAt ?? record.effectiveEndedAt)}
+                      {record.estimated && (
+                        <Typography variant="caption" sx={{ display: 'block' }}>
+                          Estimado; fim original não informado
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>{hours(record.minutes)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
+      )}
+      <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+        {cursor && (
+          <Button onClick={() => setCursor(undefined)}>Primeira página</Button>
+        )}
+        {report.page.nextCursor && (
+          <Button
+            onClick={() => setCursor(report.page.nextCursor ?? undefined)}
+          >
+            Próxima página
+          </Button>
+        )}
+        <Button onClick={() => setAttempt((value) => value + 1)}>
+          Atualizar relatório
+        </Button>
+      </Stack>
+    </Box>
+  );
+}
