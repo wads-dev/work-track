@@ -14,6 +14,7 @@ export interface ReportSourceRecord {
   topics: { topicId: string; percentage?: number; durationMinutes?: number }[];
 }
 export interface ProjectReport {
+  scope?: 'all-selected';
   projectId: string;
   asOf: string;
   policy: 'project-report-v3';

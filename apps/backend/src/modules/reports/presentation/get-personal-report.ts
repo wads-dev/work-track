@@ -1,4 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
+
 import { ReportContextError } from '../domain/global-estimates.js';
 import { z } from 'zod';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
@@ -6,8 +7,12 @@ import type { PersonalReportRepository } from '../domain/personal-report.js';
 import { buildPersonalReport } from '../domain/build-personal-report.js';
 const schema = z
   .object({
-    from: z.iso.datetime({ offset: true }),
-    to: z.iso.datetime({ offset: true }),
+    from: z.iso.datetime({ offset: true }).optional(),
+    to: z.iso.datetime({ offset: true }).optional(),
+    projectId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,128}$/)
+      .optional(),
     timeZone: z
       .string()
       .max(100)
@@ -29,8 +34,14 @@ const schema = z
   .strict()
   .refine(
     (v) =>
-      Date.parse(v.to) > Date.parse(v.from) &&
-      Date.parse(v.to) - Date.parse(v.from) <= (93 * 24 + 1) * 60 * 60000,
+      !v.from ||
+      !v.to ||
+      Boolean(
+        v.from &&
+        v.to &&
+        Date.parse(v.to) > Date.parse(v.from) &&
+        Date.parse(v.to) - Date.parse(v.from) <= (93 * 24 + 1) * 60 * 60000,
+      ),
     'Período deve ter até 93 dias e 1 hora e fim posterior ao início.',
   );
 export async function getPersonalReportHandler(
@@ -47,13 +58,24 @@ export async function getPersonalReportHandler(
       'Período, fuso, limite ou cursor inválido.',
     );
   try {
-    const page = await repository.readPage(
-      auth!.uid,
-      input.data.limit,
-      input.data.cursor,
-    );
     const context = await repository.loadContext([auth!.uid]);
-    const report = buildPersonalReport(input.data, page, asOf, context);
+    const selected = context.filter(
+      (r) => !input.data.projectId || r.projectId === input.data.projectId,
+    );
+    const page = {
+      records: selected,
+      scannedCount: context.length,
+      nextCursor: null,
+    };
+    const report = buildPersonalReport(
+      { ...input.data, cursor: undefined },
+      page,
+      asOf,
+      context,
+    );
+    report.scope = 'all-selected';
+    report.page.partial = false;
+    report.page.limit = 2000;
     if (!input.data.includeArchived) {
       const archived = new Set(
         await repository.archivedProjectIds([

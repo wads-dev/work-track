@@ -1,4 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
+import { completeSelection } from '../application/complete-selection.js';
 import { z } from 'zod';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
 import { ReportContextError } from '../domain/global-estimates.js';
@@ -6,8 +7,12 @@ import { buildCompanyReport } from '../domain/build-company-report.js';
 import type { CompanyReportRepository } from '../domain/company-report.js';
 const schema = z
   .object({
-    from: z.iso.datetime({ offset: true }),
-    to: z.iso.datetime({ offset: true }),
+    from: z.iso.datetime({ offset: true }).optional(),
+    to: z.iso.datetime({ offset: true }).optional(),
+    projectId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,128}$/)
+      .optional(),
     timeZone: z
       .string()
       .max(100)
@@ -32,8 +37,14 @@ const schema = z
   .strict()
   .refine(
     (v) =>
-      Date.parse(v.to) > Date.parse(v.from) &&
-      Date.parse(v.to) - Date.parse(v.from) <= (93 * 24 + 1) * 3600000,
+      !v.from ||
+      !v.to ||
+      Boolean(
+        v.from &&
+        v.to &&
+        Date.parse(v.to) > Date.parse(v.from) &&
+        Date.parse(v.to) - Date.parse(v.from) <= (93 * 24 + 1) * 3600000,
+      ),
     'Período até93dias+1h.',
   );
 export async function getCompanyReportHandler(
@@ -50,7 +61,9 @@ export async function getCompanyReportHandler(
       'Período, fuso, limite ou cursor inválido.',
     );
   try {
-    const page = await repository.readPage(input.data.limit, input.data.cursor),
+    const page = await completeSelection((cursor) =>
+        repository.readPage(100, cursor, input.data.projectId),
+      ),
       uids = [...new Set(page.records.map((r) => r.uid))];
     if (uids.length > 10)
       throw new ReportContextError(
@@ -63,14 +76,24 @@ export async function getCompanyReportHandler(
             ...new Set(page.records.map((r) => r.projectId)),
           ]),
       labels = await repository.userLabels(uids);
-    return buildCompanyReport(
-      input.data,
+    const report = buildCompanyReport(
+      { ...input.data, cursor: undefined },
       page,
       context,
       asOf,
       labels,
       archived,
     );
+    report.scope = 'all-selected';
+    report.page.partial = false;
+    report.page.limit = 2000;
+    report.warnings = report.warnings.filter(
+      (w) => !w.includes('página selecionada'),
+    );
+    report.warnings.push(
+      'Totais completos da seleção dentro dos limites operacionais; nenhum subtotal de primeira página.',
+    );
+    return report;
   } catch (error) {
     if (error instanceof ReportContextError)
       throw new HttpsError('resource-exhausted', error.message);

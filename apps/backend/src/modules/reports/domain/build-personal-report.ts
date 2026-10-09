@@ -16,8 +16,8 @@ export function buildPersonalReport(
   context: import('./project-report.js').ReportSourceRecord[],
 ): PersonalReport {
   assertContext(page.records, context);
-  const from = Date.parse(input.from),
-    to = Date.parse(input.to),
+  const from = input.from ? Date.parse(input.from) : -Infinity,
+    to = input.to ? Date.parse(input.to) : Infinity,
     warnings = new Set<string>([
       'Política personal-v3: orçamento global8h pessoa/dia America/Sao_Paulo allprojects/full-context, saldo cronológico start/id e próximo início próprio no mesmo projeto; fechados menores que15min ignorados como corte.',
       'Estimativas não persistidas; fatos fechados preservados. Intervalos são recortados somente para visualização no período.',
@@ -27,8 +27,8 @@ export function buildPersonalReport(
     policy: 'personal-v3',
     budgetTimeZone: 'America/Sao_Paulo',
     asOf: new Date(asOf).toISOString(),
-    from: input.from,
-    to: input.to,
+    ...(input.from ? { from: input.from } : {}),
+    ...(input.to ? { to: input.to } : {}),
     timeZone: input.timeZone,
     totalMinutes: 0,
     estimatedCount: 0,

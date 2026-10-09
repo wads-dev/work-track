@@ -43,7 +43,7 @@ it('aggregates multipleUIDs but keeps global budgets and archived facts, no tran
     readPage: vi.fn<CompanyReportRepository['readPage']>().mockResolvedValue({
       records: selected,
       scannedCount: 2,
-      nextCursor: 'users/bob/records/next',
+      nextCursor: null,
     }),
     loadContext: vi.fn().mockResolvedValue(context),
     userLabels: vi.fn().mockResolvedValue({ alice: 'Alice', bob: 'Bob' }),
@@ -61,7 +61,8 @@ it('aggregates multipleUIDs but keeps global budgets and archived facts, no tran
     { uid: 'bob', label: 'Bob', minutes: 240 },
   ]);
   expect(result.byProject).toEqual([{ projectId: 'active', minutes: 360 }]);
-  expect(result.page.partial).toBe(true);
+  expect(result.page.partial).toBe(false);
+  expect(result.scope).toBe('all-selected');
   expect(result.policy).toBe('company-v3');
   expect(result.intervals.map((r) => r.uid)).toEqual(['alice', 'bob']);
   expect(JSON.stringify(result)).not.toContain('@');

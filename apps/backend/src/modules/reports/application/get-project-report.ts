@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { completeSelection } from './complete-selection.js';
 import type { ProjectReportRepository } from '../domain/project-report.js';
 import { buildProjectReport } from '../domain/build-project-report.js';
 const inputSchema = z
@@ -46,19 +47,33 @@ export async function getProjectReport(
       'failed-precondition',
       'Projeto arquivado; inclua includeArchived para consultar histórico.',
     );
+  const full = await completeSelection(async (cursor) => {
+    const p = await repository.readPage(input.data.projectId, 500, cursor);
+    if (!p)
+      throw new ReportRequestError('not-found', 'Projeto não encontrado.');
+    return p;
+  });
+  page.records = full.records;
+  page.nextCursor = null;
   const context = await repository.loadContext([
     ...new Set(page.records.map((r) => r.uid)),
   ]);
   const labels = await repository.userLabels([
     ...new Set(page.records.map((record) => record.uid)),
   ]);
-  return buildProjectReport(
+  const report = buildProjectReport(
     input.data.projectId,
     page,
     input.data.limit,
     asOf,
     labels,
-    Boolean(input.data.cursor),
+    false,
     context,
   );
+  report.scope = 'all-selected';
+  report.page.limit = 2000;
+  report.warnings.push(
+    'Totais completos da seleção dentro dos limites operacionais.',
+  );
+  return report;
 }

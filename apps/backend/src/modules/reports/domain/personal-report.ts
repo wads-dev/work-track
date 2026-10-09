@@ -1,18 +1,21 @@
 import type { ReportSourceRecord } from './project-report.js';
 export interface PersonalReportInput {
   includeArchived?: boolean;
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
+  projectId?: string;
   timeZone: string;
   limit?: number;
   cursor?: string;
 }
 export interface PersonalReport {
+  scope?: 'all-selected';
   policy: 'personal-v3';
   budgetTimeZone: 'America/Sao_Paulo';
   asOf: string;
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
+  projectId?: string;
   timeZone: string;
   totalMinutes: number;
   estimatedCount: number;

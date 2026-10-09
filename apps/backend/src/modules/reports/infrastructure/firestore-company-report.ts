@@ -30,10 +30,11 @@ export class FirestoreCompanyReportRepository implements CompanyReportRepository
       uids,
     );
   }
-  async readPage(limit: number, cursor?: string) {
+  async readPage(limit: number, cursor?: string, projectId?: string) {
     let query = this.db
       .collectionGroup('records')
       .orderBy(FieldPath.documentId());
+    if (projectId) query = query.where('projectId', '==', projectId);
     if (cursor) query = query.startAfter(this.db.doc(cursor));
     const snapshot = await query.limit(limit + 1).get(),
       docs = snapshot.docs.slice(0, limit);

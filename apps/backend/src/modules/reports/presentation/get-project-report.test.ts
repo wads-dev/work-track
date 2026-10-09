@@ -68,7 +68,8 @@ describe('getProjectReport callable adapter', () => {
       auth,
       Date.parse('2026-10-08T20:00:00Z'),
     );
-    expect(readPage).toHaveBeenCalledExactlyOnceWith(
+    expect(readPage).toHaveBeenNthCalledWith(
+      1,
       'project',
       20,
       'users/alice/records/one',
@@ -76,7 +77,8 @@ describe('getProjectReport callable adapter', () => {
     expect(result).toMatchObject({
       policy: 'project-report-v3',
       asOf: '2026-10-08T20:00:00.000Z',
-      page: { partial: true },
+      page: { partial: false },
+      scope: 'all-selected',
       totalMinutes: 0,
     });
     expect(JSON.stringify(result)).not.toContain('alice@wads.dev');

@@ -15,6 +15,7 @@ export interface CompanyReportRepository {
   readPage(
     limit: number,
     cursor?: string,
+    projectId?: string,
   ): Promise<{
     records: ReportSourceRecord[];
     scannedCount: number;

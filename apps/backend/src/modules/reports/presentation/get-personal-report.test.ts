@@ -41,7 +41,8 @@ it('only reads authenticated own records and validates bounds/auth/cursor', asyn
     ).rejects.toMatchObject({ code: 'invalid-argument' });
   expect(readPage).not.toHaveBeenCalled();
   await getPersonalReportHandler(repo, input, auth);
-  expect(readPage).toHaveBeenCalledExactlyOnceWith('alice', 200, undefined);
+  expect(readPage).not.toHaveBeenCalled();
+  expect(repo.loadContext).toHaveBeenCalledExactlyOnceWith(['alice']);
 });
 it('accepts a62 civil day range spanning fall DST', async () => {
   const repo = {
