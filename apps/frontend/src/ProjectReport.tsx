@@ -21,10 +21,10 @@ import {
 import { useEffect, useState } from 'react';
 import { useDeletionRevision, deletionRevision } from './record-deletion';
 
-import { httpsCallable, type Functions } from 'firebase/functions';
+import type { Functions } from 'firebase/functions';
+import { subscribeAuthorizedReport } from './authorized-report-source';
 import type { Firestore } from 'firebase/firestore';
-import { subscribePersonalReport } from './personal-report-source';
-import { personalProjectReportRepository } from './personal-project-report-repository';
+import { useProjects } from './useProjects';
 import { getProjectReport } from '../../backend/src/modules/reports/application/get-project-report';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { reportError } from './report-error';
@@ -84,11 +84,17 @@ export function ProjectReport({
   const includeArchived = params.get('includeArchived') === 'true';
   const revision = useDeletionRevision(uid);
   const accessRevision = useProjectAccessRevision();
+  const projects = useProjects(functions, uid, 'all');
+  const authorizedProjectIdsKey = JSON.stringify(
+    [...new Set([...projects.rows.map((p) => p.id), projectId])].sort(),
+  );
   const [reportAccessRevision, setReportAccessRevision] = useState(-1);
   const [reportOwner, setReportOwner] = useState('');
   const [reportRevision, setReportRevision] = useState(-1);
   const [cachedReport, setReport] = useState<Report | null>(null);
   const report =
+    !projects.loading &&
+    !projects.error &&
     reportRevision === revision &&
     reportOwner === uid &&
     reportAccessRevision === accessRevision
@@ -103,104 +109,73 @@ export function ProjectReport({
     setLoading(true);
     setError('');
     setReport(null);
-    if (personal) {
-      let generation = 0;
-      const stop = subscribePersonalReport(
-        db,
-        uid,
-        (snapshot) => {
-          const current = ++generation;
-          setReport(null);
-          setLoading(true);
-          void getProjectReport(
-            personalProjectReportRepository(snapshot.repository, uid),
-            { projectId, limit: 200, includeArchived },
-            Date.now(),
-            uid,
-          )
-            .then((result) => {
-              if (
-                !active ||
-                current !== generation ||
-                deletionRevision(uid) !== revision ||
-                projectAccessRevision() !== accessRevision
-              )
-                return;
-              setReportAccessRevision(accessRevision);
-              setReportOwner(uid);
-              setReportRevision(revision);
-              setReport(result);
-              setProvisional(snapshot.fromCache || snapshot.hasPendingWrites);
-              setError('');
-              setLoading(false);
-            })
-            .catch((failure) => {
-              if (!active || current !== generation) return;
-              setReport(null);
-              setError(reportError(failure));
-              setLoading(false);
-            });
-        },
-        (failure) => {
-          if (!active) return;
-          generation++;
-          setReport(null);
-          setError(reportError(failure));
-          setLoading(false);
-        },
-        [projectId],
-      );
-      return () => {
-        active = false;
-        generation++;
-        stop();
-      };
+    if (projects.loading) return;
+    if (projects.error) {
+      setError(projects.error);
+      setLoading(false);
+      return;
     }
-    setProvisional(false);
-    const callable = httpsCallable<
-      {
-        projectId: string;
-        limit: number;
-        cursor?: string;
-        includeArchived: boolean;
+    let generation = 0;
+    const stop = subscribeAuthorizedReport(
+      db,
+      uid,
+      (snapshot) => {
+        const current = ++generation;
+        setReport(null);
+        setLoading(true);
+        void getProjectReport(
+          snapshot.repository.project(),
+          { projectId, limit: 200, includeArchived },
+          Date.now(),
+          uid,
+        )
+          .then((result) => {
+            if (
+              !active ||
+              current !== generation ||
+              deletionRevision(uid) !== revision ||
+              projectAccessRevision() !== accessRevision
+            )
+              return;
+            setReportAccessRevision(accessRevision);
+            setReportOwner(uid);
+            setReportRevision(revision);
+            setReport(result);
+            setProvisional(
+              !snapshot.coherent ||
+                snapshot.fromCache ||
+                snapshot.hasPendingWrites,
+            );
+            setError('');
+            setLoading(false);
+          })
+          .catch((failure) => {
+            if (!active || current !== generation) return;
+            setReport(null);
+            setError(reportError(failure));
+            setLoading(false);
+          });
       },
-      Report
-    >(functions, 'getProjectReport');
-    void callable({
-      projectId,
-      limit: 200,
-      includeArchived,
-    })
-      .then((result) => {
-        if (active) {
-          if (
-            deletionRevision(uid) !== revision ||
-            projectAccessRevision() !== accessRevision
-          )
-            return;
-          setReportAccessRevision(accessRevision);
-          setReportOwner(uid);
-          setReportRevision(revision);
-          setReport(result.data);
-          setLoading(false);
-        }
-      })
-      .catch((failure: unknown) => {
-        if (
-          active &&
-          deletionRevision(uid) === revision &&
-          projectAccessRevision() === accessRevision
-        ) {
-          setError(reportError(failure));
-          setLoading(false);
-        }
-      });
+      (failure) => {
+        if (!active) return;
+        generation++;
+        setReport(null);
+        setError(reportError(failure));
+        setLoading(false);
+      },
+      JSON.parse(authorizedProjectIdsKey) as string[],
+    );
     return () => {
       active = false;
+      generation++;
+      stop();
     };
   }, [
     db,
     personal,
+    projects.loading,
+    projects.error,
+    authorizedProjectIdsKey,
     functions,
     projectId,
     attempt,

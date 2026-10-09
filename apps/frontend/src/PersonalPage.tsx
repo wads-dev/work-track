@@ -40,15 +40,15 @@ import { topicBuckets, type ReportTopic } from './topic-report-model';
 import { useEffect, useState } from 'react';
 import { useDeletionRevision, deletionRevision } from './record-deletion';
 
-import { httpsCallable, type Functions } from 'firebase/functions';
+import type { Functions } from 'firebase/functions';
 import { executePersonalReport } from '../../backend/src/modules/reports/application/get-personal-report';
 import { executeCalendarReport } from '../../backend/src/modules/reports/application/get-calendar-report';
 import { calendarInput } from '../../backend/src/modules/reports/application/calendar-input';
-import { ownCalendarRepository } from './own-calendar-repository';
 import {
-  subscribePersonalReport,
-  type PersonalReportSnapshot,
-} from './personal-report-source';
+  subscribeAuthorizedReport,
+  type AuthorizedReportSnapshot,
+} from './authorized-report-source';
+import { executeCompanyReport } from '../../backend/src/modules/reports/application/get-company-report';
 import type { Firestore } from 'firebase/firestore';
 import {
   Link as RouterLink,
@@ -56,6 +56,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { reportError } from './report-error';
+import { reportRepositoryMatches } from './report-repository-fence';
 import { UiIcon } from './UiIcons';
 import { ReportToolbar } from './ReportToolbar';
 import { EmptyState } from './Surface';
@@ -246,14 +247,9 @@ export function PersonalPage({
   ]);
   const [reportRevision, setReportRevision] = useState(-1);
   const [cachedReport, setReport] = useState<PersonalReport | null>(null);
-  const report =
-    !privacyBlocked &&
-    reportRevision === revision &&
-    reportOwner === uid &&
-    reportQuery === queryIdentity &&
-    reportAccessRevision === accessRevision
-      ? cachedReport
-      : null;
+  const [reportRepository, setReportRepository] = useState<
+    AuthorizedReportSnapshot['repository'] | undefined
+  >(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -261,27 +257,40 @@ export function PersonalPage({
     owner: string;
     revision: number;
     query: string;
-    snapshot: PersonalReportSnapshot;
+    snapshot: AuthorizedReportSnapshot;
   } | null>(null);
   const [localError, setLocalError] = useState('');
+  const authorizedProjectIdsKey = JSON.stringify(
+    [
+      ...new Set([
+        ...projects.rows.map((p) => p.id),
+        ...(projectId ? [projectId] : []),
+      ]),
+    ].sort(),
+  );
   useEffect(() => {
     setLocalSnapshot(null);
     setLocalError('');
-    if (
-      company ||
-      (calendar && person.mode !== 'own') ||
-      privacyBlocked ||
-      invalid
-    )
+    if (privacyBlocked || invalid) return;
+    if (projects.loading) return;
+    if (projects.error) {
+      setLocalError(projects.error);
       return;
-    return subscribePersonalReport(
+    }
+    return subscribeAuthorizedReport(
       db,
       uid,
       (snapshot) => {
         setLocalSnapshot({
           owner: uid,
           revision: accessRevision,
-          query: JSON.stringify([from, to, projectId, allWeeks]),
+          query: JSON.stringify([
+            from,
+            to,
+            projectId,
+            allWeeks,
+            authorizedProjectIdsKey,
+          ]),
           snapshot,
         });
       },
@@ -289,7 +298,7 @@ export function PersonalPage({
         setLocalSnapshot(null);
         setLocalError(reportError(failure));
       },
-      projectId ? [projectId] : [],
+      JSON.parse(authorizedProjectIdsKey) as string[],
       calendar && !allWeeks && from && to ? { from, to, projectId } : undefined,
     );
   }, [
@@ -302,16 +311,32 @@ export function PersonalPage({
     privacyBlocked,
     Boolean(invalid),
     person.mode,
+    projects.loading,
+    projects.error,
+    authorizedProjectIdsKey,
     from,
     to,
     projectId,
     allWeeks,
   ]);
   const local =
+    !projects.loading &&
+    !projects.error &&
     localSnapshot?.owner === uid &&
     localSnapshot.revision === accessRevision &&
-    localSnapshot.query === JSON.stringify([from, to, projectId, allWeeks])
+    localSnapshot.query ===
+      JSON.stringify([from, to, projectId, allWeeks, authorizedProjectIdsKey])
       ? localSnapshot.snapshot
+      : null;
+  const localRepository = local?.repository;
+  const report =
+    !privacyBlocked &&
+    reportRevision === revision &&
+    reportOwner === uid &&
+    reportQuery === queryIdentity &&
+    reportAccessRevision === accessRevision &&
+    reportRepositoryMatches(true, localRepository, reportRepository)
+      ? cachedReport
       : null;
   useEffect(() => {
     let active = true;
@@ -328,7 +353,7 @@ export function PersonalPage({
     setLoading(true);
     setError('');
     setReport(null);
-    if (!company && (!calendar || person.mode === 'own') && !local) {
+    if (!localRepository) {
       setError(localError);
       setLoading(!localError);
       return;
@@ -336,7 +361,7 @@ export function PersonalPage({
     const request =
       !calendar && !company
         ? executePersonalReport(
-            local!.repository,
+            localRepository.calendar().own,
             {
               ...(from ? { from } : {}),
               ...(to ? { to } : {}),
@@ -346,9 +371,11 @@ export function PersonalPage({
             },
             uid,
           ).then((data) => ({ data: data as PersonalReport }))
-        : calendar && person.mode === 'own'
+        : calendar
           ? executeCalendarReport(
-              ownCalendarRepository(local!.repository, uid),
+              (
+                localRepository as AuthorizedReportSnapshot['repository']
+              ).calendar(),
               calendarInput.parse(
                 calendarRequest(params, uid, from, to, zone, includeArchived),
               ),
@@ -361,42 +388,17 @@ export function PersonalPage({
                 allWeeks,
               ),
             }))
-          : calendar
-            ? httpsCallable(
-                functions,
-                'getCalendarReport',
-              )(
-                calendarRequest(params, uid, from, to, zone, includeArchived),
-              ).then((result) => ({
-                data: calendarReport(
-                  result.data as CalendarResponse,
-                  uid,
-                  person.mode,
-                  allWeeks,
-                ),
-              }))
-            : httpsCallable<
-                {
-                  from?: string;
-                  to?: string;
-                  projectId?: string;
-                  timeZone: string;
-                  limit: number;
-                  cursor?: string;
-                  includeArchived: boolean;
-                },
-                PersonalReport
-              >(
-                functions,
-                'getCompanyReport',
-              )({
+          : executeCompanyReport(
+              localRepository as AuthorizedReportSnapshot['repository'],
+              {
                 ...(from ? { from } : {}),
                 ...(to ? { to } : {}),
                 ...(projectId ? { projectId } : {}),
                 timeZone: zone,
-                limit: company ? 50 : 200,
+                limit: 50,
                 includeArchived,
-              });
+              },
+            ).then((data) => ({ data: data as PersonalReport }));
     void request
       .then((result) => {
         if (active) {
@@ -409,6 +411,7 @@ export function PersonalPage({
           setReportOwner(uid);
           setReportQuery(queryIdentity);
           setReportRevision(revision);
+          setReportRepository(localRepository);
           setReport(result.data);
           if (calendar)
             setDirectory({
@@ -435,7 +438,7 @@ export function PersonalPage({
       active = false;
     };
   }, [
-    local,
+    localRepository,
     localError,
     functions,
     from,
@@ -833,10 +836,8 @@ export function PersonalPage({
             : 'Somente projetos globais autorizados, nunca registros pessoais de outras pessoas'}
         </p>
       )}
-      {(!calendar || person.mode === 'own') &&
-        !company &&
-        local &&
-        (local.fromCache || local.hasPendingWrites) && (
+      {local &&
+        (!local.coherent || local.fromCache || local.hasPendingWrites) && (
           <Alert role="status">
             <AlertDescription>
               Dados locais provisórios; sincronizando com o Firestore. Os totais

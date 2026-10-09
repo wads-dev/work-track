@@ -143,11 +143,15 @@ describe('calendar people default and safe scope', () => {
       new URL('./PersonalPage.tsx', import.meta.url),
       'utf8',
     );
-    expect(source).toContain("'getCalendarReport'");
-    expect(source).toContain("'getCompanyReport'");
+    expect(source).not.toContain("'getCalendarReport'");
+    expect(source).not.toContain("'getCompanyReport'");
+    expect(source).toContain('executeCalendarReport(');
+    expect(source).toContain('executeCompanyReport(');
+    expect(source).toContain('subscribeAuthorizedReport');
     expect(source).not.toContain("'getPersonalReport'");
     expect(source).toContain('executePersonalReport(');
-    expect(source).toContain('subscribePersonalReport(');
+    expect(source).not.toContain('subscribePersonalReport');
+    expect(source).toContain('const localRepository = local?.repository;');
     expect(source).toContain('uid={uid}');
     expect(source).not.toContain('projectId: projectId || undefined');
     expect(source).toContain(

@@ -208,6 +208,33 @@ describe('timeline stays mathematically faithful while surfaces change', () => {
     expect(activityHeight(folded, 1260, 1440)).toBeCloseTo(198);
     expect(activityHeight(folded, 600, 605)).toBeCloseTo(5.5);
   });
+  it.each([3, 4, 8])(
+    'preserves all %i simultaneous events in separate columns',
+    (count) => {
+      const start = Date.parse('2026-10-08T00:00:00-03:00');
+      const items = Array.from({ length: count }, (_, index) => ({
+        id: String(index),
+        effectiveStartedAt: new Date(start + 8 * 3600000).toISOString(),
+        effectiveEndedAt: new Date(start + 11 * 3600000).toISOString(),
+      }));
+      const result = layoutDay(items, start, start + 86400000);
+      expect(result).toHaveLength(count);
+      expect(new Set(result.map((event) => event.item.id)).size).toBe(count);
+      expect(result.map((event) => event.column)).toEqual(
+        Array.from({ length: count }, (_, index) => index),
+      );
+      expect(
+        result.every((event) => event.columns === count && event.overlap),
+      ).toBe(true);
+      for (const event of result) {
+        const left = event.column / event.columns;
+        const width = 1 / event.columns;
+        expect(width).toBeGreaterThan(0);
+        expect(left + width).toBeLessThanOrEqual(1);
+      }
+    },
+  );
+
   it('separates overlaps but lets touching intervals share a column', () => {
     const start = Date.parse('2026-10-08T00:00:00-03:00');
     const make = (id: string, a: number, b: number) => ({
