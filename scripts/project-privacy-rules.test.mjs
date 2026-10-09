@@ -61,6 +61,10 @@ function jwt(uid, changes = {}) {
 }
 const aliceToken = jwt(alice);
 const bobToken = jwt(bob);
+const externalAliceToken = jwt(alice, {
+  email: 'alice@example.net',
+  firebase: { sign_in_provider: 'password' },
+});
 
 function value(field) {
   if (field === null) return { nullValue: null };
@@ -80,7 +84,8 @@ function documentUrl(path) {
 }
 async function request(url, token, method = 'GET', body) {
   const headers = { 'content-type': 'application/json' };
-  if (token !== null) headers.authorization = 'Bearer ' + token;
+  if (token !== null && token !== undefined)
+    headers.authorization = 'Bearer ' + token;
   const response = await fetch(url, {
     method,
     headers,
@@ -100,7 +105,11 @@ function get(path, token) {
   return request(documentUrl(path), token);
 }
 function list(path, token) {
-  return request(documentUrl(path) + '?pageSize=100', token);
+  // A Web SDK collection read is an unfiltered structured query. Keep the same
+  // authenticated token and negative permission expectation as filtered queries.
+  const segments = path.split('/');
+  const collectionId = segments.pop();
+  return query(segments.join('/'), collectionId, token);
 }
 function write(path, data, token) {
   return request(documentUrl(path), token, 'PATCH', { fields: fields(data) });
@@ -329,327 +338,377 @@ after(async () => {
   }
 });
 
-test('project privacy: real Firestore rules with Alice and Bob', async (t) => {
-  const check = (name, run) => t.test(name, run);
-  for (const [uid, token, other, otherToken] of [
-    [alice, aliceToken, bob, bobToken],
-    [bob, bobToken, alice, aliceToken],
-  ]) {
-    const ownProject = uid === alice ? 'personal-alice' : 'personal-bob';
-    const otherProject = uid === alice ? 'personal-bob' : 'personal-alice';
-    await check(
-      uid + ': own personal get includes embedded topics',
-      async () => {
-        const data = await allowed(get('projects/' + ownProject, token));
-        assert.equal(data.fields.topics.arrayValue.values.length, 1);
-      },
-    );
-    await check(uid + ': other personal get denied', () =>
-      denied(get('projects/' + otherProject, token)),
-    );
-    for (const id of ['work', 'work-bob', 'legacy', 'legacy-no-owner']) {
-      await check(uid + ': shared work/legacy get ' + id, () =>
-        allowed(get('projects/' + id, token)),
-      );
-    }
-    await check(uid + ': all project list denied', () =>
-      denied(list('projects', token)),
-    );
-    await check(uid + ': old project query denied', () =>
-      denied(query('', 'projects', token)),
-    );
-    await check(uid + ': even work-only project query denied', () =>
-      denied(query('', 'projects', token, { where: equal('type', 'work') })),
-    );
-    await check(uid + ': even owner-filtered project query denied', () =>
-      denied(query('', 'projects', token, { where: equal('createdBy', uid) })),
-    );
-    await check(uid + ': own entire canonical history allowed', async () => {
-      const result = await allowed(list('users/' + uid + '/records', token));
-      assert.equal(result.documents.length, 15);
-    });
-    await check(uid + ': own paginated history query allowed', async () => {
-      const result = await allowed(
-        query('users/' + uid, 'records', token, {
-          orderBy: [
-            { field: { fieldPath: '__name__' }, direction: 'ASCENDING' },
-          ],
-          limit: 100,
-        }),
-      );
-      assert.equal(result.filter((row) => row.document).length, 15);
-    });
-    for (const id of [
-      'personal',
-      'bad-type',
-      'bad-owner',
-      'orphan',
-      'no-project',
-      'path-project',
-    ]) {
-      await check(uid + ': own history get ' + id + ' allowed', () =>
-        allowed(get('users/' + uid + '/records/' + id, token)),
-      );
-    }
-    for (const id of ['work', 'legacy', 'legacy-no-owner']) {
-      await check(uid + ': other canonical work get ' + id + ' allowed', () =>
-        allowed(get('users/' + other + '/records/' + id, token)),
-      );
-    }
-    for (const id of [
-      'personal',
-      'personal-bob',
-      'bad-type',
-      'bad-owner',
-      'orphan',
-      'no-project',
-      'null-project',
-      'number-project',
-      'list-project',
-      'map-project',
-      'empty-project',
-      'path-project',
-    ]) {
-      await check(uid + ': other canonical record ' + id + ' denied', () =>
-        denied(get('users/' + other + '/records/' + id, token)),
-      );
-    }
-    await check(uid + ': other canonical list denied', () =>
-      denied(list('users/' + other + '/records', token)),
-    );
-    await check(uid + ': other work-filtered canonical query denied', () =>
-      denied(
-        query('users/' + other, 'records', token, {
-          where: equal('projectId', 'work'),
-        }),
-      ),
-    );
-    await check(uid + ': collectionGroup records denied', () =>
-      denied(query('', 'records', token, { allDescendants: true })),
-    );
-    await check(uid + ': own uid collectionGroup records denied', () =>
-      denied(
-        query('', 'records', token, {
-          allDescendants: true,
-          where: equal('uid', uid),
-        }),
-      ),
-    );
-    for (const id of ['work', 'personal', 'orphan']) {
-      await check(uid + ': own audit get ' + id + ' allowed', () =>
-        allowed(get('users/' + uid + '/records/' + id + '/audit/entry', token)),
-      );
-      await check(uid + ': other audit get ' + id + ' denied', () =>
-        denied(
-          get('users/' + other + '/records/' + id + '/audit/entry', token),
-        ),
-      );
-    }
-    await check(uid + ': own audit list allowed', () =>
-      allowed(list('users/' + uid + '/records/work/audit', token)),
-    );
-    await check(uid + ': other audit list denied', () =>
-      denied(list('users/' + other + '/records/work/audit', token)),
-    );
-    await check(uid + ': owner personal type flip denied', () =>
-      denied(write('projects/' + ownProject, { type: 'work' }, token)),
-    );
-    await check(uid + ': other personal ownership hijack denied', () =>
-      denied(write('projects/' + otherProject, { createdBy: uid }, token)),
-    );
-    await check(uid + ': work privatization denied', () =>
-      denied(
-        write('projects/work', { type: 'personal', createdBy: uid }, token),
-      ),
-    );
-    await check(uid + ': own record project flip denied', () =>
-      denied(
-        write(
-          'users/' + uid + '/records/personal',
-          { projectId: 'work' },
-          token,
-        ),
-      ),
-    );
-    await check(uid + ': own audit update denied', () =>
-      denied(
-        write(
-          'users/' + uid + '/records/work/audit/entry',
-          { reason: 'Tampered' },
-          token,
-        ),
-      ),
-    );
-    await check(uid + ': own project delete denied', () =>
-      denied(request(documentUrl('projects/' + ownProject), token, 'DELETE')),
-    );
-    await check(uid + ': own record delete denied', () =>
-      denied(
-        request(documentUrl('users/' + uid + '/records/work'), token, 'DELETE'),
-      ),
-    );
-    await check(uid + ': personal remains private after denied flips', () =>
-      denied(get('projects/' + ownProject, otherToken)),
-    );
-  }
-
-  for (const id of [
-    'personal-no-owner',
-    'personal-null-owner',
-    'personal-number-owner',
-    'personal-list-owner',
-    'personal-map-owner',
-    'personal-empty-owner',
-    'personal-long-owner',
-    'bad-type',
-    'null-type',
-    'number-type',
-    'list-type',
-    'map-type',
-  ]) {
-    for (const [uid, token] of [
-      [alice, aliceToken],
-      [bob, bobToken],
-    ]) {
-      await check(uid + ': malformed personal/enum ' + id + ' denied', () =>
-        denied(get('projects/' + id, token)),
-      );
-    }
-  }
-  const invalidAuth = [
-    ['unauthenticated', null],
-    ['anonymous', jwt(alice, { firebase: { sign_in_provider: 'anonymous' } })],
-    ['unverified', jwt(alice, { email_verified: false })],
-    ['verification string', jwt(alice, { email_verified: 'true' })],
-    [
-      'wrong provider',
-      jwt(alice, { firebase: { sign_in_provider: 'password' } }),
-    ],
-    ['wrong domain', jwt(alice, { email: 'alice@example.com' })],
-    ['domain suffix attack', jwt(alice, { email: 'alice@wads.dev.evil' })],
-    ['missing email', jwt(alice, { email: null })],
-    ['missing verified', jwt(alice, { email_verified: null })],
-    ['missing firebase', jwt(alice, { firebase: null })],
-    ['missing provider', jwt(alice, { firebase: {} })],
-  ];
-  for (const [name, token] of invalidAuth) {
-    for (const path of [
-      'projects/work',
-      'projects/personal-alice',
-      'users/' + alice + '/records/work',
-      'users/' + alice + '/records/work/audit/entry',
-    ]) {
-      await check(name + ': get denied ' + path, () =>
-        denied(get(path, token)),
-      );
-    }
-    await check(name + ': own history list denied', () =>
-      denied(list('users/' + alice + '/records', token)),
-    );
-    await check(name + ': own audit list denied', () =>
-      denied(list('users/' + alice + '/records/work/audit', token)),
-    );
-  }
-  await check('case-insensitive exact company domain accepted', () =>
-    allowed(get('projects/work', jwt(alice, { email: 'ALICE@WADS.DEV' }))),
+function and(...filters) {
+  return { compositeFilter: { op: 'AND', filters } };
+}
+function compare(fieldPath, op, field) {
+  return { fieldFilter: { field: { fieldPath }, op, value: value(field) } };
+}
+function validProject(id, owner, type = 'work') {
+  return {
+    id,
+    type,
+    createdBy: owner,
+    createdAt: '2026-10-09T12:00:00Z',
+    title: 'Synthetic project',
+    description: 'Synthetic project description for rules',
+    topics: [],
+  };
+}
+function validRecord(projectId, uid = alice) {
+  return {
+    uid,
+    projectId,
+    startedAt: '2026-10-09T12:00:00Z',
+    timeZone: 'UTC',
+    originalText: 'Synthetic transcript',
+    interpretation: 'Synthetic context',
+    requestId: 'synthetic-request',
+    fingerprint: 'synthetic-fingerprint',
+    topics: [],
+  };
+}
+test('project authorization: public authenticated and own personal', async (t) => {
+  const external = jwt('external', {
+    email: 'external@example.com',
+    email_verified: false,
+    firebase: { sign_in_provider: 'password' },
+  });
+  await t.test(
+    'public means any authenticated provider; private uses parent owner only',
+    async () => {
+      for (const token of [aliceToken, bobToken, external]) {
+        for (const p of ['work', 'legacy', 'legacy-no-owner'])
+          await allowed(get('projects/' + p, token));
+        await allowed(get('users/' + alice + '/records/work', token));
+        await denied(
+          get(
+            'projects/personal-alice',
+            token === aliceToken ? bobToken : token,
+          ),
+        );
+      }
+      await allowed(get('projects/personal-alice', aliceToken));
+      await allowed(get('users/' + bob + '/records/personal', aliceToken));
+      await denied(get('users/' + alice + '/records/personal', bobToken));
+      for (const path of ['projects/work', 'users/' + alice + '/records/work'])
+        await denied(get(path));
+    },
   );
-  for (const path of [
-    'projects/work/topics/nested',
-    'projects/personal-alice/topics/nested',
-    'projects/work/audit/entry',
-    'projects/work/merges/entry',
-    'projects/work/records/nested',
-    'users/' + alice + '/topics/nested',
-    'users/' + alice,
-    'oauth_states/secret',
-    'oauth_tokens/secret',
-    'internal_jobs/secret',
-  ]) {
-    for (const [uid, token] of [
-      [alice, aliceToken],
-      [bob, bobToken],
-    ]) {
-      await check(uid + ': default deny get ' + path, () =>
-        denied(get(path, token)),
+  await t.test(
+    'invalid parents, forged snapshots and own orphan history fail closed',
+    async () => {
+      for (const id of [
+        'bad-type',
+        'bad-owner',
+        'orphan',
+        'no-project',
+        'null-project',
+        'number-project',
+        'list-project',
+        'map-project',
+        'empty-project',
+        'path-project',
+      ]) {
+        for (const token of [externalAliceToken, bobToken])
+          await denied(get('users/' + alice + '/records/' + id, token));
+      }
+      await denied(get('projects/bad-type', aliceToken));
+    },
+  );
+  await t.test(
+    'TEMP canonical corporate owner reads preserve old frontend, not collectionGroup or foreign history',
+    async () => {
+      await allowed(list('users/' + alice + '/records', aliceToken));
+      await allowed(get('users/' + alice + '/records/orphan', aliceToken));
+      for (const token of [externalAliceToken, bobToken]) {
+        await denied(list('users/' + alice + '/records', token));
+        await denied(get('users/' + alice + '/records/orphan', token));
+      }
+      await denied(
+        query('', 'records', aliceToken, {
+          allDescendants: true,
+          where: equal('uid', alice),
+        }),
       );
-      await check(uid + ': default deny write ' + path, () =>
-        denied(write(path, { secret: 'Overwrite' }, token)),
+      for (const changes of [
+        { email_verified: false },
+        { email: 'alice@example.net' },
+        { firebase: { sign_in_provider: 'password' } },
+        { email: '' },
+      ]) {
+        await denied(list('users/' + alice + '/records', jwt(alice, changes)));
+      }
+    },
+  );
+  await t.test(
+    'project discovery is query-compatible, not an unfiltered list',
+    async () => {
+      await allowed(
+        query('', 'projects', bobToken, { where: equal('type', 'work') }),
       );
-    }
-  }
-  for (const path of [
-    'projects/work/topics',
-    'projects/personal-alice/topics',
-    'users',
-    'oauth_states',
-    'oauth_tokens',
-    'internal_jobs',
-  ]) {
-    await check('default deny list ' + path, () =>
-      denied(list(path, aliceToken)),
-    );
-  }
-  for (const path of [
-    'projects/new-project',
-    'users/' + alice + '/records/new-record',
-    'users/' + alice + '/records/work/audit/new-audit',
-  ]) {
-    await check('client create denied ' + path, () =>
-      denied(
+      await allowed(
+        query('', 'projects', aliceToken, {
+          where: and(equal('type', 'personal'), equal('createdBy', alice)),
+        }),
+      );
+      await denied(
+        query('', 'projects', bobToken, {
+          where: and(equal('type', 'personal'), equal('createdBy', alice)),
+        }),
+      );
+      await denied(list('projects', aliceToken));
+      await denied(
+        query('', 'projects', undefined, { where: equal('type', 'work') }),
+      );
+    },
+  );
+  await t.test(
+    'collectionGroup records: project constraint plus temporal and UID filters',
+    async () => {
+      const options = {
+        allDescendants: true,
+        where: equal('projectId', 'work'),
+      };
+      await allowed(query('', 'records', bobToken, options));
+      await allowed(
+        query('', 'records', aliceToken, {
+          allDescendants: true,
+          where: equal('projectId', 'personal-alice'),
+        }),
+      );
+      await denied(
+        query('', 'records', bobToken, {
+          allDescendants: true,
+          where: equal('projectId', 'personal-alice'),
+        }),
+      );
+      await denied(
+        query('', 'records', aliceToken, {
+          allDescendants: true,
+          where: equal('uid', alice),
+        }),
+      );
+      await denied(query('', 'records', undefined, options));
+      await allowed(
         write(
-          path,
-          { type: 'personal', createdBy: alice, projectId: 'work' },
+          'users/' + alice + '/records/timed',
+          validRecord('work'),
+          'owner',
+        ),
+      );
+      await allowed(
+        query('', 'records', bobToken, {
+          allDescendants: true,
+          where: and(
+            equal('projectId', 'work'),
+            equal('uid', alice),
+            compare(
+              'startedAt',
+              'GREATER_THAN_OR_EQUAL',
+              '2026-10-09T00:00:00Z',
+            ),
+            compare('startedAt', 'LESS_THAN', '2026-10-10T00:00:00Z'),
+          ),
+          orderBy: [
+            { field: { fieldPath: 'startedAt' }, direction: 'ASCENDING' },
+          ],
+        }),
+      );
+    },
+  );
+  await t.test(
+    'project writes protect ownership/type and validate schema',
+    async () => {
+      const p = validProject('client-project', alice);
+      await allowed(write('projects/client-project', p, aliceToken));
+      await allowed(
+        write(
+          'projects/client-project',
+          { ...p, title: 'Edited by public user' },
+          bobToken,
+        ),
+      );
+      await denied(
+        write('projects/client-project', { ...p, createdBy: bob }, bobToken),
+      );
+      await denied(
+        write(
+          'projects/client-project',
+          { ...p, type: 'personal' },
           aliceToken,
         ),
-      ),
-    );
-  }
-  await check('owner audit deletion denied', () =>
-    denied(
-      request(
-        documentUrl('users/' + alice + '/records/work/audit/entry'),
-        aliceToken,
-        'DELETE',
-      ),
-    ),
-  );
-  await check('forged record owner field cannot reveal personal', () =>
-    denied(get('users/' + bob + '/records/personal', aliceToken)),
-  );
-  await check(
-    'trusted type changes immediately affect other-user record authorization',
-    async () => {
-      const projectPath = 'projects/admin-flip';
-      const recordPath = 'users/' + alice + '/records/admin-flip';
+      );
+      await denied(
+        write('projects/client-project', { ...p, type: 'invalid' }, aliceToken),
+      );
+      await denied(
+        write(
+          'projects/forged-owner',
+          validProject('forged-owner', alice),
+          bobToken,
+        ),
+      );
+      await denied(
+        write('projects/malformed', { type: 'work', createdBy: bob }, bobToken),
+      );
+      await denied(
+        write(
+          'projects/personal-alice',
+          validProject('personal-alice', alice, 'personal'),
+          bobToken,
+        ),
+      );
+      await denied(
+        request(documentUrl('projects/personal-alice'), bobToken, 'DELETE'),
+      );
       await allowed(
-        write(projectPath, { type: 'work', createdBy: alice }, 'owner'),
+        request(documentUrl('projects/client-project'), bobToken, 'DELETE'),
+      );
+    },
+  );
+  await t.test(
+    'record create/update/delete use parent, preserve identity and both move endpoints',
+    async () => {
+      const path = 'users/' + alice + '/records/client-record';
+      const record = validRecord('work');
+      await allowed(write(path, record, bobToken));
+      await allowed(
+        write(path, { ...record, interpretation: 'Public edit' }, bobToken),
+      );
+      await denied(write(path, { ...record, uid: bob }, bobToken));
+      await denied(
+        write(path, { ...record, fingerprint: 'changed' }, bobToken),
+      );
+      await denied(
+        write(path, { ...record, projectId: 'personal-alice' }, bobToken),
+      );
+      await denied(
+        write(path, { ...record, projectId: 'missing-project' }, aliceToken),
+      );
+      await denied(write(path, { ...record, topics: 'bad' }, bobToken));
+      await denied(
+        write(
+          'users/' + alice + '/records/forged',
+          { ...record, uid: bob },
+          bobToken,
+        ),
+      );
+      await denied(
+        write(
+          'users/' + alice + '/records/private-forged',
+          validRecord('personal-alice'),
+          bobToken,
+        ),
+      );
+      await denied(write('users/' + alice + '/records/anonymous', record));
+      await allowed(
+        write(path, { ...record, projectId: 'personal-alice' }, aliceToken),
+      );
+      await denied(write(path, record, bobToken));
+      await denied(request(documentUrl(path), bobToken, 'DELETE'));
+      await allowed(write(path, record, aliceToken));
+      await allowed(request(documentUrl(path), bobToken, 'DELETE'));
+    },
+  );
+  await t.test(
+    'current parent revocation and deletion affect records and queries',
+    async () => {
+      const p = 'projects/revoked';
+      const path = 'users/' + alice + '/records/revoked';
+      await allowed(write(p, validProject('revoked', alice), 'owner'));
+      await allowed(write(path, validRecord('revoked'), 'owner'));
+      await allowed(get(path, bobToken));
+      await allowed(
+        write(p, validProject('revoked', alice, 'personal'), 'owner'),
+      );
+      await denied(get(path, bobToken));
+      await denied(
+        query('', 'records', bobToken, {
+          allDescendants: true,
+          where: equal('projectId', 'revoked'),
+        }),
+      );
+      await allowed(get(path, aliceToken));
+      await allowed(request(documentUrl(p), 'owner', 'DELETE'));
+      await denied(get(path, externalAliceToken));
+      await denied(write(path, validRecord('work'), aliceToken));
+      await denied(request(documentUrl(path), aliceToken, 'DELETE'));
+    },
+  );
+  await t.test(
+    'no recursive audit, OAuth, profile or projection grants',
+    async () => {
+      for (const path of [
+        'users/' + alice,
+        'oauth_tokens/secret',
+        'oauth_states/secret',
+        'projects/work/topics/nested',
+        'projects/work/audit/entry',
+        'projects/work/merges/entry',
+        'projects/work/reportRecords/hidden',
+      ]) {
+        await denied(get(path, aliceToken));
+        await denied(write(path, { secret: 'forged' }, aliceToken));
+      }
+      await allowed(
+        get('users/' + alice + '/records/work/audit/entry', aliceToken),
+      );
+      await denied(
+        get('users/' + alice + '/records/work/audit/entry', bobToken),
+      );
+      await denied(
+        write(
+          'users/' + alice + '/records/work/audit/entry',
+          { authorUid: alice },
+          aliceToken,
+        ),
+      );
+    },
+  );
+  await t.test(
+    'anonymous provider and endedAt overlap constraints',
+    async () => {
+      const anonymous = jwt(alice, {
+        firebase: { sign_in_provider: 'anonymous' },
+      });
+      await denied(get('projects/work', anonymous));
+      await denied(get('users/' + alice + '/records/work', anonymous));
+      await denied(
+        query('', 'records', anonymous, {
+          allDescendants: true,
+          where: equal('projectId', 'work'),
+        }),
+      );
+      await denied(
+        write(
+          'users/' + alice + '/records/anonymous-provider',
+          validRecord('work'),
+          anonymous,
+        ),
       );
       await allowed(
         write(
-          recordPath,
+          'users/' + alice + '/records/overlap',
           {
-            uid: alice,
-            projectId: 'admin-flip',
-            type: 'work',
-            projectSnapshot: { type: 'work' },
+            ...validRecord('work'),
+            startedAt: '2026-10-08T23:00:00Z',
+            endedAt: '2026-10-09T02:00:00Z',
           },
           'owner',
         ),
       );
-      await allowed(get(recordPath, bobToken));
       await allowed(
-        write(projectPath, { type: 'personal', createdBy: alice }, 'owner'),
+        query('', 'records', bobToken, {
+          allDescendants: true,
+          where: and(
+            equal('projectId', 'work'),
+            equal('uid', alice),
+            compare('endedAt', 'GREATER_THAN_OR_EQUAL', '2026-10-09T00:00:00Z'),
+            compare('startedAt', 'LESS_THAN', '2026-10-10T00:00:00Z'),
+          ),
+        }),
       );
-      await denied(get(projectPath, bobToken));
-      await denied(get(recordPath, bobToken));
-      await allowed(get(recordPath, aliceToken));
-      await allowed(
-        write(projectPath, { type: 'invalid', createdBy: alice }, 'owner'),
-      );
-      await denied(get(recordPath, bobToken));
-      await allowed(request(documentUrl(projectPath), 'owner', 'DELETE'));
-      await denied(get(recordPath, bobToken));
-      await allowed(get(recordPath, aliceToken));
     },
   );
 });

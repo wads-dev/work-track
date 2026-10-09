@@ -1,20 +1,16 @@
 rules_version = '2';
-// Assumed data model (all mutations are performed by the trusted Admin SDK):
-// projects/{projectId}: id/title/description/createdAt strings; createdBy is the
-// immutable, Admin-controlled owner UID (nonempty string, at most 128 chars).
-// type is 'personal' (owner-only) or 'work' (company-shared). Missing type is
-// legacy work; any other type fails closed. topics is an embedded list of
-// {id,title,description}; recordedAt timestamp; optional updatedBy/updatedAt,
-// archived/confidential/publicAlias/githubUrl. Confidential is presentation only.
-// users/{uid}/records/{recordId}: uid/projectId/requestId strings; startedAt,
-// optional endedAt/commandAt ISO strings; timeZone/originalText/interpretation
-// strings; topics/interruptions lists; recordedAt timestamp; fingerprint string.
-// Owners can read their entire canonical history, including orphaned records.
-// Other company users can get a record only if its current project is work.
-// Audit entries: authorUid/reason/updatedAt/before/after summaries, private to owner.
-// oauth_* documents contain credentials and are never accessible to clients.
+// work and legacy missing-type projects are public to authenticated users.
+// personal projects are private to createdBy. Full canonical record content is
+// intentionally shared by CURRENT parent authorization, regardless of record uid.
+// Prototype: review and verify with the emulator before broad deployment.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    // TEMP rollout compatibility: remove together with the canonical read clause
+    // after the new project-constrained frontend is deployed.
     function isCompanyGoogleUser() {
       return request.auth != null
         && request.auth.token.email is string
@@ -22,59 +18,88 @@ service cloud.firestore {
         && request.auth.token.email.lower().matches('^[^@]+@wads[.]dev$')
         && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
-
-    function isOwner(uid) {
-      return request.auth != null && request.auth.uid == uid;
-    }
-
-    function isWorkProject(data) {
-      // Explicit organizational sharing was the legacy behavior.
-      return !('type' in data) || data.type == 'work';
-    }
-
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isWorkProject(data) { return !('type' in data) || data.type == 'work'; }
     function isPersonalProjectOwner(data) {
       return 'type' in data && data.type == 'personal'
-        && 'createdBy' in data && data.createdBy is string
-        && data.createdBy.size() > 0 && data.createdBy.size() <= 128
-        && isOwner(data.createdBy);
+        && data.createdBy is string && data.createdBy.size() > 0
+        && data.createdBy.size() <= 128 && isOwner(data.createdBy);
     }
-
-    function resolvesToWorkProject(data) {
-      // Never trust a record's type/snapshot/owner as project authorization.
-      return 'projectId' in data && data.projectId is string
-        && data.projectId.matches('^[A-Za-z0-9_-]{1,128}$')
+    function projectAccess(data) {
+      return signedIn() && (isWorkProject(data) || isPersonalProjectOwner(data));
+    }
+    function validId(id) { return id is string && id.matches('^[A-Za-z0-9_-]{1,128}$'); }
+    function recordProjectAccess(data) {
+      return 'projectId' in data && validId(data.projectId)
         && exists(/databases/$(database)/documents/projects/$(data.projectId))
-        && isWorkProject(get(/databases/$(database)/documents/projects/$(data.projectId)).data);
+        && projectAccess(get(/databases/$(database)/documents/projects/$(data.projectId)).data);
     }
-
+    function validProject(data, projectId) {
+      return data.keys().hasAll(['id', 'title', 'description', 'createdBy', 'createdAt', 'topics'])
+        && data.id == projectId && validId(projectId)
+        && data.createdBy is string && data.createdBy.size() > 0 && data.createdBy.size() <= 128
+        && (!('type' in data) || data.type in ['work', 'personal'])
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 160
+        && data.description is string && data.description.size() >= 20 && data.description.size() <= 6000
+        && data.createdAt is string && data.topics is list
+        && (!('archived' in data) || data.archived is bool)
+        && (!('confidential' in data) || data.confidential is bool);
+    }
+    function validRecord(data, uid, recordId) {
+      return data.keys().hasAll(['uid', 'projectId', 'startedAt', 'timeZone', 'originalText', 'interpretation', 'requestId', 'fingerprint', 'topics'])
+        && (!('id' in data) || data.id == recordId)
+        && data.uid == uid && uid is string && uid.size() > 0 && uid.size() <= 128
+        && validId(data.projectId) && validId(data.requestId)
+        && data.fingerprint is string && data.fingerprint.size() > 0
+        && data.startedAt is string && data.startedAt.size() >= 20 && data.startedAt.size() <= 40
+        && (!('endedAt' in data) || (data.endedAt is string && data.endedAt.size() >= 20 && data.endedAt.size() <= 40))
+        && data.timeZone is string && data.timeZone.size() > 0 && data.timeZone.size() <= 100
+        && data.originalText is string && data.originalText.size() > 0 && data.originalText.size() <= 12000
+        && data.interpretation is string && data.interpretation.size() > 0 && data.interpretation.size() <= 6000
+        && data.topics is list && data.topics.size() <= 30
+        && (!('interruptions' in data) || (data.interruptions is list && data.interruptions.size() <= 30));
+    }
     match /projects/{projectId} {
-      allow get: if isCompanyGoogleUser()
-        && (isWorkProject(resource.data) || isPersonalProjectOwner(resource.data));
-      // Rules are not filters: project discovery goes through listProjects.
-      allow list: if false;
-      allow write: if false;
+      // Query selectors: type == work; type == personal AND createdBy == uid.
+      // Legacy missing-type projects are readable but cannot be selected with
+      // type==work. Do not perform an unbounded unfiltered discovery query.
+      allow get: if projectAccess(resource.data);
+      // Absence of type cannot constrain a query's potential result set. Legacy
+      // documents remain accessible by get, but discovery requires explicit type.
+      allow list: if signedIn() && (resource.data.get('type', '') == 'work'
+        || (resource.data.get('type', '') == 'personal'
+          && resource.data.get('createdBy', '') == request.auth.uid));
+      allow create: if signedIn() && 'type' in request.resource.data
+        && validProject(request.resource.data, projectId)
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if projectAccess(resource.data) && projectAccess(request.resource.data)
+        && validProject(request.resource.data, projectId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'type', 'createdBy', 'createdAt']);
+      allow delete: if projectAccess(resource.data);
     }
-
     match /users/{uid}/records/{recordId} {
-      allow get: if isCompanyGoogleUser()
-        && (isOwner(uid) || resolvesToWorkProject(resource.data));
-      allow list: if isCompanyGoogleUser() && isOwner(uid);
-      // Owner edits use callable/MCP transaction with audit; client writes denied.
-      allow write: if false;
+      // TEMP: previous canonical owner history access, not collectionGroup access.
+      allow get, list: if isCompanyGoogleUser() && isOwner(uid);
+      allow create: if signedIn() && validId(recordId)
+        && validRecord(request.resource.data, uid, recordId) && recordProjectAccess(request.resource.data);
+      allow update: if recordProjectAccess(resource.data) && recordProjectAccess(request.resource.data)
+        && resource.data.uid == uid && validRecord(request.resource.data, uid, recordId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'uid', 'requestId', 'fingerprint', 'receivedAt']);
+      allow delete: if recordProjectAccess(resource.data) && resource.data.uid == uid;
       match /audit/{auditId} {
-        allow read: if isCompanyGoogleUser() && isOwner(uid);
+        allow read: if isOwner(uid);
         allow write: if false;
       }
     }
-
-    // Only project gets, canonical records and record-owner audit have grants.
-    // Project subcollections (topics/audit/merges), user profiles, OAuth and all
-    // other nested paths stay denied; no recursive records grant exists.
-    // All client collectionGroup('records') queries stay denied, even with uid
-    // filters. Client create/update/delete always deny, including owner/type
-    // changes. Trusted Admin SDK bypasses rules and must validate schemas and ACLs.
-    match /{document=**} {
-      allow read, write: if false;
+    // Required for collectionGroup('records'). Only record documents whose
+    // current parent is authorized are granted; no grant extends to their children.
+    // Final project policy denies orphans; TEMP canonical owner exception above
+    // preserves the old frontend until project-constrained reads are deployed.
+    match /{path=**}/records/{recordId} {
+      allow get, list: if recordProjectAccess(resource.data);
     }
+    // Profiles, OAuth, audits outside the explicit owner branch, projections and
+    // all other paths remain denied. Never recursively inherit a project grant.
+    match /{document=**} { allow read, write: if false; }
   }
 }
