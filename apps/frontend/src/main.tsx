@@ -271,7 +271,7 @@ function App() {
                 </Button>
                 <List>
                   {[
-                    ['/app', 'Visão geral'],
+                    ['/app', 'Dashboard'],
                     ['/projects', 'Projetos'],
                     ['/records', 'Meus registros'],
                     ['/pending', 'Pendências'],
@@ -315,7 +315,17 @@ function App() {
               sx={{ py: 4 }}
             >
               <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
-                Dashboard
+                {location.pathname.startsWith('/projects')
+                  ? 'Projetos'
+                  : location.pathname.startsWith('/records')
+                    ? 'Meus registros'
+                    : location.pathname === '/calendar'
+                      ? 'Calendário'
+                      : location.pathname === '/pending'
+                        ? 'Pendências'
+                        : location.pathname === '/rules'
+                          ? 'Regras do relatório'
+                          : 'Dashboard'}
               </Typography>
               <Typography color="text.secondary" sx={{ mb: 4 }}>
                 Projetos da equipe e seus registros de atividade.

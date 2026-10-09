@@ -92,6 +92,34 @@ export function calendarDays(day: string, view: View) {
     addDays(start, i),
   );
 }
+export function customRange(first: string, last: string, zone: string) {
+  parseDay(first);
+  parseDay(last);
+  validZone(zone);
+  if (last < first)
+    throw new Error('Data final não pode ser anterior à inicial.');
+  const count =
+    (Date.parse(last + 'T12:00:00Z') - Date.parse(first + 'T12:00:00Z')) /
+      86400000 +
+    1;
+  const from = midnight(first, zone),
+    to = midnight(addDays(last, 1), zone);
+  if (count > 31 || Date.parse(to) - Date.parse(from) > 31 * 86400000 + 3600000)
+    throw new Error(
+      'Intervalo máximo: 31 dias inclusivos (mais até 1 hora de ajuste de horário de verão). Escolha um intervalo menor; consultas não são somadas automaticamente.',
+    );
+  return { first, count, from, to };
+}
+export function moveReference(day: string, view: View, direction: number) {
+  if (view !== 'month')
+    return addDays(day, direction * (view === 'week' ? 7 : 1));
+  const d = parseDay(day);
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + direction, 1, 12),
+  )
+    .toISOString()
+    .slice(0, 10);
+}
 export function overlaps(
   a: { effectiveStartedAt: string; effectiveEndedAt: string },
   b: { effectiveStartedAt: string; effectiveEndedAt: string },

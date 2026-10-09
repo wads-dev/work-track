@@ -24,6 +24,8 @@ import { hours, pieSlices } from './report-chart';
 import {
   calendarDays,
   addDays,
+  customRange,
+  moveReference,
   dayKey,
   midnight,
   overlaps,
@@ -79,6 +81,8 @@ export function PersonalPage({
     params.get('date') ?? dayKey(new Date(), 'America/Sao_Paulo');
   const rawView = params.get('view') ?? (calendar ? 'week' : 'day');
   const cursor = params.get('cursor') ?? '';
+  const firstDate = params.get('fromDate') ?? selected;
+  const lastDate = params.get('toDate') ?? selected;
   let validated: ReturnType<typeof range> | null = null;
   let invalid = '';
   let view: View = 'day';
@@ -86,7 +90,9 @@ export function PersonalPage({
     if (!['day', 'week', 'month'].includes(rawView))
       throw new Error('Visualização inválida.');
     view = rawView as View;
-    validated = range(selected, view, validZone(zone));
+    validated = calendar
+      ? range(selected, view, validZone(zone))
+      : customRange(firstDate, lastDate, zone);
   } catch (error) {
     invalid = error instanceof Error ? error.message : 'Filtros inválidos.';
   }
@@ -166,31 +172,69 @@ export function PersonalPage({
         {calendar ? 'Calendário pessoal' : 'Dashboard pessoal'}
       </Typography>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-        <TextField
-          type="date"
-          label="Data de referência"
-          value={selected}
-          onChange={(e) => update('date', e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <TextField
-          select
-          label="Período"
-          value={view}
-          onChange={(e) => update('view', e.target.value)}
-        >
-          {['day', 'week', 'month'].map((v) => (
-            <MenuItem key={v} value={v}>
-              {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
-            </MenuItem>
-          ))}
-        </TextField>
+        {calendar ? (
+          <>
+            <Button
+              onClick={() => update('date', moveReference(selected, view, -1))}
+            >
+              Anterior
+            </Button>
+            <TextField
+              type="date"
+              label="Data de referência"
+              value={selected}
+              onChange={(e) => update('date', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              select
+              label="Visualização"
+              value={view}
+              onChange={(e) => update('view', e.target.value)}
+            >
+              {['day', 'week', 'month'].map((v) => (
+                <MenuItem key={v} value={v}>
+                  {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button
+              onClick={() => update('date', moveReference(selected, view, 1))}
+            >
+              Próximo
+            </Button>
+          </>
+        ) : (
+          <>
+            <TextField
+              type="date"
+              label="Data inicial (inclusiva)"
+              value={firstDate}
+              onChange={(e) => update('fromDate', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              type="date"
+              label="Data final (inclusiva)"
+              value={lastDate}
+              onChange={(e) => update('toDate', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </>
+        )}
         <TextField
           label="Fuso IANA"
           value={zone}
           onChange={(e) => update('timeZone', e.target.value)}
         />
       </Stack>
+      {!calendar && (
+        <Typography color="text.secondary">
+          Intervalo máximo de 31 dias inclusivos, com até 1 hora adicional para
+          horário de verão. Consultas não são somadas automaticamente; paginação
+          continua limitada aos dados examinados.
+        </Typography>
+      )}
       {loading ? (
         <CircularProgress aria-label="Carregando relatório pessoal" />
       ) : error ? (
