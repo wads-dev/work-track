@@ -165,13 +165,25 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
   async mergeProjects(input: MergeProjectsInput, uid: string) {
     const sourceRef = this.db.collection('projects').doc(input.sourceProjectId),
       targetRef = this.db.collection('projects').doc(input.targetProjectId);
-    const query = this.db
-      .collectionGroup('records')
-      .where('projectId', '==', input.sourceProjectId);
+    // Personal merges never read another UID's records, including stale canonical references.
+    // UID equality also excludes spoofed owner-collection facts from preview and migration.
+    const recordsQuery = (source: ManagedProject) =>
+      effectiveProjectType(source) === 'personal'
+        ? this.db
+            .collection('users')
+            .doc(source.createdBy)
+            .collection('records')
+            .where('projectId', '==', input.sourceProjectId)
+            .where('uid', '==', source.createdBy)
+        : this.db
+            .collectionGroup('records')
+            .where('projectId', '==', input.sourceProjectId);
     if (!input.confirmed) {
       const [a, b] = await Promise.all([sourceRef.get(), targetRef.get()]);
       assertProjectMergeAccess(a.data(), b.data(), uid);
-      const count = await query.count().get();
+      const count = await recordsQuery(a.data() as ManagedProject)
+        .count()
+        .get();
       if (!a.exists || !b.exists)
         throw new ProjectManagementError(
           'not-found',
@@ -322,7 +334,9 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
           'failed-precondition',
           'Locks da mesclagem inconsistentes.',
         );
-      const page = await tx.get(query.limit(101));
+      const page = await tx.get(
+        recordsQuery(a.data() as ManagedProject).limit(101),
+      );
       const docs = page.docs.slice(0, 100);
       const target = b.data() as ManagedProject;
       const changes = docs.map((doc) => {
@@ -332,7 +346,10 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
           parts.length !== 4 ||
           parts[0] !== 'users' ||
           parts[2] !== 'records' ||
-          parts[1] !== data.uid
+          parts[1] !== data.uid ||
+          (effectiveProjectType(a.data() as ManagedProject) === 'personal' &&
+            (parts[1] !== a.data()?.createdBy ||
+              data.uid !== a.data()?.createdBy))
         )
           throw new ProjectManagementError(
             'failed-precondition',
