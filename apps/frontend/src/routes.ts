@@ -4,12 +4,13 @@ export function safeReturnTo(value: string | null): string {
     const url = new URL(value, 'https://work-track.invalid');
     if (
       url.origin !== 'https://work-track.invalid' ||
-      !/^\/(app|projects|records|pending|rules|calendar)(\/[^/]+)?$/.test(
+      !/^\/(app|projects|records|pending|rules|calendar|me)(\/[^/]+)?$/.test(
         url.pathname,
       )
     )
       return '/app';
-    if (/^\/(app|pending|rules|calendar)\//.test(url.pathname)) return '/app';
+    if (/^\/(app|pending|rules|calendar|me)\//.test(url.pathname))
+      return '/app';
     return url.pathname + url.search + url.hash;
   } catch {
     return '/app';

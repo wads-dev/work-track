@@ -8,7 +8,7 @@
 
 ## Próximas entregas planejadas
 
-- [ ] Arquivar/desarquivar projetos e listar arquivados. Ocultar nos relatórios/calendário por padrão sem apagar registros; distinguir arquivamento manual de origem mesclada. Definir efeito no orçamento global sem fabricar saldo. Arquivar não melhora custo sozinho sem queries/indexação.
+- [x] Arquivar/desarquivar projetos e listar arquivados, publicados. Ocultos nos relatórios/calendário por padrão sem apagar registros; arquivo manual distinto de origem mesclada. Contexto do orçamento global preservado. Arquivar não melhora custo sozinho sem queries/indexação.
 
 - [x] Dashboard pessoal: distribuição de tempo por projeto em dia, semana e mês, via relatório calculado e paginação explícita.
 - [x] Calendário pessoal semanal/mensal com atividades coloridas, sobreposições e estimativas identificadas. Visualização responsiva por dia, sem drag-and-drop.

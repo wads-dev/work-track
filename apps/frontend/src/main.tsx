@@ -5,6 +5,7 @@ import {
   AppBar,
   Drawer,
   IconButton,
+  Tooltip,
   List,
   ListItemButton,
   ListItemText,
@@ -119,7 +120,7 @@ function App() {
       aria-label={mode === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
       onClick={() => setThemeOverride(mode === 'dark' ? 'light' : 'dark')}
     >
-      <span aria-hidden="true">{mode === 'dark' ? '☀' : '☾'}</span>
+      <UiIcon kind={mode === 'dark' ? 'sun' : 'moon'} />
     </IconButton>
   );
   const location = useLocation();
@@ -231,28 +232,44 @@ function App() {
                 >
                   <span aria-hidden="true">☰</span>
                 </IconButton>
-                {toggleTheme}
+                <Typography component="h1" variant="h6" sx={{ flexGrow: 1 }}>
+                  Work Track ›{' '}
+                  {location.pathname.startsWith('/projects')
+                    ? 'Projetos'
+                    : location.pathname.startsWith('/records')
+                      ? 'Meus registros'
+                      : location.pathname === '/calendar'
+                        ? 'Calendário'
+                        : location.pathname === '/pending'
+                          ? 'Pendências'
+                          : location.pathname === '/rules'
+                            ? 'Regras'
+                            : location.pathname === '/me'
+                              ? 'Meu relatório'
+                              : 'Dashboard'}
+                </Typography>
+                <Tooltip title="Alternar tema">{toggleTheme}</Tooltip>
                 <PendingBell db={services.db} uid={user.uid} />
-                <Button
-                  color="inherit"
-                  aria-pressed={revealed}
-                  onClick={() => setRevealed((value) => !value)}
+                <Tooltip
+                  title={
+                    revealed
+                      ? 'Ocultar dados confidenciais'
+                      : 'Revelar dados confidenciais'
+                  }
                 >
-                  {revealed ? '◉ Ocultar dados' : '⊘ Modo live: ocultos'}
-                </Button>
-                <Typography sx={{ flexGrow: 1, fontWeight: 700 }}>
-                  Work Track
-                </Typography>
-                <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
-                  {user.email}
-                </Typography>
-                <Button
-                  color="inherit"
-                  onClick={() => void logout()}
-                  disabled={busy}
-                >
-                  Sair
-                </Button>
+                  <IconButton
+                    aria-label={
+                      revealed
+                        ? 'Ocultar dados confidenciais'
+                        : 'Revelar dados confidenciais'
+                    }
+                    aria-pressed={revealed}
+                    onClick={() => setRevealed((value) => !value)}
+                  >
+                    <UiIcon kind={revealed ? 'eye' : 'eyeoff'} />
+                  </IconButton>
+                </Tooltip>
+                <Typography variant="body2">{user.email}</Typography>
               </Toolbar>
             </AppBar>
             <Drawer open={menuOpen} onClose={() => setMenuOpen(false)}>
@@ -262,9 +279,7 @@ function App() {
                 aria-label="Menu principal"
                 sx={{ width: 280, maxWidth: '85vw', p: 2 }}
               >
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                  Work Track
-                </Typography>
+                <Typography variant="h6">Work Track</Typography>
                 <Button onClick={() => setMenuOpen(false)}>Fechar menu</Button>
                 <Button onClick={() => setThemeOverride(null)}>
                   Tema do sistema
@@ -272,10 +287,11 @@ function App() {
                 <List>
                   {[
                     ['/app', 'Dashboard'],
+                    ['/me', 'Meu relatório'],
                     ['/projects', 'Projetos'],
                     ['/records', 'Meus registros'],
                     ['/pending', 'Pendências'],
-                    ['/rules', 'Regras do relatório'],
+                    ['/rules', 'Regras'],
                     ['/calendar', 'Calendário'],
                   ].map(([to, label]) => (
                     <ListItemButton
@@ -290,14 +306,14 @@ function App() {
                     >
                       <UiIcon
                         kind={
-                          to === '/rules'
-                            ? 'rules'
-                            : to === '/pending'
-                              ? 'bell'
-                              : to === '/projects'
-                                ? 'projects'
-                                : to === '/app'
-                                  ? 'home'
+                          to === '/app'
+                            ? 'home'
+                            : to === '/projects'
+                              ? 'projects'
+                              : to === '/pending'
+                                ? 'bell'
+                                : to === '/rules'
+                                  ? 'rules'
                                   : 'detail'
                         }
                       />
@@ -305,6 +321,9 @@ function App() {
                     </ListItemButton>
                   ))}
                 </List>
+                <Button disabled={busy} onClick={() => void logout()}>
+                  Sair
+                </Button>
               </Box>
             </Drawer>
             <Container
@@ -312,30 +331,24 @@ function App() {
               id="conteudo"
               tabIndex={-1}
               maxWidth="xl"
-              sx={{ py: 4 }}
+              sx={{ py: 3 }}
             >
-              <Typography component="h1" variant="h4" sx={{ mb: 1 }}>
-                {location.pathname.startsWith('/projects')
-                  ? 'Projetos'
-                  : location.pathname.startsWith('/records')
-                    ? 'Meus registros'
-                    : location.pathname === '/calendar'
-                      ? 'Calendário'
-                      : location.pathname === '/pending'
-                        ? 'Pendências'
-                        : location.pathname === '/rules'
-                          ? 'Regras do relatório'
-                          : 'Dashboard'}
-              </Typography>
-              <Typography color="text.secondary" sx={{ mb: 4 }}>
-                Projetos da equipe e seus registros de atividade.
-              </Typography>
               {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                   {error}
                 </Alert>
               )}
               <Routes>
+                <Route
+                  path="/me"
+                  element={
+                    <PersonalPage
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                    />
+                  }
+                />
                 <Route path="/rules" element={<RulesPage />} />
                 <Route
                   path="/pending"
@@ -351,6 +364,7 @@ function App() {
                   path="/app"
                   element={
                     <PersonalPage
+                      company
                       key={user.uid}
                       db={services.db}
                       functions={services.functions}

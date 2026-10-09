@@ -12,6 +12,8 @@ import {
   TextField,
   Typography,
   Tooltip,
+  IconButton,
+  Collapse,
 } from '@mui/material';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import type { Firestore } from 'firebase/firestore';
@@ -21,6 +23,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { reportError } from './report-error';
+import { UiIcon } from './UiIcons';
 import { CalendarTimeline } from './CalendarTimeline';
 import { date, text, useRows } from './data';
 import { safeProject, usePrivacy } from './privacy';
@@ -57,6 +60,7 @@ type PersonalReport = {
   totalMinutes: number;
   estimatedCount: number;
   byProject: { projectId: string; minutes: number }[];
+  byUser?: { uid: string; label: string; minutes: number }[];
   intervals: Interval[];
   warnings: string[];
   page: {
@@ -71,11 +75,15 @@ export function PersonalPage({
   db,
   functions,
   calendar = false,
+  company = false,
 }: {
   db: Firestore;
   functions: Functions;
   calendar?: boolean;
+  company?: boolean;
 }) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const { revealed } = usePrivacy();
@@ -131,12 +139,12 @@ export function PersonalPage({
       PersonalReport
     >(
       functions,
-      'getPersonalReport',
+      company ? 'getCompanyReport' : 'getPersonalReport',
     )({
       from,
       to,
       timeZone: zone,
-      limit: 200,
+      limit: company ? 50 : 200,
       includeArchived,
       ...(cursor ? { cursor } : {}),
     })
@@ -155,7 +163,7 @@ export function PersonalPage({
     return () => {
       active = false;
     };
-  }, [functions, from, to, zone, cursor, attempt, includeArchived]);
+  }, [functions, from, to, zone, cursor, attempt, includeArchived, company]);
   const label = (id: string) =>
     text(
       safeProject(projects.rows.find((p) => p.id === id)?.data, revealed)
@@ -184,95 +192,119 @@ export function PersonalPage({
     );
   return (
     <Stack spacing={3}>
-      <Typography component="h2" variant="h5">
-        {calendar ? 'Calendário pessoal' : 'Dashboard pessoal'}
-      </Typography>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-        {calendar ? (
-          <>
-            <Button
-              onClick={() => update('date', moveReference(selected, view, -1))}
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+        }}
+      >
+        <Typography variant="h5">
+          {report && !loading ? hours(report.totalMinutes) : '—'}
+        </Typography>
+        <Stack direction="row" spacing={1}>
+          <Button onClick={() => setFiltersOpen((value) => !value)}>
+            Filtros
+          </Button>
+          <Tooltip title="Atualizar">
+            <IconButton
+              aria-label="Atualizar relatório"
+              onClick={() => setAttempt((v) => v + 1)}
             >
-              Anterior
-            </Button>
-            <TextField
-              type="date"
-              label="Data de referência"
-              value={selected}
-              onChange={(e) => update('date', e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
+              <UiIcon kind="refresh" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Detalhes do cálculo">
+            <IconButton
+              aria-label="Detalhes do cálculo"
+              onClick={() => setInfoOpen((v) => !v)}
+            >
+              <UiIcon kind="detail" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Stack>
+      <Collapse in={filtersOpen || calendar}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          {calendar ? (
+            <>
+              <Button
+                onClick={() =>
+                  update('date', moveReference(selected, view, -1))
+                }
+              >
+                Anterior
+              </Button>
+              <TextField
+                type="date"
+                label="Data de referência"
+                value={selected}
+                onChange={(e) => update('date', e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <TextField
+                select
+                label="Visualização"
+                value={view}
+                onChange={(e) => update('view', e.target.value)}
+              >
+                {['day', 'week', 'month'].map((v) => (
+                  <MenuItem key={v} value={v}>
+                    {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                onClick={() => update('date', moveReference(selected, view, 1))}
+              >
+                Próximo
+              </Button>
+            </>
+          ) : (
+            <>
+              <TextField
+                type="date"
+                label="Data inicial (inclusiva)"
+                value={firstDate}
+                onChange={(e) => update('fromDate', e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <TextField
+                type="date"
+                label="Data final (inclusiva)"
+                value={lastDate}
+                onChange={(e) => update('toDate', e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            </>
+          )}
+          {calendar && (
             <TextField
               select
-              label="Visualização"
-              value={view}
-              onChange={(e) => update('view', e.target.value)}
+              label="Densidade"
+              value={density}
+              onChange={(e) => update('density', e.target.value)}
             >
-              {['day', 'week', 'month'].map((v) => (
-                <MenuItem key={v} value={v}>
-                  {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
-                </MenuItem>
-              ))}
+              <MenuItem value="supercompact">Supercompacto</MenuItem>
+              <MenuItem value="compact">Compacto</MenuItem>
+              <MenuItem value="timeline">Linha do tempo</MenuItem>
             </TextField>
-            <Button
-              onClick={() => update('date', moveReference(selected, view, 1))}
-            >
-              Próximo
-            </Button>
-          </>
-        ) : (
-          <>
-            <TextField
-              type="date"
-              label="Data inicial (inclusiva)"
-              value={firstDate}
-              onChange={(e) => update('fromDate', e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
+          )}
+        </Stack>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={includeArchived}
+              onChange={(e) =>
+                update('includeArchived', String(e.target.checked))
+              }
             />
-            <TextField
-              type="date"
-              label="Data final (inclusiva)"
-              value={lastDate}
-              onChange={(e) => update('toDate', e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          </>
-        )}
-        {calendar && (
-          <TextField
-            select
-            label="Densidade"
-            value={density}
-            onChange={(e) => update('density', e.target.value)}
-          >
-            <MenuItem value="supercompact">Supercompacto</MenuItem>
-            <MenuItem value="compact">Compacto</MenuItem>
-            <MenuItem value="timeline">Linha do tempo</MenuItem>
-          </TextField>
-        )}
-      </Stack>
-      {!calendar && (
-        <Typography color="text.secondary">
-          Intervalo máximo de 93 dias inclusivos, com até 1 hora adicional para
-          horário de verão. Consultas não são somadas automaticamente; paginação
-          continua limitada aos dados examinados.
-        </Typography>
-      )}
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={includeArchived}
-            onChange={(e) =>
-              update('includeArchived', String(e.target.checked))
-            }
-          />
-        }
-        label="Incluir projetos arquivados nesta consulta"
-      />
-      <Typography variant="body2" color="text.secondary">
-        Seleção aplicada no servidor antes dos totais exibidos; orçamento global
-        continua considerando também registros arquivados.
-      </Typography>
+          }
+          label="Incluir projetos arquivados nesta consulta"
+        />
+      </Collapse>
       {loading ? (
         <CircularProgress aria-label="Carregando relatório pessoal" />
       ) : error ? (
@@ -289,92 +321,100 @@ export function PersonalPage({
       ) : (
         report && (
           <>
-            <Typography variant="h5">
-              {hours(report.totalMinutes)} agregadas nesta página
-            </Typography>
-            <Typography color="text.secondary">
-              Pode somar simultâneas; não são horas líquidas únicas. Referência{' '}
-              {date(report.asOf, zone)} · {report.policy}.{' '}
-              {report.page.scannedCount} registros examinados,{' '}
-              {report.page.excludedCount} fora do período/inválidos.
-            </Typography>
-            {(report.page.partial || cursor || report.estimatedCount > 0) && (
+            {(report.page.partial || cursor) && (
               <Alert severity="warning">
-                Parcial por página de até {report.page.limit} registros.{' '}
-                {report.estimatedCount} estimado(s); fatos originais
-                preservados.
+                Dados parciais desta página; não é total global.
               </Alert>
             )}
-            <Typography>
-              Estimativas usam orçamento global de 8 horas por pessoa/dia entre
-              projetos, calculado com contexto completo antes da seleção da
-              página. Fatos fechados consomem a margem sem truncamento. Totais
-              exibidos continuam somente desta página.{' '}
-              <Button component={RouterLink} to="/rules">
-                Regras do relatório
-              </Button>
-            </Typography>
-            {revealed
-              ? report.warnings.map((warning, i) => (
-                  <Alert key={i} severity="warning">
-                    {warning}
-                  </Alert>
-                ))
-              : report.warnings.length > 0 && (
-                  <Alert severity="warning">
-                    Há {report.warnings.length} avisos de cálculo. Conteúdo
-                    oculto no modo live.
-                  </Alert>
+            <Collapse in={infoOpen}>
+              <Stack spacing={1}>
+                <Typography>
+                  Referência {date(report.asOf, zone)} · {report.policy};{' '}
+                  {report.page.scannedCount} registros examinados.{' '}
+                  {report.estimatedCount} estimados. Tempos podem somar
+                  atividades simultâneas.
+                </Typography>
+                <Button component={RouterLink} to="/rules">
+                  Regras de cálculo
+                </Button>
+                {revealed ? (
+                  report.warnings.map((warning, i) => (
+                    <Alert key={i} severity="warning">
+                      {warning}
+                    </Alert>
+                  ))
+                ) : (
+                  <Typography>
+                    Avisos detalhados ocultos no modo live.
+                  </Typography>
                 )}
+              </Stack>
+            </Collapse>
             {report.intervals.length === 0 && (
               <Alert severity="info">
                 Nenhum intervalo neste período na página examinada. Outras
                 páginas podem conter dados.
               </Alert>
             )}
-            {!calendar && (
+            {!calendar &&
+              report.byProject.some((project) => project.minutes > 0) && (
+                <Paper sx={{ p: 3 }}>
+                  <Typography component="h3" variant="h6">
+                    Tempo por projeto
+                  </Typography>
+                  <Box
+                    component="svg"
+                    viewBox="0 0 200 200"
+                    role="img"
+                    aria-label="Distribuição por projeto; valores na legenda"
+                    sx={{ width: 240, maxWidth: '100%' }}
+                  >
+                    <title>Tempo por projeto</title>
+                    {pieSlices(
+                      report.byProject.map((p) => ({
+                        label: label(p.projectId),
+                        minutes: p.minutes,
+                      })),
+                    ).map((slice, i) =>
+                      slice.full ? (
+                        <circle
+                          key={i}
+                          cx="100"
+                          cy="100"
+                          r="85"
+                          fill={slice.color}
+                        />
+                      ) : (
+                        <path key={i} d={slice.path} fill={slice.color} />
+                      ),
+                    )}
+                  </Box>
+                  <Box component="ul">
+                    {report.byProject.map((p) => (
+                      <li key={p.projectId}>
+                        {label(p.projectId)}: {hours(p.minutes)} ·{' '}
+                        {report.totalMinutes > 0
+                          ? new Intl.NumberFormat('pt-BR', {
+                              style: 'percent',
+                              maximumFractionDigits: 1,
+                            }).format(p.minutes / report.totalMinutes)
+                          : '0%'}{' '}
+                        do agregado desta página
+                      </li>
+                    ))}
+                  </Box>
+                </Paper>
+              )}
+            {company && report.byUser?.some((person) => person.minutes > 0) && (
               <Paper sx={{ p: 3 }}>
-                <Typography component="h3" variant="h6">
-                  Tempo por projeto
+                <Typography component="h2" variant="h6">
+                  Tempo por pessoa
                 </Typography>
-                <Box
-                  component="svg"
-                  viewBox="0 0 200 200"
-                  role="img"
-                  aria-label="Distribuição por projeto; valores na legenda"
-                  sx={{ width: 240, maxWidth: '100%' }}
-                >
-                  <title>Tempo por projeto</title>
-                  {pieSlices(
-                    report.byProject.map((p) => ({
-                      label: label(p.projectId),
-                      minutes: p.minutes,
-                    })),
-                  ).map((slice, i) =>
-                    slice.full ? (
-                      <circle
-                        key={i}
-                        cx="100"
-                        cy="100"
-                        r="85"
-                        fill={slice.color}
-                      />
-                    ) : (
-                      <path key={i} d={slice.path} fill={slice.color} />
-                    ),
-                  )}
-                </Box>
                 <Box component="ul">
-                  {report.byProject.map((p) => (
-                    <li key={p.projectId}>
-                      {label(p.projectId)}: {hours(p.minutes)} ·{' '}
-                      {report.totalMinutes > 0
-                        ? new Intl.NumberFormat('pt-BR', {
-                            style: 'percent',
-                            maximumFractionDigits: 1,
-                          }).format(p.minutes / report.totalMinutes)
-                        : '0%'}{' '}
-                      do agregado desta página
+                  {report.byUser.map((person, index) => (
+                    <li key={person.uid}>
+                      {revealed ? person.label : 'Pessoa ' + (index + 1)}:{' '}
+                      {hours(person.minutes)}
                     </li>
                   ))}
                 </Box>
