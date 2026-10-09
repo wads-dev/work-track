@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirestoreMergeRepository } from './modules/merge/infrastructure/firestore-merge.js';
 import { FirestoreTopicReportRepository } from './modules/reports/infrastructure/firestore-topic-report.js';
 import { getTopicReportHandler } from './modules/reports/presentation/get-topic-report.js';
 import { FirestoreCalendarReportRepository } from './modules/reports/infrastructure/firestore-calendar-report.js';
@@ -291,6 +292,7 @@ export const api = onRequest(
     new FirestoreSplitRepository(getFirestore()),
     new FirestoreRemovalRepository(getFirestore()),
     new FirestoreRecordMovementRepository(getFirestore()),
+    new FirestoreMergeRepository(getFirestore()),
   ),
 );
 export const createProject = onCall(
