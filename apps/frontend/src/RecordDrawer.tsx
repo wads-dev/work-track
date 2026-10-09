@@ -1,4 +1,5 @@
 import { useProjects } from './useProjects';
+import { canFinishNow, createFinishNowCommand } from './finish-now';
 import { isDeletedRecord, createDeletionObserver } from './record-deletion';
 import { writeUrlTab } from './url-tabs';
 import { UiIcon } from './UiIcons';
@@ -102,6 +103,14 @@ export function RecordDrawer({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState('');
+  const [finishSuccess, setFinishSuccess] = useState(false);
+  const finishCommand = useRef(createFinishNowCommand());
+  const editorDirty = useRef(false);
+  const mutationBusy = useRef(false);
+  const currentScope = useRef(uid + '/' + recordId);
+  currentScope.current = uid + '/' + recordId;
   const [end, setEnd] = useState('');
   const [removeEnd, setRemoveEnd] = useState(false);
   const [reason, setReason] = useState('');
@@ -118,6 +127,13 @@ export function RecordDrawer({
     20,
   );
   useEffect(() => {
+    setRecord(null);
+    editorDirty.current = false;
+    mutationBusy.current = false;
+    finishCommand.current = createFinishNowCommand();
+    setFinishing(false);
+    setFinishError('');
+    setFinishSuccess(false);
     setLoading(true);
     setError('');
     const observeDeletion = createDeletionObserver(uid);
@@ -133,7 +149,7 @@ export function RecordDrawer({
         const activeRecord = data && !isDeletedRecord(data) ? data : null;
         setRecord(activeRecord);
         setLoading(false);
-        if (activeRecord) {
+        if (activeRecord && !editorDirty.current) {
           setEnd(endToLocal(activeRecord.endedAt));
           setConfirmed(false);
         }
@@ -149,8 +165,44 @@ export function RecordDrawer({
       stop();
     };
   }, [db, uid, recordId]);
+  async function finishNow() {
+    if (saving || finishing || finishSuccess || !canFinishNow(record, uid))
+      return;
+    if (mutationBusy.current) return;
+    mutationBusy.current = true;
+    const scope = uid + '/' + recordId;
+    setFinishing(true);
+    setFinishError('');
+    setFinishSuccess(false);
+    try {
+      const done = await finishCommand.current.run(
+        recordId,
+        uid,
+        record,
+        (payload) => httpsCallable(functions, 'updateRecord')(payload),
+      );
+      if (currentScope.current === scope && done) setFinishSuccess(true);
+    } catch (failure) {
+      if (currentScope.current === scope)
+        setFinishError(
+          failure &&
+            typeof failure === 'object' &&
+            'code' in failure &&
+            failure.code === 'functions/aborted'
+            ? 'Registro alterado por outra operação. Confira os dados atualizados antes de finalizar novamente.'
+            : 'Não foi possível finalizar. Tente novamente para reenviar a mesma solicitação com segurança.',
+        );
+    } finally {
+      if (currentScope.current === scope) {
+        mutationBusy.current = false;
+        setFinishing(false);
+      }
+    }
+  }
   async function save() {
-    if (!record || !confirmed) return;
+    if (mutationBusy.current || !record || !confirmed || finishing || saving)
+      return;
+    mutationBusy.current = true;
     setError('');
     setSuccess('');
     try {
@@ -209,6 +261,7 @@ export function RecordDrawer({
           failure instanceof Error ? failure.message : 'Falha ao salvar.',
         );
     } finally {
+      mutationBusy.current = false;
       setSaving(false);
     }
   }
@@ -235,7 +288,11 @@ export function RecordDrawer({
         <Typography id="registro-titulo" component="h2" variant="h5">
           Detalhes do registro
         </Typography>
-        <IconButton aria-label="Fechar" disabled={saving} onClick={close}>
+        <IconButton
+          aria-label="Fechar"
+          disabled={finishing || saving}
+          onClick={close}
+        >
           <UiIcon kind="close" />
         </IconButton>
       </Stack>
@@ -284,6 +341,36 @@ export function RecordDrawer({
                   ? date(record.endedAt, 'America/Sao_Paulo')
                   : 'Aberto'}
               </Typography>
+              {finishError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {finishError}
+                </Alert>
+              )}
+              {finishSuccess && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  Registro finalizado. Os dados e o histórico serão atualizados
+                  automaticamente.
+                </Alert>
+              )}
+              {!finishSuccess && canFinishNow(record, uid) && (
+                <Button
+                  variant="contained"
+                  disabled={finishing || saving}
+                  onClick={finishNow}
+                  sx={{
+                    mt: 1,
+                    minHeight: 44,
+                    width: { xs: '100%', sm: 'auto' },
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  {finishing
+                    ? 'Finalizando…'
+                    : finishError
+                      ? 'Tentar finalizar novamente'
+                      : 'Finalizar agora'}
+                </Button>
+              )}
               <Tabs
                 value={activeTab}
                 onChange={(_, value) => setActiveTab(value)}
@@ -375,8 +462,9 @@ export function RecordDrawer({
                       label="Fim efetivo"
                       slotProps={{ inputLabel: { shrink: true } }}
                       value={end}
-                      disabled={saving || removeEnd}
+                      disabled={finishing || saving || removeEnd}
                       onChange={(event) => {
+                        editorDirty.current = true;
                         setEnd(event.target.value);
                         setConfirmed(false);
                       }}
@@ -389,8 +477,9 @@ export function RecordDrawer({
                           control={
                             <Checkbox
                               checked={removeEnd}
-                              disabled={saving}
+                              disabled={finishing || saving}
                               onChange={(event) => {
+                                editorDirty.current = true;
                                 setRemoveEnd(event.target.checked);
                                 setConfirmed(false);
                               }}
@@ -403,7 +492,7 @@ export function RecordDrawer({
                     <TextField
                       label="Motivo da alteração"
                       value={reason}
-                      disabled={saving}
+                      disabled={finishing || saving}
                       onChange={(event) => setReason(event.target.value)}
                       multiline
                       minRows={2}
@@ -419,7 +508,7 @@ export function RecordDrawer({
                       control={
                         <Checkbox
                           checked={confirmed}
-                          disabled={saving}
+                          disabled={finishing || saving}
                           onChange={(event) =>
                             setConfirmed(event.target.checked)
                           }
@@ -509,7 +598,7 @@ export function RecordDrawer({
               type="submit"
               form="record-edit-form"
               variant="contained"
-              disabled={saving || !confirmed}
+              disabled={finishing || saving || !confirmed}
             >
               {saving ? 'Salvando…' : 'Salvar alteração'}
             </Button>
@@ -535,7 +624,7 @@ export function RecordDrawer({
           },
         }}
         onClose={() => {
-          if (!saving) close();
+          if (!saving && !finishing) close();
         }}
       >
         {content}
@@ -546,7 +635,7 @@ export function RecordDrawer({
       anchor="right"
       open
       onClose={() => {
-        if (!saving) close();
+        if (!saving && !finishing) close();
       }}
     >
       {content}
