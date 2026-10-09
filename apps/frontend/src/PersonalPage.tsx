@@ -3,6 +3,13 @@ import {
   projectAccessRevision,
 } from './project-access-revision';
 import { QueryToolbar, QueryToolbarField } from './QueryToolbar';
+import {
+  calendarPerson,
+  calendarRequest,
+  updateCalendarPerson,
+  calendarReport,
+  type CalendarResponse,
+} from './calendar-people';
 import { useProjects } from './useProjects';
 import { TopicReport } from './TopicReport';
 import { topicBuckets, type ReportTopic } from './topic-report-model';
@@ -41,7 +48,7 @@ import { CalendarTimeline } from './CalendarTimeline';
 import { CalendarProjectFilter } from './CalendarProjectFilter';
 import { updatePersonalFilters } from './calendar-project-filter';
 import { date, text } from './data';
-import { safeProject, usePrivacy } from './privacy';
+import { isHidden, safeProject, usePrivacy } from './privacy';
 import { hours, pieSlices } from './report-chart';
 import {
   calendarDays,
@@ -57,6 +64,8 @@ import {
   type View,
 } from './calendar-utils';
 type Interval = {
+  uid?: string;
+  readOnly?: boolean;
   id: string;
   projectId: string;
   startedAt: string;
@@ -77,6 +86,8 @@ type PersonalReport = {
   totalMinutes: number;
   estimatedCount: number;
   byProject: { projectId: string; minutes: number }[];
+  participantsUnavailable?: boolean;
+  participants?: { uid: string; label: string }[];
   byTopic: ReportTopic[];
   unassignedMinutes: number;
   byUser?: { uid: string; label: string; minutes: number }[];
@@ -106,6 +117,11 @@ export function PersonalPage({
   const [infoOpen, setInfoOpen] = useState(false);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
+  const person = calendarPerson(params, uid);
+  useEffect(() => {
+    if (calendar && !params.get('uid'))
+      setParams(updateCalendarPerson(params, uid), { replace: true });
+  }, [calendar, params, uid, setParams]);
   const { revealed } = usePrivacy();
   const projects = useProjects(functions, uid, company ? 'work' : 'all');
   const zone = 'America/Sao_Paulo';
@@ -120,6 +136,12 @@ export function PersonalPage({
   const lastDate = params.get('toDate') ?? '';
   const projectId = params.get('projectId') ?? '';
   const recordId = params.get('record');
+  const privacyBlocked =
+    calendar &&
+    person.mode === 'global' &&
+    !!projectId &&
+    (!projects.rows.some((p) => p.id === projectId) ||
+      isHidden(projects.rows.find((p) => p.id === projectId)?.data, revealed));
   let validated: ReturnType<typeof range> | null = null;
   let invalid = '';
   let view: View = 'day';
@@ -148,11 +170,44 @@ export function PersonalPage({
   const accessRevision = useProjectAccessRevision();
   const [reportAccessRevision, setReportAccessRevision] = useState(-1);
   const [reportOwner, setReportOwner] = useState('');
+  const [directory, setDirectory] = useState<{
+    owner: string;
+    partition: string;
+    unavailable: boolean;
+    revision: number;
+    rows: { uid: string; label: string }[];
+  }>({ owner: '', partition: '', unavailable: false, revision: -1, rows: [] });
+  const directoryPartition = JSON.stringify([
+    projectId,
+    includeArchived,
+    zone,
+    calendar,
+  ]);
+  const participants =
+    directory.owner === uid &&
+    directory.revision === accessRevision &&
+    directory.partition === directoryPartition &&
+    !privacyBlocked
+      ? directory.rows
+      : [];
+  const [reportQuery, setReportQuery] = useState('');
+  const queryIdentity = JSON.stringify([
+    calendar,
+    company,
+    from,
+    to,
+    zone,
+    projectId,
+    includeArchived,
+    calendar ? person.selected : '',
+  ]);
   const [reportRevision, setReportRevision] = useState(-1);
   const [cachedReport, setReport] = useState<PersonalReport | null>(null);
   const report =
+    !privacyBlocked &&
     reportRevision === revision &&
     reportOwner === uid &&
+    reportQuery === queryIdentity &&
     reportAccessRevision === accessRevision
       ? cachedReport
       : null;
@@ -161,35 +216,55 @@ export function PersonalPage({
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    if (invalid) {
+    if (invalid || privacyBlocked) {
+      setReport(null);
+      setError(
+        privacyBlocked
+          ? 'Revele o projeto selecionado ou escolha um projeto disponível para consultar outras pessoas.'
+          : '',
+      );
       setLoading(false);
       return;
     }
     setLoading(true);
     setError('');
     setReport(null);
-    void httpsCallable<
-      {
-        from?: string;
-        to?: string;
-        projectId?: string;
-        timeZone: string;
-        limit: number;
-        cursor?: string;
-        includeArchived: boolean;
-      },
-      PersonalReport
-    >(
-      functions,
-      company ? 'getCompanyReport' : 'getPersonalReport',
-    )({
-      ...(from ? { from } : {}),
-      ...(to ? { to } : {}),
-      ...(projectId ? { projectId } : {}),
-      timeZone: zone,
-      limit: company ? 50 : 200,
-      includeArchived,
-    })
+    const request = calendar
+      ? httpsCallable(
+          functions,
+          'getCalendarReport',
+        )(calendarRequest(params, uid, from, to, zone, includeArchived)).then(
+          (result) => ({
+            data: calendarReport(
+              result.data as CalendarResponse,
+              uid,
+              person.mode,
+            ),
+          }),
+        )
+      : httpsCallable<
+          {
+            from?: string;
+            to?: string;
+            projectId?: string;
+            timeZone: string;
+            limit: number;
+            cursor?: string;
+            includeArchived: boolean;
+          },
+          PersonalReport
+        >(
+          functions,
+          company ? 'getCompanyReport' : 'getPersonalReport',
+        )({
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
+          ...(projectId ? { projectId } : {}),
+          timeZone: zone,
+          limit: company ? 50 : 200,
+          includeArchived,
+        });
+    void request
       .then((result) => {
         if (active) {
           if (
@@ -199,8 +274,17 @@ export function PersonalPage({
             return;
           setReportAccessRevision(accessRevision);
           setReportOwner(uid);
+          setReportQuery(queryIdentity);
           setReportRevision(revision);
           setReport(result.data);
+          if (calendar)
+            setDirectory({
+              owner: uid,
+              partition: directoryPartition,
+              unavailable: result.data.participantsUnavailable === true,
+              revision: accessRevision,
+              rows: result.data.participants ?? [],
+            });
           setLoading(false);
         }
       })
@@ -228,6 +312,12 @@ export function PersonalPage({
     uid,
     includeArchived,
     company,
+    calendar,
+    person.mode,
+    person.selected,
+    queryIdentity,
+    directoryPartition,
+    privacyBlocked,
     projectId,
     invalid,
   ]);
@@ -241,7 +331,10 @@ export function PersonalPage({
       Array.from(id).reduce((n, c) => n + c.charCodeAt(0), 0) % 6
     ];
   function update(key: string, value: string) {
-    setParams(updatePersonalFilters(params, key, value));
+    const next = updatePersonalFilters(params, key, value);
+    if (calendar && key === 'clear') next.set('uid', uid);
+    next.delete('record');
+    setParams(next);
   }
   if (invalid)
     return (
@@ -258,7 +351,7 @@ export function PersonalPage({
     <Stack spacing={2}>
       {recordId && (
         <RecordDrawer
-          key={recordId}
+          key={uid + recordId}
           db={db}
           functions={functions}
           uid={uid}
@@ -393,22 +486,87 @@ export function PersonalPage({
               ))}
             </TextField>
           </QueryToolbarField>
+          <QueryToolbarField>
+            <TextField
+              select
+              size="small"
+              label="Pessoa"
+              value={person.selected}
+              disabled={loading}
+              sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
+              onChange={(e) =>
+                setParams(updateCalendarPerson(params, e.target.value))
+              }
+            >
+              <MenuItem value={uid}>Meu calendário</MenuItem>
+              {participants.length > 0 && !directory.unavailable && (
+                <MenuItem value="all">Todas as pessoas · até 10</MenuItem>
+              )}
+              {participants
+                .filter((p) => p.uid !== uid)
+                .map((p) => (
+                  <MenuItem key={p.uid} value={p.uid}>
+                    {p.label || 'Pessoa da organização'}
+                  </MenuItem>
+                ))}
+              {person.selected !== uid &&
+                person.selected !== 'all' &&
+                !participants.some((p) => p.uid === person.selected) && (
+                  <MenuItem value={person.selected}>
+                    Pessoa selecionada · projetos globais
+                  </MenuItem>
+                )}
+            </TextField>
+          </QueryToolbarField>
           <QueryToolbarField kind="project">
             <CalendarProjectFilter
               key={String(revealed)}
               projectId={projectId}
-              projects={projects.rows.map((p) => ({
-                id: p.id,
-                label: label(p.id),
-                searchText:
-                  text(p.data.title, '') + ' ' + text(p.data.description, ''),
-              }))}
+              projects={projects.rows
+                .filter(
+                  (p) =>
+                    person.mode !== 'global' ||
+                    (!isHidden(p.data, revealed) &&
+                      (!p.data.type || p.data.type === 'work')),
+                )
+                .map((p) => ({
+                  id: p.id,
+                  label: label(p.id),
+                  searchText:
+                    text(p.data.title, '') + ' ' + text(p.data.description, ''),
+                }))}
               loading={projects.loading}
               error={projects.error}
               onChange={(id) => update('projectId', id)}
             />
           </QueryToolbarField>
         </QueryToolbar>
+      )}
+      {calendar &&
+        directory.unavailable &&
+        directory.partition === directoryPartition &&
+        directory.owner === uid &&
+        directory.revision === accessRevision && (
+          <Alert severity="warning">
+            Lista de pessoas indisponível para este escopo. Suas horas estão
+            completas; escolha um projeto para reduzir a consulta e selecionar
+            outra pessoa.
+          </Alert>
+        )}
+      {calendar && (
+        <Typography variant="body2">
+          {person.mode === 'own'
+            ? 'Meu calendário'
+            : person.selected === 'all'
+              ? 'Todas as pessoas · organização'
+              : 'Calendário de ' +
+                (participants.find((p) => p.uid === person.selected)?.label ||
+                  'pessoa selecionada')}{' '}
+          ·{' '}
+          {person.mode === 'own'
+            ? 'Meus registros pessoais e globais'
+            : 'Somente projetos globais autorizados, nunca registros pessoais de outras pessoas'}
+        </Typography>
       )}
       {loading ? (
         <CircularProgress aria-label="Carregando relatório pessoal" />
@@ -422,6 +580,9 @@ export function PersonalPage({
           }
         >
           {error}
+          {calendar &&
+            person.mode === 'global' &&
+            ' Escolha uma pessoa ou um projeto se a seleção ultrapassar 10 pessoas; não exibimos totais parciais.'}
         </Alert>
       ) : (
         report && (
@@ -617,6 +778,11 @@ export function PersonalPage({
                 zone={zone}
                 label={label}
                 color={color}
+                viewerUid={uid}
+                authorLabel={(id) =>
+                  participants.find((p) => p.uid === id)?.label ||
+                  'Pessoa da organização'
+                }
                 returnTo={location.pathname + location.search}
               />
             )}
@@ -708,7 +874,7 @@ export function PersonalPage({
                       ) : (
                         entries.map((item) => (
                           <Tooltip
-                            key={item.id}
+                            key={JSON.stringify([item.uid || uid, item.id])}
                             title={
                               label(item.projectId) +
                               ' · ' +
@@ -735,12 +901,21 @@ export function PersonalPage({
                             }
                           >
                             <Button
-                              component={RouterLink}
-                              to={contextualRecordPath(
-                                location.pathname,
-                                location.search,
-                                item.id,
-                              )}
+                              tabIndex={0}
+                              component={
+                                item.uid && item.uid !== uid
+                                  ? 'span'
+                                  : RouterLink
+                              }
+                              to={
+                                item.uid && item.uid !== uid
+                                  ? undefined
+                                  : contextualRecordPath(
+                                      location.pathname,
+                                      location.search,
+                                      item.id,
+                                    )
+                              }
                               sx={{
                                 display: 'block',
                                 textAlign: 'left',
@@ -793,6 +968,9 @@ export function PersonalPage({
                                     ),
                                   ),
                                 )}{' '}
+                                {item.uid &&
+                                  (participants.find((p) => p.uid === item.uid)
+                                    ?.label || 'Pessoa da organização') + ' · '}
                                 {label(item.projectId)}
                                 {density !== 'supercompact' && (
                                   <>

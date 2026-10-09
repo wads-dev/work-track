@@ -17,7 +17,7 @@ import {
   projectMinute,
   type Timed,
 } from './timeline-layout';
-type Event = Timed & { projectId: string; estimated: boolean };
+type Event = Timed & { uid?: string; projectId: string; estimated: boolean };
 export function CalendarTimeline({
   items,
   day,
@@ -26,6 +26,8 @@ export function CalendarTimeline({
   label,
   color,
   returnTo,
+  viewerUid,
+  authorLabel,
 }: {
   items: Event[];
   day: string;
@@ -34,6 +36,8 @@ export function CalendarTimeline({
   label: (id: string) => string;
   color: (id: string) => string;
   returnTo: string;
+  viewerUid: string;
+  authorLabel: (uid: string) => string;
 }) {
   const [expansion, setExpansion] = useState<{
     period: string;
@@ -259,17 +263,40 @@ export function CalendarTimeline({
                       (e.item.estimated ? ' · Estimado' : '') +
                       (e.overlap ? ' · Sobreposição' : '');
                     return (
-                      <Tooltip key={e.item.id} title={caption}>
+                      <Tooltip
+                        key={JSON.stringify([
+                          e.item.uid || viewerUid,
+                          e.item.id,
+                        ])}
+                        title={
+                          (e.item.uid ? authorLabel(e.item.uid) + ' · ' : '') +
+                          caption
+                        }
+                      >
                         <Button
-                          component={RouterLink}
-                          to={contextualRecordPath(
-                            returnTo.split('?')[0],
-                            returnTo.includes('?')
-                              ? '?' + returnTo.split('?').slice(1).join('?')
-                              : '',
-                            e.item.id,
-                          )}
-                          aria-label={caption}
+                          component={
+                            e.item.uid && e.item.uid !== viewerUid
+                              ? 'span'
+                              : RouterLink
+                          }
+                          to={
+                            e.item.uid && e.item.uid !== viewerUid
+                              ? undefined
+                              : contextualRecordPath(
+                                  returnTo.split('?')[0],
+                                  returnTo.includes('?')
+                                    ? '?' +
+                                        returnTo.split('?').slice(1).join('?')
+                                    : '',
+                                  e.item.id,
+                                )
+                          }
+                          tabIndex={0}
+                          aria-label={
+                            (e.item.uid
+                              ? authorLabel(e.item.uid) + ' · '
+                              : '') + caption
+                          }
                           sx={{
                             position: 'absolute',
                             top: projectMinute(e.wallStart, segments),
@@ -307,6 +334,9 @@ export function CalendarTimeline({
                                 px: 0.5,
                               }}
                             >
+                              {e.item.uid
+                                ? authorLabel(e.item.uid) + ' · '
+                                : ''}
                               {time(e.start)} {label(e.item.projectId)}
                               {e.item.estimated ? ' ◷' : ''}
                               {e.overlap ? ' ⇆' : ''}

@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirestoreCalendarReportRepository } from './modules/reports/infrastructure/firestore-calendar-report.js';
+import { getCalendarReportHandler } from './modules/reports/presentation/get-calendar-report.js';
 import { FirestoreRecordMovementRepository } from './modules/registration/infrastructure/firestore-record-movement.js';
 import { movementHandler } from './modules/registration/presentation/record-movement.js';
 import { changeProjectScopeHandler } from './modules/registration/presentation/change-project-scope.js';
@@ -32,6 +34,21 @@ import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
+export const getCalendarReport = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    getCalendarReportHandler(
+      new FirestoreCalendarReportRepository(getFirestore(), getAuth()),
+      request.data as unknown,
+      request.auth,
+    ),
+);
 export const moveSubject = onCall(
   {
     region: 'southamerica-east1',
