@@ -61,7 +61,7 @@ export function ProjectEditor({
         />
       }
       <ProjectTopics
-        key={projectId}
+        key={'topics/' + projectId}
         functions={functions}
         projectId={projectId}
         project={project}
@@ -87,9 +87,7 @@ function ProjectForm({
   const [description, setDescription] = useState(text(project.description, ''));
   const type = project.type === 'personal' ? 'personal' : 'work';
   const [githubUrl, setGithubUrl] = useState(text(project.githubUrl, ''));
-  const [confidential, setConfidential] = useState(
-    project.confidential === true,
-  );
+  const confidential = project.confidential === true;
   const [alias, setAlias] = useState(
     text(project.publicAlias, 'Projeto reservado'),
   );
@@ -139,7 +137,6 @@ function ProjectForm({
         description,
         type,
         githubUrl,
-        confidential,
         alias,
         reason,
       });
@@ -153,7 +150,6 @@ function ProjectForm({
         title,
         description,
         githubUrl: githubUrl || null,
-        confidential,
         publicAlias: alias,
         reason,
         requestId: saveIntent.current.requestId,
@@ -228,7 +224,7 @@ function ProjectForm({
           label="Tipo"
           value={type}
           disabled
-          helperText="O tipo de acesso não pode ser convertido nesta edição."
+          helperText="Gerencie o escopo em Acesso e apresentação no topo."
         >
           <MenuItem value="">Não especificado</MenuItem>
           <MenuItem value="personal">Pessoal · somente o dono</MenuItem>
@@ -241,14 +237,8 @@ function ProjectForm({
           disabled={busy}
         />
         <FormControlLabel
-          control={
-            <Checkbox
-              checked={confidential}
-              onChange={(e) => setConfidential(e.target.checked)}
-              disabled={busy}
-            />
-          }
-          label="Projeto confidencial"
+          control={<Checkbox checked={confidential} disabled />}
+          label="Confidencialidade: gerencie em Acesso e apresentação no topo"
         />
         <TextField
           label="Alias público neutro"

@@ -1,3 +1,7 @@
+import {
+  useProjectAccessRevision,
+  projectAccessRevision,
+} from './project-access-revision';
 import { QueryToolbar, QueryToolbarField } from './QueryToolbar';
 import { useProjects } from './useProjects';
 import { TopicReport } from './TopicReport';
@@ -141,11 +145,17 @@ export function PersonalPage({
     validated?.to ??
     (!invalid && lastDate ? midnight(addDays(lastDate, 1), zone) : '');
   const revision = useDeletionRevision(uid);
+  const accessRevision = useProjectAccessRevision();
+  const [reportAccessRevision, setReportAccessRevision] = useState(-1);
   const [reportOwner, setReportOwner] = useState('');
   const [reportRevision, setReportRevision] = useState(-1);
   const [cachedReport, setReport] = useState<PersonalReport | null>(null);
   const report =
-    reportRevision === revision && reportOwner === uid ? cachedReport : null;
+    reportRevision === revision &&
+    reportOwner === uid &&
+    reportAccessRevision === accessRevision
+      ? cachedReport
+      : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -182,7 +192,12 @@ export function PersonalPage({
     })
       .then((result) => {
         if (active) {
-          if (deletionRevision(uid) !== revision) return;
+          if (
+            deletionRevision(uid) !== revision ||
+            projectAccessRevision() !== accessRevision
+          )
+            return;
+          setReportAccessRevision(accessRevision);
           setReportOwner(uid);
           setReportRevision(revision);
           setReport(result.data);
@@ -190,7 +205,11 @@ export function PersonalPage({
         }
       })
       .catch((failure: unknown) => {
-        if (active && deletionRevision(uid) === revision) {
+        if (
+          active &&
+          deletionRevision(uid) === revision &&
+          projectAccessRevision() === accessRevision
+        ) {
           setError(reportError(failure));
           setLoading(false);
         }
@@ -205,6 +224,7 @@ export function PersonalPage({
     zone,
     attempt,
     revision,
+    accessRevision,
     uid,
     includeArchived,
     company,

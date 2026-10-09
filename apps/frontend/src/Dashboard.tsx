@@ -50,6 +50,7 @@ import { detailPath, matchesFilter, contextualRecordPath } from './routes';
 import { UiIcon } from './UiIcons';
 import { usePrivacy, isHidden, safeProject, safeRecord } from './privacy';
 import { ProjectEditor } from './ProjectEditor';
+import { ProjectAccess } from './ProjectAccess';
 import { matchesArchive } from './project-archive';
 
 function DataTable({
@@ -334,6 +335,13 @@ export function Dashboard({
                 : 'Compartilhado · usuários autorizados da empresa'}
             </Typography>
           )}
+        <ProjectAccess
+          functions={functions}
+          uid={uid}
+          projectId={projectId}
+          project={rawProjectsById.get(projectId)?.data}
+          hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
+        />
         <Tabs
           value={projectTab}
           onChange={(_, value) => setProjectTab(value)}
@@ -377,7 +385,12 @@ export function Dashboard({
               projects.rows.find((row) => row.id === projectId)?.data.title,
               'Projeto reservado',
             )}
-            key={projectId}
+            key={
+              projectId +
+              String(rawProjectsById.get(projectId)?.data.type) +
+              String(rawProjectsById.get(projectId)?.data.updatedAt) +
+              String(rawProjectsById.has(projectId))
+            }
             projectId={projectId}
             functions={functions}
             hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}

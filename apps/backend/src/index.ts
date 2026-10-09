@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { changeProjectScopeHandler } from './modules/registration/presentation/change-project-scope.js';
+import { FirestoreProjectScopeRepository } from './modules/registration/infrastructure/firestore-project-scope.js';
 import { FirestoreRemovalRepository } from './modules/removal/infrastructure/firestore-removal.js';
 import { FirestoreSplitRepository } from './modules/split/infrastructure/firestore-split.js';
 import { FirestoreDailyHoursRepository } from './modules/daily-hours/infrastructure/firestore-daily-hours.js';
@@ -28,6 +30,21 @@ import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
+export const changeProjectScope = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    changeProjectScopeHandler(
+      new FirestoreProjectScopeRepository(getFirestore()),
+      request.data as unknown,
+      request.auth,
+    ),
+);
 export const getCompanyReport = onCall(
   {
     region: 'southamerica-east1',
