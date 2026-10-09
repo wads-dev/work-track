@@ -103,7 +103,7 @@ describe('topic details facts and privacy', () => {
     const project = () => ({ title: 'SecretProject', confidential: true });
     expect(topicBuckets([topic], project, false)[0]).toMatchObject({
       detailsAvailable: false,
-      topicLabel: 'Assunto reservado',
+      topicLabel: 'Tópico reservado',
     });
     expect(topicBuckets([topic], project, true)[0].detailsAvailable).toBe(true);
   });

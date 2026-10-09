@@ -14,7 +14,7 @@ it('masks project and topic before view model for confidential and unknown metad
   ]) {
     const result = topicBuckets([topic], () => metadata, false);
     expect(result[0].projectLabel).toBe('Projeto reservado');
-    expect(result[0].topicLabel).toBe('Assunto reservado');
+    expect(result[0].topicLabel).toBe('Tópico reservado');
     expect(JSON.stringify(result)).not.toContain('Secret');
     expect(JSON.stringify(result)).not.toContain('raw-user');
   }

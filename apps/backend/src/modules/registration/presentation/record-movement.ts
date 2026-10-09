@@ -53,7 +53,7 @@ export function registerMovementTools(
     openWorldHint: false,
   };
   const description =
-    'Consulte get_instructions. Move somente registros próprios entre projetos de mesmo escopo, com auditoria em cada registro. Prévia sem escrita por padrão; apresente destino, contagem e avisos e peça confirmação humana. Só depois confirmed true com mesmo previewToken/requestId/motivo. subject_target opcional reutiliza nome exato normalizado único ativo ou cria assunto com nome original. Múltiplos assuntos/aliases/mais de100 bloqueados; origem preservada para outros participantes. Nunca confirme automaticamente.';
+    'Consulte get_instructions. Move somente registros próprios entre projetos de mesmo escopo, com auditoria em cada registro. Prévia sem escrita por padrão; apresente destino, contagem e avisos e peça confirmação humana. Só depois confirmed true com mesmo previewToken/requestId/motivo. subject_target opcional reutiliza nome exato normalizado único ativo ou cria tópico com nome original. Múltiplos tópicos/aliases/mais de100 bloqueados; origem preservada para outros participantes. Nunca confirme automaticamente.';
   const run = async (fn: () => Promise<Record<string, unknown>>) => {
     try {
       return {

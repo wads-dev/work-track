@@ -29,7 +29,7 @@ export type TopicBreakdown = {
 type Resolution =
   { topicId: string; label: string; warning?: string } | { error: string };
 
-const UNKNOWN_TOPIC = 'Assunto sem identificação';
+const UNKNOWN_TOPIC = 'Tópico sem identificação';
 const UNKNOWN_USER = 'Participante sem nome';
 const MAX_ALIAS_CHAIN = 200;
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -42,14 +42,14 @@ export function resolveTopic(
   topics: Map<string, TopicMetadata | null>,
   originalId: string,
 ): Resolution {
-  if (!originalId.trim()) return { error: 'ID de assunto vazio' };
+  if (!originalId.trim()) return { error: 'ID de tópico vazio' };
   const visited = new Set<string>();
   let current = originalId;
   while (visited.size < MAX_ALIAS_CHAIN) {
-    if (visited.has(current)) return { error: 'Ciclo de aliases de assuntos' };
+    if (visited.has(current)) return { error: 'Ciclo de aliases de tópicos' };
     visited.add(current);
     const topic = topics.get(current);
-    if (topic === null) return { error: 'Metadados de assunto duplicados' };
+    if (topic === null) return { error: 'Metadados de tópico duplicados' };
     if (topic === undefined) {
       // A missing historical original is still a stable technical identity.
       // A missing alias target is not evidence of a canonical identity.
@@ -57,7 +57,7 @@ export function resolveTopic(
         ? {
             topicId: originalId,
             label: UNKNOWN_TOPIC,
-            warning: 'Assunto histórico ausente dos metadados',
+            warning: 'Tópico histórico ausente dos metadados',
           }
         : { error: 'Destino de alias ausente dos metadados' };
     }
@@ -68,7 +68,7 @@ export function resolveTopic(
       };
     current = topic.mergedIntoTopicId;
   }
-  return { error: 'Cadeia de aliases excede o limite de 200 assuntos' };
+  return { error: 'Cadeia de aliases excede o limite de 200 tópicos' };
 }
 
 /** Attribute only supplied intervals; no estimates or source mutations occur here. */
@@ -153,7 +153,7 @@ export function buildTopicBreakdown(
           : undefined;
       if (topic.durationMinutes !== undefined && topic.percentage !== undefined)
         warn(
-          'Assunto ' +
+          'Tópico ' +
             JSON.stringify(topic.topicId) +
             ' com duração e percentual: duração válida tem precedência, senão percentual válido',
         );
@@ -162,7 +162,7 @@ export function buildTopicBreakdown(
         (topic.percentage !== undefined && percentage === undefined)
       )
         warn(
-          'Assunto ' +
+          'Tópico ' +
             JSON.stringify(topic.topicId) +
             ' com alocação inválida ignorada',
         );
@@ -193,7 +193,7 @@ export function buildTopicBreakdown(
       const resolution = resolveTopic(topics, allocation.originalId);
       if ('error' in resolution) {
         warn(
-          'Assunto original ' +
+          'Tópico original ' +
             JSON.stringify(allocation.originalId) +
             ': ' +
             resolution.error +
@@ -203,7 +203,7 @@ export function buildTopicBreakdown(
       }
       if (resolution.warning)
         warn(
-          'Assunto original ' +
+          'Tópico original ' +
             JSON.stringify(allocation.originalId) +
             ': ' +
             resolution.warning +
@@ -223,7 +223,7 @@ export function buildTopicBreakdown(
       unassignedMinutes += interval.minutes;
       for (const [topicId, ids] of collisions)
         warn(
-          'Alocações dos assuntos originais ' +
+          'Alocações dos tópicos originais ' +
             JSON.stringify([...ids].sort(compare)) +
             ' convergem para ' +
             JSON.stringify(topicId) +
@@ -233,7 +233,7 @@ export function buildTopicBreakdown(
     }
     if (allocations.length === 0 && record.topics.length > 1)
       warn(
-        'Vários assuntos sem alocação válida: distribuição ambígua, intervalo inteiro sem distribuição',
+        'Vários tópicos sem alocação válida: distribuição ambígua, intervalo inteiro sem distribuição',
       );
     const attributed = resolved.reduce(
       (total, topic) => total + topic.minutes,

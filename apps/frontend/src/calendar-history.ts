@@ -9,7 +9,7 @@ export function calendarTopics(
   if (!project || isHidden(project, revealed)) return [];
   return objects(project.topics)
     .filter((t) => !t.mergedIntoTopicId && (includeArchived || !t.archived))
-    .map((t) => ({ id: text(t.id, ''), label: text(t.title, 'Assunto') }))
+    .map((t) => ({ id: text(t.id, ''), label: text(t.title, 'Tópico') }))
     .filter((t) => !!t.id);
 }
 export function updateCalendarFilters(

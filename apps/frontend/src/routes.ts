@@ -6,7 +6,7 @@ export function topicDetailsPath(projectId: string, topicId: string) {
     id !== '.' &&
     id !== '..';
   if (!valid(projectId) || !valid(topicId))
-    throw new Error('Identidade de assunto inválida.');
+    throw new Error('Identidade de tópico inválida.');
   return (
     '/projects/' +
     encodeURIComponent(projectId) +

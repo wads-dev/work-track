@@ -178,7 +178,7 @@ export function subscribePersonalReport(
                     ),
                 )
               )
-                throw new Error('Contexto global contém assuntos inválidos.');
+                throw new Error('Contexto global contém tópicos inválidos.');
               return [
                 {
                   id: d.id,

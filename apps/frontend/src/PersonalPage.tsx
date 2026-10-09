@@ -185,7 +185,7 @@ export function PersonalPage({
         'Selecione um projeto para consultar todas as semanas com atividade.',
       );
     if (subject && (!projectId || !topics.some((t) => t.id === subject)))
-      throw new Error('Selecione um assunto disponível no projeto escolhido.');
+      throw new Error('Selecione um tópico disponível no projeto escolhido.');
     validated =
       calendar && !allWeeks
         ? range(selected, view, validZone(zone))
@@ -764,7 +764,7 @@ export function PersonalPage({
             <QueryToolbarField>
               <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
                 <span className="text-xs text-muted-foreground">
-                  {'Assunto'}
+                  {'Tópico'}
                 </span>
                 <Select
                   value={subject || '__all__'}
@@ -772,11 +772,11 @@ export function PersonalPage({
                     update('subject', value === '__all__' ? '' : value)
                   }
                 >
-                  <SelectTrigger aria-label={'Assunto'}>
+                  <SelectTrigger aria-label={'Tópico'}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">Todos os assuntos</SelectItem>
+                    <SelectItem value="__all__">Todos os tópicos</SelectItem>
                     {topics.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.label}
@@ -805,7 +805,7 @@ export function PersonalPage({
       {calendar && subject && (
         <Alert>
           <AlertDescription>
-            Assunto:{' '}
+            Tópico:{' '}
             <MetadataLink
               projectId={projectId}
               project={projects.rows.find((p) => p.id === projectId)?.data}
@@ -813,8 +813,8 @@ export function PersonalPage({
               topicId={subject}
             />{' '}
             . As horas e barras representam os intervalos completos dos
-            registros que contêm este assunto, não uma divisão proporcional
-            entre assuntos.
+            registros que contêm este tópico, não uma divisão proporcional entre
+            tópicos.
           </AlertDescription>
         </Alert>
       )}

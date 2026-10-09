@@ -124,11 +124,11 @@ describe('audited record movement', () => {
     expect(source).toContain('mutationBusy={mutationBusy}');
     expect(source).toContain('mutationBusy.current || moveOpen');
     expect(source).toContain('Mover registro');
-    expect(source).toContain('Transferência de assunto');
+    expect(source).toContain('Transferência de tópico');
     expect(source).toContain('Origem:');
     expect(source).toContain('Destino:');
     expect(source).toContain('record.uid === uid');
-    expect(source).toContain('Projeto reservado · Assuntos reservados');
+    expect(source).toContain('Projeto reservado · Tópicos reservados');
     expect(source).toContain('isHidden(parent, revealed)');
     expect(source).toContain('movementSide(row.data.before)');
     expect(source).toContain('movementSide(row.data.after)');

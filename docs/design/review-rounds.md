@@ -20,8 +20,8 @@ Lead informou deploy autorizado concluído:13functions4d42a63, Hosting9e64b8d/Bo
 
 | Rota/estado                  | Rounds/lotes efetivamente inspecionados | Estado atual                         | Limite / próximo escopo                                                             |
 | ---------------------------- | --------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------- |
-| /app dashboard               | A, B, C, E1                             | Aprovada                             | Sem reabrir estética. Nova área assuntos1440/390 e reload vistos.                   |
-| /me relatório                | B, E1 assuntos                          | Aprovada; base congelada pelo humano | Colega3,5h/assunto1,75h; não é prova de todo cache transitório.                     |
+| /app dashboard               | A, B, C, E1                             | Aprovada                             | Sem reabrir estética. Nova área tópicos1440/390 e reload vistos.                    |
+| /me relatório                | B, E1 tópicos                           | Aprovada; base congelada pelo humano | Colega3,5h/tópico1,75h; não é prova de todo cache transitório.                      |
 | /projects lista              | B, D                                    | Aprovada                             | Personalempty/owner/colleague, scopeURL/reload.                                     |
 | /projects/:id overview       | B, C, E1, E2                            | Aprovada após E2                     | Regressão2colunas E1 corrigida, E2 ambas viewports vistos.                          |
 | /projects/:id editar/arquivo | C, E1                                   | Aprovada                             | Header/acessoimutável, inlineform e confirmação; nenhum submit.                     |
@@ -65,7 +65,7 @@ Os registros a seguir preservam decisões e limitações do momento da coleta. M
 
 Estados contextuais não são novos paths: `?record=ID` abre registro sobre a rota de origem; `&recordTab=details|edit|history` deve representar as abas (implementação C). `/records/:recordId` usa o mesmo controle `recordTab`. `/app`, `/me`, `/calendar`, `/pending` e listas podem abrir o drawer preservando período/filtros. Cada combinação de parâmetros tem URL independente sem duplicar páginas no Router. Filtros de relatórios incluem `fromDate`, `toDate`, `projectId` e `includeArchived`; listas também têm filtros próprios (`project`, `status`, `after`).
 
-Na entrega B, assunto→pessoas ainda era futuro. E implementou seleção qualificada projectId/topicId no parâmetro topic e foi validada em reload/back/forward, sem criar nova subrota.
+Na entrega B, tópico→pessoas ainda era futuro. E implementou seleção qualificada projectId/topicId no parâmetro topic e foi validada em reload/back/forward, sem criar nova subrota.
 
 ## Registro dos rounds
 

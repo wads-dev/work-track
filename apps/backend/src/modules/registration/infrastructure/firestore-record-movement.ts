@@ -54,10 +54,10 @@ function topics(project: Record<string, unknown>): Topic[] {
         typeof (t as Topic).description !== 'string',
     )
   )
-    fail('Catálogo de assuntos inválido.');
+    fail('Catálogo de tópicos inválido.');
   const result = project.topics as Topic[];
   if (new Set(result.map((t) => t.id)).size !== result.length)
-    fail('IDs de assuntos duplicados.');
+    fail('IDs de tópicos duplicados.');
   return result;
 }
 function recordTopics(
@@ -72,7 +72,7 @@ function recordTopics(
         typeof (t as Record<string, unknown>).topicId !== 'string',
     )
   )
-    fail('Assuntos do registro inválidos.');
+    fail('Tópicos do registro inválidos.');
   return data.topics as Array<Record<string, unknown>>;
 }
 const version = (
@@ -144,7 +144,7 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
         const rs = recordTopics(data);
         if (rs.length !== 1)
           fail(
-            'Registro com múltiplos assuntos exige remapeamento explícito; movimento indisponível.',
+            'Registro com múltiplos tópicos exige remapeamento explícito; movimento indisponível.',
           );
         if (typeof data.projectId !== 'string')
           fail('Projeto de origem inválido.');
@@ -211,14 +211,14 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
         targetTopics = topics(target),
         sourceTopic = sourceTopics.find((t) => t.id === sourceId);
       if (!sourceTopic || sourceTopic.archived || sourceTopic.mergedIntoTopicId)
-        fail('Assunto de origem deve ser canônico e ativo.');
+        fail('Tópico de origem deve ser canônico e ativo.');
       // A source alias can match functional reports without literal record membership. Reject rather than omit its records.
       if (sourceTopics.some((t) => t.mergedIntoTopicId))
         fail(
           'Origem com aliases exige conciliação dedicada; nenhuma atividade movida.',
         );
       if (candidates.length === 0)
-        fail('Nenhum registro próprio ativo neste assunto.');
+        fail('Nenhum registro próprio ativo neste tópico.');
       if (candidates.length > 100)
         throw new ProjectManagementError(
           'resource-exhausted',
@@ -233,16 +233,14 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
             'Registro com resolução histórica de alias exige revisão dedicada.',
           );
         if (recordTopics(d).length !== 1)
-          fail(
-            'Há registros com múltiplos assuntos; nenhuma atividade movida.',
-          );
+          fail('Há registros com múltiplos tópicos; nenhuma atividade movida.');
       }
       let dest: Topic | undefined,
         willCreate = false;
       if (input.subject_target) {
         dest = targetTopics.find((t) => t.id === input.subject_target);
         if (!dest || dest.archived || dest.mergedIntoTopicId)
-          fail('Assunto de destino deve existir, ser canônico e ativo.');
+          fail('Tópico de destino deve existir, ser canônico e ativo.');
       } else {
         const matches = targetTopics.filter(
           (t) =>
@@ -261,7 +259,7 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
               32,
             );
           if (targetTopics.some((t) => t.id === id))
-            fail('ID de destino em conflito; selecione assunto explícito.');
+            fail('ID de destino em conflito; selecione tópico explícito.');
           dest = {
             id,
             title: sourceTopic.title,
@@ -282,7 +280,7 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
       ]);
       const recordIds = candidates.map((s) => s.id).sort();
       const warnings = [
-        'Somente seus registros serão movidos. O assunto original permanece para histórico e outros participantes.',
+        'Somente seus registros serão movidos. O tópico original permanece para histórico e outros participantes.',
         'Identidade, textos, tempos e distribuições são preservados; relatórios por projeto e estimativas podem mudar.',
       ];
       const updatedAt = new Date().toISOString(),

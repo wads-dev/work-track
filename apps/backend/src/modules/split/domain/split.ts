@@ -140,7 +140,7 @@ export function planSplit(
   )
     throw new SplitError(
       'failed-precondition',
-      'Minutos absolutos de assuntos exigem repartição explícita; nenhuma alteração.',
+      'Minutos absolutos de tópicos exigem repartição explícita; nenhuma alteração.',
     );
   if (
     source.interruptions !== undefined &&
@@ -167,7 +167,7 @@ export function planSplit(
         if (general.length !== 1)
           throw new SplitError(
             'failed-precondition',
-            'Escolha assuntos explícitos; Geral canônico único não encontrado.',
+            'Escolha tópicos explícitos; Geral canônico único não encontrado.',
           );
         return [{ topicId: general[0]!.id }];
       })();
@@ -182,7 +182,7 @@ export function planSplit(
     )
       throw new SplitError(
         'failed-precondition',
-        'Assunto destino inexistente, arquivado ou alias; escolha assunto canônico.',
+        'Tópico destino inexistente, arquivado ou alias; escolha tópico canônico.',
       );
   }
   if (

@@ -159,7 +159,7 @@ export class FirestoreProjectScopeRepository implements ProjectScopeRepository {
       ]);
       const warnings = requiresSharingAcknowledgement
         ? [
-            'Global compartilha com a organização TODOS os metadados, assuntos, textos de registros e histórico associado. Confidencialidade é apresentação, não autorização.',
+            'Global compartilha com a organização TODOS os metadados, tópicos, textos de registros e histórico associado. Confidencialidade é apresentação, não autorização.',
           ]
         : [
             'Pessoal restringe futuras leituras ao criador; não revoga cópias já lidas nem remove histórico.',

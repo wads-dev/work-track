@@ -158,7 +158,7 @@ export async function executeCalendarReport(
     if ('error' in resolved)
       throw new CalendarReportError(
         'failed-precondition',
-        'Assunto não possui identidade canônica segura.',
+        'Tópico não possui identidade canônica segura.',
       );
     selectedTopic = resolved.topicId;
   }
@@ -196,7 +196,7 @@ export async function executeCalendarReport(
   if (JSON.stringify(topics) !== JSON.stringify(finalTopics))
     throw new CalendarReportError(
       'failed-precondition',
-      'Assuntos alterados durante leitura; atualize a seleção.',
+      'Tópicos alterados durante leitura; atualize a seleção.',
     );
   const topicWarnings = new Set<string>();
   const intervals = report.intervals
@@ -302,7 +302,7 @@ export async function executeCalendarReport(
       ...topicWarnings,
       ...(input.topicId
         ? [
-            'Filtro de assunto seleciona ocorrências e preserva todo o intervalo do registro; minutos atribuídos ao assunto são informados separadamente, sem encurtar a linha do tempo.',
+            'Filtro de tópico seleciona ocorrências e preserva todo o intervalo do registro; minutos atribuídos ao tópico são informados separadamente, sem encurtar a linha do tempo.',
           ]
         : []),
       ...(participantsUnavailable

@@ -122,7 +122,7 @@ export function TopicDetails({
     return (
       <Skeleton
         role="status"
-        aria-label="Carregando assunto"
+        aria-label="Carregando tópico"
         className={cn('size-6 rounded-full')}
       />
     );
@@ -136,8 +136,8 @@ export function TopicDetails({
     return (
       <Alert>
         <AlertDescription>
-          Assunto reservado ou projeto indisponível. Revele o conteúdo
-          autorizado para consultar detalhes.
+          Tópico reservado ou projeto indisponível. Revele o conteúdo autorizado
+          para consultar detalhes.
         </AlertDescription>
       </Alert>
     );
@@ -145,7 +145,7 @@ export function TopicDetails({
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          Assunto indisponível ou unificação inconsistente. Nenhum relatório
+          Tópico indisponível ou unificação inconsistente. Nenhum relatório
           alternativo foi consultado.
         </AlertDescription>
       </Alert>
@@ -153,7 +153,7 @@ export function TopicDetails({
   const data = current?.data;
   const label = text(
     objects(project?.topics).find((t) => t.id === canonical)?.title,
-    'Assunto',
+    'Tópico',
   );
   return (
     <div className={cn('flex flex-col min-w-0 gap-4')}>
@@ -181,7 +181,7 @@ export function TopicDetails({
       {topicId !== canonical && (
         <Alert>
           <AlertDescription>
-            Este assunto foi unificado. Os fatos abaixo pertencem ao assunto
+            Este tópico foi unificado. Os fatos abaixo pertencem ao tópico
             canônico{' '}
             <RouterLink
               to={topicDetailsPath(projectId, canonical) + location.search}
@@ -207,7 +207,7 @@ export function TopicDetails({
       ) : !data ? (
         <Skeleton
           role="status"
-          aria-label="Carregando relatório do assunto"
+          aria-label="Carregando relatório do tópico"
           className={cn('size-6 rounded-full')}
         />
       ) : (
@@ -218,7 +218,7 @@ export function TopicDetails({
                 Histórico completo autorizado
               </h2>
               <p className={cn('text-base')}>
-                {data.occurrenceCount} registros com este assunto ·{' '}
+                {data.occurrenceCount} registros com este tópico ·{' '}
                 {data.intervals.length} intervalos com horas computáveis
               </p>
               <p className={cn('text-base')}>
@@ -236,12 +236,12 @@ export function TopicDetails({
               {data.occurrenceCount === 0 && (
                 <Alert>
                   <AlertDescription>
-                    Nenhum registro encontrado para este assunto.
+                    Nenhum registro encontrado para este tópico.
                   </AlertDescription>
                 </Alert>
               )}
               <p className={cn('text-base')}>
-                Tempo atribuído ao assunto: {hours(data.totalMinutes)}
+                Tempo atribuído ao tópico: {hours(data.totalMinutes)}
               </p>
               <p className={cn('text-base')}>
                 Fatos encerrados: {hours(data.closedMinutes)} · Estimativas

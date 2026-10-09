@@ -10,14 +10,14 @@ export function metadataNavigation(
   topicId?: string,
 ) {
   if (isHidden(project, revealed))
-    return { label: topicId ? 'Assunto reservado' : 'Projeto reservado' };
+    return { label: topicId ? 'Tópico reservado' : 'Projeto reservado' };
   if (topicId) {
     const canonical = canonicalCatalogTopic(objects(project?.topics), topicId);
-    if (!canonical) return { label: 'Assunto indisponível' };
+    if (!canonical) return { label: 'Tópico indisponível' };
     return {
       label: text(
         objects(project?.topics).find((t) => t.id === canonical)?.title,
-        'Assunto',
+        'Tópico',
       ),
       path: topicDetailsPath(projectId, canonical),
     };

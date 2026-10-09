@@ -39,6 +39,6 @@ export const calendarInput = z
             Date.parse(v.to) > Date.parse(v.from) &&
             Date.parse(v.to) - Date.parse(v.from) <= (93 * 24 + 1) * 3600000,
           )),
-    'Período até93dias+1h; todas semanas exige projeto e omissão de datas; assunto exige projeto.',
+    'Período até93dias+1h; todas semanas exige projeto e omissão de datas; tópico exige projeto.',
   );
 export type CalendarInput = z.infer<typeof calendarInput>;

@@ -324,12 +324,12 @@ export function RecordDrawer({
     const snapshot = object(side);
     const parent = projects.rows.find((p) => p.id === snapshot.projectId)?.data;
     if (!revealed && (!parent || isHidden(parent, revealed)))
-      return 'Projeto reservado · Assuntos reservados';
+      return 'Projeto reservado · Tópicos reservados';
     return (
       text(object(snapshot.projectSnapshot).title, 'Projeto') +
       ' · ' +
       objects(snapshot.topicSnapshots)
-        .map((t) => text(t.title, 'Assunto'))
+        .map((t) => text(t.title, 'Tópico'))
         .join(', ')
     );
   };
@@ -738,7 +738,7 @@ export function RecordDrawer({
                                 <>
                                   Ação:{' '}
                                   {row.data.action === 'move_subject'
-                                    ? 'Transferência de assunto'
+                                    ? 'Transferência de tópico'
                                     : 'Mover registro'}
                                   <br />
                                   Origem: {movementSide(row.data.before)}

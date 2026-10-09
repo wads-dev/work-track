@@ -57,13 +57,13 @@ export function TopicReport({
   return (
     <Card className="gap-0 py-0">
       <section
-        aria-label="Tempo por assunto"
+        aria-label="Tempo por tópico"
         className={cn('p-4 sm:p-5 min-w-0')}
       >
         <div className={cn('flex flex-col gap-4')}>
-          <h3 className={cn('text-lg font-semibold')}>Tempo por assunto</h3>
+          <h3 className={cn('text-lg font-semibold')}>Tempo por tópico</h3>
           <p className={cn('text-sm text-muted-foreground')}>
-            Distribuição informada pelo relatório. Assuntos de projetos
+            Distribuição informada pelo relatório. Tópicos de projetos
             diferentes permanecem separados; tempo sem divisão não é repartido
             automaticamente.
           </p>
@@ -73,13 +73,13 @@ export function TopicReport({
           </p>
           {buckets.length === 0 ? (
             <p className={cn('text-base text-muted-foreground')}>
-              Nenhum assunto com tempo neste escopo.
+              Nenhum tópico com tempo neste escopo.
             </p>
           ) : (
             <>
               <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
                 <span className="text-xs text-muted-foreground">
-                  {'Assunto e projeto'}
+                  {'Tópico e projeto'}
                 </span>
                 <Select
                   value={(active ? selected : '') || '__all__'}
@@ -87,11 +87,11 @@ export function TopicReport({
                     setSelected(value === '__all__' ? '' : value)
                   }
                 >
-                  <SelectTrigger aria-label={'Assunto e projeto'}>
+                  <SelectTrigger aria-label={'Tópico e projeto'}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">Todos os assuntos</SelectItem>
+                    <SelectItem value="__all__">Todos os tópicos</SelectItem>
                     {buckets.map((bucket) => (
                       <SelectItem
                         key={topicBucketKey(bucket)}
@@ -107,7 +107,7 @@ export function TopicReport({
                 </Select>
               </Label>
               <InteractiveChart
-                title="Tempo por assunto"
+                title="Tempo por tópico"
                 variant="bar"
                 data={(active ? [active] : buckets).map((bucket) => ({
                   key: topicBucketKey(bucket),
@@ -196,14 +196,14 @@ export function TopicReport({
                 <div>
                   <h4 className={cn('text-base font-medium')}>
                     {personal
-                      ? 'Meu tempo neste assunto'
-                      : 'Pessoas neste assunto'}
+                      ? 'Meu tempo neste tópico'
+                      : 'Pessoas neste tópico'}
                   </h4>
                   <InteractiveChart
                     title={
                       personal
-                        ? 'Meu tempo neste assunto'
-                        : 'Pessoas neste assunto'
+                        ? 'Meu tempo neste tópico'
+                        : 'Pessoas neste tópico'
                     }
                     variant="bar"
                     data={active.people.map((person) => ({

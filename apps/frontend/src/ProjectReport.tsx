@@ -366,8 +366,8 @@ export function ProjectReport({
                 detailsAvailable: !hidden,
                 projectLabel: hidden ? 'Projeto reservado' : projectLabel,
                 topicLabel: hidden
-                  ? 'Assunto reservado'
-                  : topic.label || 'Assunto',
+                  ? 'Tópico reservado'
+                  : topic.label || 'Tópico',
                 minutes: topic.minutes,
                 people: (topic.byUser ?? []).map((person, index) => ({
                   key: String(index),

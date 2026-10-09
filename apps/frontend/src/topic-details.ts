@@ -50,7 +50,7 @@ export function validateTopicReport(
   canonicalTopicId: string,
 ) {
   const fail = () => {
-    throw new Error('Relatório de assunto incompleto ou incompatível.');
+    throw new Error('Relatório de tópico incompleto ou incompatível.');
   };
   if (
     data.policy !== 'topic-report-v3' ||

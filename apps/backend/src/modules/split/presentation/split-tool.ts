@@ -14,7 +14,7 @@ export function registerSplitTool(
     'split_record',
     {
       description:
-        'Consulte get_instructions. Divida trecho explícito de registro próprio encerrado para projeto/assuntos existentes sem duplicar horas. Prévia somente leitura por padrão; mostre segmentos e peça confirmação humana. Só depois confirmed true, mesmo requestId/motivo e previewToken. Transferência pessoal para corporativo publica texto original completo e interpretação: informe a pessoa e exija acknowledgeSharedDestination true após confirmação explícita. Não invente fim de aberto. Minutos absolutos de tópicos e interrupções ambíguas exigem repartição explícita em fluxo separado; não tente apagá-los. Não é abono, faturamento nem undo.',
+        'Consulte get_instructions. Divida trecho explícito de registro próprio encerrado para projeto/tópicos existentes sem duplicar horas. Prévia somente leitura por padrão; mostre segmentos e peça confirmação humana. Só depois confirmed true, mesmo requestId/motivo e previewToken. Transferência pessoal para corporativo publica texto original completo e interpretação: informe a pessoa e exija acknowledgeSharedDestination true após confirmação explícita. Não invente fim de aberto. Minutos absolutos de tópicos e interrupções ambíguas exigem repartição explícita em fluxo separado; não tente apagá-los. Não é abono, faturamento nem undo.',
       inputSchema: splitInput,
       annotations: {
         readOnlyHint: false,

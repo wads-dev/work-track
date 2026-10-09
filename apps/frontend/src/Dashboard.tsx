@@ -652,7 +652,7 @@ export function Dashboard({
               <QueryToolbarField kind="standard">
                 {' '}
                 <div className="space-y-1.5">
-                  <Label>Assunto / tópico</Label>
+                  <Label>Tópico</Label>
                   <Select
                     value={topicFilter || '__all__'}
                     disabled={!projectFilter}
@@ -660,18 +660,18 @@ export function Dashboard({
                       updateFilter('topic', value === '__all__' ? '' : value)
                     }
                   >
-                    <SelectTrigger aria-label="Assunto / tópico">
+                    <SelectTrigger aria-label="Tópico">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__all__">Todos os assuntos</SelectItem>
+                      <SelectItem value="__all__">Todos os tópicos</SelectItem>
                       {topicOptions.map((topic) => (
                         <SelectItem key={text(topic.id)} value={text(topic.id)}>
                           {isHidden(
                             rawProjectsById.get(projectFilter)?.data,
                             revealed,
                           )
-                            ? 'Assunto reservado'
+                            ? 'Tópico reservado'
                             : text(topic.title)}
                         </SelectItem>
                       ))}
@@ -837,7 +837,7 @@ export function Dashboard({
                         topicId={text(t.topicId)}
                       />
                     ) : (
-                      'Assunto indisponível'
+                      'Tópico indisponível'
                     )}
                   </span>
                 ))}

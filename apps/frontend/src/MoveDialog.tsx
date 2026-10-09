@@ -244,7 +244,7 @@ export function MoveDialog({
         className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"
       >
         <DialogTitle id={'move-title'}>
-          {recordId ? 'Mover registro' : 'Transferir assunto'}
+          {recordId ? 'Mover registro' : 'Transferir tópico'}
         </DialogTitle>
         <div className="space-y-4">
           <div className="flex flex-col gap-4">
@@ -252,10 +252,10 @@ export function MoveDialog({
             <Alert className="my-2">
               <AlertDescription>
                 Somente seus registros ativos serão movidos entre projetos do
-                mesmo escopo. Registros com múltiplos assuntos são bloqueados.
+                mesmo escopo. Registros com múltiplos tópicos são bloqueados.
                 Horários, textos e autoria serão preservados; não haverá
-                duplicação de horas. O assunto de origem permanece para
-                histórico e outras pessoas.
+                duplicação de horas. O tópico de origem permanece para histórico
+                e outras pessoas.
               </AlertDescription>
             </Alert>
             {done ? (
@@ -300,7 +300,7 @@ export function MoveDialog({
                 )}
                 <div className="min-w-0 space-y-2">
                   <Label htmlFor={'MoveDialog-8616'}>
-                    {'Assunto no destino'}
+                    {'Tópico no destino'}
                   </Label>
                   <Select
                     value={topic || '__same_name__'}
@@ -321,7 +321,7 @@ export function MoveDialog({
                         <SelectItem key={String(t.id)} value={String(t.id)}>
                           {text(
                             safeProject(t, revealed).title,
-                            'Assunto reservado',
+                            'Tópico reservado',
                           )}
                         </SelectItem>
                       ))}

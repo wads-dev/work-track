@@ -44,7 +44,7 @@ function fixture() {
       type: 'work',
       title: id,
       description: 'Contexto projeto',
-      topics: [{ id: 'general', title: 'Geral', description: 'Assunto geral' }],
+      topics: [{ id: 'general', title: 'Geral', description: 'Tópico geral' }],
     });
   const ref = (path: string): Ref => ({
     path,

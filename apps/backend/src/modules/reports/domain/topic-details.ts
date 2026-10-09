@@ -164,7 +164,7 @@ export function buildTopicDetails(
     intervals,
     warnings: [
       ...warnings,
-      'Ocorrências usam início real inclusive registros sem minutos; horas do assunto são atribuídas separadamente da duração completa dos registros.',
+      'Ocorrências usam início real inclusive registros sem minutos; horas do tópico são atribuídas separadamente da duração completa dos registros.',
     ],
   };
 }

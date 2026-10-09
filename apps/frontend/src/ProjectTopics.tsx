@@ -84,7 +84,7 @@ export function ProjectTopics({
     });
   };
   const label = (id: string) =>
-    text(catalog.find((t) => t.id === id)?.title, 'Assunto');
+    text(catalog.find((t) => t.id === id)?.title, 'Tópico');
   const valid =
     sources.length > 0 &&
     sources.length <= 30 &&
@@ -117,7 +117,7 @@ export function ProjectTopics({
       });
       if (execute) {
         setMessage(
-          'Assuntos mesclados. Registros e snapshots preservados. Recarregue o catálogo antes de outra operação.',
+          'Tópicos mesclados. Registros e snapshots preservados. Recarregue o catálogo antes de outra operação.',
         );
         setPreview(null);
         setConfirmed(false);
@@ -157,11 +157,11 @@ export function ProjectTopics({
   };
   return (
     <section
-      aria-label={'Gerenciar assuntos'}
+      aria-label={'Gerenciar tópicos'}
       className="rounded-xl border bg-card p-4 text-card-foreground"
     >
       <div className="flex flex-col gap-4">
-        <h3 className="text-lg font-semibold">Assuntos do projeto</h3>
+        <h3 className="text-lg font-semibold">Tópicos do projeto</h3>
         {movingTopic && (
           <MoveDialog
             functions={functions}
@@ -188,10 +188,10 @@ export function ProjectTopics({
                     }
                     className="text-primary underline underline-offset-4"
                   >
-                    {text(t.title, 'Assunto')}
+                    {text(t.title, 'Tópico')}
                   </RouterLink>
                 ) : (
-                  'Assunto reservado'
+                  'Tópico reservado'
                 )}
                 {t.mergedIntoTopicId
                   ? ' · alias histórico de ' +
@@ -203,7 +203,7 @@ export function ProjectTopics({
               {!t.archived && !t.mergedIntoTopicId && (
                 <Button
                   disabled={busy || !!movingTopic}
-                  aria-label={'Transferir assunto ' + text(t.title)}
+                  aria-label={'Transferir tópico ' + text(t.title)}
                   onClick={() => setMovingTopic(t)}
                   variant="outline"
                   className="min-h-11"
@@ -215,11 +215,11 @@ export function ProjectTopics({
           ))}
         </ul>
         <p className="text-sm">
-          Mescle assuntos sem reescrever registros ou snapshots. Geral não pode
+          Mescle tópicos sem reescrever registros ou snapshots. Geral não pode
           ser origem; pode ser destino. Não há desfazer.
         </p>
         <div className="min-w-0 space-y-2">
-          <Label htmlFor={'ProjectTopics-7680'}>{'Assuntos de origem'}</Label>
+          <Label htmlFor={'ProjectTopics-7680'}>{'Tópicos de origem'}</Label>
           <div className="space-y-2 rounded-md border p-3">
             {active
               .filter((t) => t.id !== 'general' && t.id !== target)
@@ -238,27 +238,27 @@ export function ProjectTopics({
                       )
                     }
                   />
-                  <span>{text(t.title, 'Assunto')}</span>
+                  <span>{text(t.title, 'Tópico')}</span>
                 </label>
               ))}
           </div>
         </div>
         <div className="min-w-0 space-y-2">
-          <Label htmlFor={'ProjectTopics-8399'}>{'Assunto de destino'}</Label>
+          <Label htmlFor={'ProjectTopics-8399'}>{'Tópico de destino'}</Label>
           <Select
             value={target}
             disabled={busy || !!message}
             onValueChange={(value) => update('mergeTarget', value)}
           >
             <SelectTrigger id={'ProjectTopics-8399'}>
-              <SelectValue placeholder={'Assunto de destino'} />
+              <SelectValue placeholder={'Tópico de destino'} />
             </SelectTrigger>
             <SelectContent>
               {active
                 .filter((t) => !sources.includes(text(t.id, '')))
                 .map((t, i) => (
                   <SelectItem key={i} value={text(t.id, '')}>
-                    {text(t.title, 'Assunto')}
+                    {text(t.title, 'Tópico')}
                   </SelectItem>
                 ))}
             </SelectContent>
@@ -277,9 +277,9 @@ export function ProjectTopics({
             <p className="text-sm leading-relaxed">
               Origens:{' '}
               {currentPreview.sourceTopics
-                .map((t) => text(t.title, 'Assunto'))
+                .map((t) => text(t.title, 'Tópico'))
                 .join(', ')}{' '}
-              → {text(currentPreview.targetTopic.title, 'Assunto')}
+              → {text(currentPreview.targetTopic.title, 'Tópico')}
             </p>
             <Alert className="my-2">
               <AlertDescription>
@@ -366,7 +366,7 @@ export function ProjectTopics({
                       .map((id) =>
                         text(
                           item.before.find((t) => t.id === id)?.title,
-                          'Assunto',
+                          'Tópico',
                         ),
                       )
                       .join(', ')}{' '}
@@ -374,7 +374,7 @@ export function ProjectTopics({
                     {text(
                       item.after.find((t) => t.id === item.targetTopicId)
                         ?.title,
-                      'Assunto',
+                      'Tópico',
                     )}
                   </p>
                 </div>

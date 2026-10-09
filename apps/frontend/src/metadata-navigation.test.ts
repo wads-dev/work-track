@@ -19,7 +19,7 @@ describe('privacy-aware current catalog navigation', () => {
       label: 'Projeto reservado',
     });
     expect(metadataNavigation('p', p, false, 't')).toEqual({
-      label: 'Assunto reservado',
+      label: 'Tópico reservado',
     });
     expect(metadataNavigation('p', p, true, 't')).toEqual({
       label: 'Secret Topic',
@@ -39,7 +39,7 @@ describe('privacy-aware current catalog navigation', () => {
       path: '/projects/p/topics/new',
     });
     expect(metadataNavigation('p', p, true, 'missing')).toEqual({
-      label: 'Assunto indisponível',
+      label: 'Tópico indisponível',
     });
   });
   it('calendar person subject full-history and report JSON return context survive', () => {

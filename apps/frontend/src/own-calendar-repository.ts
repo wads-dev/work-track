@@ -21,7 +21,7 @@ export function ownCalendarRepository(
       },
       readTopics: async () => {
         throw new Error(
-          'Assuntos corporativos não autorizados neste repositório.',
+          'Tópicos corporativos não autorizados neste repositório.',
         );
       },
       archivedProjectIds: (ids) => own.archivedProjectIds(ids),

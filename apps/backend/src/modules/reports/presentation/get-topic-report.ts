@@ -31,7 +31,7 @@ export async function getTopicReportHandler(
   authorizeReport(auth);
   const parsed = topicInput.safeParse(data);
   if (!parsed.success)
-    throw new HttpsError('invalid-argument', 'Projeto e assunto inválidos.');
+    throw new HttpsError('invalid-argument', 'Projeto e tópico inválidos.');
   const input = parsed.data,
     uid = auth!.uid;
   try {
@@ -51,7 +51,7 @@ export async function getTopicReportHandler(
       )
         throw new HttpsError(
           'failed-precondition',
-          'Projeto ou assuntos alterados durante leitura.',
+          'Projeto ou tópicos alterados durante leitura.',
         );
       if (page.archived && !input.includeArchived)
         throw new HttpsError(
@@ -72,7 +72,7 @@ export async function getTopicReportHandler(
     if (!initial) throw new HttpsError('not-found', 'Projeto não encontrado.');
     const topics = initial.topics ?? [];
     if (!topics.some((t) => t.id === input.topicId))
-      throw new HttpsError('not-found', 'Assunto não encontrado.');
+      throw new HttpsError('not-found', 'Tópico não encontrado.');
     const visible = await repository.revalidate(
       records,
       uid,
@@ -85,7 +85,7 @@ export async function getTopicReportHandler(
       );
     if (new Set(records.map((r) => r.uid)).size > 100)
       throw new ReportContextError(
-        'Assunto excede100participantes; nenhuma seleção parcial retornada.',
+        'Tópico excede100participantes; nenhuma seleção parcial retornada.',
       );
     const context = await repository.loadContext(
       [...new Set(records.map((r) => r.uid))],
@@ -118,7 +118,7 @@ export async function getTopicReportHandler(
     )
       throw new HttpsError(
         'failed-precondition',
-        'Projeto ou assuntos alterados durante leitura.',
+        'Projeto ou tópicos alterados durante leitura.',
       );
     if (
       (await repository.revalidate(visible, uid, Boolean(initial.personal)))
@@ -149,7 +149,7 @@ export async function getTopicReportHandler(
       throw new HttpsError('resource-exhausted', error.message);
     throw new HttpsError(
       'failed-precondition',
-      'Não foi possível obter detalhes completos e autorizados do assunto.',
+      'Não foi possível obter detalhes completos e autorizados do tópico.',
     );
   }
 }

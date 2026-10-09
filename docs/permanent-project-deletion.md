@@ -4,7 +4,7 @@ Este fluxo é distinto de arquivar projetos e de remover registros pelo MCP. O M
 
 ## Ordem obrigatória
 
-1. Solicitar ao backend uma exportação JSON completa do projeto, seus assuntos, registros (inclusive removidos logicamente) e documentos relacionados.
+1. Solicitar ao backend uma exportação JSON completa do projeto, seus tópicos, registros (inclusive removidos logicamente) e documentos relacionados.
 2. Iniciar o download do JSON no navegador. O navegador não pode comprovar que o arquivo foi salvo no disco; a interface exige confirmação explícita da pessoa de que guardou a cópia.
 3. Confirmar a identidade do projeto e o caráter irreversível da operação. Projetos Global podem conter registros de outras pessoas; as horas históricas desses registros também serão removidas.
 4. Enviar ao backend o comprovante de exportação emitido pelo servidor e a confirmação explícita. O backend verifica novamente autoria e o snapshot completo antes de apagar os documentos em uma única transação.

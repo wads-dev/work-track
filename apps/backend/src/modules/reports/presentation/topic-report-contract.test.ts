@@ -541,7 +541,7 @@ describe('project report common topic contract', () => {
       {
         projectId: 'project',
         topicId: 'retired-topic',
-        label: 'Assunto sem identificação',
+        label: 'Tópico sem identificação',
         minutes: 20,
         byUser: [{ uid: 'alice', label: 'Participante sem nome', minutes: 20 }],
       },

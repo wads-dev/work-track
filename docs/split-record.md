@@ -4,11 +4,11 @@
 
 ## Contrato
 
-Entrada: `recordId`, `segmentStartedAt`, `segmentEndedAt` (ISO com offset), `destinationProjectId`, `destinationTopics` (IDs existentes e percentuais opcionais explícitos), `requestId` estável, `reason`. `confirmed` é falso por padrão. Prévia retorna partes completas, durações em milissegundos, total, IDs determinísticos, `previewToken`, `warnings` e `requiresSharedAcknowledgment`. Array vazio de assuntos usa somente Geral canônico único existente, exibido na prévia; não cria assuntos.
+Entrada: `recordId`, `segmentStartedAt`, `segmentEndedAt` (ISO com offset), `destinationProjectId`, `destinationTopics` (IDs existentes e percentuais opcionais explícitos), `requestId` estável, `reason`. `confirmed` é falso por padrão. Prévia retorna partes completas, durações em milissegundos, total, IDs determinísticos, `previewToken`, `warnings` e `requiresSharedAcknowledgment`. Array vazio de tópicos usa somente Geral canônico único existente, exibido na prévia; não cria tópicos.
 
 Mostre a prévia à pessoa. Só após confirmação humana envie `confirmed: true` e o mesmo token/intent/requestId. Token é uma revisão otimista, não um segredo nem autorização: liga UID, intenção, fato e revisões dos projetos. Mudanças entre prévia e confirmação exigem nova prévia. ACL atual continua obrigatória em toda chamada e retry.
 
-Transferência pessoal para corporativo publica **texto original completo e interpretação**, não apenas frase do segmento. Prévia indica esse risco; confirmação exige adicionalmente `acknowledgeSharedDestination: true`, que é registrado na auditoria e reexigido no retry. Metadados pessoais adicionais desconhecidos bloqueiam transferência corporativa; não apague evidências para contornar. Snapshots do trecho movido usam projeto e assuntos destino.
+Transferência pessoal para corporativo publica **texto original completo e interpretação**, não apenas frase do segmento. Prévia indica esse risco; confirmação exige adicionalmente `acknowledgeSharedDestination: true`, que é registrado na auditoria e reexigido no retry. Metadados pessoais adicionais desconhecidos bloqueiam transferência corporativa; não apague evidências para contornar. Snapshots do trecho movido usam projeto e tópicos destino.
 
 ## Conservação, identidade e auditoria
 
@@ -20,6 +20,6 @@ Fingerprint/requestId de registro original continuam nele para o retry de `regis
 
 ## Limites deliberados
 
-Minutos absolutos de assuntos e quaisquer interrupções não vazias exigem contrato futuro de repartição temporal explícita; esta versão rejeita sem inferir ou duplicar alocações. Percentuais dos assuntos retidos permanecem percentuais e destino usa somente percentuais informados. Projetos/assuntos arquivados, aliases e projetos em mesclagem são bloqueados. Datas são comparadas como instantes, não strings. Intervalo factual deve ter terminado até o instante da operação. Auditoria JSON estimada acima de 700KB é rejeitada antes de writes; limites reais adicionais do Firestore também falham atomicamente. Não há backfill, index deployment ou alterações de regras.
+Minutos absolutos de tópicos e quaisquer interrupções não vazias exigem contrato futuro de repartição temporal explícita; esta versão rejeita sem inferir ou duplicar alocações. Percentuais dos tópicos retidos permanecem percentuais e destino usa somente percentuais informados. Projetos/tópicos arquivados, aliases e projetos em mesclagem são bloqueados. Datas são comparadas como instantes, não strings. Intervalo factual deve ter terminado até o instante da operação. Auditoria JSON estimada acima de 700KB é rejeitada antes de writes; limites reais adicionais do Firestore também falham atomicamente. Não há backfill, index deployment ou alterações de regras.
 
-Testes unitários cobrem prévia read-only, intervalos centrais/bordas/full, conservação, offsets, owner/ACL/orphans, assuntos, concorrência, confirmação sem token, publicação explícita, idempotência/replay original, colisões, rollback e tamanho. O mock transacional verifica ausência de commits em falhas; não substitui testes de integração em emulator/prod.
+Testes unitários cobrem prévia read-only, intervalos centrais/bordas/full, conservação, offsets, owner/ACL/orphans, tópicos, concorrência, confirmação sem token, publicação explícita, idempotência/replay original, colisões, rollback e tamanho. O mock transacional verifica ausência de commits em falhas; não substitui testes de integração em emulator/prod.

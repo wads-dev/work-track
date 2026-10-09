@@ -463,7 +463,7 @@ describe('buildTopicBreakdown', () => {
     expect(result.byTopic[0]).toMatchObject({
       projectId: 'project',
       topicId: 'historic-topic',
-      label: 'Assunto sem identificação',
+      label: 'Tópico sem identificação',
       minutes: 60,
     });
     expect(result.unassignedMinutes).toBe(0);
@@ -487,7 +487,7 @@ describe('buildTopicBreakdown', () => {
       [interval(record)],
       catalog([{ id: 'a', title: ' ' }]),
     );
-    expect(result.byTopic[0]?.label).toBe('Assunto sem identificação');
+    expect(result.byTopic[0]?.label).toBe('Tópico sem identificação');
     const duplicate = buildTopicBreakdown(
       [record],
       [interval(record)],
@@ -499,7 +499,7 @@ describe('buildTopicBreakdown', () => {
     expect(duplicate.byTopic).toEqual([]);
     expect(duplicate.unassignedMinutes).toBe(60);
     expect(duplicate.warnings.join(' ')).toContain(
-      'Metadados de assunto duplicados',
+      'Metadados de tópico duplicados',
     );
   });
 

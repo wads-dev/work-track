@@ -25,7 +25,7 @@ export function topicBuckets(
         safeProject(metadata, revealed).title,
         'Projeto reservado',
       ),
-      topicLabel: hidden ? 'Assunto reservado' : text(topic.label, 'Assunto'),
+      topicLabel: hidden ? 'Tópico reservado' : text(topic.label, 'Tópico'),
       minutes: topic.minutes,
       people: (topic.byUser ?? [])
         .filter((person) => !personalUid || person.uid === personalUid)
