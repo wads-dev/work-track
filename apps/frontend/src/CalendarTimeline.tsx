@@ -89,8 +89,8 @@ export function CalendarTimeline({
     <Box>
       <Typography variant="body2" sx={{ mb: 1 }}>
         Intervalo horário comum de {clock(span.first)} a {clock(span.last)}.
-        Altura proporcional; eventos curtos têm mínimo visual de 24 px sem
-        alterar a duração. Sobreposições em colunas.
+        Altura proporcional à duração real. Eventos curtos são marcadores com
+        detalhes na lista abaixo. Sobreposições em colunas.
       </Typography>
       <Box
         sx={{ overflowX: 'auto', p: 1 }}
@@ -111,12 +111,26 @@ export function CalendarTimeline({
               <Typography
                 component="h3"
                 variant="subtitle2"
-                sx={{ textAlign: 'center', mb: 2 }}
+                sx={{
+                  textAlign: 'center',
+                  height: 48,
+                  position: 'relative',
+                  minWidth: 0,
+                }}
               >
                 {d.key}
               </Typography>
               {d.outside && (
-                <Typography variant="caption">
+                <Typography
+                  variant="caption"
+                  sx={{
+                    position: 'absolute',
+                    mt: -3,
+                    fontSize: 10,
+                    maxWidth: 210,
+                    overflowWrap: 'anywhere',
+                  }}
+                >
                   Fora do mês consultado — sem cobertura
                 </Typography>
               )}
@@ -192,15 +206,14 @@ export function CalendarTimeline({
                           sx={{
                             position: 'absolute',
                             top: Math.max(0, (e.wallStart - span.first) * px),
-                            height: Math.max(
-                              24,
-                              (e.wallEnd - e.wallStart) * px,
-                            ),
-                            minHeight: 24,
+                            height: (e.wallEnd - e.wallStart) * px,
+                            minHeight: 0,
                             left: (e.column / e.columns) * 100 + '%',
                             width: 100 / e.columns + '%',
                             minWidth: 0,
-                            p: 0.5,
+                            p: 0,
+                            borderRadius: 0.5,
+                            boxSizing: 'border-box',
                             border: '1px solid',
                             borderColor: color(e.item.projectId),
                             borderLeft: '4px solid ' + color(e.item.projectId),
@@ -213,13 +226,77 @@ export function CalendarTimeline({
                             lineHeight: 1.15,
                           }}
                         >
-                          {caption}
+                          {(e.wallEnd - e.wallStart) * px >= 22 ? (
+                            <Typography
+                              component="span"
+                              sx={{
+                                display: 'block',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                fontSize: 11,
+                                px: 0.5,
+                              }}
+                            >
+                              {time(e.start)} {label(e.item.projectId)}
+                              {e.item.estimated ? ' ◷' : ''}
+                              {e.overlap ? ' ⇆' : ''}
+                            </Typography>
+                          ) : (
+                            <Box
+                              component="span"
+                              aria-hidden="true"
+                              sx={{
+                                display: 'block',
+                                width: '100%',
+                                height: '100%',
+                                bgcolor: color(e.item.projectId),
+                              }}
+                            />
+                          )}
                         </Button>
                       </Tooltip>
                     );
                   })}
                 </Box>
               </Box>
+              {d.events.length > 0 && (
+                <Box
+                  component="ul"
+                  aria-label="Lista legível de intervalos"
+                  sx={{
+                    m: 0,
+                    pl: 2,
+                    mt: 1,
+                    '& li': { overflowWrap: 'anywhere', fontSize: 11 },
+                  }}
+                >
+                  {d.events.map((e) => (
+                    <li key={e.item.id}>
+                      <Button
+                        component={RouterLink}
+                        to={
+                          '/records/' +
+                          encodeURIComponent(e.item.id) +
+                          '?returnTo=' +
+                          encodeURIComponent(returnTo)
+                        }
+                        sx={{
+                          fontSize: 11,
+                          p: 0.25,
+                          minWidth: 0,
+                          textAlign: 'left',
+                          display: 'block',
+                        }}
+                      >
+                        {time(e.start)}–{time(e.end)} {label(e.item.projectId)}{' '}
+                        {e.item.estimated ? '◷' : ''}
+                        {e.overlap ? '⇆' : ''}
+                      </Button>
+                    </li>
+                  ))}
+                </Box>
+              )}
             </Paper>
           ))}
         </Box>

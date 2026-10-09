@@ -456,7 +456,7 @@ export function PersonalPage({
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: {
-                    xs: '1fr',
+                    xs: 'minmax(0,1fr)',
                     sm: view === 'day' ? '1fr' : 'repeat(7,minmax(0,1fr))',
                   },
                   gap: 1,
@@ -486,6 +486,8 @@ export function PersonalPage({
                       sx={{
                         p: 1,
                         minHeight: density === 'supercompact' ? 80 : 140,
+                        minWidth: 0,
+                        overflow: 'hidden',
                         opacity: outside ? 0.55 : 1,
                       }}
                     >
@@ -546,6 +548,8 @@ export function PersonalPage({
                                   '4px solid ' + color(item.projectId),
                                 my: 1,
                                 width: '100%',
+                                minWidth: 0,
+                                maxWidth: '100%',
                                 whiteSpace:
                                   density === 'supercompact'
                                     ? 'nowrap'
