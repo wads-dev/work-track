@@ -1,4 +1,5 @@
 import { Alert, Box, Button, Paper, Tooltip, Typography } from '@mui/material';
+import { contextualRecordPath } from './routes';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   addDays,
@@ -196,12 +197,13 @@ export function CalendarTimeline({
                       <Tooltip key={e.item.id} title={caption}>
                         <Button
                           component={RouterLink}
-                          to={
-                            '/records/' +
-                            encodeURIComponent(e.item.id) +
-                            '?returnTo=' +
-                            encodeURIComponent(returnTo)
-                          }
+                          to={contextualRecordPath(
+                            returnTo.split('?')[0],
+                            returnTo.includes('?')
+                              ? '?' + returnTo.split('?').slice(1).join('?')
+                              : '',
+                            e.item.id,
+                          )}
                           aria-label={caption}
                           sx={{
                             position: 'absolute',
@@ -260,43 +262,6 @@ export function CalendarTimeline({
                   })}
                 </Box>
               </Box>
-              {d.events.length > 0 && (
-                <Box
-                  component="ul"
-                  aria-label="Lista legível de intervalos"
-                  sx={{
-                    m: 0,
-                    pl: 2,
-                    mt: 1,
-                    '& li': { overflowWrap: 'anywhere', fontSize: 11 },
-                  }}
-                >
-                  {d.events.map((e) => (
-                    <li key={e.item.id}>
-                      <Button
-                        component={RouterLink}
-                        to={
-                          '/records/' +
-                          encodeURIComponent(e.item.id) +
-                          '?returnTo=' +
-                          encodeURIComponent(returnTo)
-                        }
-                        sx={{
-                          fontSize: 11,
-                          p: 0.25,
-                          minWidth: 0,
-                          textAlign: 'left',
-                          display: 'block',
-                        }}
-                      >
-                        {time(e.start)}–{time(e.end)} {label(e.item.projectId)}{' '}
-                        {e.item.estimated ? '◷' : ''}
-                        {e.overlap ? '⇆' : ''}
-                      </Button>
-                    </li>
-                  ))}
-                </Box>
-              )}
             </Paper>
           ))}
         </Box>

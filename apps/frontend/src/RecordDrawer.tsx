@@ -6,6 +6,8 @@ import {
   Checkbox,
   CircularProgress,
   Drawer,
+  Dialog,
+  Collapse,
   FormControlLabel,
   Paper,
   Stack,
@@ -26,14 +28,25 @@ export function RecordDrawer({
   uid,
   recordId,
   search,
+  presentation = 'drawer',
+  onClose,
+  focusEnd = false,
 }: {
   db: Firestore;
   functions: Functions;
   uid: string;
   recordId: string;
   search: string;
+  presentation?: 'drawer' | 'dialog' | 'page';
+  onClose?: () => void;
+  focusEnd?: boolean;
 }) {
   const navigate = useNavigate();
+  const [editOpen, setEditOpen] = useState(focusEnd || presentation === 'page');
+  const [detailsOpen, setDetailsOpen] = useState(
+    !focusEnd && presentation === 'page',
+  );
+  const close = () => (onClose ? onClose() : navigate(closePath));
   const requestedReturn = new URLSearchParams(search).get('returnTo');
   const closePath = requestedReturn
     ? safeReturnTo(requestedReturn)
@@ -144,63 +157,86 @@ export function RecordDrawer({
       setSaving(false);
     }
   }
-  return (
-    <Drawer
-      anchor="right"
-      open
-      onClose={() => {
-        if (!saving) navigate(closePath);
+  const content = (
+    <Box
+      role={presentation === 'page' ? undefined : 'dialog'}
+      aria-modal={presentation === 'page' ? undefined : true}
+      aria-labelledby="registro-titulo"
+      sx={{
+        width: presentation === 'drawer' ? { xs: '100vw', sm: 560 } : '100%',
+        p: 3,
+        overflowWrap: 'anywhere',
       }}
     >
-      <Box
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="registro-titulo"
-        sx={{ width: { xs: '100vw', sm: 560 }, p: 3, overflowWrap: 'anywhere' }}
+      <Stack
+        direction="row"
+        sx={{ justifyContent: 'space-between', alignItems: 'center' }}
       >
-        <Stack
-          direction="row"
-          sx={{ justifyContent: 'space-between', alignItems: 'center' }}
-        >
-          <Typography id="registro-titulo" component="h2" variant="h5">
-            Detalhes do registro
-          </Typography>
-          <Button disabled={saving} onClick={() => navigate(closePath)}>
-            Fechar
-          </Button>
-        </Stack>
-        {loading && (
-          <CircularProgress aria-label="Carregando registro" sx={{ mt: 3 }} />
-        )}
-        {error && revealed && (
-          <Alert severity="error" sx={{ my: 2 }}>
-            {error}
+        <Typography id="registro-titulo" component="h2" variant="h5">
+          Detalhes do registro
+        </Typography>
+        <Button disabled={saving} onClick={close}>
+          Fechar
+        </Button>
+      </Stack>
+      {loading && (
+        <CircularProgress aria-label="Carregando registro" sx={{ mt: 3 }} />
+      )}
+      {error && revealed && (
+        <Alert severity="error" sx={{ my: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {!loading && !record && !error && (
+        <Alert severity="info">Registro não disponível nesta conta.</Alert>
+      )}
+      {success && revealed && (
+        <Alert severity="success" role="status" sx={{ my: 2 }}>
+          {success}
+        </Alert>
+      )}
+      {record &&
+        isHidden(
+          projects.rows.find((item) => item.id === record.projectId)?.data,
+          revealed,
+        ) && (
+          <Alert severity="info">
+            Detalhes, edição e auditoria ocultos no modo seguro. Revele dados no
+            topo para continuar.
           </Alert>
         )}
-        {!loading && !record && !error && (
-          <Alert severity="info">Registro não disponível nesta conta.</Alert>
-        )}
-        {success && revealed && (
-          <Alert severity="success" role="status" sx={{ my: 2 }}>
-            {success}
-          </Alert>
-        )}
-        {record &&
-          isHidden(
-            projects.rows.find((item) => item.id === record.projectId)?.data,
-            revealed,
-          ) && (
-            <Alert severity="info">
-              Detalhes, edição e auditoria ocultos no modo live. Revele dados no
-              topo para continuar.
-            </Alert>
-          )}
-        {record &&
-          !isHidden(
-            projects.rows.find((item) => item.id === record.projectId)?.data,
-            revealed,
-          ) && (
-            <>
+      {record &&
+        !isHidden(
+          projects.rows.find((item) => item.id === record.projectId)?.data,
+          revealed,
+        ) && (
+          <>
+            <Typography variant="h6">
+              {text(
+                object(record.projectSnapshot).title,
+                text(record.projectId),
+              )}
+            </Typography>
+            <Typography>
+              {date(record.startedAt, 'America/Sao_Paulo')} —{' '}
+              {record.endedAt
+                ? date(record.endedAt, 'America/Sao_Paulo')
+                : 'Aberto'}
+            </Typography>
+            <Button onClick={() => setDetailsOpen((v) => !v)}>
+              Informações e auditoria
+            </Button>
+            <Button onClick={() => setEditOpen((v) => !v)}>Editar fim</Button>
+            {presentation !== 'page' && (
+              <Button
+                onClick={() =>
+                  navigate('/records/' + encodeURIComponent(recordId))
+                }
+              >
+                Abrir página completa
+              </Button>
+            )}
+            <Collapse in={detailsOpen}>
               <Box
                 component="dl"
                 sx={{
@@ -225,7 +261,7 @@ export function RecordDrawer({
                 </dd>
                 <dt>Início original</dt>
                 <dd>{date(record.startedAt, 'America/Sao_Paulo')}</dd>
-                <dt>Fim original</dt>
+                <dt>Fim atualmente registrado</dt>
                 <dd>{date(record.endedAt, 'America/Sao_Paulo')}</dd>
                 <dt>Texto original</dt>
                 <dd>{text(record.originalText)}</dd>
@@ -234,12 +270,14 @@ export function RecordDrawer({
                 <dt>Gravado em</dt>
                 <dd>{date(record.recordedAt)}</dd>
               </Box>
-              {!record.endedAt && (
-                <Alert severity="warning">
-                  Registro aberto. Estimativas do relatório não encerram esta
-                  atividade.
-                </Alert>
-              )}
+            </Collapse>
+            {!record.endedAt && (
+              <Alert severity="warning">
+                Registro aberto. Estimativas do relatório não encerram esta
+                atividade.
+              </Alert>
+            )}
+            <Collapse in={editOpen}>
               <Paper
                 component="form"
                 onSubmit={(event) => {
@@ -253,6 +291,7 @@ export function RecordDrawer({
                 </Typography>
                 <Stack spacing={2}>
                   <TextField
+                    autoFocus={focusEnd}
                     type="datetime-local"
                     label="Fim efetivo"
                     slotProps={{ inputLabel: { shrink: true } }}
@@ -314,9 +353,11 @@ export function RecordDrawer({
                   </Button>
                 </Stack>
               </Paper>
+            </Collapse>
+            <Collapse in={detailsOpen}>
               {!revealed ? (
                 <Alert severity="info">
-                  Auditoria oculta no modo live, pois pode conter referências
+                  Auditoria oculta no modo seguro, pois pode conter referências
                   históricas confidenciais.
                 </Alert>
               ) : (
@@ -362,9 +403,34 @@ export function RecordDrawer({
                   )}
                 </>
               )}
-            </>
-          )}
-      </Box>
+            </Collapse>
+          </>
+        )}
+    </Box>
+  );
+  if (presentation === 'page') return content;
+  if (presentation === 'dialog')
+    return (
+      <Dialog
+        open
+        fullWidth
+        maxWidth="sm"
+        onClose={() => {
+          if (!saving) close();
+        }}
+      >
+        {content}
+      </Dialog>
+    );
+  return (
+    <Drawer
+      anchor="right"
+      open
+      onClose={() => {
+        if (!saving) close();
+      }}
+    >
+      {content}
     </Drawer>
   );
 }

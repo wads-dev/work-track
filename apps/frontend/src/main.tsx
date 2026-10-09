@@ -31,6 +31,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { initializeServices, type Services } from './firebase';
+import { RecordDrawer } from './RecordDrawer';
 import { Dashboard } from './Dashboard';
 import './styles.css';
 import {
@@ -40,6 +41,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useParams,
 } from 'react-router-dom';
 import { safeReturnTo } from './routes';
 import { PrivacyContext } from './privacy';
@@ -67,6 +69,19 @@ function errorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
     : 'Não foi possível concluir a operação. Tente novamente.';
+}
+function RecordPage({ services, uid }: { services: Services; uid: string }) {
+  const { recordId } = useParams();
+  return recordId ? (
+    <RecordDrawer
+      db={services.db}
+      functions={services.functions}
+      uid={uid}
+      recordId={recordId}
+      search=""
+      presentation="page"
+    />
+  ) : null;
 }
 function App() {
   const [revealed, setRevealed] = useState(false);
@@ -396,6 +411,7 @@ function App() {
                       key={user.uid}
                       db={services.db}
                       functions={services.functions}
+                      uid={user.uid}
                     />
                   }
                 />
@@ -404,6 +420,7 @@ function App() {
                   path="/pending"
                   element={
                     <PendingPage
+                      functions={services.functions}
                       key={user.uid}
                       db={services.db}
                       uid={user.uid}
@@ -418,6 +435,7 @@ function App() {
                       key={user.uid}
                       db={services.db}
                       functions={services.functions}
+                      uid={user.uid}
                     />
                   }
                 />
@@ -428,6 +446,7 @@ function App() {
                       key={user.uid}
                       db={services.db}
                       functions={services.functions}
+                      uid={user.uid}
                       calendar
                     />
                   }
@@ -470,15 +489,7 @@ function App() {
                 />
                 <Route
                   path="/records/:recordId"
-                  element={
-                    <Dashboard
-                      key={user.uid}
-                      db={services.db}
-                      functions={services.functions}
-                      uid={user.uid}
-                      mode="records"
-                    />
-                  }
+                  element={<RecordPage services={services} uid={user.uid} />}
                 />
                 <Route
                   path="*"

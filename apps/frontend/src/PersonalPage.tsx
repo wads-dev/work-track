@@ -12,7 +12,6 @@ import {
   TextField,
   Typography,
   Tooltip,
-  IconButton,
   Collapse,
 } from '@mui/material';
 import { httpsCallable, type Functions } from 'firebase/functions';
@@ -23,7 +22,9 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { reportError } from './report-error';
-import { UiIcon } from './UiIcons';
+import { ReportToolbar } from './ReportToolbar';
+import { RecordDrawer } from './RecordDrawer';
+import { contextualRecordPath } from './routes';
 import { CalendarTimeline } from './CalendarTimeline';
 import { date, text, useRows } from './data';
 import { safeProject, usePrivacy } from './privacy';
@@ -32,6 +33,7 @@ import {
   calendarDays,
   addDays,
   customRange,
+  parseDay,
   moveReference,
   dayKey,
   midnight,
@@ -52,6 +54,7 @@ type Interval = {
 };
 type PersonalReport = {
   policy: string;
+  scope?: 'all-selected';
   budgetTimeZone: string;
   asOf: string;
   from: string;
@@ -76,27 +79,31 @@ export function PersonalPage({
   functions,
   calendar = false,
   company = false,
+  uid,
 }: {
   db: Firestore;
   functions: Functions;
   calendar?: boolean;
   company?: boolean;
+  uid: string;
 }) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const { revealed } = usePrivacy();
   const projects = useRows(db, 'projects');
   const zone = 'America/Sao_Paulo';
-  const density = params.get('density') ?? 'compact';
+  const density =
+    params.get('density') ??
+    (params.get('view') === 'month' ? 'supercompact' : 'timeline');
   const selected =
     params.get('date') ?? dayKey(new Date(), 'America/Sao_Paulo');
   const rawView = params.get('view') ?? (calendar ? 'week' : 'day');
-  const cursor = params.get('cursor') ?? '';
   const includeArchived = params.get('includeArchived') === 'true';
-  const firstDate = params.get('fromDate') ?? selected;
-  const lastDate = params.get('toDate') ?? selected;
+  const firstDate = params.get('fromDate') ?? '';
+  const lastDate = params.get('toDate') ?? '';
+  const projectId = params.get('projectId') ?? '';
+  const recordId = params.get('record');
   let validated: ReturnType<typeof range> | null = null;
   let invalid = '';
   let view: View = 'day';
@@ -108,19 +115,26 @@ export function PersonalPage({
     view = rawView as View;
     validated = calendar
       ? range(selected, view, validZone(zone))
-      : customRange(firstDate, lastDate, zone);
+      : firstDate && lastDate
+        ? customRange(firstDate, lastDate, zone)
+        : null;
+    if (firstDate) parseDay(firstDate);
+    if (lastDate) parseDay(lastDate);
   } catch (error) {
     invalid = error instanceof Error ? error.message : 'Filtros inválidos.';
   }
-  const from = validated?.from ?? '';
-  const to = validated?.to ?? '';
+  const from =
+    validated?.from ?? (!invalid && firstDate ? midnight(firstDate, zone) : '');
+  const to =
+    validated?.to ??
+    (!invalid && lastDate ? midnight(addDays(lastDate, 1), zone) : '');
   const [report, setReport] = useState<PersonalReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    if (!from || !to) {
+    if (invalid) {
       setLoading(false);
       return;
     }
@@ -129,8 +143,9 @@ export function PersonalPage({
     setReport(null);
     void httpsCallable<
       {
-        from: string;
-        to: string;
+        from?: string;
+        to?: string;
+        projectId?: string;
         timeZone: string;
         limit: number;
         cursor?: string;
@@ -141,12 +156,12 @@ export function PersonalPage({
       functions,
       company ? 'getCompanyReport' : 'getPersonalReport',
     )({
-      from,
-      to,
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(projectId ? { projectId } : {}),
       timeZone: zone,
       limit: company ? 50 : 200,
       includeArchived,
-      ...(cursor ? { cursor } : {}),
     })
       .then((result) => {
         if (active) {
@@ -163,7 +178,17 @@ export function PersonalPage({
     return () => {
       active = false;
     };
-  }, [functions, from, to, zone, cursor, attempt, includeArchived, company]);
+  }, [
+    functions,
+    from,
+    to,
+    zone,
+    attempt,
+    includeArchived,
+    company,
+    projectId,
+    invalid,
+  ]);
   const label = (id: string) =>
     text(
       safeProject(projects.rows.find((p) => p.id === id)?.data, revealed)
@@ -175,7 +200,15 @@ export function PersonalPage({
     ];
   function update(key: string, value: string) {
     const next = new URLSearchParams(params);
-    next.set(key, value);
+    if (key === 'clear') {
+      next.delete('fromDate');
+      next.delete('toDate');
+      next.delete('projectId');
+    } else if (value) next.set(key, value);
+    else next.delete(key);
+    if (key === 'view') {
+      next.set('density', value === 'month' ? 'supercompact' : 'timeline');
+    }
     next.delete('cursor');
     setParams(next);
   }
@@ -192,196 +225,98 @@ export function PersonalPage({
     );
   return (
     <Stack spacing={2}>
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-        }}
-      >
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: 600, whiteSpace: 'nowrap', flexGrow: 1 }}
-        >
-          {report && !loading ? hours(report.totalMinutes) : '—'}
-        </Typography>
-        {!calendar && (
-          <Box
-            sx={{
-              display: 'flex',
-              gap: 1,
-              alignItems: 'center',
-              order: { xs: 3, md: 0 },
-              width: { xs: '100%', md: 'auto' },
-              pt: { xs: 1, md: 0 },
-              flexWrap: { xs: 'wrap', md: 'nowrap' },
-            }}
-          >
-            <TextField
-              size="small"
-              type="date"
-              label="De"
-              value={firstDate}
-              onChange={(e) => update('fromDate', e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{
-                flex: { xs: 1, md: 'none' },
-                width: { md: 158 },
-                minWidth: 130,
-              }}
-            />
-            <TextField
-              size="small"
-              type="date"
-              label="Até"
-              value={lastDate}
-              onChange={(e) => update('toDate', e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{
-                flex: { xs: 1, md: 'none' },
-                width: { md: 158 },
-                minWidth: 130,
-              }}
-            />
-            <Tooltip title="Incluir projetos arquivados">
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={includeArchived}
-                    onChange={(e) =>
-                      update('includeArchived', String(e.target.checked))
-                    }
-                  />
-                }
-                label="Arquivados"
-                sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: 13 } }}
-              />
-            </Tooltip>
-          </Box>
-        )}
-        <Stack direction="row" spacing={0.25}>
-          {calendar && (
-            <Tooltip title="Filtros">
-              <IconButton
-                aria-label="Filtros"
-                aria-expanded={filtersOpen}
-                color={filtersOpen ? 'primary' : 'default'}
-                onClick={() => setFiltersOpen((value) => !value)}
-              >
-                <UiIcon kind="filter" />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Tooltip title="Atualizar">
-            <IconButton
-              aria-label="Atualizar relatório"
-              onClick={() => setAttempt((v) => v + 1)}
-            >
-              <UiIcon kind="refresh" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Detalhes do cálculo">
-            <IconButton
-              aria-label="Detalhes do cálculo"
-              onClick={() => setInfoOpen((v) => !v)}
-            >
-              <UiIcon kind="detail" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Stack>
-      {calendar && (
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: 'minmax(0,1fr) minmax(0,1fr)',
-              md: 'minmax(240px,1fr) 150px 180px',
-            },
-            gap: 1.25,
-            alignItems: 'center',
+      {recordId && (
+        <RecordDrawer
+          key={recordId}
+          db={db}
+          functions={functions}
+          uid={uid}
+          recordId={recordId}
+          search={location.search}
+          presentation="dialog"
+          onClose={() => {
+            const next = new URLSearchParams(params);
+            next.delete('record');
+            setParams(next);
           }}
-        >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.25,
-              gridColumn: { xs: '1 / -1', md: 'auto' },
-              minWidth: 0,
-            }}
+        />
+      )}
+      {!calendar ? (
+        <ReportToolbar
+          total={report && !loading ? hours(report.totalMinutes) : '—'}
+          fromDate={firstDate}
+          toDate={lastDate}
+          projectId={projectId}
+          projects={projects.rows.map((p) => ({
+            id: p.id,
+            label: label(p.id),
+          }))}
+          onFilter={update}
+          onRefresh={() => setAttempt((v) => v + 1)}
+          onInfo={() => setInfoOpen((v) => !v)}
+        />
+      ) : (
+        <Button onClick={() => setAttempt((v) => v + 1)}>Atualizar</Button>
+      )}
+      {calendar && (
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+          <Button
+            onClick={() => update('date', moveReference(selected, view, -1))}
           >
-            <Tooltip title="Período anterior">
-              <IconButton
-                aria-label="Período anterior"
-                onClick={() =>
-                  update('date', moveReference(selected, view, -1))
-                }
-              >
-                <UiIcon kind="previous" />
-              </IconButton>
-            </Tooltip>
-            <TextField
-              size="small"
-              type="date"
-              label="Data"
-              value={selected}
-              onChange={(e) => update('date', e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1, minWidth: 0, maxWidth: { md: 200 } }}
-            />
-            <Tooltip title="Próximo período">
-              <IconButton
-                aria-label="Próximo período"
-                onClick={() => update('date', moveReference(selected, view, 1))}
-              >
-                <UiIcon kind="next" />
-              </IconButton>
-            </Tooltip>
-          </Box>
+            Anterior
+          </Button>
+          <TextField
+            size="small"
+            type="date"
+            value={selected}
+            label="Referência"
+            slotProps={{ inputLabel: { shrink: true } }}
+            onChange={(e) => update('date', e.target.value)}
+          />
           <TextField
             size="small"
             select
-            label="Período"
             value={view}
+            label="Visualização"
             onChange={(e) => update('view', e.target.value)}
           >
-            <MenuItem value="day">Dia</MenuItem>
-            <MenuItem value="week">Semana</MenuItem>
-            <MenuItem value="month">Mês</MenuItem>
+            {['day', 'week', 'month'].map((v) => (
+              <MenuItem key={v} value={v}>
+                {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
+              </MenuItem>
+            ))}
           </TextField>
           <TextField
             size="small"
             select
-            label="Formato"
+            label="Densidade"
             value={density}
             onChange={(e) => update('density', e.target.value)}
           >
-            <MenuItem value="supercompact">Supercompacto</MenuItem>
-            <MenuItem value="compact">Compacto</MenuItem>
-            <MenuItem value="timeline">Régua</MenuItem>
+            {['supercompact', 'compact', 'timeline'].map((d) => (
+              <MenuItem key={d} value={d}>
+                {d}
+              </MenuItem>
+            ))}
           </TextField>
-        </Box>
+          <Button
+            onClick={() => update('date', moveReference(selected, view, 1))}
+          >
+            Próximo
+          </Button>
+        </Stack>
       )}
-      {calendar && (
-        <Collapse in={filtersOpen}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                size="small"
-                checked={includeArchived}
-                onChange={(e) =>
-                  update('includeArchived', String(e.target.checked))
-                }
-              />
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={includeArchived}
+            onChange={(e) =>
+              update('includeArchived', String(e.target.checked))
             }
-            label="Incluir arquivados"
           />
-        </Collapse>
-      )}
+        }
+        label="Incluir arquivados"
+      />
       {loading ? (
         <CircularProgress aria-label="Carregando relatório pessoal" />
       ) : error ? (
@@ -398,7 +333,7 @@ export function PersonalPage({
       ) : (
         report && (
           <>
-            {(report.page.partial || cursor) && (
+            {report.page.partial && (
               <Alert severity="warning">
                 Dados parciais desta página; não é total global.
               </Alert>
@@ -422,7 +357,7 @@ export function PersonalPage({
                   ))
                 ) : (
                   <Typography>
-                    Avisos detalhados ocultos no modo live.
+                    Avisos detalhados ocultos no modo seguro.
                   </Typography>
                 )}
               </Stack>
@@ -476,7 +411,7 @@ export function PersonalPage({
                               maximumFractionDigits: 1,
                             }).format(p.minutes / report.totalMinutes)
                           : '0%'}{' '}
-                        do agregado desta página
+                        do agregado selecionado
                       </li>
                     ))}
                   </Box>
@@ -626,14 +561,11 @@ export function PersonalPage({
                           >
                             <Button
                               component={RouterLink}
-                              to={
-                                '/records/' +
-                                encodeURIComponent(item.id) +
-                                '?returnTo=' +
-                                encodeURIComponent(
-                                  location.pathname + location.search,
-                                )
-                              }
+                              to={contextualRecordPath(
+                                location.pathname,
+                                location.search,
+                                item.id,
+                              )}
                               sx={{
                                 display: 'block',
                                 textAlign: 'left',
@@ -722,30 +654,6 @@ export function PersonalPage({
                 })}
               </Box>
             )}
-            <Stack direction="row" spacing={2}>
-              {cursor && (
-                <Button
-                  onClick={() => {
-                    const next = new URLSearchParams(params);
-                    next.delete('cursor');
-                    setParams(next);
-                  }}
-                >
-                  Primeira página
-                </Button>
-              )}
-              {report.page.nextCursor && (
-                <Button
-                  onClick={() => {
-                    const next = new URLSearchParams(params);
-                    next.set('cursor', report.page.nextCursor!);
-                    setParams(next);
-                  }}
-                >
-                  Próxima página (substitui dados)
-                </Button>
-              )}
-            </Stack>
           </>
         )
       )}

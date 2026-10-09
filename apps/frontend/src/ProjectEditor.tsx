@@ -29,7 +29,7 @@ export function ProjectEditor({
   if (hidden)
     return (
       <Alert severity="info" sx={{ my: 2 }}>
-        Metadados e gerenciamento ocultos no modo live. O alias exibido é
+        Metadados e gerenciamento ocultos no modo seguro. O alias exibido é
         neutro; esta ofuscação visual não altera acesso.
       </Alert>
     );

@@ -42,12 +42,14 @@ Dentro do container os serviços escutam 0.0.0.0 para permitir o encaminhamento 
 
 ## Dashboard e OAuth: limites atuais
 
-O frontend conecta explicitamente Auth e Firestore aos emuladores quando a configuração usa projectId demo-work-track e o hostname é localhost ou 127.0.0.1. Usa portas 9099 e 8081. Projeto demo em outro hostname falha fechado. O startup Docker ainda não foi testado; confirme que o Hosting Emulator fornece configuração demo válida antes de autenticar. Não teste com configuração de produção nem suponha que /__/firebase/init.json configure os conectores. No telefone/outro host, os endereços precisariam de adaptação deliberada; as portas loopback não oferecem acesso remoto.
+O frontend conecta explicitamente Auth e Firestore aos emuladores quando a configuração usa projectId demo-work-track e o hostname é localhost ou 127.0.0.1. Usa portas 9099 e 8081. Projeto demo em outro hostname falha fechado. Startup Docker verificado: os emuladores iniciaram, e o Hosting retornou configuração demo-work-track. Confirme o bootstrap demo antes de autenticar. Não teste com configuração de produção nem suponha que /__/firebase/init.json configure os conectores. No telefone/outro host, os endereços precisariam de adaptação deliberada; as portas loopback não oferecem acesso remoto.
 
-As regras permitem projetos somente para token Google com email verificado @wads.dev e registros apenas para o UID do caminho. Use identidades de teste compatíveis no Auth Emulator; não enfraqueça regras para testar o dashboard. O fluxo Google local é simulado pelo emulador, não um login de produção.
+As regras permitem leitura de projetos e registros corporativos para token Google com email verificado @wads.dev; auditoria de registros somente para o dono. Use identidades de teste compatíveis no Auth Emulator; não enfraqueça regras para testar o dashboard. O fluxo Google local é simulado pelo emulador, não um login de produção.
 
 O backend OAuth ainda fixa issuer/resource/login de produção em seu bootstrap. Este Compose não modifica esse contrato: endpoints podem responder localmente, mas o fluxo OAuth browser completo não é um fluxo demo pronto e pode gerar redirects de produção. Não siga esses redirects para testar isolamento. Ajustar issuer/resource por ambiente requer uma tarefa separada com testes.
 
 ## Validação realizada e pendências
 
-Nesta entrega, apenas docker compose config, sintaxe sh e validações estáticas são executadas. Nenhum build de imagem, container ou servidor foi iniciado. Config válida não prova startup/runtime, compilação das regras, login Google, export/import ou integração SDK: validar esses itens posteriormente, com autorização para executar o ambiente.
+Com autorização do usuário, a imagem foi construída e os emuladores iniciados. Foram verificados bootstrap demo, relatórios via SDK e revisão visual desktop/mobile com dados sintéticos locais. A porta Firestore foi alterada para 8081 e respondeu ao teste HTTP. Não foi utilizado login de produção na revisão local.
+
+Persistência de export/import ainda requer teste específico: após um reinício anterior, a conta/dados de teste precisaram ser recriados. Testes adversariais completos das regras permanecem pendentes.

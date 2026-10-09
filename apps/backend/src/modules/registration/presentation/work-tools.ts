@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { instructionPrefix, workInstructions } from './instructions.js';
 import {
   updateProjectInput,
   archiveProjectInput,
@@ -24,6 +25,20 @@ export function registerWorkTools(
   editing?: RecordEditingRepository,
   management?: ProjectManagementRepository,
 ) {
+  server.registerTool(
+    'get_instructions',
+    {
+      description:
+        'Leia primeiro: conceitos e fluxo seguro antes das demais ferramentas Work Track. Somente leitura, não registra atividade.',
+      inputSchema: z.object({}).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    () => ({ content: [{ type: 'text' as const, text: workInstructions }] }),
+  );
   const service = new RegistrationService(repository);
   const output = (data: unknown) => ({
     content: [{ type: 'text' as const, text: JSON.stringify(data) }],
@@ -45,6 +60,7 @@ export function registerWorkTools(
       'archive_project',
       {
         description:
+          instructionPrefix +
           'Arquive/desarquive projeto com ID explícito, archived boolean, motivo e requestId estável. Origem mesclada não pode ser reaberta. Nunca apagar histórico.',
         inputSchema: archiveProjectInput,
       },
@@ -54,6 +70,7 @@ export function registerWorkTools(
       'update_project',
       {
         description:
+          instructionPrefix +
           'Edite metadados de projeto com ID explícito, motivo e requestId estável. Confidencialidade é apenas apresentação, não autorização.',
         inputSchema: updateProjectInput,
       },
@@ -63,6 +80,7 @@ export function registerWorkTools(
       'merge_projects',
       {
         description:
+          instructionPrefix +
           'Preview sem mutation por padrão. Exige origem/destino explícitos. confirmed true, requestId e motivo executam um lote até100. Repetir retoma. Nunca escolher ou confirmar sem pedido humano.',
         inputSchema: mergeProjectsInput,
       },
@@ -74,6 +92,7 @@ export function registerWorkTools(
       'update_record',
       {
         description:
+          instructionPrefix +
           'Edite registro próprio com ID explícito e motivo. endedAt null reabre explicitamente; não infira horário.',
         inputSchema: updateRecordInput,
       },
@@ -84,6 +103,7 @@ export function registerWorkTools(
     'search_projects',
     {
       description:
+        instructionPrefix +
         'Pesquise antes de registrar/criar. Busca aproximada por título, descrição e tópicos, com acentos e erros de escrita; não usa embeddings. Sem query lista projetos. Retorna IDs, tópicos e scores. Pergunte em caso de ambiguidade.',
       inputSchema: z.object({
         query: z.string().max(500).default(''),
@@ -99,6 +119,7 @@ export function registerWorkTools(
     'create_project',
     {
       description:
+        instructionPrefix +
         'Crie projeto compartilhado após pesquisar e não encontrar. Exige título e descrição generosa do escopo. Retorna ID e tópico Geral padrão. Reutiliza títulos normalizados iguais.',
       inputSchema: projectInput,
     },
@@ -108,6 +129,7 @@ export function registerWorkTools(
     'create_topic',
     {
       description:
+        instructionPrefix +
         'Crie tópico em projeto existente; reutilize tópicos retornados pela pesquisa. Geral já existe para atividades sem contexto específico.',
       inputSchema: topicInput,
     },
@@ -117,6 +139,7 @@ export function registerWorkTools(
     'register',
     {
       description:
+        instructionPrefix +
         'Registre atividade do usuário autenticado: projeto e início obrigatórios; fim opcional, nunca invente. Resolva tempos relativos ao momento da fala, não ao recebimento de transcrição. Preserve texto e interpretação. Aceita vários tópicos existentes e percentuais/durações somente informados; não reparte automaticamente. Sem tópicos usa Geral. Preserve interrupções e sobreposições; não encerra registros anteriores. Vários projetos: uma chamada por projeto. closePrevious padrão false; pergunte e obtenha confirmação humana explícita antes de true, exige motivo; múltiplos abertos exigem closedPreviousRecordId explícito, nunca adivinhe. Reutilize requestId nos retries.',
       inputSchema: registerInput,
     },

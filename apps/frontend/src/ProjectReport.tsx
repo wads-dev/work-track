@@ -139,7 +139,6 @@ export function ProjectReport({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
-  const [cursor, setCursor] = useState<string | undefined>();
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -158,7 +157,6 @@ export function ProjectReport({
       projectId,
       limit: 200,
       includeArchived,
-      ...(cursor ? { cursor } : {}),
     })
       .then((result) => {
         if (active) {
@@ -175,7 +173,7 @@ export function ProjectReport({
     return () => {
       active = false;
     };
-  }, [functions, projectId, cursor, attempt, includeArchived]);
+  }, [functions, projectId, attempt, includeArchived]);
   if (loading)
     return (
       <Stack direction="row" spacing={2} role="status">
@@ -199,7 +197,7 @@ export function ProjectReport({
             onClick={() => {
               const next = new URLSearchParams(params);
               next.set('includeArchived', 'true');
-              setCursor(undefined);
+
               setParams(next);
             }}
           >
@@ -212,7 +210,7 @@ export function ProjectReport({
   if (hidden)
     return (
       <Alert severity="info" sx={{ mt: 2 }}>
-        Relatório, tópicos e avisos ocultos no modo live. Revele dados no topo
+        Relatório, tópicos e avisos ocultos no modo seguro. Revele dados no topo
         para visualizar. Esta ofuscação não altera permissões de acesso.
       </Alert>
     );
@@ -222,7 +220,7 @@ export function ProjectReport({
         onClick={() => {
           const next = new URLSearchParams(params);
           next.set('includeArchived', String(!includeArchived));
-          setCursor(undefined);
+
           setParams(next);
         }}
       >
@@ -231,7 +229,7 @@ export function ProjectReport({
           : 'Permitir histórico arquivado nesta consulta'}
       </Button>
       <Typography component="h2" variant="h5">
-        Tempo agregado nesta página: {hours(report.totalMinutes)}
+        Tempo agregado selecionado: {hours(report.totalMinutes)}
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
         Pode somar atividades simultâneas; não representa tempo líquido único.
@@ -240,14 +238,14 @@ export function ProjectReport({
       <Typography sx={{ mb: 2 }}>
         Estimativas não alteram fatos: orçamento global de 8 horas por
         pessoa/dia entre todos os projetos, com contexto completo. Fatos
-        fechados consomem margem sem truncamento; o total exibido continua desta
-        página.{' '}
+        fechados consomem margem sem truncamento; o total exibido considera
+        todos os registros selecionados.{' '}
         <Link component={RouterLink} to="/rules">
           Consultar regras e limites do relatório
         </Link>
         .
       </Typography>
-      {(report.estimatedCount > 0 || report.page.partial || cursor) && (
+      {report.page.partial && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           Relatório parcial
           {report.estimatedCount > 0
@@ -281,7 +279,7 @@ export function ProjectReport({
           >
             <Table sx={{ minWidth: 650 }}>
               <caption>
-                Registros desta página — sem texto privado ou contexto
+                Registros selecionados — sem texto privado ou contexto
               </caption>
               <TableHead>
                 <TableRow>
@@ -340,16 +338,6 @@ export function ProjectReport({
         </>
       )}
       <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-        {cursor && (
-          <Button onClick={() => setCursor(undefined)}>Primeira página</Button>
-        )}
-        {report.page.nextCursor && (
-          <Button
-            onClick={() => setCursor(report.page.nextCursor ?? undefined)}
-          >
-            Próxima página
-          </Button>
-        )}
         <Button onClick={() => setAttempt((value) => value + 1)}>
           Atualizar relatório
         </Button>

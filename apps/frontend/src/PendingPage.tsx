@@ -31,6 +31,9 @@ import {
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { date, text, type Row, useRows } from './data';
 import { isHidden, safeProject, usePrivacy } from './privacy';
+import { RecordDrawer } from './RecordDrawer';
+import { contextualRecordPath } from './routes';
+import type { Functions } from 'firebase/functions';
 import { UiIcon } from './UiIcons';
 export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
   const state = useRows(db, 'users/' + uid + '/records');
@@ -54,9 +57,18 @@ export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
     </Tooltip>
   );
 }
-export function PendingPage({ db, uid }: { db: Firestore; uid: string }) {
+export function PendingPage({
+  db,
+  uid,
+  functions,
+}: {
+  db: Firestore;
+  uid: string;
+  functions: Functions;
+}) {
   const [params, setParams] = useSearchParams();
   const cursor = params.get('after') ?? '';
+  const recordId = params.get('record');
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -100,6 +112,23 @@ export function PendingPage({ db, uid }: { db: Firestore; uid: string }) {
   const open = rows.filter((row) => isOpen(row.data));
   return (
     <Stack spacing={2}>
+      {recordId && (
+        <RecordDrawer
+          key={recordId}
+          db={db}
+          functions={functions}
+          uid={uid}
+          recordId={recordId}
+          search={'?' + params.toString()}
+          presentation="dialog"
+          focusEnd
+          onClose={() => {
+            const next = new URLSearchParams(params);
+            next.delete('record');
+            setParams(next);
+          }}
+        />
+      )}
       <Typography component="h2" variant="h5">
         Pendências — meus registros abertos
       </Typography>
@@ -167,17 +196,11 @@ export function PendingPage({ db, uid }: { db: Firestore; uid: string }) {
                           <Tooltip title="Abrir detalhes do registro">
                             <IconButton
                               component={RouterLink}
-                              to={
-                                '/records/' +
-                                encodeURIComponent(row.id) +
-                                '?returnTo=' +
-                                encodeURIComponent(
-                                  '/pending' +
-                                    (cursor
-                                      ? '?after=' + encodeURIComponent(cursor)
-                                      : ''),
-                                )
-                              }
+                              to={contextualRecordPath(
+                                '/pending',
+                                '?' + params.toString(),
+                                row.id,
+                              )}
                               aria-label={
                                 isHidden(project, revealed)
                                   ? 'Detalhes de registro reservado'

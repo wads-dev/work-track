@@ -32,7 +32,7 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
-import { detailPath, matchesFilter } from './routes';
+import { detailPath, matchesFilter, contextualRecordPath } from './routes';
 import { UiIcon } from './UiIcons';
 import { usePrivacy, isHidden, safeProject, safeRecord } from './privacy';
 import { ProjectEditor } from './ProjectEditor';
@@ -183,9 +183,10 @@ export function Dashboard({
       ),
     })),
   };
-  const { projectId, recordId } = useParams();
+  const { projectId } = useParams();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
+  const recordId = params.get('record');
   const [localFilter, setLocalFilter] = useState('');
   const filter = revealed ? localFilter : '';
   const projectFilter = params.get('project') ?? '';
@@ -299,6 +300,11 @@ export function Dashboard({
           uid={uid}
           recordId={recordId}
           search={location.search}
+          onClose={() => {
+            const next = new URLSearchParams(params);
+            next.delete('record');
+            setParams(next);
+          }}
         />
       )}
       {mode !== 'projects' && records.rows.some((row) => isOpen(row.data)) && (
@@ -328,30 +334,27 @@ export function Dashboard({
           global.
         </Alert>
       )}
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Consulta somente leitura. Apenas seus próprios registros são exibidos.
-        Filtros atuam sobre até 100 itens carregados por lista, não sobre todo o
-        banco. Compartilhar URL não concede acesso.
-      </Alert>
-      {mode === 'projects' && (
-        <TextField
-          select
-          label="Projetos por estado (lista carregada)"
-          value={archiveFilter}
-          onChange={(e) => updateFilter('status', e.target.value)}
-          sx={{ mb: 2, minWidth: 220 }}
-        >
-          <MenuItem value="active">Ativos</MenuItem>
-          <MenuItem value="archived">Arquivados</MenuItem>
-          <MenuItem value="all">Todos</MenuItem>
-        </TextField>
-      )}
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
+        {mode === 'projects' && (
+          <TextField
+            select
+            label="Projetos por estado (lista carregada)"
+            value={archiveFilter}
+            onChange={(e) => updateFilter('status', e.target.value)}
+            size="small"
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="active">Ativos</MenuItem>
+            <MenuItem value="archived">Arquivados</MenuItem>
+            <MenuItem value="all">Todos</MenuItem>
+          </TextField>
+        )}
+
         <TextField
           label={
             revealed
               ? 'Filtrar texto local (não compartilhado)'
-              : 'Filtro textual indisponível no modo live'
+              : 'Filtro textual indisponível no modo seguro'
           }
           disabled={!revealed}
           value={filter}
@@ -420,7 +423,11 @@ export function Dashboard({
             <>
               <Link
                 component={RouterLink}
-                to={detailPath('records', id, location.search)}
+                to={contextualRecordPath(
+                  location.pathname,
+                  location.search,
+                  id,
+                )}
               >
                 {text(object(data.projectSnapshot).title, text(data.projectId))}
               </Link>
@@ -438,7 +445,11 @@ export function Dashboard({
             <Tooltip title="Abrir detalhes e auditoria">
               <IconButton
                 component={RouterLink}
-                to={detailPath('records', id, location.search)}
+                to={contextualRecordPath(
+                  location.pathname,
+                  location.search,
+                  id,
+                )}
                 aria-label="Abrir detalhes e auditoria do registro"
               >
                 <UiIcon kind="detail" />

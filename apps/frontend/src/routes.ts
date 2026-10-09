@@ -23,6 +23,15 @@ export function detailPath(
 ) {
   return '/' + kind + '/' + encodeURIComponent(id) + search;
 }
+export function contextualRecordPath(
+  path: string,
+  search: string,
+  recordId: string,
+) {
+  const params = new URLSearchParams(search);
+  params.set('record', recordId);
+  return path + '?' + params.toString();
+}
 export function matchesFilter(values: unknown[], filter: string) {
   const needle = filter.trim().toLocaleLowerCase('pt-BR');
   return (

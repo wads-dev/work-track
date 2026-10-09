@@ -1,4 +1,4 @@
-# Política de relatório V2
+# Política de relatório V3
 
 Relatórios projetam intervalos sem modificar início/fim original. Fatos com fim explícito são preservados mesmo acima de oito horas ou atravessando dias.
 
@@ -10,9 +10,9 @@ Fatos fechados são descontados da margem diária sem truncamento. O saldo resta
 
 ## Contexto completo e paginação
 
-O backend lê contexto completo das pessoas envolvidas antes de calcular; somente depois seleciona os resultados da página. Totais e gráficos continuam da página exibida. Próximos inícios e fatos em outras páginas/projetos afetam estimativas corretamente.
+O backend lê contexto completo das pessoas envolvidas antes de calcular. Os relatórios agregam toda a seleção, inclusive registros encontrados em páginas internas; não apresentam a primeira página como total global. Sem datas, consultam todo o histórico. Início e fim são filtros opcionais independentes; quando ambos existem, o intervalo aceita até 93 dias e 1 hora. Filtro de projeto altera somente a seleção, nunca o orçamento global. Próximos inícios e fatos de outros projetos continuam afetando estimativas corretamente.
 
-O protótipo limita leitura a 2000 registros por pessoa e 10 pessoas por página para proteger custo/recursos. Contexto incompleto/inválido falha explicitamente; não é substituído por estimativa local chamada global. Limite por pessoa requer evolução da leitura/indexação, não exclusão de evidências.
+O protótipo limita leitura a 2000 registros por pessoa, 2000 registros na seleção e 10 pessoas por consulta para proteger custo/recursos. Contexto incompleto/inválido falha explicitamente; não é substituído por estimativa local chamada global. Limite por pessoa requer evolução da leitura/indexação, não exclusão de evidências.
 
 Sobreposições são somadas, não união de intervalos. Um tópico único recebe o intervalo; vários tópicos sem divisão ficam Não distribuído. Alocações informadas são preservadas com warning se excedem o tempo.
 

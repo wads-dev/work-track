@@ -15,7 +15,7 @@ export function safeProject(
   return {
     id: project?.id,
     title: 'Projeto reservado',
-    description: 'Dados ocultos no modo live.',
+    description: 'Dados ocultos no modo seguro.',
     confidential: true,
     topics: [],
   };
@@ -33,8 +33,8 @@ export function safeRecord(
     endedAt: record.endedAt,
     timeZone: record.timeZone,
     recordedAt: record.recordedAt,
-    originalText: 'Oculto no modo live',
-    interpretation: 'Oculto no modo live',
+    originalText: 'Oculto no modo seguro',
+    interpretation: 'Oculto no modo seguro',
     projectSnapshot: { title: 'Projeto reservado' },
     topicSnapshots: [],
     topics: [],

@@ -245,6 +245,7 @@ describe('remote MCP OAuth', () => {
     ).toEqual(
       [
         'whoami',
+        'get_instructions',
         'search_projects',
         'create_project',
         'create_topic',
