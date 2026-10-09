@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { Alert, Box, Button, Paper, Tooltip, Typography } from '@mui/material';
+import {
+  Stack,
+  Alert,
+  Box,
+  Button,
+  Paper,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { contextualRecordPath } from './routes';
 import { Link as RouterLink } from 'react-router-dom';
 import {
@@ -28,6 +36,7 @@ export function CalendarTimeline({
   returnTo,
   viewerUid,
   authorLabel,
+  renderProject,
 }: {
   items: Event[];
   day: string;
@@ -38,6 +47,7 @@ export function CalendarTimeline({
   returnTo: string;
   viewerUid: string;
   authorLabel: (uid: string) => string;
+  renderProject?: (id: string) => import('react').ReactNode;
 }) {
   const [expansion, setExpansion] = useState<{
     period: string;
@@ -363,6 +373,13 @@ export function CalendarTimeline({
           ))}
         </Box>
       </Box>
+      {renderProject && (
+        <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', mt: 1 }}>
+          {Array.from(new Set(items.map((i) => i.projectId))).map((id) => (
+            <Box key={id}>{renderProject(id)}</Box>
+          ))}
+        </Stack>
+      )}
     </Box>
   );
 }

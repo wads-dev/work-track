@@ -134,7 +134,23 @@ export function TopicReport({
                         )}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {bucket.projectLabel}
+                        {bucket.detailsAvailable ? (
+                          <Link
+                            component={RouterLink}
+                            to={
+                              '/projects/' +
+                              encodeURIComponent(bucket.projectId) +
+                              '?returnTo=' +
+                              encodeURIComponent(
+                                location.pathname + location.search,
+                              )
+                            }
+                          >
+                            {bucket.projectLabel}
+                          </Link>
+                        ) : (
+                          bucket.projectLabel
+                        )}
                       </Typography>
                     </Box>
                     <Typography

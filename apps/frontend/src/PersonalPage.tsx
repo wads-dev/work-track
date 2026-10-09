@@ -1,3 +1,4 @@
+import { MetadataLink } from './MetadataLink';
 import {
   useProjectAccessRevision,
   projectAccessRevision,
@@ -353,6 +354,13 @@ export function PersonalPage({
       safeProject(projects.rows.find((p) => p.id === id)?.data, revealed)
         ?.title,
     );
+  const projectLink = (id: string) => (
+    <MetadataLink
+      projectId={id}
+      project={projects.rows.find((p) => p.id === id)?.data}
+      revealed={revealed}
+    />
+  );
   const color = (id: string) =>
     ['#2457a7', '#a84417', '#35704a', '#8d4388', '#796214', '#166c77'][
       Array.from(id).reduce((n, c) => n + c.charCodeAt(0), 0) % 6
@@ -623,8 +631,14 @@ export function PersonalPage({
         )}
       {calendar && subject && (
         <Alert severity="info">
-          Assunto: {topics.find((t) => t.id === subject)?.label || 'Assunto'}.
-          As horas e barras representam os intervalos completos dos registros
+          Assunto:{' '}
+          <MetadataLink
+            projectId={projectId}
+            project={projects.rows.find((p) => p.id === projectId)?.data}
+            revealed={revealed}
+            topicId={subject}
+          />{' '}
+          . As horas e barras representam os intervalos completos dos registros
           que contêm este assunto, não uma divisão proporcional entre assuntos.
         </Alert>
       )}
@@ -771,7 +785,7 @@ export function PersonalPage({
                     >
                       {report.byProject.map((p) => (
                         <li key={p.projectId}>
-                          {label(p.projectId)}: {hours(p.minutes)} ·{' '}
+                          {projectLink(p.projectId)}: {hours(p.minutes)} ·{' '}
                           {report.totalMinutes > 0
                             ? new Intl.NumberFormat('pt-BR', {
                                 style: 'percent',
@@ -852,6 +866,7 @@ export function PersonalPage({
                 items={report.intervals}
                 zone={zone}
                 label={label}
+                renderProject={projectLink}
                 color={color}
                 viewerUid={uid}
                 authorLabel={(id) =>
@@ -868,6 +883,7 @@ export function PersonalPage({
                 view={view}
                 zone={zone}
                 label={label}
+                renderProject={projectLink}
                 color={color}
                 viewerUid={uid}
                 authorLabel={(id) =>
@@ -964,133 +980,142 @@ export function PersonalPage({
                         </Typography>
                       ) : (
                         entries.map((item) => (
-                          <Tooltip
-                            key={JSON.stringify([item.uid || uid, item.id])}
-                            title={
-                              label(item.projectId) +
-                              ' · ' +
-                              new Intl.DateTimeFormat('pt-BR', {
-                                timeZone: zone,
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              }).format(new Date(item.effectiveStartedAt)) +
-                              ' — ' +
-                              new Intl.DateTimeFormat('pt-BR', {
-                                timeZone: zone,
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              }).format(new Date(item.effectiveEndedAt)) +
-                              ' · ' +
-                              new Intl.NumberFormat('pt-BR', {
-                                maximumFractionDigits: 1,
-                              }).format(
-                                (Date.parse(item.effectiveEndedAt) -
-                                  Date.parse(item.effectiveStartedAt)) /
-                                  60000,
-                              ) +
-                              ' min'
-                            }
-                          >
-                            <Button
-                              tabIndex={0}
-                              component={
-                                item.uid && item.uid !== uid
-                                  ? 'span'
-                                  : RouterLink
+                          <Box key={JSON.stringify([item.uid || uid, item.id])}>
+                            <Tooltip
+                              title={
+                                label(item.projectId) +
+                                ' · ' +
+                                new Intl.DateTimeFormat('pt-BR', {
+                                  timeZone: zone,
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                }).format(new Date(item.effectiveStartedAt)) +
+                                ' — ' +
+                                new Intl.DateTimeFormat('pt-BR', {
+                                  timeZone: zone,
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                }).format(new Date(item.effectiveEndedAt)) +
+                                ' · ' +
+                                new Intl.NumberFormat('pt-BR', {
+                                  maximumFractionDigits: 1,
+                                }).format(
+                                  (Date.parse(item.effectiveEndedAt) -
+                                    Date.parse(item.effectiveStartedAt)) /
+                                    60000,
+                                ) +
+                                ' min'
                               }
-                              to={
-                                item.uid && item.uid !== uid
-                                  ? undefined
-                                  : contextualRecordPath(
-                                      location.pathname,
-                                      location.search,
-                                      item.id,
-                                    )
-                              }
-                              sx={{
-                                display: 'block',
-                                textAlign: 'left',
-                                borderLeft:
-                                  '4px solid ' + color(item.projectId),
-                                my: 1,
-                                width: '100%',
-                                minWidth: 0,
-                                maxWidth: '100%',
-                                whiteSpace:
-                                  density === 'supercompact'
-                                    ? 'nowrap'
-                                    : 'normal',
-                                py: density === 'supercompact' ? 0.25 : 1,
-                              }}
                             >
-                              <Typography
-                                variant="caption"
+                              <Button
+                                tabIndex={0}
+                                component={
+                                  item.uid && item.uid !== uid
+                                    ? 'span'
+                                    : RouterLink
+                                }
+                                to={
+                                  item.uid && item.uid !== uid
+                                    ? undefined
+                                    : contextualRecordPath(
+                                        location.pathname,
+                                        location.search,
+                                        item.id,
+                                      )
+                                }
                                 sx={{
                                   display: 'block',
+                                  textAlign: 'left',
+                                  borderLeft:
+                                    '4px solid ' + color(item.projectId),
+                                  my: 1,
+                                  width: '100%',
+                                  minWidth: 0,
+                                  maxWidth: '100%',
                                   whiteSpace:
                                     density === 'supercompact'
                                       ? 'nowrap'
                                       : 'normal',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
+                                  py: density === 'supercompact' ? 0.25 : 1,
                                 }}
                               >
-                                <Box
-                                  component="span"
-                                  aria-hidden="true"
+                                <Typography
+                                  variant="caption"
                                   sx={{
-                                    display: 'inline-block',
-                                    width: 6,
-                                    height: 6,
-                                    bgcolor: color(item.projectId),
-                                    mr: 0.5,
-                                    borderRadius: '50%',
+                                    display: 'block',
+                                    whiteSpace:
+                                      density === 'supercompact'
+                                        ? 'nowrap'
+                                        : 'normal',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
                                   }}
-                                />
-                                {new Intl.DateTimeFormat('pt-BR', {
-                                  timeZone: zone,
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }).format(
-                                  new Date(
-                                    Math.max(
-                                      start,
-                                      Date.parse(item.effectiveStartedAt),
-                                    ),
-                                  ),
-                                )}{' '}
-                                {item.uid &&
-                                  (participants.find((p) => p.uid === item.uid)
-                                    ?.label || 'Pessoa da organização') + ' · '}
-                                {label(item.projectId)}
-                                {density !== 'supercompact' && (
-                                  <>
-                                    <br />
-                                    {new Intl.DateTimeFormat('pt-BR', {
-                                      timeZone: zone,
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    }).format(
-                                      new Date(
-                                        Math.min(
-                                          end,
-                                          Date.parse(item.effectiveEndedAt),
-                                        ),
+                                >
+                                  <Box
+                                    component="span"
+                                    aria-hidden="true"
+                                    sx={{
+                                      display: 'inline-block',
+                                      width: 6,
+                                      height: 6,
+                                      bgcolor: color(item.projectId),
+                                      mr: 0.5,
+                                      borderRadius: '50%',
+                                    }}
+                                  />
+                                  {new Intl.DateTimeFormat('pt-BR', {
+                                    timeZone: zone,
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  }).format(
+                                    new Date(
+                                      Math.max(
+                                        start,
+                                        Date.parse(item.effectiveStartedAt),
                                       ),
-                                    )}
-                                    {item.estimated ? ' · Estimado' : ''}
-                                    {report.intervals.some(
-                                      (other) =>
-                                        other.id !== item.id &&
-                                        overlaps(item, other),
-                                    )
-                                      ? ' · Sobreposição'
-                                      : ''}
-                                  </>
-                                )}
-                              </Typography>
-                            </Button>
-                          </Tooltip>
+                                    ),
+                                  )}{' '}
+                                  {item.uid &&
+                                    (participants.find(
+                                      (p) => p.uid === item.uid,
+                                    )?.label || 'Pessoa da organização') +
+                                      ' · '}
+                                  {label(item.projectId)}
+                                  {density !== 'supercompact' && (
+                                    <>
+                                      <br />
+                                      {new Intl.DateTimeFormat('pt-BR', {
+                                        timeZone: zone,
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      }).format(
+                                        new Date(
+                                          Math.min(
+                                            end,
+                                            Date.parse(item.effectiveEndedAt),
+                                          ),
+                                        ),
+                                      )}
+                                      {item.estimated ? ' · Estimado' : ''}
+                                      {report.intervals.some(
+                                        (other) =>
+                                          other.id !== item.id &&
+                                          overlaps(item, other),
+                                      )
+                                        ? ' · Sobreposição'
+                                        : ''}
+                                    </>
+                                  )}
+                                </Typography>
+                              </Button>
+                            </Tooltip>
+                            <Typography
+                              variant="caption"
+                              sx={{ display: 'block', px: 1 }}
+                            >
+                              {projectLink(item.projectId)}
+                            </Typography>
+                          </Box>
                         ))
                       )}
                     </Paper>
@@ -1125,7 +1150,7 @@ export function PersonalPage({
                         mr: 1,
                       }}
                     />
-                    {label(p.projectId)} · {hours(p.minutes)}
+                    {projectLink(p.projectId)} · {hours(p.minutes)}
                   </li>
                 ))}
               </Box>

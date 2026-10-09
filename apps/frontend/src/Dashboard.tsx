@@ -7,6 +7,7 @@ import {
 } from './QueryToolbar';
 import { useProjects } from './useProjects';
 import { topicDetailsPath } from './routes';
+import { MetadataLink } from './MetadataLink';
 import { ProjectCreate } from './ProjectCreate';
 import { ProjectSelector } from './ProjectSelector';
 import { writeUrlTab } from './url-tabs';
@@ -47,7 +48,12 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
-import { detailPath, matchesFilter, contextualRecordPath } from './routes';
+import {
+  detailPath,
+  matchesFilter,
+  contextualRecordPath,
+  safeReturnTo,
+} from './routes';
 import { UiIcon } from './UiIcons';
 import { usePrivacy, isHidden, safeProject, safeRecord } from './privacy';
 import { ProjectEditor } from './ProjectEditor';
@@ -308,6 +314,15 @@ export function Dashboard({
   if (projectId)
     return (
       <Box component="section" aria-label="Projeto">
+        {params.has('returnTo') && (
+          <Button
+            component={RouterLink}
+            to={safeReturnTo(params.get('returnTo'))}
+            sx={{ mb: 2 }}
+          >
+            Voltar ao contexto
+          </Button>
+        )}
         <Button
           component={RouterLink}
           to={'/projects' + location.search}
@@ -318,7 +333,7 @@ export function Dashboard({
         <Typography component="h2" variant="h5">
           {text(
             projects.rows.find((item) => item.id === projectId)?.data.title,
-            projectId,
+            'Projeto indisponível',
           )}
         </Typography>
         <Typography color="text.secondary">
@@ -597,15 +612,21 @@ export function Dashboard({
               .slice(0, 5)
               .map((row) => (
                 <li key={row.id}>
+                  <MetadataLink
+                    projectId={text(row.data.projectId, '')}
+                    project={
+                      rawProjects.rows.find((p) => p.id === row.data.projectId)
+                        ?.data
+                    }
+                    revealed={revealed}
+                  />
+                  {' · '}
                   <Link
                     component={RouterLink}
                     to={detailPath('records', row.id, location.search)}
                   >
-                    {text(
-                      object(row.data.projectSnapshot).title,
-                      text(row.data.projectId),
-                    )}{' '}
-                    · {date(row.data.startedAt, row.data.timeZone)}
+                    Registro iniciado{' '}
+                    {date(row.data.startedAt, row.data.timeZone)}
                   </Link>
                 </li>
               ))}
@@ -749,12 +770,11 @@ export function Dashboard({
           headers={['Projeto', 'Descrição', 'Tópicos', 'Criado em']}
           state={filteredProjects}
           render={(data, id) => [
-            <Link
-              component={RouterLink}
-              to={detailPath('projects', id, location.search)}
-            >
-              {text(data.title)}
-            </Link>,
+            <MetadataLink
+              projectId={id}
+              project={rawProjects.rows.find((p) => p.id === id)?.data}
+              revealed={revealed}
+            />,
             text(data.description),
             <Stack sx={{ gap: 1 }}>
               {objects(data.topics).length === 0 && 'Não informado'}
@@ -805,18 +825,32 @@ export function Dashboard({
           state={filteredRecords}
           render={(data, id) => [
             <>
-              <Link
-                component={RouterLink}
-                to={contextualRecordPath(
-                  location.pathname,
-                  location.search,
-                  id,
-                )}
-              >
-                {text(object(data.projectSnapshot).title, text(data.projectId))}
-              </Link>
+              <MetadataLink
+                projectId={text(data.projectId, '')}
+                project={
+                  rawProjects.rows.find((p) => p.id === data.projectId)?.data
+                }
+                revealed={revealed}
+              />
               <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                {topicLabels(data)}
+                {objects(data.topics).map((t, index) => (
+                  <span key={index}>
+                    {index > 0 ? ' · ' : ''}
+                    {text(t.topicId, '') ? (
+                      <MetadataLink
+                        projectId={text(data.projectId, '')}
+                        project={
+                          rawProjects.rows.find((p) => p.id === data.projectId)
+                            ?.data
+                        }
+                        revealed={revealed}
+                        topicId={text(t.topicId)}
+                      />
+                    ) : (
+                      'Assunto indisponível'
+                    )}
+                  </span>
+                ))}
               </Typography>
             </>,
             <>
