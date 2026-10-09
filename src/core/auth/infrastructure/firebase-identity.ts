@@ -1,7 +1,7 @@
 import type { Auth, UserRecord } from 'firebase-admin/auth';
 import { InvalidGrantError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
-import type { IdentityService } from './oauth-provider.js';
-import type { Identity } from './oauth-security.js';
+import type { IdentityService } from '../application/oauth-provider.js';
+import type { Identity } from '../domain/oauth-security.js';
 
 export class FirebaseIdentityService implements IdentityService {
   constructor(private readonly auth: Auth) {}

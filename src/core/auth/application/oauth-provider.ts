@@ -16,7 +16,7 @@ import {
   InvalidScopeError,
   InvalidTokenError,
 } from '@modelcontextprotocol/sdk/server/auth/errors.js';
-import type { OAuthStore } from './oauth-store.js';
+import type { OAuthStore } from '../domain/oauth-store.js';
 import {
   digest,
   secret,
@@ -24,7 +24,7 @@ import {
   requireCompanyIdentity,
   validateRedirect,
   type Identity,
-} from './oauth-security.js';
+} from '../domain/oauth-security.js';
 
 interface Flow {
   clientId: string;

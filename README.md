@@ -44,6 +44,10 @@ A ferramenta temporária `whoami` permite confirmar a identidade autenticada. El
 
 Região Functions: southamerica-east1. O banco existente fica em nam5; nenhuma migração de região é feita nesta etapa.
 
+## Arquitetura
+
+Código organizado em core, shared e modules/registration, com camadas domain, application, infrastructure e presentation. Consulte [arquitetura](docs/architecture.md).
+
 ## Desenvolvimento
 
 Node.js 22 e npm. Execute `npm ci`, depois `npm run check` para formatação, ESLint, tipos, testes e build.

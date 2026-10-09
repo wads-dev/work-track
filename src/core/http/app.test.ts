@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { InvalidGrantError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { createApp } from './app.js';
-import { WorkTrackOAuth } from './oauth-provider.js';
-import type { OAuthStore } from './oauth-store.js';
-import { digest } from './oauth-security.js';
+import { WorkTrackOAuth } from '../auth/application/oauth-provider.js';
+import type { OAuthStore } from '../auth/domain/oauth-store.js';
+import { digest } from '../auth/domain/oauth-security.js';
 
 class MemoryStore implements OAuthStore {
   values = new Map<string, unknown>();

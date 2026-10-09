@@ -3,10 +3,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
-import type { WorkTrackOAuth } from './oauth-provider.js';
+import type { WorkTrackOAuth } from '../auth/application/oauth-provider.js';
 import { z } from 'zod';
-import type { WorkRepository } from './work-model.js';
-import { registerWorkTools } from './work-tools.js';
+import type { WorkRepository } from '../../modules/registration/domain/work-model.js';
+import { registerWorkTools } from '../../modules/registration/presentation/work-tools.js';
 
 export function createApp(
   provider: WorkTrackOAuth,

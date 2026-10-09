@@ -5,9 +5,13 @@ import type {
   Topic,
   WorkRepository,
   RegisterInput,
-} from './work-model.js';
-import { projectInput, topicInput, registerInput } from './work-model.js';
-import { normalize } from './project-search.js';
+} from '../domain/work-model.js';
+import {
+  projectInput,
+  topicInput,
+  registerInput,
+} from '../domain/work-model.js';
+import { normalize } from '../../../shared/text/normalize.js';
 export class FirestoreWorkRepository implements WorkRepository {
   constructor(private readonly db: Firestore) {}
   async listProjects(): Promise<Project[]> {

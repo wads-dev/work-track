@@ -2,12 +2,12 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
-import { getHealth } from './health.js';
-import { createApp } from './app.js';
-import { WorkTrackOAuth } from './oauth-provider.js';
-import { FirebaseIdentityService } from './firebase-identity.js';
-import { FirestoreOAuthStore } from './firestore-oauth-store.js';
-import { FirestoreWorkRepository } from './firestore-work.js';
+import { getHealth } from './core/health/health.js';
+import { createApp } from './core/http/app.js';
+import { WorkTrackOAuth } from './core/auth/application/oauth-provider.js';
+import { FirebaseIdentityService } from './core/auth/infrastructure/firebase-identity.js';
+import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-store.js';
+import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
 const provider = new WorkTrackOAuth(

@@ -32,4 +32,35 @@ export default tseslint.config(
     },
     languageOptions: { parserOptions: { projectService: true } },
   },
+  {
+    files: ['src/modules/**/domain/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'firebase-admin',
+                'firebase-admin/**',
+                'firebase-functions/**',
+                'express',
+                '@modelcontextprotocol/**',
+              ],
+              message: 'Domínio não depende de adaptadores externos.',
+            },
+            {
+              group: [
+                '**/infrastructure/**',
+                '**/presentation/**',
+                '**/application/**',
+                '**/core/**',
+              ],
+              message: 'Dependências de domínio devem apontar para dentro.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

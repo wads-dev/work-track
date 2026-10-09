@@ -1,11 +1,5 @@
 import type { Project } from './work-model.js';
-export const normalize = (text: string) =>
-  text
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+import { normalize } from '../../../shared/text/normalize.js';
 function grams(text: string) {
   const result = new Set<string>();
   for (let i = 0; i < text.length - 1; i++) result.add(text.slice(i, i + 2));

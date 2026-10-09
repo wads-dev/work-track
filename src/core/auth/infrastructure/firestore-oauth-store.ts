@@ -1,6 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { InvalidGrantError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
-import type { OAuthStore } from './oauth-store.js';
+import type { OAuthStore } from '../domain/oauth-store.js';
 
 export class FirestoreOAuthStore implements OAuthStore {
   constructor(private readonly db: Firestore) {}
