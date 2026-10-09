@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // A API futura validará Firebase Auth antes de usar o Admin SDK.
+    // Nenhum acesso direto de clientes está liberado nesta base.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
