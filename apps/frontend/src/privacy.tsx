@@ -5,7 +5,7 @@ export function isHidden(
   project: Record<string, unknown> | undefined,
   revealed: boolean,
 ) {
-  return !revealed && (!project || project.confidential !== false);
+  return !revealed && (!project || project.confidential === true);
 }
 export function safeProject(
   project: Record<string, unknown> | undefined,
