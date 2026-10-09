@@ -1,6 +1,10 @@
 import { useOwnRecords } from './useOwnRecords';
 import { filterRecords, recordPage } from './record-filters';
-import { QueryToolbar } from './QueryToolbar';
+import {
+  QueryToolbar,
+  QueryToolbarField,
+  QueryPeriodControls,
+} from './QueryToolbar';
 import { useProjects } from './useProjects';
 import { ProjectCreate } from './ProjectCreate';
 import { ProjectSelector } from './ProjectSelector';
@@ -598,25 +602,103 @@ export function Dashboard({
       {mode !== 'projects' && (
         <QueryToolbar
           label="Filtros de registros"
-          sx={{
-            mb: 2,
-            p: { xs: 2, sm: 3 },
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: 'minmax(0,1fr)',
-              md: 'minmax(280px,1fr) minmax(280px,360px) auto',
-            },
-            gap: 2,
-            alignItems: 'start',
-          }}
+          sx={{ mb: 2 }}
+          actions={
+            <>
+              {' '}
+              {rawRecords.error && (
+                <Button onClick={rawRecords.retry}>Tentar novamente</Button>
+              )}
+              <Button
+                sx={{ whiteSpace: 'nowrap' }}
+                onClick={() => {
+                  const next = new URLSearchParams(params);
+                  setLocalFilter('');
+                  next.delete('q');
+                  for (const key of [
+                    'project',
+                    'topic',
+                    'fromDate',
+                    'toDate',
+                    'recordStatus',
+                    'timeZone',
+                  ])
+                    next.delete(key);
+                  setParams(next);
+                }}
+              >
+                Limpar filtros
+              </Button>
+            </>
+          }
+          secondary={
+            <>
+              {' '}
+              <QueryToolbarField kind="search">
+                {' '}
+                <TextField
+                  size="small"
+                  label="Pesquisar registros"
+                  value={filter}
+                  onChange={(event) => updateFilter('q', event.target.value)}
+                />
+              </QueryToolbarField>
+              <QueryToolbarField kind="standard">
+                {' '}
+                <TextField
+                  size="small"
+                  select
+                  label="Assunto / tópico"
+                  value={topicFilter}
+                  disabled={!projectFilter}
+                  onChange={(e) => updateFilter('topic', e.target.value)}
+                >
+                  <MenuItem value="">Todos os assuntos</MenuItem>
+                  {topicOptions.map((topic) => (
+                    <MenuItem key={text(topic.id)} value={text(topic.id)}>
+                      {isHidden(
+                        rawProjectsById.get(projectFilter)?.data,
+                        revealed,
+                      )
+                        ? 'Assunto reservado'
+                        : text(topic.title)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </QueryToolbarField>
+              <QueryToolbarField kind="standard">
+                {' '}
+                <TextField
+                  size="small"
+                  label="Fuso do período"
+                  value={zone}
+                  onChange={(e) => updateFilter('timeZone', e.target.value)}
+                />
+              </QueryToolbarField>
+              <QueryToolbarField kind="standard">
+                {' '}
+                <TextField
+                  size="small"
+                  select
+                  label="Estado do registro"
+                  value={params.get('recordStatus') ?? 'all'}
+                  onChange={(e) => updateFilter('recordStatus', e.target.value)}
+                >
+                  <MenuItem value="all">Todos</MenuItem>
+                  <MenuItem value="open">Em aberto</MenuItem>
+                  <MenuItem value="closed">Encerrados</MenuItem>
+                </TextField>
+              </QueryToolbarField>{' '}
+            </>
+          }
         >
-          <TextField
-            label="Pesquisar registros"
-            value={filter}
-            onChange={(event) => updateFilter('q', event.target.value)}
-            fullWidth
+          <QueryPeriodControls
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromChange={(value) => updateFilter('fromDate', value)}
+            onToChange={(value) => updateFilter('toDate', value)}
           />
-          <>
+          <QueryToolbarField kind="project">
             <ProjectSelector
               key={uid + String(revealed)}
               projects={rawProjects.rows.map((row) => ({
@@ -635,77 +717,7 @@ export function Dashboard({
               error={rawProjects.error}
               onChange={(id) => updateFilter('project', id)}
             />
-          </>
-          <TextField
-            select
-            label="Assunto / tópico"
-            value={topicFilter}
-            disabled={!projectFilter}
-            onChange={(e) => updateFilter('topic', e.target.value)}
-            sx={{ minWidth: 200 }}
-          >
-            <MenuItem value="">Todos os assuntos</MenuItem>
-            {topicOptions.map((topic) => (
-              <MenuItem key={text(topic.id)} value={text(topic.id)}>
-                {isHidden(rawProjectsById.get(projectFilter)?.data, revealed)
-                  ? 'Assunto reservado'
-                  : text(topic.title)}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            type="date"
-            label="De"
-            value={fromDate}
-            slotProps={{ inputLabel: { shrink: true } }}
-            onChange={(e) => updateFilter('fromDate', e.target.value)}
-          />
-          <TextField
-            type="date"
-            label="Até"
-            value={toDate}
-            slotProps={{ inputLabel: { shrink: true } }}
-            onChange={(e) => updateFilter('toDate', e.target.value)}
-          />
-          <TextField
-            label="Fuso do período"
-            value={zone}
-            onChange={(e) => updateFilter('timeZone', e.target.value)}
-          />
-          <TextField
-            select
-            label="Estado do registro"
-            value={params.get('recordStatus') ?? 'all'}
-            onChange={(e) => updateFilter('recordStatus', e.target.value)}
-          >
-            <MenuItem value="all">Todos</MenuItem>
-            <MenuItem value="open">Em aberto</MenuItem>
-            <MenuItem value="closed">Encerrados</MenuItem>
-          </TextField>
-          {rawRecords.error && (
-            <Button onClick={rawRecords.retry}>Tentar novamente</Button>
-          )}
-
-          <Button
-            sx={{ whiteSpace: 'nowrap', minHeight: 44 }}
-            onClick={() => {
-              const next = new URLSearchParams(params);
-              setLocalFilter('');
-              next.delete('q');
-              for (const key of [
-                'project',
-                'topic',
-                'fromDate',
-                'toDate',
-                'recordStatus',
-                'timeZone',
-              ])
-                next.delete(key);
-              setParams(next);
-            }}
-          >
-            Limpar filtros
-          </Button>
+          </QueryToolbarField>
         </QueryToolbar>
       )}
       {mode !== 'projects' && (

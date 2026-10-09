@@ -1,4 +1,4 @@
-import { QueryToolbar } from './QueryToolbar';
+import { QueryToolbar, QueryToolbarField } from './QueryToolbar';
 import { useProjects } from './useProjects';
 import { TopicReport } from './TopicReport';
 import { topicBuckets, type ReportTopic } from './topic-report-model';
@@ -270,98 +270,124 @@ export function PersonalPage({
           onInfo={() => setInfoOpen((v) => !v)}
         />
       ) : (
-        <QueryToolbar label="Filtros do calendário">
-          <Tooltip title="Período anterior">
-            <IconButton
-              aria-label="Período anterior"
-              onClick={() => update('date', moveReference(selected, view, -1))}
-            >
-              <UiIcon kind="previous" />
-            </IconButton>
-          </Tooltip>
-          <TextField
-            size="small"
-            type="date"
-            value={selected}
-            label="Referência"
-            slotProps={{ inputLabel: { shrink: true } }}
-            onChange={(e) => update('date', e.target.value)}
-            sx={{ width: { xs: 130, sm: 150 }, minWidth: 0 }}
-          />
-          <Tooltip title="Próximo período">
-            <IconButton
-              aria-label="Próximo período"
-              onClick={() => update('date', moveReference(selected, view, 1))}
-            >
-              <UiIcon kind="next" />
-            </IconButton>
-          </Tooltip>
-          <TextField
-            size="small"
-            select
-            value={view}
-            label="Visualização"
-            onChange={(e) => update('view', e.target.value)}
-            sx={{ width: 100 }}
-          >
-            {['day', 'week', 'month'].map((v) => (
-              <MenuItem key={v} value={v}>
-                {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            size="small"
-            select
-            label="Densidade"
-            value={density}
-            onChange={(e) => update('density', e.target.value)}
-            sx={{ width: 140 }}
-          >
-            {['supercompact', 'compact', 'timeline'].map((d) => (
-              <MenuItem key={d} value={d}>
-                {d === 'timeline'
-                  ? 'Régua'
-                  : d === 'compact'
-                    ? 'Compacto'
-                    : 'Supercompacto'}
-              </MenuItem>
-            ))}
-          </TextField>
-          <CalendarProjectFilter
-            key={String(revealed)}
-            projectId={projectId}
-            projects={projects.rows.map((p) => ({
-              id: p.id,
-              label: label(p.id),
-              searchText:
-                text(p.data.title, '') + ' ' + text(p.data.description, ''),
-            }))}
-            loading={projects.loading}
-            error={projects.error}
-            onChange={(id) => update('projectId', id)}
-          />
-          <FormControlLabel
-            sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: 12 } }}
-            control={
-              <Checkbox
-                size="small"
-                checked={includeArchived}
-                onChange={(e) =>
-                  update('includeArchived', String(e.target.checked))
+        <QueryToolbar
+          label="Filtros do calendário"
+          actions={
+            <>
+              {' '}
+              <FormControlLabel
+                sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: 12 } }}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={includeArchived}
+                    onChange={(e) =>
+                      update('includeArchived', String(e.target.checked))
+                    }
+                  />
                 }
+                label="Arquivados"
               />
-            }
-            label="Arquivados"
-          />
-          <Tooltip title="Atualizar calendário">
-            <IconButton
-              aria-label="Atualizar calendário"
-              onClick={() => setAttempt((v) => v + 1)}
+              <Tooltip title="Atualizar calendário">
+                <IconButton
+                  aria-label="Atualizar calendário"
+                  onClick={() => setAttempt((v) => v + 1)}
+                >
+                  <UiIcon kind="refresh" />
+                </IconButton>
+              </Tooltip>
+            </>
+          }
+          secondary={
+            <QueryToolbarField>
+              <TextField
+                size="small"
+                select
+                label="Densidade"
+                value={density}
+                onChange={(e) => update('density', e.target.value)}
+              >
+                {['supercompact', 'compact', 'timeline'].map((d) => (
+                  <MenuItem key={d} value={d}>
+                    {d === 'timeline'
+                      ? 'Régua'
+                      : d === 'compact'
+                        ? 'Compacto'
+                        : 'Supercompacto'}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </QueryToolbarField>
+          }
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              width: { xs: '100%', sm: 'auto' },
+              '& [data-query-field]': { width: 160 },
+            }}
+          >
+            <Tooltip title="Período anterior">
+              <IconButton
+                aria-label="Período anterior"
+                onClick={() =>
+                  update('date', moveReference(selected, view, -1))
+                }
+              >
+                <UiIcon kind="previous" />
+              </IconButton>
+            </Tooltip>
+            <QueryToolbarField kind="date">
+              <TextField
+                size="small"
+                type="date"
+                value={selected}
+                label="Referência"
+                slotProps={{ inputLabel: { shrink: true } }}
+                onChange={(e) => update('date', e.target.value)}
+              />
+            </QueryToolbarField>
+            <Tooltip title="Próximo período">
+              <IconButton
+                aria-label="Próximo período"
+                onClick={() => update('date', moveReference(selected, view, 1))}
+              >
+                <UiIcon kind="next" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <QueryToolbarField>
+            <TextField
+              size="small"
+              select
+              value={view}
+              label="Visualização"
+              onChange={(e) => update('view', e.target.value)}
             >
-              <UiIcon kind="refresh" />
-            </IconButton>
-          </Tooltip>
+              {['day', 'week', 'month'].map((v) => (
+                <MenuItem key={v} value={v}>
+                  {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
+                </MenuItem>
+              ))}
+            </TextField>
+          </QueryToolbarField>
+          <QueryToolbarField kind="project">
+            <CalendarProjectFilter
+              key={String(revealed)}
+              projectId={projectId}
+              projects={projects.rows.map((p) => ({
+                id: p.id,
+                label: label(p.id),
+                searchText:
+                  text(p.data.title, '') + ' ' + text(p.data.description, ''),
+              }))}
+              loading={projects.loading}
+              error={projects.error}
+              onChange={(id) => update('projectId', id)}
+            />
+          </QueryToolbarField>
         </QueryToolbar>
       )}
       {loading ? (
