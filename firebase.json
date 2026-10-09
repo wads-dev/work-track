@@ -1,7 +1,7 @@
 {
   "functions": [
     {
-      "source": ".",
+      "source": "apps/backend",
       "codebase": "default",
       "runtime": "nodejs22",
       "ignore": [
@@ -18,7 +18,7 @@
         "gha-creds-*.json",
         "public"
       ],
-      "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
+      "predeploy": ["npm run build --workspace @work-track/backend"]
     }
   ],
   "firestore": {
@@ -41,7 +41,7 @@
     "singleProjectMode": true
   },
   "hosting": {
-    "public": "public",
+    "public": "apps/frontend/dist",
     "cleanUrls": true,
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
@@ -71,7 +71,8 @@
           }
         ]
       }
-    ]
+    ],
+    "predeploy": ["npm run build --workspace @work-track/frontend"]
   },
   "auth": {
     "providers": {

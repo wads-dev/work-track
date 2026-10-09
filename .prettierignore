@@ -1,6 +1,8 @@
 node_modules/
 .npm-cache/
 lib/
+**/lib/
+**/dist/
 coverage/
 package-lock.json
 .firebase/

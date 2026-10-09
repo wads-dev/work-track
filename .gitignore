@@ -1,6 +1,7 @@
 node_modules/
 .npm-cache/
 lib/
+dist/
 coverage/
 .firebase/
 .firebase-cli/

@@ -4,31 +4,23 @@
   "private": true,
   "description": "Servidor MCP para registro de trabalho com Firebase.",
   "type": "module",
-  "main": "lib/index.js",
   "engines": {
     "node": "22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
+    "test": "npm run test --workspaces --if-present",
     "test:watch": "vitest",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "prepare": "node scripts/prepare.mjs",
     "emulators": "npm run build && npx -y firebase-tools@latest emulators:start --only functions,firestore,auth,hosting",
     "deploy": "npm run check && XDG_CONFIG_HOME=./.firebase-cli npx -y firebase-tools@latest deploy --only functions,hosting,auth,firestore:rules --project wadsworktrack",
     "smoke:mcp": "node scripts/smoke-mcp.mjs"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1",
-    "express": "^5.2.1",
-    "firebase-admin": "^14.5.0",
-    "firebase-functions": "^7.4.0",
-    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -43,7 +35,8 @@
     "supertest": "^7.3.1",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.71.1",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "@modelcontextprotocol/sdk": "^1.32.1"
   },
   "lint-staged": {
     "*.{ts,js,mjs}": [
@@ -51,5 +44,8 @@
       "prettier --write"
     ],
     "*.{json,md,yml,yaml}": "prettier --write"
-  }
+  },
+  "workspaces": [
+    "apps/*"
+  ]
 }

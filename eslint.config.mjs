@@ -5,7 +5,8 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: [
-      'lib/**',
+      '**/lib/**',
+      '**/dist/**',
       'coverage/**',
       'node_modules/**',
       '.npm-cache/**',
@@ -14,7 +15,10 @@ export default tseslint.config(
       '.agents/**',
     ],
   },
-  { files: ['public/**/*.js'], languageOptions: { globals: globals.browser } },
+  {
+    files: ['apps/frontend/public/**/*.js', 'apps/frontend/src/**/*.{ts,tsx}'],
+    languageOptions: { globals: globals.browser },
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -22,7 +26,7 @@ export default tseslint.config(
     rules: { eqeqeq: ['error', 'always'] },
   },
   {
-    files: ['src/**/*.ts'],
+    files: ['apps/backend/src/**/*.ts'],
     extends: [...tseslint.configs.recommendedTypeChecked],
     rules: {
       '@typescript-eslint/no-unused-vars': [
@@ -33,7 +37,7 @@ export default tseslint.config(
     languageOptions: { parserOptions: { projectService: true } },
   },
   {
-    files: ['src/modules/**/domain/**/*.ts'],
+    files: ['apps/backend/src/modules/**/domain/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
