@@ -120,8 +120,7 @@ it('preserves chronological order when destination is first', async () => {
 });
 it.each([
   { endedAt: null },
-  { endedAt: '2026-10-09T12:30:00Z' },
-  { endedAt: '2026-10-09T13:30:00Z' },
+  { endedAt: '2026-10-09T11:30:00Z' },
   { deletedAt: 'removed' },
   { projectId: 'other' },
   { timeZone: 'America/Sao_Paulo' },
@@ -175,6 +174,43 @@ it('rechecks private ownership on preview, confirmation and replay', async () =>
     f.repo.mergeRecords(confirm, 'alice', now),
   ).rejects.toMatchObject({ code: 'not-found' });
 });
+it.each([
+  ['2026-10-09T12:00:00Z', '2026-10-09T12:30:00Z', 7200000],
+  ['2026-10-09T12:00:00Z', '2026-10-09T13:30:00Z', 7200000],
+  ['2026-10-09T12:00:00Z', '2026-10-09T15:00:00Z', 10800000],
+  ['2026-10-09T13:15:00Z', '2026-10-09T13:45:00Z', 3600000],
+  ['2026-10-09T13:00:00Z', '2026-10-09T15:00:00Z', 7200000],
+])(
+  'merges gaps, overlaps, containment and equal starts (%s to %s)',
+  async (startedAt, endedAt, duration) => {
+    const f = fixture();
+    Object.assign(f.source, { startedAt, endedAt });
+    const other = {
+      uid: 'alice',
+      projectId: 'another',
+      startedAt: '2026-10-09T12:30:00Z',
+      endedAt: '2026-10-09T13:15:00Z',
+    };
+    f.data.set('users/alice/records/other', other);
+    const p = await f.repo.mergeRecords(input, 'alice', now);
+    expect(p.totalMilliseconds).toBe(duration);
+    expect(f.writes()).toBe(0);
+    expect(
+      Date.parse(p.target.endedAt as string) -
+        Date.parse(p.target.startedAt as string),
+    ).toBe(duration);
+    expect(p.warnings.join(' ')).toContain('soma original');
+    const result = await f.repo.mergeRecords(
+      { ...input, confirmed: true, previewToken: p.previewToken },
+      'alice',
+      now,
+    );
+    expect(result.target.startedAt).toBe(p.target.startedAt);
+    expect(result.target.endedAt).toBe(p.target.endedAt);
+    expect(f.data.get('users/alice/records/other')).toEqual(other);
+    expect(f.writes()).toBe(3);
+  },
+);
 it('rolls back all writes on transaction failure', async () => {
   const f = fixture(),
     before = structuredClone([...f.data]);

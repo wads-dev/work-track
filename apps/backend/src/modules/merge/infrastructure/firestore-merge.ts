@@ -121,10 +121,11 @@ export class FirestoreMergeRepository implements MergeRepository {
         reject(
           'Merge exige dois registros encerrados com intervalos válidos no passado.',
         );
-      if (se !== ts && te !== ss)
-        reject(
-          'Merge exige intervalos contíguos, sem lacunas ou sobreposição.',
-        );
+      // Merge represents one continuous context, including gaps and overlaps.
+      const startedAt = ss <= ts ? source.startedAt : target.startedAt;
+      const endedAt = se >= te ? source.endedAt : target.endedAt;
+      const totalMilliseconds = Math.max(se, te) - Math.min(ss, ts);
+      const originalMilliseconds = se - ss + te - ts;
       if (canonical(source.topics ?? []) !== canonical(target.topics ?? []))
         reject(
           'Distribuições de tópicos diferentes exigem conciliação explícita.',
@@ -193,8 +194,8 @@ export class FirestoreMergeRepository implements MergeRepository {
       const updatedAt = new Date(now).toISOString();
       const afterTarget = {
         ...target,
-        startedAt: first.startedAt,
-        endedAt: last.endedAt,
+        startedAt,
+        endedAt,
         originalText,
         interpretation,
         updatedAt,
@@ -217,18 +218,19 @@ export class FirestoreMergeRepository implements MergeRepository {
         previewToken: token,
         sourceRecordId: input.sourceRecordId,
         targetRecordId: input.targetRecordId,
-        totalMilliseconds: se - ss + te - ts,
+        totalMilliseconds,
         warnings: [
           'Origem será removida logicamente; destino conserva ID. Textos serão concatenados cronologicamente; snapshots completos ficam na auditoria.',
-          'Não há desfazer. Horas fechadas são preservadas; estimativas de outros registros abertos podem mudar.',
+          `Intervalo contínuo do menor início ao maior fim: ${totalMilliseconds / 60000} minutos; soma original: ${originalMilliseconds / 60000} minutos; diferença: ${(totalMilliseconds - originalMilliseconds) / 60000} minutos. Lacunas são incluídas e sobreposições entre estes registros são contadas uma vez. Outros registros/projetos não são alterados; relatórios podem redistribuir horas em sobreposições.`,
+          'Não há desfazer. Estimativas de outros registros abertos podem mudar.',
         ],
         source: confirmed ? afterSource : source,
         target: confirmed
           ? afterTarget
           : {
               ...target,
-              startedAt: first.startedAt,
-              endedAt: last.endedAt,
+              startedAt,
+              endedAt,
               originalText,
               interpretation,
             },
