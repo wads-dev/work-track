@@ -72,3 +72,11 @@ Inspecionados [tokens GolderUnicorn](/Users/bizup/GitRepos/wads.dev/GolderUnicor
 ## Refinamento solicitado pelo usuário — projeto
 
 Replicar o padrão real de abas do registro. Aba principal é o dashboard DO projeto, com gráficos/pessoas/relatório inteiramente project-scoped. Aba Detalhes/Editar reúne título, descrição, repositório Git e confidencialidade. Arquivar deve ser ícone secundário com tooltip e confirmação explícita, nunca um card dominante antes do relatório. Confidencialidade continua apresentação, não autorização. Formulários mantêm motivo, antes/depois e confirmação quando exigidos.
+
+## Resultado finito B–E
+
+B percorreu13estados desktop/mobile; C corrigiu footer móvel, composição de projetos/toolbar, edição inline e contraste dark sem reabrir Meu Relatório/calendário congelados. C não provou histórico revelado: arquivos com esse nome continham modo seguro, conforme checklist. D confirmou escolha de acesso obrigatória sem default, tab pessoal persistente naURL/reload, lista vazia, lista privada owner e ausência para colega após troca real de identidade no emulator; URL direta negada sem título/descrição/horas. Histórico populado foi finalmente aberto e visto em D.
+
+E acrescentou distribuição por assunto qualificada pelo projeto. Company/personal/projeto foram inspecionados1440/390; URL contém par projectId/topicId, reload e back/forward funcionaram nos casos descritos no [checklist](visual-checklist.md). Uma regressão concreta deixou coluna de pessoas~110px no desktop; corrigida pontualmente em E2(index-BohQojQt.js): cards iguais~548px e mobile empilhado preservado. Não houve novo ciclo estético. Nenhum submit de trabalho real, arquivo ou consentimento OAuth foi executado pelo designer.
+
+Esta é aprovação visual/funcional **dos estados enumerados**, não certificação de segurança nem cobertura exaustiva. Testes backend/regras e release pertencem ao Lead; lacunas constam da matriz.
