@@ -7,6 +7,8 @@ import {
   Drawer,
   IconButton,
   Tooltip,
+  Menu,
+  MenuItem,
   List,
   ListItemButton,
   ListItemText,
@@ -95,13 +97,48 @@ function App() {
   const mode = themeOverride ?? (systemDark ? 'dark' : 'light');
   const theme = workTheme(mode, reducedMotion);
   const desktop = useMediaQuery('(min-width:1200px)');
+  const [themeAnchor, setThemeAnchor] = useState<HTMLElement | null>(null);
   const toggleTheme = (
-    <IconButton
-      aria-label={mode === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
-      onClick={() => setThemeOverride(mode === 'dark' ? 'light' : 'dark')}
-    >
-      <UiIcon kind={mode === 'dark' ? 'sun' : 'moon'} />
-    </IconButton>
+    <>
+      <IconButton
+        aria-label="Escolher tema"
+        id="theme-menu-trigger"
+        aria-controls={themeAnchor ? 'theme-menu' : undefined}
+        aria-haspopup="menu"
+        aria-expanded={Boolean(themeAnchor)}
+        onClick={(event) => setThemeAnchor(event.currentTarget)}
+      >
+        <UiIcon kind={mode === 'dark' ? 'sun' : 'moon'} />
+      </IconButton>
+      <Menu
+        id="theme-menu"
+        slotProps={{ list: { 'aria-labelledby': 'theme-menu-trigger' } }}
+        anchorEl={themeAnchor}
+        open={Boolean(themeAnchor)}
+        onClose={() => setThemeAnchor(null)}
+      >
+        {(
+          [
+            { value: null, label: 'Sistema' },
+            { value: 'light', label: 'Claro' },
+            { value: 'dark', label: 'Escuro' },
+          ] as const
+        ).map(({ value, label }) => (
+          <MenuItem
+            key={label}
+            role="menuitemradio"
+            aria-checked={themeOverride === value}
+            selected={themeOverride === value}
+            onClick={() => {
+              setThemeOverride(value);
+              setThemeAnchor(null);
+            }}
+          >
+            {label}
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
   );
   const location = useLocation();
   const returnTo = safeReturnTo(
@@ -266,7 +303,7 @@ function App() {
                               ? 'Meu relatório'
                               : 'Dashboard'}
                 </Typography>
-                <Tooltip title="Alternar tema">{toggleTheme}</Tooltip>
+                {toggleTheme}
                 <PendingBell db={services.db} uid={user.uid} />
                 <Tooltip
                   title={
@@ -382,12 +419,6 @@ function App() {
                 >
                   {user.email}
                 </Typography>
-                <Button
-                  onClick={() => setThemeOverride(null)}
-                  sx={{ justifyContent: 'flex-start' }}
-                >
-                  Tema do sistema
-                </Button>
                 <Button disabled={busy} onClick={() => void logout()}>
                   Sair
                 </Button>
@@ -531,9 +562,6 @@ function App() {
               >
                 <Stack direction="row" sx={{ justifyContent: 'end' }}>
                   {toggleTheme}
-                  <Button onClick={() => setThemeOverride(null)}>
-                    Tema do sistema
-                  </Button>
                 </Stack>
                 <Stack spacing={3}>
                   <Box

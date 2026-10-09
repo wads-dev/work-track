@@ -1,11 +1,14 @@
 import { projectMutation } from './project-mutation';
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { type Functions } from 'firebase/functions';
 import {
   Alert,
   Box,
   Button,
-  Collapse,
+  Dialog,
+  DialogTitle,
+  Fab,
   MenuItem,
   Stack,
   TextField,
@@ -51,28 +54,36 @@ export function ProjectCreate({
     }
   };
   return (
-    <Box
-      sx={{
-        minWidth: 0,
-        width: { xs: '100%', sm: open ? 'auto' : 'fit-content' },
-        justifySelf: { xs: 'stretch', sm: 'end' },
-        textAlign: { sm: 'right' },
-      }}
-    >
-      <Button
-        variant="contained"
-        sx={{
-          width: { xs: '100%', sm: 'auto' },
-          minHeight: 44,
-          whiteSpace: 'nowrap',
-        }}
-        onClick={() => setOpen((value) => !value)}
+    <>
+      <Fab
+        color="primary"
+        variant="extended"
+        aria-label="Novo projeto"
+        aria-haspopup="dialog"
+        aria-controls={open ? 'create-project-dialog' : undefined}
         aria-expanded={open}
-        aria-controls="create-project-panel"
+        onClick={() => setOpen(true)}
+        sx={{
+          position: 'fixed',
+          right: { xs: 16, sm: 24 },
+          bottom: 'calc(24px + env(safe-area-inset-bottom))',
+          zIndex: (theme) => theme.zIndex.speedDial,
+        }}
       >
+        <Plus size={20} aria-hidden="true" style={{ marginRight: 8 }} />
         Novo projeto
-      </Button>
-      <Collapse in={open} unmountOnExit sx={{ textAlign: 'left' }}>
+      </Fab>
+      <Dialog
+        id="create-project-dialog"
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        fullWidth
+        maxWidth="sm"
+        aria-labelledby="create-project-title"
+      >
+        <DialogTitle id="create-project-title">Criar projeto</DialogTitle>
         <Box
           component="form"
           id="create-project-panel"
@@ -87,11 +98,9 @@ export function ProjectCreate({
           }}
         >
           <Stack spacing={2}>
-            <Typography component="h2" variant="h6">
-              Criar projeto
-            </Typography>
             <TextField
               required
+              autoFocus
               label="Tipo de acesso"
               select
               value={type}
@@ -131,6 +140,9 @@ export function ProjectCreate({
               não substitui o acesso pessoal somente ao dono.
             </Typography>
             {error && <Alert severity="error">{error}</Alert>}
+            <Button disabled={busy} onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
             <Button
               type="submit"
               variant="contained"
@@ -145,7 +157,7 @@ export function ProjectCreate({
             </Button>
           </Stack>
         </Box>
-      </Collapse>
-    </Box>
+      </Dialog>
+    </>
   );
 }

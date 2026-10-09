@@ -401,15 +401,20 @@ export function Dashboard({
     ),
   };
   return (
-    <>
+    <Box
+      sx={{
+        pb:
+          mode === 'projects' ? 'calc(104px + env(safe-area-inset-bottom))' : 0,
+      }}
+    >
       {mode === 'projects' && (
-        <>
+        <Box>
           <Box
             sx={{
               display: 'grid',
               gridTemplateColumns: {
                 xs: 'minmax(0,1fr)',
-                sm: 'minmax(0,1fr) auto',
+                sm: 'minmax(0,1fr)',
               },
               gap: 2,
               alignItems: 'start',
@@ -486,13 +491,14 @@ export function Dashboard({
                 setLocalFilter('');
                 next.delete('q');
                 next.delete('project');
+                next.delete('status');
                 setParams(next);
               }}
             >
               Limpar filtros
             </Button>
           </Box>
-        </>
+        </Box>
       )}
       {recordId && (
         <RecordDrawer
@@ -537,10 +543,24 @@ export function Dashboard({
         </Alert>
       )}
       {mode !== 'projects' && (
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={1}
-          sx={{ mb: 2 }}
+        <Box
+          component="section"
+          aria-label="Filtros de registros"
+          sx={{
+            mb: 2,
+            p: { xs: 2, sm: 3 },
+            bgcolor: 'background.paper',
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: '12px',
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: 'minmax(0,1fr)',
+              md: 'minmax(280px,1fr) minmax(280px,360px) auto',
+            },
+            gap: 2,
+            alignItems: 'start',
+          }}
         >
           <TextField
             label="Pesquisar registros"
@@ -569,6 +589,7 @@ export function Dashboard({
             />
           </>
           <Button
+            sx={{ whiteSpace: 'nowrap', minHeight: 44 }}
             onClick={() => {
               const next = new URLSearchParams(params);
               setLocalFilter('');
@@ -579,7 +600,7 @@ export function Dashboard({
           >
             Limpar filtros
           </Button>
-        </Stack>
+        </Box>
       )}
       {mode !== 'projects' && records.rows.length === 100 && (
         <Typography variant="caption" color="text.secondary">
@@ -617,6 +638,7 @@ export function Dashboard({
       )}
       {mode !== 'projects' && (
         <DataTable
+          hideHeading={mode === 'records'}
           title="Meus registros"
           headers={['Projeto / tópicos', 'Início / fim', 'Detalhes']}
           state={filteredRecords}
@@ -659,6 +681,6 @@ export function Dashboard({
           ]}
         />
       )}
-    </>
+    </Box>
   );
 }
