@@ -1,35 +1,76 @@
-# Wads Ponto
+# Work Track
 
-Base TypeScript de um servidor MCP para registrar início e fim de trabalho por usuário e projeto, usando Firebase Functions, Firebase Auth e Firestore. O nome é provisório.
+Servidor MCP remoto em TypeScript para o projeto Firebase `wadsworktrack`. Esta etapa implementa autenticação; Search Projects e Register serão adicionados depois.
 
-## Pré-requisitos
+## Conectar
 
-- Node.js 22 e npm (use `nvm use`).
-- Projeto Firebase para executar emuladores e publicar; produção com Functions exige plano Blaze.
-- Java compatível com a versão do Firebase CLI para o emulador Firestore.
+Endpoint canônico: https://wadsworktrack.web.app/mcp
+
+```sh
+npx -y mcp-remote https://wadsworktrack.web.app/mcp
+```
+
+Configuração de um cliente MCP baseado em stdio:
+
+```json
+{
+  "mcpServers": {
+    "work-track": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://wadsworktrack.web.app/mcp"]
+    }
+  }
+}
+```
+
+O cliente descobre o OAuth, registra seu callback, abre o navegador e solicita login Google. Confira o nome do cliente e o endereço de retorno antes de autorizar. Somente usuários com e-mail verificado @wads.dev e login Google recebem acesso ao MCP.
+
+A ferramenta temporária `whoami` permite confirmar a identidade autenticada. Ela não registra trabalho. Nenhuma ferramenta de projetos ou registros está implementada nesta etapa.
+
+## Arquitetura e segurança
+
+- Firebase Hosting: página de login e origem HTTPS estável.
+- Firebase Functions de segunda geração: Express, OAuth e MCP Streamable HTTP sem estado de transporte.
+- Firebase Auth: login Google e verificação do ID token, incluindo revogação e login recente.
+- Firestore Standard, banco (default): clientes OAuth, solicitações, códigos e tokens persistidos entre instâncias.
+- OAuth: descoberta RFC 8414/RFC 9728, registro dinâmico, PKCE S256, consentimento explícito e redirects registrados.
+- Códigos expiram em 2 minutos e são consumidos uma única vez via transação.
+- Access tokens opacos expiram em 1 hora e são vinculados ao recurso MCP. Apenas hashes dos tokens são persistidos.
+- Refresh tokens expiram em 7 dias e são rotacionados em cada uso.
+- A cada chamada, contas desativadas, revogadas ou fora do domínio são recusadas.
+- ID tokens Firebase não são aceitos diretamente como tokens MCP nem repassados para o cliente.
+- As regras Firestore negam todo acesso direto, incluindo dados OAuth. O Admin SDK usa IAM e as verificações do servidor.
+- Sem Identity Platform: uma conta externa pode autenticar no Firebase, mas não pode obter autorização MCP.
+
+Região Functions: southamerica-east1. O banco existente fica em nam5; nenhuma migração de região é feita nesta etapa.
 
 ## Desenvolvimento
 
-`npm ci` instala as dependências e configura o hook Git.
+Node.js 22 e npm. Execute `npm ci`, depois `npm run check` para formatação, ESLint, tipos, testes e build.
 
-- `npm run check`: formatação, lint, tipos, testes e build.
-- `npm run format`: formata os arquivos com Prettier.
-- `npm run lint:fix`: corrige problemas de lint automaticamente.
-- `npm run test:watch`: testes em modo watch.
+- `npm run format`: Prettier.
+- `npm run lint:fix`: correções de lint.
+- `npm run test:watch`: testes contínuos.
 
-ESLint faz análise TypeScript com informações de tipos. TypeScript usa modo estrito. Husky e lint-staged verificam os arquivos preparados para commit. A integração contínua executa a mesma validação completa em pushes e pull requests.
+Husky/lint-staged validam commits, e GitHub Actions executa o check completo. Os testes usam identidades falsas exclusivamente em testes; a Function publicada usa Firebase Admin real.
 
 ## Firebase
 
-1. Autentique o CLI com `npx firebase-tools login`.
-2. Associe seu projeto com `npx firebase-tools use --add`.
-3. Execute `npm run emulators` para Functions, Auth e Firestore.
-4. Execute `npm run deploy` quando estiver pronto para publicar.
+Projeto: `wadsworktrack`. Plano Blaze necessário. O CLI foi autenticado com configuração local ignorada pelo Git.
 
-A região inicial é `southamerica-east1` (São Paulo). O endpoint público `health` retorna apenas o status do serviço. As regras Firestore negam todo acesso direto de clientes; o Admin SDK ignora essas regras, portanto as futuras ferramentas devem validar a identidade e isolar os dados por usuário no servidor.
+```sh
+XDG_CONFIG_HOME="$PWD/.firebase-cli" npx -y firebase-tools@latest login
+XDG_CONFIG_HOME="$PWD/.firebase-cli" npx -y firebase-tools@latest deploy --only functions,hosting,auth,firestore:rules --project wadsworktrack
+```
 
-## Escopo atual
+A configuração Google usa o e-mail de suporte victor@wads.dev e os domínios Hosting do projeto. Configurações públicas do app web são obtidas da rota reservada do Hosting `/__/firebase/init.json`; não é necessário distribuir segredo OAuth ao cliente.
 
-Esta etapa entrega somente a base do projeto e um teste de diagnóstico. Ainda não implementa transporte MCP, autenticação de chamadas ou ferramentas de registro. Nenhum projeto Firebase foi criado ou publicado.
+## Verificação
 
-Próxima etapa: definir o fluxo de autenticação MCP com Firebase Auth e implementar ferramentas para registrar início e fim, sem cálculos ou relatórios. Não há uso de Firebase Storage.
+Execute `npm run smoke:mcp` para testar o proxy real `npx mcp-remote`. O navegador solicita login; após autorização o teste lista ferramentas e chama `whoami`. Tokens ficam em uma pasta local ignorada pelo Git. Não compartilhe esses arquivos nem os códigos OAuth.
+
+O build usa a conta padrão Compute com `roles/cloudbuild.builds.builder`; o runtime usa `roles/datastore.user` e `roles/firebaseauth.viewer`. Não foi concedido papel Editor. O hook de preparação pula Husky em produção. A limpeza de imagens do Artifact Registry está configurada para um dia.
+
+## Limites atuais
+
+Teste real do login precisa de interação humana com a conta Google. Rate limiting do SDK é por instância, não global; Functions limita o número de instâncias. Documentos de credenciais expiradas são recusados, mas limpeza automática/TTL ainda deve ser configurada antes de uso em escala.

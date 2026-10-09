@@ -12,7 +12,10 @@
         ".husky",
         "src",
         "*-debug.log*",
-        ".env*"
+        ".env*",
+        ".agents",
+        ".firebase-cli",
+        "public"
       ],
       "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
     }
@@ -34,5 +37,50 @@
       "enabled": true
     },
     "singleProjectMode": true
+  },
+  "hosting": {
+    "public": "public",
+    "cleanUrls": true,
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "**",
+        "function": {
+          "functionId": "api",
+          "region": "southamerica-east1"
+        }
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Referrer-Policy",
+            "value": "no-referrer"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      }
+    ]
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Work Track",
+        "supportEmail": "victor@wads.dev",
+        "authorizedRedirectUris": [
+          "https://wadsworktrack.firebaseapp.com/__/auth/handler",
+          "https://wadsworktrack.web.app/__/auth/handler"
+        ]
+      }
+    }
   }
 }

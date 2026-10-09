@@ -3,9 +3,12 @@ node_modules/
 lib/
 coverage/
 .firebase/
+.firebase-cli/
+.mcp-auth/
 *-debug.log*
 .env
 .env.*
 !.env.example
 .DS_Store
 .agents
+skills-lock.json

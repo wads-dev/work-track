@@ -18,22 +18,29 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
-    "prepare": "husky",
-    "emulators": "npm run build && npx firebase-tools emulators:start --only functions,firestore,auth",
-    "deploy": "npm run check && npx firebase-tools deploy --only functions,firestore:rules"
+    "prepare": "node scripts/prepare.mjs",
+    "emulators": "npm run build && npx -y firebase-tools@latest emulators:start --only functions,firestore,auth,hosting",
+    "deploy": "npm run check && XDG_CONFIG_HOME=./.firebase-cli npx -y firebase-tools@latest deploy --only functions,hosting,auth,firestore:rules --project wadsworktrack",
+    "smoke:mcp": "node scripts/smoke-mcp.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "express": "^5.2.1",
     "firebase-admin": "^14.5.0",
-    "firebase-functions": "^7.4.0"
+    "firebase-functions": "^7.4.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
+    "@types/supertest": "^7.2.1",
     "eslint": "^10.12.0",
     "globals": "^16.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.0.0",
     "prettier": "^3.0.0",
+    "supertest": "^7.3.1",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"

@@ -1,0 +1,29 @@
+body {
+  font-family: system-ui, sans-serif;
+  background: #101827;
+  color: #f1f5f9;
+  margin: 0;
+  padding: 24px;
+}
+main {
+  max-width: 520px;
+  margin: 12vh auto;
+}
+button {
+  background: #93c5fd;
+  color: #0f172a;
+  padding: 14px 20px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+}
+#redirect {
+  overflow-wrap: anywhere;
+}
+#status {
+  color: #fcd34d;
+}

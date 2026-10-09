@@ -10,8 +10,11 @@ export default tseslint.config(
       'node_modules/**',
       '.npm-cache/**',
       '.firebase/**',
+      '.firebase-cli/**',
+      '.agents/**',
     ],
   },
+  { files: ['public/**/*.js'], languageOptions: { globals: globals.browser } },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -21,6 +24,12 @@ export default tseslint.config(
   {
     files: ['src/**/*.ts'],
     extends: [...tseslint.configs.recommendedTypeChecked],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_' },
+      ],
+    },
     languageOptions: { parserOptions: { projectService: true } },
   },
 );

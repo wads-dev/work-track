@@ -4,3 +4,5 @@ lib/
 coverage/
 package-lock.json
 .firebase/
+.firebase-cli/
+.agents/
