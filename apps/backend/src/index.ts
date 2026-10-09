@@ -13,6 +13,7 @@ import { FirestoreProjectManagementRepository } from './modules/registration/inf
 import { updateRecordHandler } from './modules/registration/presentation/update-record.js';
 import { FirestoreRecordEditingRepository } from './modules/registration/infrastructure/firestore-record-editing.js';
 import { getAuth } from 'firebase-admin/auth';
+import { FirestorePauseRepository } from './modules/pause/infrastructure/firestore-pause.js';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { getProjectReportHandler } from './modules/reports/presentation/get-project-report.js';
@@ -163,6 +164,7 @@ export const api = onRequest(
     new FirestoreProjectManagementRepository(getFirestore()),
     new FirestoreTopicManagementRepository(getFirestore()),
     new FirestoreDailyHoursRepository(getFirestore()),
+    new FirestorePauseRepository(getFirestore()),
   ),
 );
 export const createProject = onCall(

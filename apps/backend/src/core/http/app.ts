@@ -1,4 +1,6 @@
 import express from 'express';
+import type { PauseRepository } from '../../modules/pause/domain/pause.js';
+import { registerPauseTool } from '../../modules/pause/presentation/pause-tool.js';
 import type { DailyHoursRepository } from '../../modules/daily-hours/domain/daily-hours.js';
 import { registerDailyHoursTool } from '../../modules/daily-hours/presentation/daily-hours-tool.js';
 import type { TopicManagementRepository } from '../../modules/registration/domain/topic-management.js';
@@ -20,6 +22,7 @@ export function createApp(
   managementRepository?: ProjectManagementRepository,
   topicManagementRepository?: TopicManagementRepository,
   dailyHoursRepository?: DailyHoursRepository,
+  pauseRepository?: PauseRepository,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -118,6 +121,12 @@ export function createApp(
         );
       if (dailyHoursRepository && typeof uid === 'string' && uid)
         registerDailyHoursTool(server, dailyHoursRepository, uid);
+      if (
+        pauseRepository &&
+        typeof uid === 'string' &&
+        /^[A-Za-z0-9_-]{1,128}$/.test(uid)
+      )
+        registerPauseTool(server, pauseRepository, uid);
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });
