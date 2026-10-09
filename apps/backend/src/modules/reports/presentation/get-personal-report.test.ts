@@ -31,7 +31,7 @@ it('only reads authenticated own records and validates bounds/auth/cursor', asyn
     code: 'unauthenticated',
   });
   for (const patch of [
-    { to: '2026-12-01T00:00:00Z' },
+    { to: '2027-02-01T00:00:00Z' },
     { timeZone: 'invalid' },
     { cursor: 'users/bob/records/x' },
     { uid: 'bob' },
@@ -43,7 +43,7 @@ it('only reads authenticated own records and validates bounds/auth/cursor', asyn
   await getPersonalReportHandler(repo, input, auth);
   expect(readPage).toHaveBeenCalledExactlyOnceWith('alice', 200, undefined);
 });
-it('accepts a31 civil day range spanning fall DST', async () => {
+it('accepts a62 civil day range spanning fall DST', async () => {
   const repo = {
     archivedProjectIds: vi
       .fn<PersonalReportRepository['archivedProjectIds']>()
@@ -59,11 +59,42 @@ it('accepts a31 civil day range spanning fall DST', async () => {
     getPersonalReportHandler(
       repo,
       {
-        from: '2026-10-15T00:00:00-04:00',
-        to: '2026-11-15T00:00:00-05:00',
+        from: '2026-10-01T00:00:00-04:00',
+        to: '2026-12-02T00:00:00-05:00',
         timeZone: 'America/New_York',
       },
       auth,
     ),
   ).resolves.toMatchObject({ policy: 'personal-v3' });
+  const start = Date.parse('2026-08-01T00:00:00Z');
+  for (const duration of [
+    61 * 86400000,
+    62 * 86400000,
+    (93 * 24 + 1) * 3600000,
+  ]) {
+    await expect(
+      getPersonalReportHandler(
+        repo,
+        {
+          from: new Date(start).toISOString(),
+          to: new Date(start + duration).toISOString(),
+          timeZone: 'UTC',
+        },
+        auth,
+      ),
+    ).resolves.toMatchObject({ policy: 'personal-v3' });
+  }
+  const calls = repo.readPage.mock.calls.length;
+  await expect(
+    getPersonalReportHandler(
+      repo,
+      {
+        from: new Date(start).toISOString(),
+        to: new Date(start + (93 * 24 + 1) * 3600000 + 1).toISOString(),
+        timeZone: 'UTC',
+      },
+      auth,
+    ),
+  ).rejects.toMatchObject({ code: 'invalid-argument' });
+  expect(repo.readPage).toHaveBeenCalledTimes(calls);
 });

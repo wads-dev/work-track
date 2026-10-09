@@ -30,8 +30,8 @@ const schema = z
   .refine(
     (v) =>
       Date.parse(v.to) > Date.parse(v.from) &&
-      Date.parse(v.to) - Date.parse(v.from) <= (31 * 24 + 1) * 60 * 60000,
-    'Período deve ter até31 dias e fim posterior ao início.',
+      Date.parse(v.to) - Date.parse(v.from) <= (93 * 24 + 1) * 60 * 60000,
+    'Período deve ter até 93 dias e 1 hora e fim posterior ao início.',
   );
 export async function getPersonalReportHandler(
   repository: PersonalReportRepository,
