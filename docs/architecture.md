@@ -11,6 +11,6 @@ DDD pragmático, com um único contexto de registro. Projetos e tópicos são en
 - `src/shared`: utilitários neutros, sem dependência de core ou módulos.
 - `src/index.ts`: composition root e exports exigidos pelo Firebase.
 
-Dependências fluem para dentro: apresentação usa aplicação; aplicação usa domínio e contratos; infraestrutura implementa os contratos. Domínio não conhece Firebase, Express ou MCP. Não há módulo vazio de relatórios.
+Dependências fluem para dentro: apresentação usa aplicação; aplicação usa domínio e contratos; infraestrutura implementa os contratos. Domínio não conhece Firebase, Express ou MCP. O módulo reports tem um bootstrap interno para consulta por projeto via collectionGroup, sem API pública nem cálculos de relatório.
 
 Os nomes, schemas e URLs MCP/OAuth, as coleções Firestore e os registros existentes são preservados. Testes ficam próximos das implementações.
