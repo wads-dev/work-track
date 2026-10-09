@@ -17,18 +17,19 @@ async function setup() {
   if (!response.ok)
     throw new Error('Solicitação inválida ou expirada. Reconecte o MCP.');
   const data = await response.json();
-  document.getElementById('client').textContent =
-    'Cliente solicitante: ' + data.clientName;
-  document.getElementById('redirect').textContent =
-    'Retorno autorizado: ' + data.redirectUri;
+  document.getElementById('client').textContent = data.clientName;
+  document.getElementById('redirect').textContent = data.redirectUri;
   const configResponse = await fetch('/__/firebase/init.json');
   if (!configResponse.ok)
     throw new Error('Configuração Firebase indisponível.');
   const auth = getAuth(initializeApp(await configResponse.json()));
   await setPersistence(auth, inMemoryPersistence);
+  status.dataset.state = 'ready';
+  status.textContent = '';
   button.disabled = false;
   button.addEventListener('click', async () => {
     button.disabled = true;
+    status.dataset.state = 'loading';
     status.textContent = 'Aguardando login Google…';
     try {
       const provider = new GoogleAuthProvider();
@@ -52,6 +53,7 @@ async function setup() {
         throw new Error(body.message ?? 'Não foi possível autorizar.');
       location.replace(body.redirect);
     } catch (error) {
+      status.dataset.state = 'error';
       status.textContent =
         error instanceof Error ? error.message : 'Falha no login.';
       button.disabled = false;
@@ -59,5 +61,12 @@ async function setup() {
   });
 }
 setup().catch((error) => {
+  status.dataset.state = 'error';
+  const client = document.getElementById('client');
+  const redirect = document.getElementById('redirect');
+  if (client.textContent === 'Carregando solicitação…') {
+    client.textContent = 'Solicitação indisponível';
+    redirect.textContent = 'Não validado';
+  }
   status.textContent = error.message;
 });

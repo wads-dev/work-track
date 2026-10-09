@@ -12,6 +12,7 @@ import {
   TextField,
   Typography,
   Tooltip,
+  IconButton,
   Collapse,
 } from '@mui/material';
 import { httpsCallable, type Functions } from 'firebase/functions';
@@ -22,7 +23,9 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { reportError } from './report-error';
+import { UiIcon } from './UiIcons';
 import { ReportToolbar } from './ReportToolbar';
+import { EmptyState } from './Surface';
 import { RecordDrawer } from './RecordDrawer';
 import { contextualRecordPath } from './routes';
 import { CalendarTimeline } from './CalendarTimeline';
@@ -243,6 +246,7 @@ export function PersonalPage({
       )}
       {!calendar ? (
         <ReportToolbar
+          includeArchived={includeArchived}
           total={report && !loading ? hours(report.totalMinutes) : '—'}
           fromDate={firstDate}
           toDate={lastDate}
@@ -256,15 +260,20 @@ export function PersonalPage({
           onInfo={() => setInfoOpen((v) => !v)}
         />
       ) : (
-        <Button onClick={() => setAttempt((v) => v + 1)}>Atualizar</Button>
-      )}
-      {calendar && (
-        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-          <Button
-            onClick={() => update('date', moveReference(selected, view, -1))}
-          >
-            Anterior
-          </Button>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}
+        >
+          <Tooltip title="Período anterior">
+            <IconButton
+              aria-label="Período anterior"
+              onClick={() => update('date', moveReference(selected, view, -1))}
+            >
+              <UiIcon kind="previous" />
+            </IconButton>
+          </Tooltip>
           <TextField
             size="small"
             type="date"
@@ -272,13 +281,23 @@ export function PersonalPage({
             label="Referência"
             slotProps={{ inputLabel: { shrink: true } }}
             onChange={(e) => update('date', e.target.value)}
+            sx={{ width: { xs: 130, sm: 150 }, minWidth: 0 }}
           />
+          <Tooltip title="Próximo período">
+            <IconButton
+              aria-label="Próximo período"
+              onClick={() => update('date', moveReference(selected, view, 1))}
+            >
+              <UiIcon kind="next" />
+            </IconButton>
+          </Tooltip>
           <TextField
             size="small"
             select
             value={view}
             label="Visualização"
             onChange={(e) => update('view', e.target.value)}
+            sx={{ width: 100 }}
           >
             {['day', 'week', 'month'].map((v) => (
               <MenuItem key={v} value={v}>
@@ -292,31 +311,41 @@ export function PersonalPage({
             label="Densidade"
             value={density}
             onChange={(e) => update('density', e.target.value)}
+            sx={{ width: 140 }}
           >
             {['supercompact', 'compact', 'timeline'].map((d) => (
               <MenuItem key={d} value={d}>
-                {d}
+                {d === 'timeline'
+                  ? 'Régua'
+                  : d === 'compact'
+                    ? 'Compacto'
+                    : 'Supercompacto'}
               </MenuItem>
             ))}
           </TextField>
-          <Button
-            onClick={() => update('date', moveReference(selected, view, 1))}
-          >
-            Próximo
-          </Button>
+          <FormControlLabel
+            sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: 12 } }}
+            control={
+              <Checkbox
+                size="small"
+                checked={includeArchived}
+                onChange={(e) =>
+                  update('includeArchived', String(e.target.checked))
+                }
+              />
+            }
+            label="Arquivados"
+          />
+          <Tooltip title="Atualizar calendário">
+            <IconButton
+              aria-label="Atualizar calendário"
+              onClick={() => setAttempt((v) => v + 1)}
+            >
+              <UiIcon kind="refresh" />
+            </IconButton>
+          </Tooltip>
         </Stack>
       )}
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={includeArchived}
-            onChange={(e) =>
-              update('includeArchived', String(e.target.checked))
-            }
-          />
-        }
-        label="Incluir arquivados"
-      />
       {loading ? (
         <CircularProgress aria-label="Carregando relatório pessoal" />
       ) : error ? (
@@ -363,95 +392,143 @@ export function PersonalPage({
               </Stack>
             </Collapse>
             {report.intervals.length === 0 && (
-              <Alert severity="info">
-                Nenhum intervalo neste período na página examinada. Outras
-                páginas podem conter dados.
-              </Alert>
+              <EmptyState
+                title="Nenhum registro neste escopo"
+                detail="Ajuste o período ou os filtros para consultar outras atividades."
+              />
             )}
-            {!calendar &&
-              report.byProject.some((project) => project.minutes > 0) && (
-                <Paper sx={{ p: 3 }}>
-                  <Typography component="h3" variant="h6">
-                    Tempo por projeto
-                  </Typography>
-                  <Box
-                    component="svg"
-                    viewBox="0 0 200 200"
-                    role="img"
-                    aria-label="Distribuição por projeto; valores na legenda"
-                    sx={{ width: 240, maxWidth: '100%' }}
-                  >
-                    <title>Tempo por projeto</title>
-                    {pieSlices(
-                      report.byProject.map((p) => ({
-                        label: label(p.projectId),
-                        minutes: p.minutes,
-                      })),
-                    ).map((slice, i) =>
-                      slice.full ? (
-                        <circle
-                          key={i}
-                          cx="100"
-                          cy="100"
-                          r="85"
-                          fill={slice.color}
-                        />
-                      ) : (
-                        <path key={i} d={slice.path} fill={slice.color} />
-                      ),
-                    )}
-                  </Box>
-                  <Box component="ul">
-                    {report.byProject.map((p) => (
-                      <li key={p.projectId}>
-                        {label(p.projectId)}: {hours(p.minutes)} ·{' '}
-                        {report.totalMinutes > 0
-                          ? new Intl.NumberFormat('pt-BR', {
-                              style: 'percent',
-                              maximumFractionDigits: 1,
-                            }).format(p.minutes / report.totalMinutes)
-                          : '0%'}{' '}
-                        do agregado selecionado
-                      </li>
-                    ))}
-                  </Box>
-                </Paper>
-              )}
-            {company && report.byUser?.some((person) => person.minutes > 0) && (
-              <Paper sx={{ p: 3 }}>
-                <Typography component="h2" variant="h6">
-                  Tempo por pessoa
-                </Typography>
-                <Box component="ul">
-                  {report.byUser.map((person, index) => (
-                    <li key={person.uid}>
-                      {revealed ? person.label : 'Pessoa ' + (index + 1)}:{' '}
-                      {hours(person.minutes)}
-                    </li>
-                  ))}
-                </Box>
-              </Paper>
-            )}
-            {calendar && (
-              <Box component="ul" aria-label="Legenda dos projetos">
-                {report.byProject.map((p) => (
-                  <li key={p.projectId}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  md: company ? 'repeat(2,minmax(0,1fr))' : '1fr',
+                },
+                gap: 2,
+              }}
+            >
+              {!calendar &&
+                report.byProject.some((project) => project.minutes > 0) && (
+                  <Paper sx={{ p: { xs: 2, sm: 2.5 }, minWidth: 0 }}>
+                    <Typography component="h3" variant="h6">
+                      Tempo por projeto
+                    </Typography>
                     <Box
-                      component="span"
-                      aria-hidden="true"
+                      component="svg"
+                      viewBox="0 0 200 200"
+                      role="img"
+                      aria-label="Distribuição por projeto; valores na legenda"
                       sx={{
-                        display: 'inline-block',
-                        width: 12,
-                        height: 12,
-                        bgcolor: color(p.projectId),
-                        mr: 1,
+                        width: 160,
+                        maxWidth: '100%',
+                        display: 'block',
+                        mx: 'auto',
+                        my: 2,
                       }}
-                    />
-                    {label(p.projectId)} · {hours(p.minutes)}
-                  </li>
-                ))}
-              </Box>
-            )}
+                    >
+                      <title>Tempo por projeto</title>
+                      {pieSlices(
+                        report.byProject.map((p) => ({
+                          label: label(p.projectId),
+                          minutes: p.minutes,
+                        })),
+                      ).map((slice, i) =>
+                        slice.full ? (
+                          <circle
+                            key={i}
+                            cx="100"
+                            cy="100"
+                            r="85"
+                            fill={slice.color}
+                          />
+                        ) : (
+                          <path key={i} d={slice.path} fill={slice.color} />
+                        ),
+                      )}
+                      <Box
+                        component="circle"
+                        cx="100"
+                        cy="100"
+                        r="58"
+                        sx={{ fill: 'background.paper' }}
+                      />
+                    </Box>
+                    <Box
+                      component="ul"
+                      sx={{
+                        listStyle: 'none',
+                        p: 0,
+                        m: 0,
+                        '& li': {
+                          py: 1,
+                          borderBottom: 1,
+                          borderColor: 'divider',
+                          fontSize: 14,
+                        },
+                      }}
+                    >
+                      {report.byProject.map((p) => (
+                        <li key={p.projectId}>
+                          {label(p.projectId)}: {hours(p.minutes)} ·{' '}
+                          {report.totalMinutes > 0
+                            ? new Intl.NumberFormat('pt-BR', {
+                                style: 'percent',
+                                maximumFractionDigits: 1,
+                              }).format(p.minutes / report.totalMinutes)
+                            : '0%'}{' '}
+                          do agregado selecionado
+                        </li>
+                      ))}
+                    </Box>
+                  </Paper>
+                )}
+              {company &&
+                report.byUser?.some((person) => person.minutes > 0) && (
+                  <Paper sx={{ p: { xs: 2, sm: 2.5 }, minWidth: 0 }}>
+                    <Typography component="h2" variant="h6">
+                      Tempo por pessoa
+                    </Typography>
+                    <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
+                      {report.byUser.map((person, index) => (
+                        <Box
+                          component="li"
+                          key={person.uid}
+                          sx={{
+                            py: 1.5,
+                            borderBottom: 1,
+                            borderColor: 'divider',
+                          }}
+                        >
+                          {revealed ? person.label : 'Pessoa ' + (index + 1)}:{' '}
+                          {hours(person.minutes)}
+                          <Box
+                            aria-hidden="true"
+                            sx={{
+                              mt: 1,
+                              height: 6,
+                              bgcolor: 'action.hover',
+                              borderRadius: 1,
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                height: '100%',
+                                width:
+                                  (report.totalMinutes > 0
+                                    ? (person.minutes / report.totalMinutes) *
+                                      100
+                                    : 0) + '%',
+                                bgcolor: 'primary.main',
+                              }}
+                            />
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Paper>
+                )}
+            </Box>
             {calendar && density === 'timeline' && (
               <CalendarTimeline
                 items={report.intervals}
@@ -468,10 +545,14 @@ export function PersonalPage({
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: {
-                    xs: 'minmax(0,1fr)',
+                    xs:
+                      view === 'month'
+                        ? 'repeat(7,minmax(0,1fr))'
+                        : 'minmax(0,1fr)',
                     sm: view === 'day' ? '1fr' : 'repeat(7,minmax(0,1fr))',
                   },
-                  gap: 1,
+                  gap: { xs: 0.5, sm: 1 },
+                  '& .MuiPaper-root': { minWidth: 0, overflow: 'hidden' },
                 }}
               >
                 {calendarDays(selected, view).map((day) => {
@@ -498,7 +579,7 @@ export function PersonalPage({
                       sx={{
                         p: 1,
                         minHeight: {
-                          xs: entries.length ? 80 : 44,
+                          xs: view === 'month' ? 80 : entries.length ? 80 : 44,
                           sm: density === 'supercompact' ? 88 : 116,
                         },
                         boxShadow: 'none',
@@ -513,12 +594,18 @@ export function PersonalPage({
                       <Typography
                         component="h3"
                         variant="subtitle2"
-                        sx={{ mb: 0.5, color: 'text.secondary' }}
+                        sx={{
+                          mb: 0.5,
+                          color: 'text.secondary',
+                          fontSize: { xs: view === 'month' ? 11 : 14, sm: 14 },
+                          whiteSpace: view === 'month' ? 'nowrap' : 'normal',
+                          overflow: 'hidden',
+                        }}
                       >
                         {new Intl.DateTimeFormat('pt-BR', {
-                          weekday: 'short',
+                          weekday: view === 'month' ? undefined : 'short',
                           day: 'numeric',
-                          month: 'short',
+                          month: view === 'month' ? undefined : 'short',
                           timeZone: zone,
                         }).format(new Date(day + 'T12:00:00Z'))}
                       </Typography>
@@ -527,7 +614,15 @@ export function PersonalPage({
                           Fora do mês consultado — sem cobertura
                         </Typography>
                       ) : entries.length === 0 ? (
-                        <Typography variant="caption">
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: {
+                              xs: view === 'month' ? 'none' : 'block',
+                              sm: 'block',
+                            },
+                          }}
+                        >
                           Sem atividades
                         </Typography>
                       ) : (
@@ -652,6 +747,38 @@ export function PersonalPage({
                     </Paper>
                   );
                 })}
+              </Box>
+            )}
+            {calendar && (
+              <Box
+                component="ul"
+                aria-label="Legenda dos projetos"
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 2,
+                  listStyle: 'none',
+                  m: 0,
+                  p: 0,
+                  fontSize: 12,
+                }}
+              >
+                {report.byProject.map((p) => (
+                  <li key={p.projectId}>
+                    <Box
+                      component="span"
+                      aria-hidden="true"
+                      sx={{
+                        display: 'inline-block',
+                        width: 12,
+                        height: 12,
+                        bgcolor: color(p.projectId),
+                        mr: 1,
+                      }}
+                    />
+                    {label(p.projectId)} · {hours(p.minutes)}
+                  </li>
+                ))}
               </Box>
             )}
           </>

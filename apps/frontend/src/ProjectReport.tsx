@@ -75,7 +75,13 @@ function Pie({ title, buckets }: { title: string; buckets: Bucket[] }) {
             viewBox="0 0 200 200"
             role="img"
             aria-label={title + ' — valores na legenda abaixo'}
-            sx={{ width: '100%', maxWidth: 240, display: 'block', mx: 'auto' }}
+            sx={{
+              width: 160,
+              maxWidth: '100%',
+              display: 'block',
+              mx: 'auto',
+              my: 2,
+            }}
           >
             <title>{title}</title>
             {slices.map((slice, index) =>
@@ -96,8 +102,23 @@ function Pie({ title, buckets }: { title: string; buckets: Bucket[] }) {
                 />
               ),
             )}
+            <Box
+              component="circle"
+              cx="100"
+              cy="100"
+              r="58"
+              sx={{ fill: 'background.paper' }}
+            />
           </Box>
-          <Box component="ul" sx={{ pl: 2 }}>
+          <Box
+            component="ul"
+            sx={{
+              listStyle: 'none',
+              p: 0,
+              m: 0,
+              '& li': { py: 1, borderBottom: 1, borderColor: 'divider' },
+            }}
+          >
             {slices.map((slice, index) => (
               <li key={index}>
                 <Box
@@ -228,9 +249,18 @@ export function ProjectReport({
           ? 'Voltar à seleção ativa'
           : 'Permitir histórico arquivado nesta consulta'}
       </Button>
-      <Typography component="h2" variant="h5">
-        Tempo agregado selecionado: {hours(report.totalMinutes)}
-      </Typography>
+      <Paper sx={{ p: 2, my: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          Tempo registrado · seleção atual
+        </Typography>
+        <Typography
+          component="h2"
+          variant="h4"
+          sx={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {hours(report.totalMinutes)}
+        </Typography>
+      </Paper>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
         Pode somar atividades simultâneas; não representa tempo líquido único.
         Referência: {date(report.asOf)}. Política: {report.policy}.
@@ -272,7 +302,36 @@ export function ProjectReport({
             <Pie title="Tempo por pessoa" buckets={report.byUser} />
             <Pie title="Tempo por tópico" buckets={report.byTopic} />
           </Stack>
+          <Stack spacing={1} sx={{ display: { xs: 'flex', sm: 'none' } }}>
+            {report.records.map((record) => (
+              <Paper key={record.id + record.uid} sx={{ p: 2 }}>
+                <Typography variant="h6">
+                  {report.byUser.find((item) => item.uid === record.uid)
+                    ?.label ?? record.uid}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {date(record.startedAt)} —{' '}
+                  {date(record.endedAt ?? record.effectiveEndedAt)}
+                </Typography>
+                <Typography sx={{ mt: 1 }}>
+                  {hours(record.minutes)}{' '}
+                  {record.estimated
+                    ? '· Estimado; fim original não informado'
+                    : '· Factual'}
+                </Typography>
+                {record.uid === uid && (
+                  <Button
+                    component={RouterLink}
+                    to={detailPath('records', record.id, search)}
+                  >
+                    Detalhes
+                  </Button>
+                )}
+              </Paper>
+            ))}
+          </Stack>
           <TableContainer
+            sx={{ display: { xs: 'none', sm: 'block' } }}
             component={Paper}
             tabIndex={0}
             aria-label="Registros resumidos do projeto"

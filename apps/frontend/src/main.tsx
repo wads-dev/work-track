@@ -20,7 +20,6 @@ import {
   ThemeProvider,
   Toolbar,
   Typography,
-  createTheme,
   useMediaQuery,
 } from '@mui/material';
 import {
@@ -33,6 +32,8 @@ import {
 import { initializeServices, type Services } from './firebase';
 import { RecordDrawer } from './RecordDrawer';
 import { Dashboard } from './Dashboard';
+import '@fontsource-variable/geist';
+import { workTheme } from './theme';
 import './styles.css';
 import {
   BrowserRouter,
@@ -91,45 +92,8 @@ function App() {
     null,
   );
   const mode = themeOverride ?? (systemDark ? 'dark' : 'light');
-  const theme = createTheme({
-    palette: {
-      mode,
-      primary: { main: mode === 'dark' ? '#adc6ff' : '#2457a7' },
-      background: {
-        default: mode === 'dark' ? '#11151d' : '#f3f6fa',
-        paper: mode === 'dark' ? '#1b2230' : '#ffffff',
-      },
-    },
-    shape: { borderRadius: 18 },
-    transitions: {
-      duration: reducedMotion
-        ? {
-            shortest: 0,
-            shorter: 0,
-            short: 0,
-            standard: 0,
-            complex: 0,
-            enteringScreen: 0,
-            leavingScreen: 0,
-          }
-        : {},
-    },
-    components: {
-      MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
-      MuiAppBar: {
-        styleOverrides: {
-          root: {
-            background:
-              mode === 'dark' ? 'rgba(27,34,48,.9)' : 'rgba(255,255,255,.9)',
-            color: mode === 'dark' ? '#e2e8f0' : '#172338',
-            backdropFilter: 'blur(12px)',
-            borderBottom:
-              '1px solid ' + (mode === 'dark' ? '#354055' : '#dce3ef'),
-          },
-        },
-      },
-    },
-  });
+  const theme = workTheme(mode, reducedMotion);
+  const desktop = useMediaQuery('(min-width:1200px)');
   const toggleTheme = (
     <IconButton
       aria-label={mode === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
@@ -148,6 +112,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | undefined;
@@ -236,7 +201,11 @@ function App() {
         </a>
         {authorized && services ? (
           <>
-            <AppBar position="static" elevation={0}>
+            <AppBar
+              position="static"
+              elevation={0}
+              sx={{ ml: { lg: '280px' }, width: { lg: 'calc(100% - 280px)' } }}
+            >
               <Toolbar
                 sx={{
                   gap: { xs: 0.25, sm: 1 },
@@ -246,6 +215,7 @@ function App() {
                 }}
               >
                 <IconButton
+                  sx={{ display: { lg: 'none' } }}
                   color="inherit"
                   aria-label="Abrir menu de navegação"
                   aria-expanded={menuOpen}
@@ -313,26 +283,26 @@ function App() {
                     <UiIcon kind={revealed ? 'eye' : 'eyeoff'} />
                   </IconButton>
                 </Tooltip>
-                <Typography
-                  variant="body2"
-                  noWrap
-                  sx={{
-                    display: { xs: 'none', md: 'block' },
-                    ml: 1,
-                    maxWidth: 240,
-                    color: 'text.secondary',
-                  }}
-                >
-                  {user.email}
-                </Typography>
               </Toolbar>
             </AppBar>
-            <Drawer open={menuOpen} onClose={() => setMenuOpen(false)}>
+            <Drawer
+              variant={desktop ? 'permanent' : 'temporary'}
+              open={desktop || menuOpen}
+              onClose={() => setMenuOpen(false)}
+              slotProps={{ paper: { sx: { width: 280, borderRadius: 0 } } }}
+            >
               <Box
                 component="nav"
                 id="menu-principal"
                 aria-label="Menu principal"
-                sx={{ width: 280, maxWidth: '85vw', p: 2 }}
+                sx={{
+                  width: 280,
+                  maxWidth: '85vw',
+                  p: 2,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
               >
                 <Typography variant="h6">Work Track</Typography>
                 <Typography
@@ -343,21 +313,32 @@ function App() {
                     mb: 2,
                   }}
                 >
-                  {user.email}
+                  Projetos, tempo e contexto
                 </Typography>
-                <Button onClick={() => setMenuOpen(false)}>Fechar menu</Button>
-                <Button onClick={() => setThemeOverride(null)}>
-                  Tema do sistema
-                </Button>
-                <List>
+                {!desktop && (
+                  <IconButton
+                    aria-label="Fechar menu"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <UiIcon kind="close" />
+                  </IconButton>
+                )}
+                <Typography
+                  variant="overline"
+                  color="text.secondary"
+                  sx={{ px: 2, mt: 2 }}
+                >
+                  Trabalho e gestão
+                </Typography>
+                <List sx={{ flex: 1 }}>
                   {[
                     ['/app', 'Dashboard'],
                     ['/me', 'Meu relatório'],
+                    ['/calendar', 'Calendário'],
                     ['/projects', 'Projetos'],
                     ['/records', 'Meus registros'],
                     ['/pending', 'Pendências'],
                     ['/rules', 'Regras'],
-                    ['/calendar', 'Calendário'],
                   ].map(([to, label]) => (
                     <ListItemButton
                       key={to}
@@ -379,13 +360,30 @@ function App() {
                                 ? 'bell'
                                 : to === '/rules'
                                   ? 'rules'
-                                  : 'detail'
+                                  : to === '/calendar'
+                                    ? 'calendar'
+                                    : to === '/records'
+                                      ? 'records'
+                                      : 'chart'
                         }
                       />
                       <ListItemText primary={label} sx={{ ml: 2 }} />
                     </ListItemButton>
                   ))}
                 </List>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ px: 2, overflowWrap: 'anywhere', mb: 1 }}
+                >
+                  {user.email}
+                </Typography>
+                <Button
+                  onClick={() => setThemeOverride(null)}
+                  sx={{ justifyContent: 'flex-start' }}
+                >
+                  Tema do sistema
+                </Button>
                 <Button disabled={busy} onClick={() => void logout()}>
                   Sair
                 </Button>
@@ -396,7 +394,13 @@ function App() {
               id="conteudo"
               tabIndex={-1}
               maxWidth="xl"
-              sx={{ py: { xs: 2, sm: 3 } }}
+              sx={{
+                py: { xs: 2, sm: 3 },
+                px: { xs: 2, sm: 3 },
+                ml: { lg: '280px' },
+                width: { lg: 'calc(100% - 280px)' },
+                minWidth: 0,
+              }}
             >
               {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
@@ -515,7 +519,12 @@ function App() {
             }}
           >
             <Card sx={{ width: '100%', maxWidth: 440 }}>
-              <CardContent sx={{ p: 4 }}>
+              <CardContent
+                sx={{
+                  p: { xs: 2.5, sm: 4 },
+                  '&:last-child': { pb: { xs: 2.5, sm: 4 } },
+                }}
+              >
                 <Stack direction="row" sx={{ justifyContent: 'end' }}>
                   {toggleTheme}
                   <Button onClick={() => setThemeOverride(null)}>
@@ -523,6 +532,19 @@ function App() {
                   </Button>
                 </Stack>
                 <Stack spacing={3}>
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: 'action.selected',
+                      color: 'primary.main',
+                      borderRadius: 2,
+                    }}
+                  >
+                    <UiIcon kind="projects" />
+                  </Box>
                   <Typography
                     component="h1"
                     variant="h4"

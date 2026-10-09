@@ -20,6 +20,8 @@ import {
   IconButton,
   Tooltip,
   MenuItem,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
@@ -76,7 +78,25 @@ function DataTable({
         </Alert>
       ) : (
         <>
+          <Stack sx={{ display: { xs: 'flex', sm: 'none' } }} spacing={1.5}>
+            {state.rows.map((row) => (
+              <Paper key={row.id} sx={{ p: 2 }}>
+                {render(row.data, row.id).map((cell, index) => (
+                  <Box
+                    key={headers[index]}
+                    sx={{ mb: 1, overflowWrap: 'anywhere' }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      {headers[index]}
+                    </Typography>
+                    <Box sx={{ fontSize: 14 }}>{cell}</Box>
+                  </Box>
+                ))}
+              </Paper>
+            ))}
+          </Stack>
           <TableContainer
+            sx={{ display: { xs: 'none', sm: 'block' } }}
             component={Paper}
             tabIndex={0}
             aria-label={title + ' — role para ver todas as colunas'}
@@ -187,6 +207,7 @@ export function Dashboard({
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const recordId = params.get('record');
+  const [projectTab, setProjectTab] = useState('report');
   const [localFilter, setLocalFilter] = useState('');
   const filter = revealed ? localFilter : '';
   const projectFilter = params.get('project') ?? '';
@@ -232,26 +253,41 @@ export function Dashboard({
             'O relatório consulta o projeto diretamente, independente do limite da lista.',
           )}
         </Typography>
-        <ProjectEditor
-          functions={functions}
-          projectId={projectId}
-          project={rawProjects.rows.find((item) => item.id === projectId)?.data}
-          hidden={isHidden(
-            rawProjects.rows.find((item) => item.id === projectId)?.data,
-            revealed,
-          )}
-        />
-        <ProjectReport
-          key={projectId}
-          projectId={projectId}
-          functions={functions}
-          hidden={isHidden(
-            rawProjects.rows.find((item) => item.id === projectId)?.data,
-            revealed,
-          )}
-          search={location.search}
-          uid={uid}
-        />
+        <Tabs
+          value={projectTab}
+          onChange={(_, value) => setProjectTab(value)}
+          aria-label="Seções do projeto"
+          sx={{ mt: 2, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab value="report" label="Visão geral" />
+          <Tab value="settings" label="Detalhes / Editar" />
+        </Tabs>
+        <Box hidden={projectTab !== 'settings'}>
+          <ProjectEditor
+            functions={functions}
+            projectId={projectId}
+            project={
+              rawProjects.rows.find((item) => item.id === projectId)?.data
+            }
+            hidden={isHidden(
+              rawProjects.rows.find((item) => item.id === projectId)?.data,
+              revealed,
+            )}
+          />
+        </Box>
+        <Box hidden={projectTab !== 'report'}>
+          <ProjectReport
+            key={projectId}
+            projectId={projectId}
+            functions={functions}
+            hidden={isHidden(
+              rawProjects.rows.find((item) => item.id === projectId)?.data,
+              revealed,
+            )}
+            search={location.search}
+            uid={uid}
+          />
+        </Box>
       </Box>
     );
   const filteredProjects = {

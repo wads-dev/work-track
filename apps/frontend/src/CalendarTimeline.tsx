@@ -117,11 +117,6 @@ export function CalendarTimeline({
     String(m % 60).padStart(2, '0');
   return (
     <Box>
-      <Typography variant="body2" sx={{ mb: 1 }}>
-        Intervalo horário comum de {clock(span.first)} a {clock(span.last)}.
-        Altura proporcional à duração real. Eventos curtos são marcadores com
-        detalhes ao focar ou passar o cursor. Sobreposições em colunas.
-      </Typography>
       <Box
         sx={{ overflowX: 'auto', p: 1 }}
         tabIndex={0}
@@ -131,8 +126,10 @@ export function CalendarTimeline({
           sx={{
             display: 'grid',
             gridTemplateColumns:
-              'repeat(' + Math.min(days.length, 7) + ',minmax(240px,1fr))',
-            minWidth: Math.min(days.length, 7) * 240,
+              view === 'month'
+                ? 'repeat(7,minmax(100px,1fr))'
+                : 'repeat(' + Math.min(days.length, 7) + ',minmax(240px,1fr))',
+            minWidth: view === 'month' ? 700 : Math.min(days.length, 7) * 240,
             gap: 1,
           }}
         >

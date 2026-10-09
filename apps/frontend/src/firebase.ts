@@ -34,6 +34,10 @@ export async function initializeServices() {
     throw new Error('Configuração Firebase inválida.');
   }
   const emulator = emulatorMode(config.projectId, location.hostname);
+  document.documentElement.style.setProperty(
+    '--emulator-inset',
+    emulator ? '50px' : '0px',
+  );
   const app = initializeApp(config as FirebaseOptions, 'work-track-dashboard');
   const auth = getAuth(app);
   const db = getFirestore(app);

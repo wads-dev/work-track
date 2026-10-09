@@ -1,11 +1,32 @@
 import { Alert, Box, Paper, Typography } from '@mui/material';
 export function RulesPage() {
   return (
-    <Paper component="section" sx={{ p: 3 }}>
+    <Paper
+      component="section"
+      sx={{
+        p: { xs: 2, sm: 3 },
+        maxWidth: 920,
+        mx: 'auto',
+        '& h2': { mb: 2 },
+        '& p': { lineHeight: 1.7 },
+      }}
+    >
       <Typography component="h2" variant="h5">
         Regras do relatório
       </Typography>
-      <Typography>
+      <Box
+        component="nav"
+        aria-label="Sumário das regras"
+        sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, my: 2, fontSize: 14 }}
+      >
+        <a href="#rules-policy">Estimativas e fatos</a>
+        <a href="#rules-consent">Alterações</a>
+      </Box>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Fatos preservados · estimativas limitadas · orçamento global de 8h por
+        pessoa/dia. Nenhum fim é persistido automaticamente.
+      </Alert>
+      <Typography id="rules-policy">
         Políticas v3: orçamento diário global de estimativas por pessoa,
         considerando todos os projetos e registros do contexto completo. Nenhum
         fato original é alterado.
@@ -80,7 +101,7 @@ export function RulesPage() {
         cortar; próximo registro aberto no mesmo projeto também pode cortar.
         Atividade em outro projeto nunca corta a estimativa.
       </Typography>
-      <Alert severity="info" sx={{ mt: 2 }}>
+      <Alert id="rules-consent" severity="info" sx={{ mt: 2 }}>
         Editar fim ou reabrir registro exige ação e confirmação explícitas.
         Nenhuma política encerra atividades automaticamente.
       </Alert>

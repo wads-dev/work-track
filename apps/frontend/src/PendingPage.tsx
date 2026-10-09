@@ -154,59 +154,90 @@ export function PendingPage({
               páginas.
             </Alert>
           ) : (
-            <TableContainer
-              component={Paper}
-              tabIndex={0}
-              aria-label="Pendências carregadas"
-            >
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    {['Projeto', 'Início', 'Detalhes'].map((label) => (
-                      <TableCell key={label} scope="col">
-                        {label}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {open.map((row) => {
-                    const project = projects.rows.find(
-                      (p) => p.id === row.data.projectId,
-                    )?.data;
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell>
-                          {text(safeProject(project, revealed)?.title)}
+            <>
+              <Stack spacing={1.5} sx={{ display: { xs: 'flex', sm: 'none' } }}>
+                {open.map((row) => (
+                  <Paper key={row.id} sx={{ p: 2 }}>
+                    <Typography variant="h6">
+                      {text(
+                        safeProject(
+                          projects.rows.find((p) => p.id === row.data.projectId)
+                            ?.data,
+                          revealed,
+                        )?.title,
+                      )}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {date(row.data.startedAt, row.data.timeZone)}
+                    </Typography>
+                    <Button
+                      component={RouterLink}
+                      to={contextualRecordPath(
+                        '/pending',
+                        '?' + params.toString(),
+                        row.id,
+                      )}
+                    >
+                      Revisar fim
+                    </Button>
+                  </Paper>
+                ))}
+              </Stack>
+              <TableContainer
+                sx={{ display: { xs: 'none', sm: 'block' } }}
+                component={Paper}
+                tabIndex={0}
+                aria-label="Pendências carregadas"
+              >
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      {['Projeto', 'Início', 'Detalhes'].map((label) => (
+                        <TableCell key={label} scope="col">
+                          {label}
                         </TableCell>
-                        <TableCell>
-                          {date(row.data.startedAt, row.data.timeZone)}
-                        </TableCell>
-                        <TableCell>
-                          <Tooltip title="Abrir detalhes do registro">
-                            <IconButton
-                              component={RouterLink}
-                              to={contextualRecordPath(
-                                '/pending',
-                                '?' + params.toString(),
-                                row.id,
-                              )}
-                              aria-label={
-                                isHidden(project, revealed)
-                                  ? 'Detalhes de registro reservado'
-                                  : 'Abrir detalhes do registro'
-                              }
-                            >
-                              <UiIcon kind="detail" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {open.map((row) => {
+                      const project = projects.rows.find(
+                        (p) => p.id === row.data.projectId,
+                      )?.data;
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            {text(safeProject(project, revealed)?.title)}
+                          </TableCell>
+                          <TableCell>
+                            {date(row.data.startedAt, row.data.timeZone)}
+                          </TableCell>
+                          <TableCell>
+                            <Tooltip title="Abrir detalhes do registro">
+                              <IconButton
+                                component={RouterLink}
+                                to={contextualRecordPath(
+                                  '/pending',
+                                  '?' + params.toString(),
+                                  row.id,
+                                )}
+                                aria-label={
+                                  isHidden(project, revealed)
+                                    ? 'Detalhes de registro reservado'
+                                    : 'Abrir detalhes do registro'
+                                }
+                              >
+                                <UiIcon kind="detail" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
           )}
           <Stack direction="row" spacing={2}>
             {cursor && (
