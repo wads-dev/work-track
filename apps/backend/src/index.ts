@@ -35,7 +35,43 @@ import { FirebaseIdentityService } from './core/auth/infrastructure/firebase-ide
 import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-store.js';
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
+import { FirestoreProjectDeletionRepository } from './modules/registration/infrastructure/firestore-project-deletion.js';
+import { projectDeletionHandler } from './modules/registration/presentation/project-deletion.js';
+
 initializeApp();
+// Frontend callables only: intentionally absent from the MCP tool registry.
+export const exportProjectForDeletion = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  (request) =>
+    projectDeletionHandler(
+      new FirestoreProjectDeletionRepository(getFirestore()),
+      'export',
+      request.data,
+      request.auth,
+    ),
+);
+export const deleteProjectPermanently = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 120,
+    memory: '512MiB',
+  },
+  (request) =>
+    projectDeletionHandler(
+      new FirestoreProjectDeletionRepository(getFirestore()),
+      'delete',
+      request.data,
+      request.auth,
+    ),
+);
 export const getTopicReport = onCall(
   {
     region: 'southamerica-east1',

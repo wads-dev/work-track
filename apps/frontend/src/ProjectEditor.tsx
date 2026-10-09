@@ -15,6 +15,8 @@ import {
 import { type Functions } from 'firebase/functions';
 import { text } from './data';
 import { ProjectArchive } from './ProjectArchive';
+import { ProjectDeletion } from './ProjectDeletion';
+import { ownsVisibleProject } from './project-deletion';
 import { ProjectTopics } from './ProjectTopics';
 import { ProjectSelector } from './ProjectSelector';
 import { useProjects } from './useProjects';
@@ -25,11 +27,15 @@ export function ProjectEditor({
   projectId,
   project,
   hidden,
+  uid,
+  onDeleted,
 }: {
   functions: Functions;
   projectId: string;
   project?: Record<string, unknown>;
   hidden: boolean;
+  uid: string;
+  onDeleted: () => void;
 }) {
   if (hidden)
     return (
@@ -66,6 +72,16 @@ export function ProjectEditor({
         projectId={projectId}
         project={project}
       />
+      {ownsVisibleProject(uid, project, hidden) && (
+        <ProjectDeletion
+          key={JSON.stringify([uid, projectId, project])}
+          functions={functions}
+          uid={uid}
+          projectId={projectId}
+          project={project}
+          onDeleted={onDeleted}
+        />
+      )}
     </Box>
   );
 }

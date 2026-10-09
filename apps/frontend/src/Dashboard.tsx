@@ -384,6 +384,8 @@ export function Dashboard({
           hidden={projectTab !== 'details'}
         >
           <ProjectEditor
+            uid={uid}
+            onDeleted={() => navigate('/projects', { replace: true })}
             functions={functions}
             projectId={projectId}
             project={rawProjectsById.get(projectId)?.data}
