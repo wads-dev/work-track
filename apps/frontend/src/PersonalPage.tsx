@@ -18,7 +18,8 @@ import { Checkbox } from './components/ui/checkbox';
 import { Alert, AlertDescription } from './components/ui/alert';
 import { Card } from './components/ui/card';
 import { Skeleton } from './components/ui/skeleton';
-import { MetadataLink } from './MetadataLink';
+import { MetadataLink, metadataNavigation } from './MetadataLink';
+import { InteractiveChart } from './InteractiveChart';
 import {
   useProjectAccessRevision,
   projectAccessRevision,
@@ -57,7 +58,7 @@ import { CalendarProjectFilter } from './CalendarProjectFilter';
 import { updatePersonalFilters } from './calendar-project-filter';
 import { date, text } from './data';
 import { isHidden, safeProject, usePrivacy } from './privacy';
-import { hours, pieSlices } from './report-chart';
+import { hours } from './report-chart';
 import {
   calendarDays,
   addDays,
@@ -117,12 +118,14 @@ export function PersonalPage({
   functions,
   calendar = false,
   company = false,
+  profile = false,
   uid,
 }: {
   db: Firestore;
   functions: Functions;
   calendar?: boolean;
   company?: boolean;
+  profile?: boolean;
   uid: string;
 }) {
   const [infoOpen, setInfoOpen] = useState(false);
@@ -573,7 +576,7 @@ export function PersonalPage({
             <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
               <span className="text-xs text-muted-foreground">{'Pessoa'}</span>
               <Select
-                disabled={loading}
+                disabled={loading || profile}
                 value={person.selected || '__all__'}
                 onValueChange={(value) =>
                   setParams(
@@ -797,44 +800,37 @@ export function PersonalPage({
                 company && 'md:grid-cols-2',
               )}
             >
-              {!calendar &&
+              {(!calendar || profile) &&
                 report.byProject.some((project) => project.minutes > 0) && (
                   <Card className={cn('gap-0 p-4 sm:p-5 min-w-0')}>
                     <h3 className={cn('text-lg font-semibold')}>
                       Tempo por projeto
                     </h3>
-                    <svg
-                      viewBox="0 0 200 200"
-                      role="img"
-                      aria-label="Distribuição por projeto; valores na legenda"
-                      className={cn('w-40 max-w-full block mx-auto my-4')}
-                    >
-                      <title>Tempo por projeto</title>
-                      {pieSlices(
-                        report.byProject.map((p) => ({
-                          label: label(p.projectId),
-                          minutes: p.minutes,
-                        })),
-                      ).map((slice, i) =>
-                        slice.full ? (
-                          <circle
-                            key={i}
-                            cx="100"
-                            cy="100"
-                            r="85"
-                            fill={slice.color}
-                          />
-                        ) : (
-                          <path key={i} d={slice.path} fill={slice.color} />
-                        ),
-                      )}
-                      <circle
-                        cx="100"
-                        cy="100"
-                        r="58"
-                        className={cn('fill-card')}
-                      />
-                    </svg>
+                    <InteractiveChart
+                      title="Tempo por projeto"
+                      variant="pie"
+                      data={report.byProject.map((project) => {
+                        const navigation = metadataNavigation(
+                          project.projectId,
+                          projects.rows.find(
+                            (row) => row.id === project.projectId,
+                          )?.data,
+                          revealed,
+                        );
+                        return {
+                          key: project.projectId,
+                          label: navigation.label,
+                          minutes: project.minutes,
+                          href: navigation.path
+                            ? navigation.path +
+                              '?returnTo=' +
+                              encodeURIComponent(
+                                location.pathname + location.search,
+                              )
+                            : undefined,
+                        };
+                      })}
+                    />
                     <ul
                       className={cn(
                         'list-none p-0 m-0 [&_li]:py-2 [&_li]:border-b [&_li]:text-sm',
@@ -861,28 +857,28 @@ export function PersonalPage({
                     <h2 className={cn('text-lg font-semibold')}>
                       Tempo por pessoa
                     </h2>
+                    <InteractiveChart
+                      title="Tempo por pessoa"
+                      variant="bar"
+                      data={report.byUser.map((person, index) => ({
+                        key: person.uid,
+                        label: revealed
+                          ? person.label
+                          : 'Pessoa ' + (index + 1),
+                        minutes: person.minutes,
+                        href:
+                          revealed && person.uid
+                            ? '/people/' +
+                              encodeURIComponent(person.uid) +
+                              location.search
+                            : undefined,
+                      }))}
+                    />
                     <ul className={cn('list-none p-0 m-0')}>
                       {report.byUser.map((person, index) => (
                         <li key={person.uid} className={cn('py-3 border-b')}>
                           {revealed ? person.label : 'Pessoa ' + (index + 1)}:{' '}
                           {hours(person.minutes)}
-                          <div
-                            aria-hidden="true"
-                            className={cn(
-                              'mt-2 h-1.5 bg-muted rounded overflow-hidden',
-                            )}
-                          >
-                            <div
-                              className={cn('h-full bg-primary')}
-                              style={{
-                                width:
-                                  (report.totalMinutes > 0
-                                    ? (person.minutes / report.totalMinutes) *
-                                      100
-                                    : 0) + '%',
-                              }}
-                            />
-                          </div>
                         </li>
                       ))}
                     </ul>

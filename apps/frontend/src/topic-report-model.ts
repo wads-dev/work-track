@@ -31,6 +31,7 @@ export function topicBuckets(
         .filter((person) => !personalUid || person.uid === personalUid)
         .map((person, index) => ({
           key: String(index),
+          uid: revealed && !hidden && !personalUid ? person.uid : undefined,
           label: personalUid ? 'Você' : text(person.label, 'Pessoa'),
           minutes: person.minutes,
         })),

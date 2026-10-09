@@ -1,5 +1,5 @@
 export type Bucket = { label: string; minutes: number };
-const colors = [
+export const colors = [
   '#2457a7',
   '#a84417',
   '#35704a',

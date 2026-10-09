@@ -29,7 +29,7 @@ export function safeReturnTo(value: string | null): string {
     if (
       url.origin !== 'https://work-track.invalid' ||
       !(
-        /^\/(app|projects|records|pending|rules|calendar|me)(\/[^/]+)?$/.test(
+        /^\/(app|projects|records|pending|rules|calendar|me|people)(\/[^/]+)?$/.test(
           url.pathname,
         ) || /^\/projects\/[^/]+\/topics\/[^/]+$/.test(url.pathname)
       ) ||

@@ -60,6 +60,7 @@ import { PendingBell, PendingPage } from './PendingPage';
 import { RulesPage } from './RulesPage';
 import { UiIcon } from './UiIcons';
 import { PersonalPage } from './PersonalPage';
+import { PersonPage } from './PersonPage';
 
 function allowed(user: User) {
   return (
@@ -365,6 +366,17 @@ function App() {
                 </Alert>
               )}
               <Routes>
+                <Route
+                  path="/people/:personId"
+                  element={
+                    <PersonPage
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                    />
+                  }
+                />
                 <Route
                   path="/me"
                   element={

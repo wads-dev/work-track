@@ -30,7 +30,8 @@ import { date } from './data';
 import { detailPath } from './routes';
 import { UiIcon } from './UiIcons';
 
-import { hours, pieSlices, type Bucket } from './report-chart';
+import { hours, type Bucket } from './report-chart';
+import { InteractiveChart } from './InteractiveChart';
 export type Report = {
   projectId: string;
   asOf: string;
@@ -56,69 +57,6 @@ export type Report = {
   page: { limit: number; nextCursor: string | null; partial: boolean };
 };
 
-function Pie({ title, buckets }: { title: string; buckets: Bucket[] }) {
-  const slices = pieSlices(buckets);
-  return (
-    <Card className="gap-0 py-0">
-      <section aria-label={title} className={cn('p-6 flex-1 min-w-0')}>
-        <h3 className={cn('text-lg font-semibold')}>{title}</h3>
-        <p className={cn('text-sm text-muted-foreground')}>
-          Fatias proporcionais à soma dos valores desta distribuição:{' '}
-          {hours(buckets.reduce((sum, bucket) => sum + bucket.minutes, 0))}. A
-          soma dos tópicos pode diferir do tempo agregado quando as durações
-          informadas excedem o total; avisos abaixo explicam ambiguidades.
-        </p>
-        {slices.length === 0 ? (
-          <p className={cn('text-base')}>
-            Nenhum tempo disponível nesta página.
-          </p>
-        ) : (
-          <>
-            <svg
-              viewBox="0 0 200 200"
-              role="img"
-              aria-label={title + ' — valores na legenda abaixo'}
-              className={cn('w-40 max-w-full block mx-auto my-4')}
-            >
-              <title>{title}</title>
-              {slices.map((slice, index) =>
-                slice.full ? (
-                  <circle
-                    key={index}
-                    cx="100"
-                    cy="100"
-                    r="85"
-                    fill={slice.color}
-                  />
-                ) : (
-                  <path
-                    key={index}
-                    d={slice.path}
-                    fill={slice.color}
-                    stroke="white"
-                  />
-                ),
-              )}
-              <circle cx="100" cy="100" r="58" className={cn('fill-card')} />
-            </svg>
-            <ul className={cn('list-none p-0 m-0 [&_li]:py-2 [&_li]:border-b')}>
-              {slices.map((slice, index) => (
-                <li key={index}>
-                  <span
-                    aria-hidden="true"
-                    className={cn('inline-block size-3 mr-2')}
-                    style={{ backgroundColor: slice.color }}
-                  />
-                  {slice.label}: {hours(slice.minutes)}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
-    </Card>
-  );
-}
 export function ProjectReport({
   functions,
   hidden,
@@ -332,7 +270,21 @@ export function ProjectReport({
               'grid grid-cols-1 md:grid-cols-2 gap-4 my-6 [&>*]:min-w-0',
             )}
           >
-            <Pie title="Tempo por pessoa" buckets={report.byUser} />
+            <Card className="p-5 min-w-0">
+              <h3 className="text-lg font-semibold">Tempo por pessoa</h3>
+              <InteractiveChart
+                title="Tempo por pessoa"
+                variant="pie"
+                data={report.byUser.map((person, index) => ({
+                  key: person.uid,
+                  label: hidden ? 'Pessoa ' + (index + 1) : person.label,
+                  minutes: person.minutes,
+                  href: hidden
+                    ? undefined
+                    : '/people/' + encodeURIComponent(person.uid) + search,
+                }))}
+              />
+            </Card>
             <TopicReport
               unassignedMinutes={report.unassignedMinutes ?? 0}
               buckets={(report.byTopic ?? []).map((topic) => ({
@@ -346,6 +298,7 @@ export function ProjectReport({
                 minutes: topic.minutes,
                 people: (topic.byUser ?? []).map((person, index) => ({
                   key: String(index),
+                  uid: hidden ? undefined : person.uid,
                   label: person.label || 'Pessoa',
                   minutes: person.minutes,
                 })),

@@ -11,6 +11,7 @@ import { Card } from './components/ui/card';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { hours } from './report-chart';
+import { InteractiveChart } from './InteractiveChart';
 import { Link as RouterLink } from 'react-router-dom';
 
 import { topicDetailsPath } from './routes';
@@ -23,7 +24,7 @@ export type TopicReportBucket = {
   topicLabel: string;
   minutes: number;
   detailsAvailable?: boolean;
-  people: { key: string; label: string; minutes: number }[];
+  people: { key: string; label: string; minutes: number; uid?: string }[];
 };
 export const topicBucketKey = (
   bucket: Pick<TopicReportBucket, 'projectId' | 'topicId'>,
@@ -53,7 +54,6 @@ export function TopicReport({
     });
   };
   const active = buckets.find((bucket) => topicBucketKey(bucket) === selected);
-  const maximum = Math.max(0, ...buckets.map((bucket) => bucket.minutes));
   return (
     <Card className="gap-0 py-0">
       <section
@@ -106,6 +106,25 @@ export function TopicReport({
                   </SelectContent>
                 </Select>
               </Label>
+              <InteractiveChart
+                title="Tempo por assunto"
+                variant="bar"
+                data={(active ? [active] : buckets).map((bucket) => ({
+                  key: topicBucketKey(bucket),
+                  label: bucket.projectLabel + ' · ' + bucket.topicLabel,
+                  minutes: bucket.minutes,
+                  ...(bucket.detailsAvailable && bucket.topicId !== null
+                    ? {
+                        href:
+                          topicDetailsPath(bucket.projectId, bucket.topicId) +
+                          '?returnTo=' +
+                          encodeURIComponent(
+                            location.pathname + location.search,
+                          ),
+                      }
+                    : { onSelect: () => setSelected(topicBucketKey(bucket)) }),
+                }))}
+              />
               <ul className={cn('list-none p-0 m-0')}>
                 {(active ? [active] : buckets).map((bucket) => (
                   <li
@@ -170,22 +189,6 @@ export function TopicReport({
                         {hours(bucket.minutes)}
                       </p>
                     </div>
-                    <div
-                      aria-hidden="true"
-                      className={cn(
-                        'h-1.5 bg-muted rounded mt-2 overflow-hidden',
-                      )}
-                    >
-                      <div
-                        className={cn('h-full bg-primary')}
-                        style={{
-                          width:
-                            (maximum > 0
-                              ? (bucket.minutes / maximum) * 100
-                              : 0) + '%',
-                        }}
-                      />
-                    </div>
                   </li>
                 ))}
               </ul>
@@ -196,6 +199,23 @@ export function TopicReport({
                       ? 'Meu tempo neste assunto'
                       : 'Pessoas neste assunto'}
                   </h4>
+                  <InteractiveChart
+                    title={
+                      personal
+                        ? 'Meu tempo neste assunto'
+                        : 'Pessoas neste assunto'
+                    }
+                    variant="bar"
+                    data={active.people.map((person) => ({
+                      ...person,
+                      href:
+                        !personal && active.detailsAvailable && person.uid
+                          ? '/people/' +
+                            encodeURIComponent(person.uid) +
+                            location.search
+                          : undefined,
+                    }))}
+                  />
                   <ul className={cn('list-none p-0 m-0')}>
                     {active.people.map((person) => (
                       <li
