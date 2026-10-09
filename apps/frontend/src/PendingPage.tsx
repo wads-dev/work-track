@@ -21,17 +21,8 @@ import { useEffect, useState } from 'react';
 import { isAlertOpen, isOpen } from './pending-utils';
 import { useClock } from './use-clock';
 
-import {
-  collection,
-  documentId,
-  getDocs,
-  onSnapshot,
-  limit,
-  orderBy,
-  query,
-  startAfter,
-  type Firestore,
-} from 'firebase/firestore';
+import { type Firestore } from 'firebase/firestore';
+import { subscribeAuthorizedOwnRecords } from './authorized-own-record-source';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { date, text, type Row } from './data';
 import { isHidden, safeProject, usePrivacy } from './privacy';
@@ -42,31 +33,33 @@ import { UiIcon } from './UiIcons';
 export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
   // This header is mounted on every route. Its deliberately partial counter
   // must not connect the entire history repository just to use its first 100.
+  const [bellError, setBellError] = useState(false);
   const [snapshot, setSnapshot] = useState<{ uid: string; rows: Row[] }>({
     uid: '',
     rows: [],
   });
   useEffect(() => {
     let active = true;
-    const stop = onSnapshot(
-      query(
-        collection(db, 'users', uid, 'records'),
-        orderBy(documentId()),
-        limit(100),
-      ),
-      { includeMetadataChanges: true },
+    setBellError(false);
+    const stop = subscribeAuthorizedOwnRecords(
+      db,
+      uid,
       (s) => {
-        if (active)
+        if (active) {
+          setBellError(false);
           setSnapshot({
             uid,
-            rows: s.docs
-              .map((d) => ({ id: d.id, data: d.data() }))
-              .filter((r) => !isDeletedRecord(r.data)),
+            rows: s.rows.filter((r) => !isDeletedRecord(r.data)),
           });
+        }
       },
       () => {
-        if (active) setSnapshot({ uid, rows: [] });
+        if (active) {
+          setBellError(true);
+          setSnapshot({ uid, rows: [] });
+        }
       },
+      { size: 100 },
     );
     return () => {
       active = false;
@@ -103,7 +96,7 @@ export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
               <span className="relative inline-flex">
                 <UiIcon kind="bell" />
                 <Badge className="absolute -right-3 -top-2 px-1 text-[10px]">
-                  {count}
+                  {bellError ? '!' : count}
                 </Badge>
               </span>
             </span>
@@ -111,9 +104,9 @@ export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        {
-          'Abertos há mais de 8 horas nos até 100 registros carregados, não contagem global'
-        }
+        {bellError
+          ? 'Não foi possível consultar pendências.'
+          : 'Abertos há mais de 8 horas nos até 100 registros carregados, não contagem global'}
       </TooltipContent>
     </Tooltip>
   );
@@ -132,6 +125,8 @@ export function PendingPage({
   const cursor = params.get('after') ?? '';
   const recordId = params.get('record');
   const [rows, setRows] = useState<Row[]>([]);
+  const [nextCursor, setNextCursor] = useState('');
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -141,43 +136,30 @@ export function PendingPage({
     let active = true;
     setLoading(true);
     setError('');
-    const ref = collection(db, 'users', uid, 'records');
-    void (async () => {
-      const activeRows: Row[] = [];
-      let after = cursor;
-      while (active && activeRows.length < 100) {
-        const snapshot = await getDocs(
-          query(
-            ref,
-            orderBy(documentId()),
-            ...(after ? [startAfter(after)] : []),
-            limit(100),
-          ),
-        );
-        for (const doc of snapshot.docs) {
-          if (!isDeletedRecord(doc.data()))
-            activeRows.push({ id: doc.id, data: doc.data() });
-          if (activeRows.length === 100) break;
-        }
-        if (snapshot.size < 100 || activeRows.length === 100) break;
-        after = snapshot.docs[snapshot.docs.length - 1].id;
-      }
-      return activeRows;
-    })()
-      .then((activeRows) => {
+    setRows([]);
+    setHasMore(false);
+    const stop = subscribeAuthorizedOwnRecords(
+      db,
+      uid,
+      (page) => {
+        if (!active) return;
+        setRows(page.rows.filter((r) => !isDeletedRecord(r.data)));
+        setNextCursor(page.cursor);
+        setHasMore(page.hasMore);
+        setLoading(false);
+      },
+      () => {
         if (active) {
-          setRows(activeRows);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (active) {
+          setRows([]);
           setError('Não foi possível consultar pendências.');
           setLoading(false);
         }
-      });
+      },
+      { size: 100, after: cursor },
+    );
     return () => {
       active = false;
+      stop();
     };
   }, [db, uid, cursor, attempt, revision]);
   const open = rows.filter((row) => isOpen(row.data));
@@ -340,9 +322,9 @@ export function PendingPage({
                 Primeira página
               </Button>
             )}
-            {rows.length === 100 && (
+            {hasMore && (
               <Button
-                onClick={() => setParams({ after: rows[rows.length - 1].id })}
+                onClick={() => setParams({ after: nextCursor })}
                 variant="ghost"
               >
                 Examinar próxima página

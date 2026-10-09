@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore, useCallback } from 'react';
-import { collection, onSnapshot, type Firestore } from 'firebase/firestore';
+import { type Firestore } from 'firebase/firestore';
+import { subscribeAuthorizedOwnRecords } from './authorized-own-record-source';
 import { ownRecordsRepository } from './own-records-repository';
 export function useOwnRecords(db: Firestore, uid: string, enabled = true) {
   const [attempt, setAttempt] = useState(0);
@@ -10,17 +11,10 @@ export function useOwnRecords(db: Firestore, uid: string, enabled = true) {
             db,
             uid,
             (next, error) =>
-              onSnapshot(
-                collection(db, 'users', uid, 'records'),
-                { includeMetadataChanges: true },
-                (snapshot) =>
-                  next(
-                    snapshot.docs.map((doc) => ({
-                      id: doc.id,
-                      data: doc.data(),
-                    })),
-                    snapshot.metadata.fromCache,
-                  ),
+              subscribeAuthorizedOwnRecords(
+                db,
+                uid,
+                (snapshot) => next(snapshot.rows, snapshot.fromCache),
                 error,
               ),
             notify,
