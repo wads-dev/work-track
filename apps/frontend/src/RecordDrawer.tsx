@@ -159,8 +159,8 @@ export function RecordDrawer({
   }
   const content = (
     <Box
-      role={presentation === 'page' ? undefined : 'dialog'}
-      aria-modal={presentation === 'page' ? undefined : true}
+      role={presentation === 'drawer' ? 'dialog' : undefined}
+      aria-modal={presentation === 'drawer' ? true : undefined}
       aria-labelledby="registro-titulo"
       sx={{
         width: presentation === 'drawer' ? { xs: '100vw', sm: 560 } : '100%',
@@ -226,7 +226,9 @@ export function RecordDrawer({
             <Button onClick={() => setDetailsOpen((v) => !v)}>
               Informações e auditoria
             </Button>
-            <Button onClick={() => setEditOpen((v) => !v)}>Editar fim</Button>
+            {!focusEnd && (
+              <Button onClick={() => setEditOpen((v) => !v)}>Editar fim</Button>
+            )}
             {presentation !== 'page' && (
               <Button
                 onClick={() =>
@@ -271,12 +273,6 @@ export function RecordDrawer({
                 <dd>{date(record.recordedAt)}</dd>
               </Box>
             </Collapse>
-            {!record.endedAt && (
-              <Alert severity="warning">
-                Registro aberto. Estimativas do relatório não encerram esta
-                atividade.
-              </Alert>
-            )}
             <Collapse in={editOpen}>
               <Paper
                 component="form"
@@ -304,19 +300,23 @@ export function RecordDrawer({
                     helperText="Informe a data e hora efetivas. Nenhum horário é preenchido automaticamente."
                     fullWidth
                   />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={removeEnd}
-                        disabled={saving}
-                        onChange={(event) => {
-                          setRemoveEnd(event.target.checked);
-                          setConfirmed(false);
-                        }}
+                  {!!record.endedAt && (
+                    <>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={removeEnd}
+                            disabled={saving}
+                            onChange={(event) => {
+                              setRemoveEnd(event.target.checked);
+                              setConfirmed(false);
+                            }}
+                          />
+                        }
+                        label="Remover fim e reabrir explicitamente"
                       />
-                    }
-                    label="Remover fim e reabrir explicitamente"
-                  />
+                    </>
+                  )}
                   <TextField
                     label="Motivo da alteração"
                     value={reason}
@@ -327,13 +327,11 @@ export function RecordDrawer({
                     slotProps={{ htmlInput: { maxLength: 1000 } }}
                     required
                   />
-                  <Alert severity="info">
+                  <Typography variant="caption" color="text.secondary">
                     {removeEnd
-                      ? 'Você irá remover o fim, tornando a atividade aberta.'
-                      : 'Confira o fim efetivo: ' + (end || 'não informado')}
-                    . Início, texto original e horário de gravação serão
-                    preservados. Alteração registrada com autor e antes/depois.
-                  </Alert>
+                      ? 'Reabrir explicitamente'
+                      : 'Fim efetivo: ' + (end || 'não informado')}
+                  </Typography>
                   <FormControlLabel
                     control={
                       <Checkbox

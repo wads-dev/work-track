@@ -129,16 +129,6 @@ export function PendingPage({
           }}
         />
       )}
-      <Typography component="h2" variant="h5">
-        Pendências — meus registros abertos
-      </Typography>
-      <Alert severity="info">
-        Esta página examina até 100 registros próprios por ID, incluindo
-        fechados, e mostra todos os abertos encontrados, incluindo os iniciados
-        hoje. O sino alerta somente abertos há mais de 8 horas. Não representa
-        total global nem ordem de recência. Nenhum encerramento automático é
-        realizado.
-      </Alert>
       {loading ? (
         <CircularProgress aria-label="Carregando pendências" />
       ) : error ? (
@@ -235,6 +225,10 @@ export function PendingPage({
           </Stack>
         </>
       )}
+      <Typography variant="caption" color="text.secondary">
+        Até 100 registros examinados por página; contagem carregada, não global.
+        Sino: abertos há mais de 8h.
+      </Typography>
     </Stack>
   );
 }

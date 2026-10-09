@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Alert, Box, Button, Paper, Tooltip, Typography } from '@mui/material';
 import { contextualRecordPath } from './routes';
 import { Link as RouterLink } from 'react-router-dom';
@@ -8,7 +9,14 @@ import {
   range,
   type View,
 } from './calendar-utils';
-import { commonSpan, layoutDay, type Timed } from './timeline-layout';
+import {
+  commonSpan,
+  layoutDay,
+  commonGaps,
+  axisSegments,
+  projectMinute,
+  type Timed,
+} from './timeline-layout';
 type Event = Timed & { projectId: string; estimated: boolean };
 export function CalendarTimeline({
   items,
@@ -27,6 +35,11 @@ export function CalendarTimeline({
   color: (id: string) => string;
   returnTo: string;
 }) {
+  const [expansion, setExpansion] = useState<{
+    period: string;
+    keys: string[];
+  }>({ period: '', keys: [] });
+  const period = day + '-' + view;
   const coverage = range(day, view, zone);
   const days = calendarDays(day, view);
   const time = (instant: number) =>
@@ -81,7 +94,23 @@ export function CalendarTimeline({
       </Alert>
     );
   const px = 1.1;
-  const height = (span.last - span.first) * px;
+  const gaps = commonGaps(
+    data.flatMap((d) =>
+      d.events.map((e) => ({ start: e.wallStart, end: e.wallEnd })),
+    ),
+    span.first,
+    span.last,
+  );
+  const expanded = expansion.period === period ? expansion.keys : [];
+  const segments = axisSegments(span.first, span.last, gaps, expanded, px);
+  const height = segments.reduce((sum, segment) => sum + segment.height, 0);
+  const ticks = Array.from(
+    { length: (span.last - span.first) / 60 + 1 },
+    (_, i) => span.first + i * 60,
+  ).filter(
+    (minute) =>
+      !segments.some((s) => s.collapsed && minute > s.start && minute < s.end),
+  );
   const clock = (m: number) =>
     String(Math.floor(m / 60)).padStart(2, '0') +
     ':' +
@@ -91,7 +120,7 @@ export function CalendarTimeline({
       <Typography variant="body2" sx={{ mb: 1 }}>
         Intervalo horário comum de {clock(span.first)} a {clock(span.last)}.
         Altura proporcional à duração real. Eventos curtos são marcadores com
-        detalhes na lista abaixo. Sobreposições em colunas.
+        detalhes ao focar ou passar o cursor. Sobreposições em colunas.
       </Typography>
       <Box
         sx={{ overflowX: 'auto', p: 1 }}
@@ -136,40 +165,79 @@ export function CalendarTimeline({
                 </Typography>
               )}
               <Box sx={{ height: height + 30, position: 'relative', pl: 6 }}>
-                {Array.from(
-                  { length: (span.last - span.first) / 60 + 1 },
-                  (_, i) => (
-                    <Box
-                      key={i}
+                {ticks.map((minute, i) => (
+                  <Box
+                    key={i}
+                    sx={{
+                      position: 'absolute',
+                      top: 15 + projectMinute(minute, segments),
+                      left: 0,
+                      right: 0,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
                       sx={{
                         position: 'absolute',
-                        top: 15 + i * 60 * px,
                         left: 0,
-                        right: 0,
+                        width: 42,
+                        lineHeight: 1,
+                        transform: 'translateY(-50%)',
                       }}
                     >
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          position: 'absolute',
-                          left: 0,
-                          width: 42,
-                          lineHeight: 1,
-                          transform: 'translateY(-50%)',
-                        }}
-                      >
-                        {clock(span.first + i * 60)}
-                      </Typography>
-                      <Box
-                        sx={{
-                          ml: 6,
-                          borderTop: '1px solid',
-                          borderColor: 'divider',
-                        }}
-                      />
-                    </Box>
-                  ),
-                )}
+                      {clock(minute)}
+                    </Typography>
+                    <Box
+                      sx={{
+                        ml: 6,
+                        borderTop: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    />
+                  </Box>
+                ))}
+                {segments
+                  .filter((s) =>
+                    gaps.some((g) => g.start === s.start && g.end === s.end),
+                  )
+                  .map((s) => (
+                    <Button
+                      key={s.start}
+                      aria-expanded={!s.collapsed}
+                      aria-label={
+                        (s.collapsed ? 'Expandir' : 'Recolher') +
+                        ' intervalo ' +
+                        clock(s.start) +
+                        '–' +
+                        clock(s.end) +
+                        ' sem atividades em todos os dias'
+                      }
+                      onClick={() => {
+                        const key = s.start + '-' + s.end;
+                        setExpansion({
+                          period,
+                          keys: expanded.includes(key)
+                            ? expanded.filter((k) => k !== key)
+                            : [...expanded, key],
+                        });
+                      }}
+                      sx={{
+                        position: 'absolute',
+                        top: 15 + s.top,
+                        left: 48,
+                        right: 0,
+                        height: s.collapsed ? 32 : 24,
+                        minHeight: 0,
+                        p: 0,
+                        fontSize: 10,
+                        zIndex: 2,
+                        bgcolor: 'action.hover',
+                      }}
+                    >
+                      … {clock(s.start)}–{clock(s.end)} ·{' '}
+                      {(s.end - s.start) / 60}h sem atividades
+                    </Button>
+                  ))}
                 <Box
                   sx={{
                     position: 'absolute',
@@ -207,8 +275,10 @@ export function CalendarTimeline({
                           aria-label={caption}
                           sx={{
                             position: 'absolute',
-                            top: Math.max(0, (e.wallStart - span.first) * px),
-                            height: (e.wallEnd - e.wallStart) * px,
+                            top: projectMinute(e.wallStart, segments),
+                            height:
+                              projectMinute(e.wallEnd, segments) -
+                              projectMinute(e.wallStart, segments),
                             minHeight: 0,
                             left: (e.column / e.columns) * 100 + '%',
                             width: 100 / e.columns + '%',
