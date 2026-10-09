@@ -6,6 +6,7 @@ import {
   QueryPeriodControls,
 } from './QueryToolbar';
 import { useProjects } from './useProjects';
+import { topicDetailsPath } from './routes';
 import { ProjectCreate } from './ProjectCreate';
 import { ProjectSelector } from './ProjectSelector';
 import { writeUrlTab } from './url-tabs';
@@ -760,6 +761,30 @@ export function Dashboard({
               {objects(data.topics).map((topic, index) => (
                 <Chip
                   key={text(topic.id, String(index))}
+                  component={
+                    text(topic.id, '') &&
+                    !isHidden(
+                      rawProjects.rows.find((p) => p.id === id)?.data,
+                      revealed,
+                    )
+                      ? RouterLink
+                      : 'span'
+                  }
+                  {...(text(topic.id, '') &&
+                  !isHidden(
+                    rawProjects.rows.find((p) => p.id === id)?.data,
+                    revealed,
+                  )
+                    ? {
+                        to:
+                          topicDetailsPath(id, text(topic.id)) +
+                          '?returnTo=' +
+                          encodeURIComponent(
+                            location.pathname + location.search,
+                          ),
+                        clickable: true,
+                      }
+                    : {})}
                   label={text(topic.title)}
                   size="small"
                   sx={{ alignSelf: 'start', maxWidth: '100%' }}

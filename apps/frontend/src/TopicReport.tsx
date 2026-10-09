@@ -8,6 +8,9 @@ import {
   Typography,
 } from '@mui/material';
 import { hours } from './report-chart';
+import { Link as RouterLink } from 'react-router-dom';
+import { Link } from '@mui/material';
+import { topicDetailsPath } from './routes';
 
 /** View model only: callers must supply server-calculated allocations and safe labels. */
 export type TopicReportBucket = {
@@ -16,6 +19,7 @@ export type TopicReportBucket = {
   projectLabel: string;
   topicLabel: string;
   minutes: number;
+  detailsAvailable?: boolean;
   people: { key: string; label: string; minutes: number }[];
 };
 export const topicBucketKey = (
@@ -106,9 +110,28 @@ export function TopicReport({
                   >
                     <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
                       <Typography>
-                        {bucket.topicId === null
-                          ? 'Não distribuído'
-                          : bucket.topicLabel}
+                        {bucket.topicId === null ? (
+                          'Não distribuído'
+                        ) : bucket.detailsAvailable && bucket.topicId ? (
+                          <Link
+                            component={RouterLink}
+                            onClick={(e) => e.stopPropagation()}
+                            to={
+                              topicDetailsPath(
+                                bucket.projectId,
+                                bucket.topicId,
+                              ) +
+                              '?returnTo=' +
+                              encodeURIComponent(
+                                location.pathname + location.search,
+                              )
+                            }
+                          >
+                            {bucket.topicLabel}
+                          </Link>
+                        ) : (
+                          bucket.topicLabel
+                        )}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {bucket.projectLabel}

@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirestoreTopicReportRepository } from './modules/reports/infrastructure/firestore-topic-report.js';
+import { getTopicReportHandler } from './modules/reports/presentation/get-topic-report.js';
 import { FirestoreCalendarReportRepository } from './modules/reports/infrastructure/firestore-calendar-report.js';
 import { getCalendarReportHandler } from './modules/reports/presentation/get-calendar-report.js';
 import { FirestoreRecordMovementRepository } from './modules/registration/infrastructure/firestore-record-movement.js';
@@ -34,6 +36,21 @@ import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
+export const getTopicReport = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    getTopicReportHandler(
+      new FirestoreTopicReportRepository(getFirestore(), getAuth()),
+      request.data as unknown,
+      request.auth,
+    ),
+);
 export const getCalendarReport = onCall(
   {
     region: 'southamerica-east1',

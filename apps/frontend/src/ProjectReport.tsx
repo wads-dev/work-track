@@ -363,6 +363,7 @@ export function ProjectReport({
               buckets={(report.byTopic ?? []).map((topic) => ({
                 projectId: topic.projectId,
                 topicId: topic.topicId,
+                detailsAvailable: !hidden,
                 projectLabel: hidden ? 'Projeto reservado' : projectLabel,
                 topicLabel: hidden
                   ? 'Assunto reservado'

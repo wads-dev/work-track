@@ -1,12 +1,39 @@
+export function topicDetailsPath(projectId: string, topicId: string) {
+  const valid = (id: string) =>
+    !!id &&
+    !/[ /\\]/.test(id.replaceAll(' ', '')) &&
+    !Array.from(id).some((c) => c.charCodeAt(0) < 32) &&
+    id !== '.' &&
+    id !== '..';
+  if (!valid(projectId) || !valid(topicId))
+    throw new Error('Identidade de assunto inválida.');
+  return (
+    '/projects/' +
+    encodeURIComponent(projectId) +
+    '/topics/' +
+    encodeURIComponent(topicId)
+  );
+}
 export function safeReturnTo(value: string | null): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/app';
+  if (
+    !value ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('\\') ||
+    Array.from(value).some((c) => c.charCodeAt(0) < 32) ||
+    /%(?:2e|2f|5c|25|00)/i.test(value.split(/[?#]/)[0])
+  )
+    return '/app';
   try {
     const url = new URL(value, 'https://work-track.invalid');
     if (
       url.origin !== 'https://work-track.invalid' ||
-      !/^\/(app|projects|records|pending|rules|calendar|me)(\/[^/]+)?$/.test(
-        url.pathname,
-      )
+      !(
+        /^\/(app|projects|records|pending|rules|calendar|me)(\/[^/]+)?$/.test(
+          url.pathname,
+        ) || /^\/projects\/[^/]+\/topics\/[^/]+$/.test(url.pathname)
+      ) ||
+      /%(?:2f|5c|25)|[\\]/i.test(url.pathname)
     )
       return '/app';
     if (/^\/(app|pending|rules|calendar|me)\//.test(url.pathname))

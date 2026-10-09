@@ -2,6 +2,7 @@ import { ownRecordsRepository } from './own-records-repository';
 import { deletionAccount } from './record-deletion';
 import { useEffect, useState } from 'react';
 import { projectRepository } from './project-repository';
+import { TopicDetails } from './TopicDetails';
 import { createRoot } from 'react-dom/client';
 import {
   Alert,
@@ -505,6 +506,16 @@ function App() {
                       functions={services.functions}
                       uid={user.uid}
                       mode="projects"
+                    />
+                  }
+                />
+                <Route
+                  path="/projects/:projectId/topics/:topicId"
+                  element={
+                    <TopicDetails
+                      key={user.uid}
+                      functions={services.functions}
+                      uid={user.uid}
                     />
                   }
                 />

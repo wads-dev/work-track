@@ -17,6 +17,10 @@ import {
   Typography,
 } from '@mui/material';
 import { date, objects, text } from './data';
+import { Link } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
+import { topicDetailsPath } from './routes';
+import { isHidden, usePrivacy } from './privacy';
 type Preview = {
   sourceTopics: Record<string, unknown>[];
   targetTopic: Record<string, unknown>;
@@ -44,6 +48,7 @@ export function ProjectTopics({
     string,
     unknown
   > | null>(null);
+  const { revealed } = usePrivacy();
   const catalog = objects(project.topics);
   const active = catalog.filter((t) => !t.archived && !t.mergedIntoTopicId);
   const [params] = useSearchParams(),
@@ -186,7 +191,20 @@ export function ProjectTopics({
               }}
             >
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                {text(t.title, 'Assunto')}
+                {!isHidden(project, revealed) && text(t.id, '') ? (
+                  <Link
+                    component={RouterLink}
+                    to={
+                      topicDetailsPath(projectId, text(t.id)) +
+                      '?returnTo=' +
+                      encodeURIComponent(location.pathname + location.search)
+                    }
+                  >
+                    {text(t.title, 'Assunto')}
+                  </Link>
+                ) : (
+                  'Assunto reservado'
+                )}
                 {t.mergedIntoTopicId
                   ? ' · alias histórico de ' +
                     label(text(t.mergedIntoTopicId, ''))

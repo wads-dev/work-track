@@ -20,6 +20,7 @@ export function topicBuckets(
     return {
       projectId: topic.projectId,
       topicId: topic.topicId,
+      detailsAvailable: !hidden,
       projectLabel: text(
         safeProject(metadata, revealed).title,
         'Projeto reservado',
