@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { calendarTopics, topicMetadataMap } from '../domain/calendar-topics.js';
+import { resolveTopic } from '../domain/topic-breakdown.js';
+import { occupiedWeeks, calendarWeekAt } from '../domain/calendar-weeks.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
 import { buildCompanyReport } from '../domain/build-company-report.js';
@@ -18,8 +21,10 @@ export const calendarInput = z
       .max(10)
       .refine((v) => new Set(v).size === v.length)
       .optional(),
-    from: z.iso.datetime({ offset: true }),
-    to: z.iso.datetime({ offset: true }),
+    from: z.iso.datetime({ offset: true }).optional(),
+    to: z.iso.datetime({ offset: true }).optional(),
+    allWeeks: z.boolean().default(false),
+    topicId: id.optional(),
     timeZone: z
       .string()
       .max(100)
@@ -37,9 +42,16 @@ export const calendarInput = z
   .strict()
   .refine(
     (v) =>
-      Date.parse(v.to) > Date.parse(v.from) &&
-      Date.parse(v.to) - Date.parse(v.from) <= (93 * 24 + 1) * 3600000,
-    'Período até93dias+1h.',
+      (!v.topicId || Boolean(v.projectId)) &&
+      (v.allWeeks
+        ? Boolean(v.projectId) && v.from === undefined && v.to === undefined
+        : Boolean(
+            v.from &&
+            v.to &&
+            Date.parse(v.to) > Date.parse(v.from) &&
+            Date.parse(v.to) - Date.parse(v.from) <= (93 * 24 + 1) * 3600000,
+          )),
+    'Período até93dias+1h; todas semanas exige projeto e omissão de datas; assunto exige projeto.',
   );
 export interface CalendarRepository {
   own: PersonalReportRepository;
@@ -177,6 +189,25 @@ export async function getCalendarReportHandler(
       input.mode === 'own'
         ? buildPersonalReport(input, page, asOf, context)
         : buildCompanyReport(input, page, context, asOf, labels, []);
+    const topicProjects = [...new Set(selected.map((r) => r.projectId))];
+    const readTopics = () =>
+      input.mode === 'own'
+        ? repository.own.readTopics(topicProjects, uid)
+        : repository.company.readTopics(topicProjects);
+    const topics = await readTopics();
+    let selectedTopic: string | undefined;
+    if (input.topicId) {
+      const resolved = resolveTopic(
+        topicMetadataMap(topics[input.projectId!] ?? []),
+        input.topicId,
+      );
+      if ('error' in resolved)
+        throw new HttpsError(
+          'failed-precondition',
+          'Assunto não possui identidade canônica segura.',
+        );
+      selectedTopic = resolved.topicId;
+    }
     // Re-read current catalog after context loading: changes of privacy/moves cannot leak via stale page snapshots.
     const stillVisible = await repository.revalidate(valid, uid, input.mode);
     if (stillVisible.length !== valid.length)
@@ -207,10 +238,82 @@ export async function getCalendarReportHandler(
           'Arquivamento alterado durante leitura; atualize a seleção.',
         );
     }
-    const intervals = report.intervals.map((r) => ({
-      ...r,
-      uid: 'uid' in r ? r.uid : uid,
-      readOnly: ('uid' in r ? r.uid : uid) !== uid,
+    const finalTopics = await readTopics();
+    if (JSON.stringify(topics) !== JSON.stringify(finalTopics))
+      throw new HttpsError(
+        'failed-precondition',
+        'Assuntos alterados durante leitura; atualize a seleção.',
+      );
+    const topicWarnings = new Set<string>();
+    const intervals = report.intervals
+      .map((r) => {
+        const authorUid = 'uid' in r ? r.uid : uid;
+        const source = selected.find(
+          (s) =>
+            s.id === r.id && s.uid === authorUid && s.projectId === r.projectId,
+        );
+        if (!source)
+          throw new HttpsError(
+            'failed-precondition',
+            'Fonte do intervalo indisponível.',
+          );
+        const membership = calendarTopics(
+          source,
+          r.minutes,
+          topics[r.projectId] ?? [],
+        );
+        for (const warning of membership.warnings) topicWarnings.add(warning);
+        const matched = membership.topics.find(
+          (t) => t.topicId === selectedTopic,
+        );
+        return {
+          ...r,
+          uid: authorUid,
+          readOnly: authorUid !== uid,
+          topics: membership.topics,
+          ...(matched?.assignedMinutes !== undefined
+            ? { subjectAssignedMinutes: matched.assignedMinutes }
+            : {}),
+        };
+      })
+      .filter(
+        (r) =>
+          !selectedTopic || r.topics.some((t) => t.topicId === selectedTopic),
+      );
+    const occurrenceCounts = new Map<string, number>();
+    for (const record of selected) {
+      const start = Date.parse(record.startedAt),
+        end =
+          record.endedAt === undefined ? undefined : Date.parse(record.endedAt);
+      if (
+        !Number.isFinite(start) ||
+        (end !== undefined && (!Number.isFinite(end) || end < start)) ||
+        (input.from && start < Date.parse(input.from)) ||
+        (input.to && start >= Date.parse(input.to))
+      )
+        continue;
+      const membership = calendarTopics(
+        record,
+        0,
+        topics[record.projectId] ?? [],
+      );
+      if (
+        selectedTopic &&
+        !membership.topics.some((t) => t.topicId === selectedTopic)
+      )
+        continue;
+      const week = calendarWeekAt(start, input.timeZone);
+      occurrenceCounts.set(week, (occurrenceCounts.get(week) ?? 0) + 1);
+    }
+    const weeks = [
+      ...new Set([
+        ...occupiedWeeks(intervals, input.timeZone),
+        ...occurrenceCounts.keys(),
+      ]),
+    ].sort();
+    const weekOccurrences = weeks.map((week) => ({
+      week,
+      occurrenceCount: occurrenceCounts.get(week) ?? 0,
     }));
     const totals = new Map<string, number>();
     for (const r of intervals)
@@ -223,10 +326,13 @@ export async function getCalendarReportHandler(
       viewerUid: uid,
       asOf: report.asOf,
       timeZone: input.timeZone,
-      from: input.from,
-      to: input.to,
-      totalMinutes: report.totalMinutes,
-      estimatedCount: report.estimatedCount,
+      ...(input.from ? { from: input.from } : {}),
+      ...(input.to ? { to: input.to } : {}),
+      allWeeks: input.allWeeks,
+      occupiedWeeks: weeks,
+      weekOccurrences,
+      totalMinutes: intervals.reduce((sum, r) => sum + r.minutes, 0),
+      estimatedCount: intervals.filter((r) => r.estimated).length,
       byUser: [...totals].map(([uid, minutes]) => ({
         uid,
         label: labels[uid] || 'Participante sem nome',
@@ -239,6 +345,12 @@ export async function getCalendarReportHandler(
       })),
       intervals,
       warnings: [
+        ...topicWarnings,
+        ...(input.topicId
+          ? [
+              'Filtro de assunto seleciona ocorrências e preserva todo o intervalo do registro; minutos atribuídos ao assunto são informados separadamente, sem encurtar a linha do tempo.',
+            ]
+          : []),
         ...(participantsUnavailable
           ? [
               'Diretório Global indisponível por limite operacional; somente o próprio participante é apresentado. Horas próprias permanecem completas; selecione um projeto para reduzir a consulta do diretório.',

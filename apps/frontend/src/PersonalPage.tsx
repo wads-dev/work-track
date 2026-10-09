@@ -3,6 +3,8 @@ import {
   projectAccessRevision,
 } from './project-access-revision';
 import { QueryToolbar, QueryToolbarField } from './QueryToolbar';
+import { CalendarHistory } from './CalendarHistory';
+import { calendarTopics, updateCalendarFilters } from './calendar-history';
 import {
   calendarPerson,
   calendarRequest,
@@ -86,6 +88,9 @@ type PersonalReport = {
   totalMinutes: number;
   estimatedCount: number;
   byProject: { projectId: string; minutes: number }[];
+  allWeeks?: boolean;
+  occupiedWeeks?: string[];
+  weekOccurrences?: { week: string; occurrenceCount: number }[];
   participantsUnavailable?: boolean;
   participants?: { uid: string; label: string }[];
   byTopic: ReportTopic[];
@@ -136,6 +141,13 @@ export function PersonalPage({
   const lastDate = params.get('toDate') ?? '';
   const projectId = params.get('projectId') ?? '';
   const recordId = params.get('record');
+  const allWeeks = calendar && params.get('allWeeks') === 'true';
+  const subject = calendar ? params.get('subject') || '' : '';
+  const topics = calendarTopics(
+    projects.rows.find((p) => p.id === projectId)?.data,
+    revealed,
+    includeArchived,
+  );
   const privacyBlocked =
     calendar &&
     person.mode === 'global' &&
@@ -151,11 +163,18 @@ export function PersonalPage({
     if (!['supercompact', 'compact', 'timeline'].includes(density))
       throw new Error('Densidade inválida.');
     view = rawView as View;
-    validated = calendar
-      ? range(selected, view, validZone(zone))
-      : firstDate && lastDate
-        ? customRange(firstDate, lastDate, zone)
-        : null;
+    if (allWeeks && !projectId)
+      throw new Error(
+        'Selecione um projeto para consultar todas as semanas com atividade.',
+      );
+    if (subject && (!projectId || !topics.some((t) => t.id === subject)))
+      throw new Error('Selecione um assunto disponível no projeto escolhido.');
+    validated =
+      calendar && !allWeeks
+        ? range(selected, view, validZone(zone))
+        : firstDate && lastDate
+          ? customRange(firstDate, lastDate, zone)
+          : null;
     if (firstDate) parseDay(firstDate);
     if (lastDate) parseDay(lastDate);
   } catch (error) {
@@ -182,6 +201,8 @@ export function PersonalPage({
     includeArchived,
     zone,
     calendar,
+    subject,
+    allWeeks,
   ]);
   const participants =
     directory.owner === uid &&
@@ -200,6 +221,11 @@ export function PersonalPage({
     projectId,
     includeArchived,
     calendar ? person.selected : '',
+    allWeeks,
+    subject,
+    view,
+    selected,
+    density,
   ]);
   const [reportRevision, setReportRevision] = useState(-1);
   const [cachedReport, setReport] = useState<PersonalReport | null>(null);
@@ -239,6 +265,7 @@ export function PersonalPage({
               result.data as CalendarResponse,
               uid,
               person.mode,
+              allWeeks,
             ),
           }),
         )
@@ -331,7 +358,9 @@ export function PersonalPage({
       Array.from(id).reduce((n, c) => n + c.charCodeAt(0), 0) % 6
     ];
   function update(key: string, value: string) {
-    const next = updatePersonalFilters(params, key, value);
+    const next = calendar
+      ? updateCalendarFilters(params, key, value)
+      : updatePersonalFilters(params, key, value);
     if (calendar && key === 'clear') next.set('uid', uid);
     next.delete('record');
     setParams(next);
@@ -414,6 +443,7 @@ export function PersonalPage({
           secondary={
             <QueryToolbarField>
               <TextField
+                disabled={allWeeks}
                 size="small"
                 select
                 label="Densidade"
@@ -444,6 +474,7 @@ export function PersonalPage({
           >
             <Tooltip title="Período anterior">
               <IconButton
+                disabled={allWeeks}
                 aria-label="Período anterior"
                 onClick={() =>
                   update('date', moveReference(selected, view, -1))
@@ -457,6 +488,7 @@ export function PersonalPage({
                 size="small"
                 type="date"
                 value={selected}
+                disabled={allWeeks}
                 label="Referência"
                 slotProps={{ inputLabel: { shrink: true } }}
                 onChange={(e) => update('date', e.target.value)}
@@ -464,6 +496,7 @@ export function PersonalPage({
             </QueryToolbarField>
             <Tooltip title="Próximo período">
               <IconButton
+                disabled={allWeeks}
                 aria-label="Próximo período"
                 onClick={() => update('date', moveReference(selected, view, 1))}
               >
@@ -476,6 +509,7 @@ export function PersonalPage({
               size="small"
               select
               value={view}
+              disabled={allWeeks}
               label="Visualização"
               onChange={(e) => update('view', e.target.value)}
             >
@@ -518,6 +552,22 @@ export function PersonalPage({
                 )}
             </TextField>
           </QueryToolbarField>
+          <QueryToolbarField>
+            <TextField
+              select
+              size="small"
+              label="Período"
+              value={allWeeks ? 'all' : 'dated'}
+              onChange={(e) =>
+                update('allWeeks', e.target.value === 'all' ? 'true' : '')
+              }
+            >
+              <MenuItem value="dated">Período com data</MenuItem>
+              <MenuItem value="all" disabled={!projectId}>
+                Todas as semanas com atividade
+              </MenuItem>
+            </TextField>
+          </QueryToolbarField>
           <QueryToolbarField kind="project">
             <CalendarProjectFilter
               key={String(revealed)}
@@ -540,6 +590,24 @@ export function PersonalPage({
               onChange={(id) => update('projectId', id)}
             />
           </QueryToolbarField>
+          {projectId && (
+            <QueryToolbarField>
+              <TextField
+                select
+                size="small"
+                label="Assunto"
+                value={subject}
+                onChange={(e) => update('subject', e.target.value)}
+              >
+                <MenuItem value="">Todos os assuntos</MenuItem>
+                {topics.map((t) => (
+                  <MenuItem key={t.id} value={t.id}>
+                    {t.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </QueryToolbarField>
+          )}
         </QueryToolbar>
       )}
       {calendar &&
@@ -553,6 +621,13 @@ export function PersonalPage({
             outra pessoa.
           </Alert>
         )}
+      {calendar && subject && (
+        <Alert severity="info">
+          Assunto: {topics.find((t) => t.id === subject)?.label || 'Assunto'}.
+          As horas e barras representam os intervalos completos dos registros
+          que contêm este assunto, não uma divisão proporcional entre assuntos.
+        </Alert>
+      )}
       {calendar && (
         <Typography variant="body2">
           {person.mode === 'own'
@@ -770,7 +845,23 @@ export function PersonalPage({
                 />
               </Box>
             )}
-            {calendar && density === 'timeline' && (
+            {calendar && allWeeks && (
+              <CalendarHistory
+                weeks={report.occupiedWeeks ?? []}
+                occurrences={report.weekOccurrences ?? []}
+                items={report.intervals}
+                zone={zone}
+                label={label}
+                color={color}
+                viewerUid={uid}
+                authorLabel={(id) =>
+                  participants.find((p) => p.uid === id)?.label ||
+                  'Pessoa da organização'
+                }
+                returnTo={location.pathname + location.search}
+              />
+            )}
+            {calendar && !allWeeks && density === 'timeline' && (
               <CalendarTimeline
                 items={report.intervals}
                 day={selected}
@@ -786,7 +877,7 @@ export function PersonalPage({
                 returnTo={location.pathname + location.search}
               />
             )}
-            {calendar && density !== 'timeline' && (
+            {calendar && !allWeeks && density !== 'timeline' && (
               <Box
                 sx={{
                   display: 'grid',

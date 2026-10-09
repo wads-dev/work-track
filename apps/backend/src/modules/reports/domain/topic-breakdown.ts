@@ -4,7 +4,7 @@ import {
 } from '../../registration/domain/record-lifecycle.js';
 import type { ReportSourceRecord } from './project-report.js';
 
-type TopicMetadata = {
+export type TopicMetadata = {
   id: string;
   title: string;
   mergedIntoTopicId?: string;
@@ -38,7 +38,7 @@ const sourceKey = (record: Pick<TopicInterval, 'id' | 'uid' | 'projectId'>) =>
 const positiveFinite = (value: number | undefined): value is number =>
   value !== undefined && Number.isFinite(value) && value > 0;
 
-function resolveTopic(
+export function resolveTopic(
   topics: Map<string, TopicMetadata | null>,
   originalId: string,
 ): Resolution {

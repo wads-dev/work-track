@@ -401,3 +401,187 @@ it('optional own directory scan exceeding2000 physical pages or100people degrade
     getCalendarReportHandler(j.repo, input, auth),
   ).rejects.toMatchObject({ code: 'failed-precondition' });
 });
+it('allWeeks true oldhistory gaps canonical aliases multishares preservefullinterval and subjects requireproject no dates', async () => {
+  const f = fixture();
+  f.setRecords([
+    {
+      ...record('alice', 'old'),
+      startedAt: '2023-01-02T12:00:00Z',
+      endedAt: '2023-01-02T14:00:00Z',
+      topics: [
+        { topicId: 'alias', percentage: 25 },
+        { topicId: 'other', percentage: 75 },
+      ],
+    },
+    {
+      ...record('alice', 'recent'),
+      startedAt: '2026-10-02T12:00:00Z',
+      endedAt: '2026-10-02T13:00:00Z',
+      topics: [{ topicId: 'target' }, { topicId: 'other' }],
+    },
+  ]);
+  const catalog = {
+    w: [
+      { id: 'alias', title: 'Old', mergedIntoTopicId: 'target' },
+      { id: 'target', title: 'Canonical' },
+      { id: 'other', title: 'Other' },
+    ],
+  };
+  f.repo.own.readTopics = () => Promise.resolve(catalog);
+  f.repo.company.readTopics = () => Promise.resolve(catalog);
+  const result = await getCalendarReportHandler(
+    f.repo,
+    {
+      timeZone: input.timeZone,
+      allWeeks: true,
+      projectId: 'w',
+      topicId: 'alias',
+    },
+    auth,
+  );
+  expect(result).toMatchObject({
+    allWeeks: true,
+    totalMinutes: 180,
+    occupiedWeeks: ['2023-01-02', '2026-09-28'],
+    page: { partial: false },
+  });
+  expect(result).not.toHaveProperty('from');
+  expect(result).not.toHaveProperty('to');
+  expect(result.intervals[0]).toMatchObject({
+    id: 'old',
+    minutes: 120,
+    subjectAssignedMinutes: 30,
+    topics: [
+      { topicId: 'target', label: 'Canonical', assignedMinutes: 30 },
+      { topicId: 'other', label: 'Other', assignedMinutes: 90 },
+    ],
+  });
+  expect(result.intervals[1]!.topics).toHaveLength(2);
+  expect(result.intervals[1]).not.toHaveProperty('subjectAssignedMinutes');
+  for (const bad of [
+    { allWeeks: true },
+    { allWeeks: true, projectId: 'w', ...input },
+    { ...input, topicId: 'target' },
+    { projectId: 'w', timeZone: input.timeZone },
+    { projectId: 'w', timeZone: input.timeZone, from: input.from },
+  ])
+    await expect(
+      getCalendarReportHandler(f.repo, bad, auth),
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+});
+it('topic filtering afterengine preserves global8h budget and fails unsafe aliases or midread merges', async () => {
+  const f = fixture();
+  f.setRecords([
+    {
+      ...record('alice', 'first'),
+      endedAt: undefined,
+      topics: [{ topicId: 'other' }],
+    },
+    {
+      ...record('alice', 'second'),
+      startedAt: '2026-10-02T16:00:00Z',
+      endedAt: undefined,
+      topics: [{ topicId: 'wanted' }],
+    },
+  ]);
+  f.repo.own.readTopics = () =>
+    Promise.resolve({
+      w: [
+        { id: 'wanted', title: 'Wanted' },
+        { id: 'other', title: 'Other' },
+      ],
+    });
+  const full = await getCalendarReportHandler(
+    f.repo,
+    input,
+    auth,
+    Date.parse('2026-10-03T01:00:00Z'),
+  );
+  const filtered = await getCalendarReportHandler(
+    f.repo,
+    { ...input, projectId: 'w', topicId: 'wanted' },
+    auth,
+    Date.parse('2026-10-03T01:00:00Z'),
+  );
+  expect(filtered.intervals).toEqual(
+    full.intervals
+      .filter((r) => r.id === 'second')
+      .map((r) => ({ ...r, subjectAssignedMinutes: r.minutes })),
+  );
+  expect(filtered.totalMinutes).toBe(240);
+  f.repo.own.readTopics = () =>
+    Promise.resolve({
+      w: [{ id: 'wanted', title: 'Bad', mergedIntoTopicId: 'wanted' }],
+    });
+  await expect(
+    getCalendarReportHandler(
+      f.repo,
+      { ...input, projectId: 'w', topicId: 'wanted' },
+      auth,
+    ),
+  ).rejects.toMatchObject({ code: 'failed-precondition' });
+  let n = 0;
+  f.repo.own.readTopics = () =>
+    Promise.resolve({
+      w: [{ id: 'wanted', title: ++n === 1 ? 'Before' : 'After' }],
+    });
+  await expect(
+    getCalendarReportHandler(
+      f.repo,
+      { ...input, projectId: 'w', topicId: 'wanted' },
+      auth,
+    ),
+  ).rejects.toMatchObject({ code: 'failed-precondition' });
+});
+it('zero-duration valid record occupies realstart week withoccurrence count nofabricated interval; malformed excluded', async () => {
+  const f = fixture();
+  f.setRecords([
+    {
+      ...record('alice', 'zero'),
+      startedAt: '2022-01-03T12:00:00Z',
+      endedAt: '2022-01-03T12:00:00Z',
+      topics: [{ topicId: 'x' }],
+    },
+  ]);
+  f.repo.own.readTopics = () =>
+    Promise.resolve({ w: [{ id: 'x', title: 'X' }] });
+  const result = await getCalendarReportHandler(
+    f.repo,
+    { allWeeks: true, projectId: 'w', topicId: 'x', timeZone: input.timeZone },
+    auth,
+  );
+  expect(result).toMatchObject({
+    occupiedWeeks: ['2022-01-03'],
+    weekOccurrences: [{ week: '2022-01-03', occurrenceCount: 1 }],
+    intervals: [],
+    totalMinutes: 0,
+    estimatedCount: 0,
+  });
+  const empty = await getCalendarReportHandler(
+    f.repo,
+    { ...input, projectId: 'w', topicId: 'x' },
+    auth,
+  );
+  expect(empty.occupiedWeeks).toEqual([]);
+  expect(empty.weekOccurrences).toEqual([]);
+  f.setRecords([
+    {
+      ...record('alice', 'bad'),
+      startedAt: '2022-01-10T12:00:00Z',
+      endedAt: '2022-01-09T12:00:00Z',
+      topics: [{ topicId: 'x' }],
+    },
+  ]);
+  await expect(
+    getCalendarReportHandler(
+      f.repo,
+      {
+        allWeeks: true,
+        projectId: 'w',
+        topicId: 'x',
+        timeZone: input.timeZone,
+      },
+      auth,
+    ),
+  ).rejects.toMatchObject({ code: 'resource-exhausted' });
+});

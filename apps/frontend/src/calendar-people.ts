@@ -1,3 +1,4 @@
+import { validateOccupiedWeeks } from './calendar-history';
 export function calendarPerson(params: URLSearchParams, uid: string) {
   const selected = params.get('uid') || uid;
   return {
@@ -16,13 +17,18 @@ export function calendarRequest(
 ) {
   const person = calendarPerson(params, uid);
   const projectId = params.get('projectId');
+  if (
+    (params.get('subject') || params.get('allWeeks') === 'true') &&
+    !projectId
+  )
+    throw new Error('Selecione um projeto.');
   return {
-    from,
-    to,
+    ...(params.get('allWeeks') === 'true' ? { allWeeks: true } : { from, to }),
     timeZone,
     includeArchived,
     mode: person.mode,
     ...(projectId ? { projectId } : {}),
+    ...(params.get('subject') ? { topicId: params.get('subject')! } : {}),
     ...(person.userIds ? { userIds: person.userIds } : {}),
   };
 }
@@ -32,7 +38,8 @@ export function updateCalendarPerson(
 ) {
   const next = new URLSearchParams(params);
   next.set('uid', selected);
-  for (const key of ['record', 'recordTab', 'cursor']) next.delete(key);
+  for (const key of ['record', 'recordTab', 'cursor', 'historyPage'])
+    next.delete(key);
   return next;
 }
 export type CalendarResponse = {
@@ -41,8 +48,11 @@ export type CalendarResponse = {
   viewerUid: string;
   scope: 'all-selected';
   asOf: string;
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
+  allWeeks?: boolean;
+  occupiedWeeks?: string[];
+  weekOccurrences?: { week: string; occurrenceCount: number }[];
   timeZone: string;
   totalMinutes: number;
   estimatedCount: number;
@@ -74,6 +84,7 @@ export function calendarReport(
   data: CalendarResponse,
   uid: string,
   mode: 'own' | 'global',
+  allWeeks = false,
 ) {
   if (
     data.policy !== 'calendar-v3' ||
@@ -98,6 +109,12 @@ export function calendarReport(
     data.participants.some((p) => !p.uid || typeof p.label !== 'string')
   )
     throw new Error('Resposta de calendário inválida.');
+  if (Boolean(data.allWeeks) !== allWeeks)
+    throw new Error('Período de calendário incompatível.');
+  if (data.allWeeks) {
+    validateOccupiedWeeks(data.occupiedWeeks);
+    if (data.from || data.to) throw new Error('Período histórico inválido.');
+  }
   const keys = new Set<string>();
   const totals = new Map<string, number>();
   for (const item of data.intervals) {
@@ -127,6 +144,8 @@ export function calendarReport(
   return {
     ...data,
     budgetTimeZone: data.timeZone,
+    from: data.from ?? '',
+    to: data.to ?? '',
     byProject: Array.from(totals, ([projectId, minutes]) => ({
       projectId,
       minutes,
