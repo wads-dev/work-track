@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { getPersonalReportHandler } from './modules/reports/presentation/get-personal-report.js';
+import { FirestorePersonalReportRepository } from './modules/reports/infrastructure/firestore-personal-report.js';
 import { manageProjectHandler } from './modules/registration/presentation/manage-projects.js';
 import { FirestoreProjectManagementRepository } from './modules/registration/infrastructure/firestore-project-management.js';
 import { updateRecordHandler } from './modules/registration/presentation/update-record.js';
@@ -16,6 +18,21 @@ import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
+export const getPersonalReport = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    getPersonalReportHandler(
+      new FirestorePersonalReportRepository(getFirestore()),
+      request.data as unknown,
+      request.auth,
+    ),
+);
 export const updateProject = onCall(
   {
     region: 'southamerica-east1',
