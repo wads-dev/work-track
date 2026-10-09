@@ -1,4 +1,34 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
+import type { Firestore } from 'firebase/firestore';
+const recordListeners = vi.hoisted(
+  () =>
+    [] as {
+      query: { base: string; constraints: unknown[] };
+      options: { includeMetadataChanges: boolean };
+      next: (snapshot: unknown) => void;
+    }[],
+);
+vi.mock('firebase/firestore', () => ({
+  collection: (_db: unknown, ...path: string[]) => path.join('/'),
+  query: (base: string, ...constraints: unknown[]) => ({ base, constraints }),
+  where: (...args: unknown[]) => ['where', ...args],
+  orderBy: (value: unknown) => ['orderBy', value],
+  documentId: () => '__name__',
+  startAfter: (value: unknown) => ['after', value],
+  limit: (value: number) => ['limit', value],
+  onSnapshot: (
+    query: { base: string; constraints: unknown[] },
+    options: { includeMetadataChanges: boolean },
+    next: (snapshot: unknown) => void,
+  ) => {
+    recordListeners.push({ query, options, next });
+    return vi.fn();
+  },
+}));
+import {
+  subscribeAuthorizedOwnRecords,
+  type OwnRecordPage,
+} from './authorized-own-record-source';
 import { deletionAccount } from './record-deletion';
 import { projectRepository } from './project-repository';
 import { readFileSync } from 'node:fs';
@@ -85,8 +115,95 @@ it('record editor hides deleted parent, audit is not filtered; reports guard rev
     expect(source(name)).toContain('deletionRevision(uid) !== revision');
     expect(source(name)).toContain('reportOwner === uid');
   }
-  expect(source('./PendingPage.tsx')).toContain('activeRows.length < 100');
-  expect(source('./PendingPage.tsx')).toContain('!isDeletedRecord(doc.data())');
+  const pending = source('./PendingPage.tsx');
+  expect(pending).toContain('{ size: 100, after: cursor }');
+  expect(pending).toContain(
+    'page.rows.filter((r) => !isDeletedRecord(r.data))',
+  );
+  // Advance over examined raw records even when the page contains only tombstones.
+  expect(pending).toContain('setNextCursor(page.cursor)');
+  expect(pending).toContain('setHasMore(page.hasMore)');
+});
+it('caps merged raw pages and advances past tombstones without skipping live rows or repeating cursors', () => {
+  const facts = Array.from({ length: 103 }, (_, i) => ({
+    id: String(i).padStart(3, '0'),
+    data: {
+      projectId: i % 2 ? 'q' : 'p',
+      ...(i < 100 ? { deletedAt: 'gone' } : { endedAt: null }),
+    },
+  }));
+  const snapshot = (rows: Row[], pending = false) => ({
+    docs: rows.map((row) => ({ id: row.id, data: () => row.data })),
+    metadata: { fromCache: false, hasPendingWrites: pending },
+  });
+  let cursor = '';
+  const seen = new Set<string>();
+  const active: string[] = [];
+  for (let pageNumber = 0; pageNumber < 2; pageNumber++) {
+    recordListeners.splice(0);
+    let page: OwnRecordPage | undefined;
+    const stop = subscribeAuthorizedOwnRecords(
+      {} as Firestore,
+      'alice',
+      (value) => {
+        page = value;
+      },
+      () => {
+        throw Error('unexpected failure');
+      },
+      { size: 100, after: cursor },
+    );
+    recordListeners[0].next(
+      snapshot([
+        { id: 'p', data: {} },
+        { id: 'q', data: {} },
+      ]),
+    );
+    recordListeners[1].next(snapshot([]));
+    for (const listener of recordListeners.slice(2)) {
+      const project = listener.query.constraints.find(
+        (constraint) =>
+          Array.isArray(constraint) && constraint[1] === 'projectId',
+      ) as string[];
+      expect(listener.options.includeMetadataChanges).toBe(true);
+      expect(listener.query.constraints).toContainEqual(['limit', 100]);
+      if (cursor)
+        expect(listener.query.constraints).toContainEqual(['after', cursor]);
+      listener.next(
+        snapshot(
+          facts
+            .filter(
+              (row) => row.data.projectId === project[3] && row.id > cursor,
+            )
+            .slice(0, 100),
+          pageNumber === 0,
+        ),
+      );
+    }
+    expect(page).toBeDefined();
+    const result = page!;
+    expect(result.rows.length).toBeLessThanOrEqual(100);
+    for (const row of result.rows) {
+      expect(seen.has(row.id)).toBe(false);
+      seen.add(row.id);
+      if (!isDeletedRecord(row.data)) active.push(row.id);
+    }
+    expect(result.cursor > cursor).toBe(true);
+    if (pageNumber === 0) {
+      expect(result.rows).toHaveLength(100);
+      expect(active).toEqual([]);
+      expect(result.cursor).toBe('099');
+      expect(result.hasMore).toBe(true);
+      expect(result.fromCache).toBe(true);
+    } else {
+      expect(result.hasMore).toBe(false);
+      expect(result.fromCache).toBe(false);
+    }
+    cursor = result.cursor;
+    stop();
+  }
+  expect(active).toEqual(['100', '101', '102']);
+  expect(seen.size).toBe(103);
 });
 it('observed deletion invalidates two project subscribers and purge fences old observer', () => {
   let first = 0;

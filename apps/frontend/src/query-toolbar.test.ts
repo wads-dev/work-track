@@ -15,7 +15,18 @@ describe('shared query toolbar', () => {
       'recordPage(matchingSafeRecords, page, pageSize)',
     );
     const hook = source('useOwnRecords.ts');
-    expect(hook).toContain('includeMetadataChanges: true');
+    expect(hook).toContain('subscribeAuthorizedOwnRecords(');
+    expect(hook).toContain(
+      '(snapshot) => next(snapshot.rows, snapshot.fromCache)',
+    );
+    const recordSource = source('authorized-own-record-source.ts');
+    expect(recordSource).toContain('includeMetadataChanges: true');
+    expect(recordSource).toContain(
+      's.metadata.fromCache || s.metadata.hasPendingWrites',
+    );
+    // Owner history supplies no pagination options; only paginated callers get limits.
+    expect(recordSource).toContain('options.size ? [limit(options.size)] : []');
+    expect(hook).not.toContain('size:');
     expect(hook).not.toContain('limit(');
     expect(hook).not.toContain('httpsCallable');
   });
