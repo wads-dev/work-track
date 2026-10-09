@@ -112,15 +112,15 @@ const health = await fetch(base + '/health', {
 assert(health.ok, 'Health failed');
 console.log('HEALTH_PASS');
 if (stage === 'all') {
-  const index = await fetch(base + '/?release=4d42a63', {
+  const index = await fetch(base + '/?release=9e64b8d', {
     signal: AbortSignal.timeout(30000),
   });
   const html = await index.text();
   assert(
-    index.ok && html.includes('index-C_AShFyv.js'),
+    index.ok && html.includes('index-BohQojQt.js'),
     'Hosting release hash mismatch',
   );
-  const asset = await fetch(base + '/assets/index-C_AShFyv.js', {
+  const asset = await fetch(base + '/assets/index-BohQojQt.js', {
     signal: AbortSignal.timeout(30000),
   });
   assert(asset.ok, 'Hosting JS unavailable');
@@ -128,5 +128,5 @@ if (stage === 'all') {
     signal: AbortSignal.timeout(30000),
   });
   assert.equal((await config.json()).projectId, 'wadsworktrack');
-  console.log('HOSTING_EXACT_RELEASE_C_AShFyv_PASS');
+  console.log('HOSTING_EXACT_RELEASE_BohQojQt_PASS');
 }

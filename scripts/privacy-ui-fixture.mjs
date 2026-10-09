@@ -58,7 +58,7 @@ else {
     new URL('../apps/backend/package.json', import.meta.url),
   );
   const { initializeApp, deleteApp } = require('firebase-admin/app');
-  const { getFirestore } = require('firebase-admin/firestore');
+  const { Firestore } = require('firebase-admin/firestore');
   const { getAuth } = require('firebase-admin/auth');
   const app = initializeApp(
       {
@@ -70,7 +70,15 @@ else {
       },
       marker,
     ),
-    db = getFirestore(app);
+    db = new Firestore({
+      projectId,
+      host: '127.0.0.1:8081',
+      ssl: false,
+      credentials: {
+        client_email: 'local@demo-work-track.iam.gserviceaccount.com',
+        private_key: 'local-emulator-only',
+      },
+    });
   try {
     const owner = await getAuth(app).getUser(uid);
     assert.equal(owner.uid, uid, 'Owner must already exist');
