@@ -4,7 +4,11 @@ import type { ProjectManagementRepository } from '../domain/project-management.j
 it('guards callables and requires explicit merge confirmation inputs', async () => {
   const updateProject = vi.fn<ProjectManagementRepository['updateProject']>(),
     mergeProjects = vi.fn<ProjectManagementRepository['mergeProjects']>();
-  const repository = { updateProject, mergeProjects };
+  const repository = {
+    updateProject,
+    mergeProjects,
+    archiveProject: vi.fn<ProjectManagementRepository['archiveProject']>(),
+  };
   await expect(
     manageProjectHandler(repository, 'merge', {
       sourceProjectId: 'a',

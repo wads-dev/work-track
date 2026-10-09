@@ -5,6 +5,7 @@ const inputSchema = z
   .object({
     projectId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
     limit: z.number().int().min(1).max(500).default(200),
+    includeArchived: z.boolean().default(false),
     cursor: z
       .string()
       .max(512)
@@ -16,7 +17,7 @@ const inputSchema = z
   .strict();
 export class ReportRequestError extends Error {
   constructor(
-    readonly code: 'invalid-argument' | 'not-found',
+    readonly code: 'invalid-argument' | 'not-found' | 'failed-precondition',
     message: string,
   ) {
     super(message);
@@ -40,6 +41,11 @@ export async function getProjectReport(
   );
   if (!page)
     throw new ReportRequestError('not-found', 'Projeto não encontrado.');
+  if (page.archived && !input.data.includeArchived)
+    throw new ReportRequestError(
+      'failed-precondition',
+      'Projeto arquivado; inclua includeArchived para consultar histórico.',
+    );
   const context = await repository.loadContext([
     ...new Set(page.records.map((r) => r.uid)),
   ]);

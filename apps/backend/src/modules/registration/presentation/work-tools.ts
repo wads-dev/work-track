@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
   updateProjectInput,
+  archiveProjectInput,
   mergeProjectsInput,
   type ProjectManagementRepository,
 } from '../domain/project-management.js';
@@ -41,6 +42,15 @@ export function registerWorkTools(
   };
   if (management) {
     server.registerTool(
+      'archive_project',
+      {
+        description:
+          'Arquive/desarquive projeto com ID explícito, archived boolean, motivo e requestId estável. Origem mesclada não pode ser reaberta. Nunca apagar histórico.',
+        inputSchema: archiveProjectInput,
+      },
+      (input) => run(() => management.archiveProject(input, uid)),
+    );
+    server.registerTool(
       'update_project',
       {
         description:
@@ -77,11 +87,13 @@ export function registerWorkTools(
         'Pesquise antes de registrar/criar. Busca aproximada por título, descrição e tópicos, com acentos e erros de escrita; não usa embeddings. Sem query lista projetos. Retorna IDs, tópicos e scores. Pergunte em caso de ambiguidade.',
       inputSchema: z.object({
         query: z.string().max(500).default(''),
+        includeArchived: z.boolean().default(false),
         limit: z.number().int().min(1).max(100).default(20),
       }),
       annotations: { readOnlyHint: true },
     },
-    ({ query, limit }) => run(() => service.search(query, limit)),
+    ({ query, limit, includeArchived }) =>
+      run(() => service.search(query, limit, includeArchived)),
   );
   server.registerTool(
     'create_project',

@@ -18,6 +18,7 @@ import {
   Link,
   IconButton,
   Tooltip,
+  MenuItem,
 } from '@mui/material';
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
@@ -34,6 +35,7 @@ import { detailPath, matchesFilter } from './routes';
 import { UiIcon } from './UiIcons';
 import { usePrivacy, isHidden, safeProject, safeRecord } from './privacy';
 import { ProjectEditor } from './ProjectEditor';
+import { matchesArchive } from './project-archive';
 
 function DataTable({
   title,
@@ -186,6 +188,7 @@ export function Dashboard({
   const [localFilter, setLocalFilter] = useState('');
   const filter = revealed ? localFilter : '';
   const projectFilter = params.get('project') ?? '';
+  const archiveFilter = params.get('status') ?? 'active';
   useEffect(() => {
     if (!revealed) setLocalFilter('');
     if (params.has('q')) {
@@ -251,16 +254,21 @@ export function Dashboard({
     );
   const filteredProjects = {
     ...projects,
-    rows: projects.rows.filter((row) =>
-      matchesFilter(
-        [
-          row.id,
-          row.data.title,
-          row.data.description,
-          ...objects(row.data.topics).map((topic) => topic.title),
-        ],
-        filter,
-      ),
+    rows: projects.rows.filter(
+      (row) =>
+        matchesArchive(
+          rawProjects.rows.find((project) => project.id === row.id)?.data,
+          archiveFilter,
+        ) &&
+        matchesFilter(
+          [
+            row.id,
+            row.data.title,
+            row.data.description,
+            ...objects(row.data.topics).map((topic) => topic.title),
+          ],
+          filter,
+        ),
     ),
   };
   const filteredRecords = {
@@ -324,6 +332,19 @@ export function Dashboard({
         Filtros atuam sobre até 100 itens carregados por lista, não sobre todo o
         banco. Compartilhar URL não concede acesso.
       </Alert>
+      {mode === 'projects' && (
+        <TextField
+          select
+          label="Projetos por estado (lista carregada)"
+          value={archiveFilter}
+          onChange={(e) => updateFilter('status', e.target.value)}
+          sx={{ mb: 2, minWidth: 220 }}
+        >
+          <MenuItem value="active">Ativos</MenuItem>
+          <MenuItem value="archived">Arquivados</MenuItem>
+          <MenuItem value="all">Todos</MenuItem>
+        </TextField>
+      )}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
         <TextField
           label={

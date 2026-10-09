@@ -91,7 +91,35 @@ export interface MergeExecution {
   migratedCount: number;
   hasMore: boolean;
 }
+export const archiveProjectInput = z
+  .object({
+    projectId: safeId,
+    archived: z.boolean(),
+    requestId: safeId,
+    reason: z.string().trim().min(1).max(1000),
+  })
+  .strict();
+export type ArchiveProjectInput = z.infer<typeof archiveProjectInput>;
+export function assertArchiveAllowed(
+  project: { mergeLock?: unknown; mergedInto?: unknown },
+  archived: boolean,
+) {
+  if (project.mergeLock)
+    throw new ProjectManagementError(
+      'failed-precondition',
+      'Projeto em mesclagem.',
+    );
+  if (project.mergedInto && !archived)
+    throw new ProjectManagementError(
+      'failed-precondition',
+      'Origem mesclada não pode ser reaberta.',
+    );
+}
 export interface ProjectManagementRepository {
+  archiveProject(
+    input: ArchiveProjectInput,
+    uid: string,
+  ): Promise<{ projectId: string; archived: boolean; updatedAt: string }>;
   updateProject(
     input: UpdateProjectInput,
     uid: string,

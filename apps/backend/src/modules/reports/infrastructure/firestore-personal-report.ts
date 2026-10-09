@@ -10,6 +10,20 @@ const source = z.object({
 });
 export class FirestorePersonalReportRepository implements PersonalReportRepository {
   constructor(private readonly db: Firestore) {}
+  async archivedProjectIds(projectIds: string[]) {
+    const archived: string[] = [];
+    for (let i = 0; i < projectIds.length; i += 100) {
+      const docs = await this.db.getAll(
+        ...projectIds
+          .slice(i, i + 100)
+          .map((id) => this.db.collection('projects').doc(id)),
+      );
+      for (const doc of docs)
+        if (!doc.exists || doc.data()?.archived || doc.data()?.mergedInto)
+          archived.push(doc.id);
+    }
+    return archived;
+  }
   loadContext(uids: string[]) {
     return loadGlobalContext(this.db, uids);
   }

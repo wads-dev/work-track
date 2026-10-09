@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import {
   assertProjectWritable,
+  assertArchiveAllowed,
+  type ArchiveProjectInput,
   mapTopics,
   ProjectManagementError,
   type ProjectManagementRepository,
@@ -28,6 +30,55 @@ interface Job {
 }
 export class FirestoreProjectManagementRepository implements ProjectManagementRepository {
   constructor(private readonly db: Firestore) {}
+  async archiveProject(input: ArchiveProjectInput, uid: string) {
+    const ref = this.db.collection('projects').doc(input.projectId),
+      audit = ref.collection('audit').doc('archive_' + input.requestId);
+    return this.db.runTransaction(async (tx) => {
+      const snapshot = await tx.get(ref),
+        prior = await tx.get(audit);
+      if (!snapshot.exists)
+        throw new ProjectManagementError(
+          'not-found',
+          'Projeto não encontrado.',
+        );
+      if (prior.exists) {
+        const previous = prior.data() as {
+          request: string;
+          authorUid: string;
+          result: { projectId: string; archived: boolean; updatedAt: string };
+        };
+        if (
+          previous.request !== JSON.stringify(input) ||
+          previous.authorUid !== uid
+        )
+          throw new ProjectManagementError(
+            'invalid-argument',
+            'requestId já utilizado.',
+          );
+        return previous.result;
+      }
+      const before = snapshot.data() as ManagedProject;
+      assertArchiveAllowed(before, input.archived);
+      const updatedAt = new Date().toISOString(),
+        result = {
+          projectId: input.projectId,
+          archived: input.archived,
+          updatedAt,
+        };
+      tx.update(ref, { archived: input.archived, updatedAt, updatedBy: uid });
+      tx.create(audit, {
+        authorUid: uid,
+        reason: input.reason,
+        request: JSON.stringify(input),
+        action: 'archive',
+        before: { archived: before.archived ?? false },
+        after: { archived: input.archived },
+        recordedAt: FieldValue.serverTimestamp(),
+        result,
+      });
+      return result;
+    });
+  }
   async updateProject(input: UpdateProjectInput, uid: string) {
     const ref = this.db.collection('projects').doc(input.projectId),
       audit = ref.collection('audit').doc(input.requestId);

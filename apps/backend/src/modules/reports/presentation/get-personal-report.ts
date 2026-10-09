@@ -20,6 +20,7 @@ const schema = z
         }
       }),
     limit: z.number().int().min(1).max(500).default(200),
+    includeArchived: z.boolean().default(false),
     cursor: z
       .string()
       .regex(/^[A-Za-z0-9_-]{1,128}$/)
@@ -52,7 +53,33 @@ export async function getPersonalReportHandler(
       input.data.cursor,
     );
     const context = await repository.loadContext([auth!.uid]);
-    return buildPersonalReport(input.data, page, asOf, context);
+    const report = buildPersonalReport(input.data, page, asOf, context);
+    if (!input.data.includeArchived) {
+      const archived = new Set(
+        await repository.archivedProjectIds([
+          ...new Set(page.records.map((r) => r.projectId)),
+        ]),
+      );
+      const removed = report.intervals.filter((r) => archived.has(r.projectId));
+      report.intervals = report.intervals.filter(
+        (r) => !archived.has(r.projectId),
+      );
+      report.byProject = report.byProject.filter(
+        (r) => !archived.has(r.projectId),
+      );
+      report.totalMinutes = report.intervals.reduce(
+        (sum, r) => sum + r.minutes,
+        0,
+      );
+      report.estimatedCount = report.intervals.filter(
+        (r) => r.estimated,
+      ).length;
+      report.page.excludedCount += removed.length;
+      report.warnings.push(
+        'Seleção ativa exclui projetos arquivados ou ausentes da visualização; orçamento global continua incluindo todos os fatos.',
+      );
+    }
+    return report;
   } catch (error) {
     if (error instanceof ReportContextError)
       throw new HttpsError('resource-exhausted', error.message);

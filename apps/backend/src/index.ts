@@ -18,6 +18,22 @@ import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
+export const archiveProject = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    manageProjectHandler(
+      new FirestoreProjectManagementRepository(getFirestore()),
+      'archive',
+      request.data as unknown,
+      request.auth,
+    ),
+);
 export const getPersonalReport = onCall(
   {
     region: 'southamerica-east1',

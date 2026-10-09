@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { text } from './data';
+import { ProjectArchive } from './ProjectArchive';
 export function ProjectEditor({
   functions,
   projectId,
@@ -41,6 +42,11 @@ export function ProjectEditor({
     );
   return (
     <Box sx={{ my: 3 }}>
+      <ProjectArchive
+        functions={functions}
+        projectId={projectId}
+        project={project}
+      />
       <Button onClick={() => setEditing((value) => !value)}>
         {editing ? 'Fechar gerenciamento' : 'Gerenciar projeto'}
       </Button>

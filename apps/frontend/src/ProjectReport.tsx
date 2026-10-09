@@ -18,7 +18,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import { httpsCallable, type Functions } from 'firebase/functions';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { reportError } from './report-error';
 import { date } from './data';
 import { detailPath } from './routes';
@@ -133,6 +133,8 @@ export function ProjectReport({
   search: string;
   uid: string;
 }) {
+  const [params, setParams] = useSearchParams();
+  const includeArchived = params.get('includeArchived') === 'true';
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -144,10 +146,20 @@ export function ProjectReport({
     setError('');
     setReport(null);
     const callable = httpsCallable<
-      { projectId: string; limit: number; cursor?: string },
+      {
+        projectId: string;
+        limit: number;
+        cursor?: string;
+        includeArchived: boolean;
+      },
       Report
     >(functions, 'getProjectReport');
-    void callable({ projectId, limit: 200, ...(cursor ? { cursor } : {}) })
+    void callable({
+      projectId,
+      limit: 200,
+      includeArchived,
+      ...(cursor ? { cursor } : {}),
+    })
       .then((result) => {
         if (active) {
           setReport(result.data);
@@ -163,7 +175,7 @@ export function ProjectReport({
     return () => {
       active = false;
     };
-  }, [functions, projectId, cursor, attempt]);
+  }, [functions, projectId, cursor, attempt, includeArchived]);
   if (loading)
     return (
       <Stack direction="row" spacing={2} role="status">
@@ -182,6 +194,18 @@ export function ProjectReport({
         }
       >
         {error}
+        {!includeArchived && !hidden && (
+          <Button
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.set('includeArchived', 'true');
+              setCursor(undefined);
+              setParams(next);
+            }}
+          >
+            Consultar histórico de projeto arquivado
+          </Button>
+        )}
       </Alert>
     );
   if (!report) return null;
@@ -194,6 +218,18 @@ export function ProjectReport({
     );
   return (
     <Box component="section" aria-label="Relatório do projeto" sx={{ mt: 3 }}>
+      <Button
+        onClick={() => {
+          const next = new URLSearchParams(params);
+          next.set('includeArchived', String(!includeArchived));
+          setCursor(undefined);
+          setParams(next);
+        }}
+      >
+        {includeArchived
+          ? 'Voltar à seleção ativa'
+          : 'Permitir histórico arquivado nesta consulta'}
+      </Button>
       <Typography component="h2" variant="h5">
         Tempo agregado nesta página: {hours(report.totalMinutes)}
       </Typography>

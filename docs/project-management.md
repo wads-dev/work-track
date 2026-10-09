@@ -4,6 +4,12 @@ Metadados incluem título, descrição, categoria pessoal/trabalho, URL GitHub H
 
 Modo live inicia fechado em cada sessão. Abrir o olho só revela na memória; não modifica permissões ou impede acesso via SDK por usuário corporativo autorizado. Nomes, contextos, textos e histórico potencialmente sensível não devem ser renderizados quando ocultos.
 
+## Arquivar e desarquivar
+
+Arquivamento manual preserva projetos, registros e evidências. Projetos ativos são padrão; a listagem permite ativos/arquivados/todos. Relatórios e calendário excluem arquivados por padrão e permitem inclusão explícita do histórico.
+
+A exclusão visual não reinicia orçamento global: fatos e estimativas arquivados continuam no contexto do dia. Essa versão não promete otimização completa de leitura dos registros; indexação/materialização permanece backlog. Origem mesclada não pode ser desarquivada genericamente, e projetos com merge em andamento não podem ser alterados.
+
 ## Mesclagem
 
 1. Selecionar origem e destino explicitamente.

@@ -8,10 +8,13 @@ import {
 import { searchProjects } from '../domain/project-search.js';
 export class RegistrationService {
   constructor(private readonly repository: WorkRepository) {}
-  async search(query: string, limit: number) {
+  async search(query: string, limit: number, includeArchived = false) {
     return {
       projects: searchProjects(
-        await this.repository.listProjects(),
+        (await this.repository.listProjects()).filter(
+          (project) =>
+            includeArchived || (!project.archived && !project.mergedInto),
+        ),
         query,
         limit,
       ),

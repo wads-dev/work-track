@@ -4,6 +4,8 @@ import {
   Box,
   Button,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
   MenuItem,
   Paper,
   Stack,
@@ -82,6 +84,7 @@ export function PersonalPage({
     params.get('date') ?? dayKey(new Date(), 'America/Sao_Paulo');
   const rawView = params.get('view') ?? (calendar ? 'week' : 'day');
   const cursor = params.get('cursor') ?? '';
+  const includeArchived = params.get('includeArchived') === 'true';
   const firstDate = params.get('fromDate') ?? selected;
   const lastDate = params.get('toDate') ?? selected;
   let validated: ReturnType<typeof range> | null = null;
@@ -119,12 +122,20 @@ export function PersonalPage({
         timeZone: string;
         limit: number;
         cursor?: string;
+        includeArchived: boolean;
       },
       PersonalReport
     >(
       functions,
       'getPersonalReport',
-    )({ from, to, timeZone: zone, limit: 200, ...(cursor ? { cursor } : {}) })
+    )({
+      from,
+      to,
+      timeZone: zone,
+      limit: 200,
+      includeArchived,
+      ...(cursor ? { cursor } : {}),
+    })
       .then((result) => {
         if (active) {
           setReport(result.data);
@@ -140,7 +151,7 @@ export function PersonalPage({
     return () => {
       active = false;
     };
-  }, [functions, from, to, zone, cursor, attempt]);
+  }, [functions, from, to, zone, cursor, attempt, includeArchived]);
   const label = (id: string) =>
     text(
       safeProject(projects.rows.find((p) => p.id === id)?.data, revealed)
@@ -236,6 +247,21 @@ export function PersonalPage({
           continua limitada aos dados examinados.
         </Typography>
       )}
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={includeArchived}
+            onChange={(e) =>
+              update('includeArchived', String(e.target.checked))
+            }
+          />
+        }
+        label="Incluir projetos arquivados nesta consulta"
+      />
+      <Typography variant="body2" color="text.secondary">
+        Seleção aplicada no servidor antes dos totais exibidos; orçamento global
+        continua considerando também registros arquivados.
+      </Typography>
       {loading ? (
         <CircularProgress aria-label="Carregando relatório pessoal" />
       ) : error ? (

@@ -1,4 +1,5 @@
 export interface ProjectReportInput {
+  includeArchived?: boolean;
   projectId: string;
   limit?: number;
   cursor?: string;
@@ -36,6 +37,7 @@ export interface ProjectReport {
   page: { limit: number; nextCursor: string | null; partial: boolean };
 }
 export interface ReportPage {
+  archived?: boolean;
   records: ReportSourceRecord[];
   nextCursor: string | null;
   topicLabels: Record<string, string>;

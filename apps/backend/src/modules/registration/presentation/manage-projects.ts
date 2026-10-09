@@ -6,17 +6,24 @@ import {
 import {
   ProjectManagementError,
   updateProjectInput,
+  archiveProjectInput,
   mergeProjectsInput,
   type ProjectManagementRepository,
 } from '../domain/project-management.js';
 export async function manageProjectHandler(
   repository: ProjectManagementRepository,
-  kind: 'update' | 'merge',
+  kind: 'update' | 'merge' | 'archive',
   data: unknown,
   auth?: ReportAuth,
 ) {
   authorizeReport(auth);
   try {
+    if (kind === 'archive') {
+      const input = archiveProjectInput.safeParse(data);
+      if (!input.success)
+        throw new HttpsError('invalid-argument', 'Arquivamento inválido.');
+      return await repository.archiveProject(input.data, auth!.uid);
+    }
     if (kind === 'update') {
       const input = updateProjectInput.safeParse(data);
       if (!input.success)

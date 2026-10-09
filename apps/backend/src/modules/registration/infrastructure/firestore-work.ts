@@ -41,6 +41,7 @@ export class FirestoreWorkRepository implements WorkRepository {
       }
       const project: Project = {
         ...input,
+        archived: false,
         confidential: input.confidential ?? false,
         publicAlias: input.publicAlias ?? 'Projeto reservado',
         id: key,

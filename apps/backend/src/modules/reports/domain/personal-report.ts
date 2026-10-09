@@ -1,5 +1,6 @@
 import type { ReportSourceRecord } from './project-report.js';
 export interface PersonalReportInput {
+  includeArchived?: boolean;
   from: string;
   to: string;
   timeZone: string;
@@ -41,6 +42,7 @@ export interface PersonalReportPage {
   nextCursor: string | null;
 }
 export interface PersonalReportRepository {
+  archivedProjectIds(projectIds: string[]): Promise<string[]>;
   loadContext(uids: string[]): Promise<ReportSourceRecord[]>;
   readPage(
     uid: string,

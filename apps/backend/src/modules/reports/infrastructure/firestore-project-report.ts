@@ -64,6 +64,7 @@ export class FirestoreProjectReportRepository implements ProjectReportRepository
     );
     return {
       records,
+      archived: Boolean(project.data()?.archived || project.data()?.mergedInto),
       topicLabels,
       nextCursor:
         snapshot.docs.length > limit ? (docs.at(-1)?.ref.path ?? null) : null,
