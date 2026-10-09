@@ -1,3 +1,4 @@
+import { MoveDialog } from './MoveDialog';
 import { useProjects } from './useProjects';
 import { canFinishNow, createFinishNowCommand } from './finish-now';
 import { isDeletedRecord, createDeletionObserver } from './record-deletion';
@@ -92,7 +93,11 @@ export function RecordDrawer({
   const editOpen = activeTab === 'edit';
   const detailsOpen = activeTab === 'details';
   const mobile = useMediaQuery('(max-width:600px)');
-  const close = () => (onClose ? onClose() : navigate(closePath));
+  const close = () => {
+    if (mutationBusy.current || moveOpen) return;
+    if (onClose) onClose();
+    else navigate(closePath);
+  };
   const requestedReturn = new URLSearchParams(search).get('returnTo');
   const closePath = requestedReturn
     ? safeReturnTo(requestedReturn)
@@ -109,6 +114,8 @@ export function RecordDrawer({
   const finishCommand = useRef(createFinishNowCommand());
   const editorDirty = useRef(false);
   const mutationBusy = useRef(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moving, setMoving] = useState(false);
   const currentScope = useRef(uid + '/' + recordId);
   currentScope.current = uid + '/' + recordId;
   const [end, setEnd] = useState('');
@@ -130,6 +137,8 @@ export function RecordDrawer({
     setRecord(null);
     editorDirty.current = false;
     mutationBusy.current = false;
+    setMoveOpen(false);
+    setMoving(false);
     finishCommand.current = createFinishNowCommand();
     setFinishing(false);
     setFinishError('');
@@ -168,7 +177,7 @@ export function RecordDrawer({
   async function finishNow() {
     if (saving || finishing || finishSuccess || !canFinishNow(record, uid))
       return;
-    if (mutationBusy.current) return;
+    if (mutationBusy.current || moveOpen) return;
     mutationBusy.current = true;
     const scope = uid + '/' + recordId;
     setFinishing(true);
@@ -200,7 +209,15 @@ export function RecordDrawer({
     }
   }
   async function save() {
-    if (mutationBusy.current || !record || !confirmed || finishing || saving)
+    if (
+      mutationBusy.current ||
+      !record ||
+      !confirmed ||
+      finishing ||
+      saving ||
+      moving ||
+      moveOpen
+    )
       return;
     mutationBusy.current = true;
     setError('');
@@ -265,6 +282,19 @@ export function RecordDrawer({
       setSaving(false);
     }
   }
+  const movementSide = (side: unknown) => {
+    const snapshot = object(side);
+    const parent = projects.rows.find((p) => p.id === snapshot.projectId)?.data;
+    if (!revealed && (!parent || isHidden(parent, revealed)))
+      return 'Projeto reservado · Assuntos reservados';
+    return (
+      text(object(snapshot.projectSnapshot).title, 'Projeto') +
+      ' · ' +
+      objects(snapshot.topicSnapshots)
+        .map((t) => text(t.title, 'Assunto'))
+        .join(', ')
+    );
+  };
   const content = (
     <Box
       role={presentation === 'drawer' ? 'dialog' : undefined}
@@ -290,7 +320,7 @@ export function RecordDrawer({
         </Typography>
         <IconButton
           aria-label="Fechar"
-          disabled={finishing || saving}
+          disabled={finishing || saving || moving || moveOpen}
           onClick={close}
         >
           <UiIcon kind="close" />
@@ -352,24 +382,59 @@ export function RecordDrawer({
                   automaticamente.
                 </Alert>
               )}
-              {!finishSuccess && canFinishNow(record, uid) && (
-                <Button
-                  variant="contained"
-                  disabled={finishing || saving}
-                  onClick={finishNow}
-                  sx={{
-                    mt: 1,
-                    minHeight: 44,
-                    width: { xs: '100%', sm: 'auto' },
-                    alignSelf: 'flex-start',
-                  }}
-                >
-                  {finishing
-                    ? 'Finalizando…'
-                    : finishError
-                      ? 'Tentar finalizar novamente'
-                      : 'Finalizar agora'}
-                </Button>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1}
+                sx={{ mt: 1, flexWrap: 'wrap' }}
+              >
+                {!finishSuccess && canFinishNow(record, uid) && (
+                  <Button
+                    variant="contained"
+                    disabled={finishing || saving || moving || moveOpen}
+                    onClick={finishNow}
+                    sx={{
+                      mt: 1,
+                      minHeight: 44,
+                      width: { xs: '100%', sm: 'auto' },
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    {finishing
+                      ? 'Finalizando…'
+                      : finishError
+                        ? 'Tentar finalizar novamente'
+                        : 'Finalizar agora'}
+                  </Button>
+                )}
+                {record.uid === uid &&
+                  (record.deletedAt === null ||
+                    record.deletedAt === undefined) && (
+                    <Button
+                      variant="outlined"
+                      disabled={saving || finishing || moving || moveOpen}
+                      sx={{ minHeight: 44, width: { xs: '100%', sm: 'auto' } }}
+                      onClick={() => setMoveOpen(true)}
+                    >
+                      Mover registro
+                    </Button>
+                  )}
+              </Stack>
+              {moveOpen && (
+                <MoveDialog
+                  key={uid + '/' + recordId}
+                  functions={functions}
+                  uid={uid}
+                  projectId={String(record.projectId)}
+                  recordId={recordId}
+                  originLabel={
+                    text(object(record.projectSnapshot).title) +
+                    ' · ' +
+                    date(record.startedAt)
+                  }
+                  mutationBusy={mutationBusy}
+                  onBusyChange={setMoving}
+                  onClose={() => setMoveOpen(false)}
+                />
               )}
               <Tabs
                 value={activeTab}
@@ -462,7 +527,9 @@ export function RecordDrawer({
                       label="Fim efetivo"
                       slotProps={{ inputLabel: { shrink: true } }}
                       value={end}
-                      disabled={finishing || saving || removeEnd}
+                      disabled={
+                        finishing || saving || moving || moveOpen || removeEnd
+                      }
                       onChange={(event) => {
                         editorDirty.current = true;
                         setEnd(event.target.value);
@@ -477,7 +544,9 @@ export function RecordDrawer({
                           control={
                             <Checkbox
                               checked={removeEnd}
-                              disabled={finishing || saving}
+                              disabled={
+                                finishing || saving || moving || moveOpen
+                              }
                               onChange={(event) => {
                                 editorDirty.current = true;
                                 setRemoveEnd(event.target.checked);
@@ -492,7 +561,7 @@ export function RecordDrawer({
                     <TextField
                       label="Motivo da alteração"
                       value={reason}
-                      disabled={finishing || saving}
+                      disabled={finishing || saving || moving || moveOpen}
                       onChange={(event) => setReason(event.target.value)}
                       multiline
                       minRows={2}
@@ -508,7 +577,7 @@ export function RecordDrawer({
                       control={
                         <Checkbox
                           checked={confirmed}
-                          disabled={finishing || saving}
+                          disabled={finishing || saving || moving || moveOpen}
                           onChange={(event) =>
                             setConfirmed(event.target.checked)
                           }
@@ -564,6 +633,21 @@ export function RecordDrawer({
                           </Typography>
                           <Typography variant="body2">Autor: Pessoa</Typography>
                           <Typography variant="body2">
+                            {['move_subject', 'move_record'].includes(
+                              String(row.data.action),
+                            ) && (
+                              <>
+                                Ação:{' '}
+                                {row.data.action === 'move_subject'
+                                  ? 'Transferência de assunto'
+                                  : 'Mover registro'}
+                                <br />
+                                Origem: {movementSide(row.data.before)}
+                                <br />
+                                Destino: {movementSide(row.data.after)}
+                                <br />
+                              </>
+                            )}
                             Fim antes: {text(object(row.data.before).endedAt)}
                             <br />
                             Fim depois: {text(object(row.data.after).endedAt)}
@@ -598,7 +682,7 @@ export function RecordDrawer({
               type="submit"
               form="record-edit-form"
               variant="contained"
-              disabled={finishing || saving || !confirmed}
+              disabled={finishing || saving || moving || moveOpen || !confirmed}
             >
               {saving ? 'Salvando…' : 'Salvar alteração'}
             </Button>

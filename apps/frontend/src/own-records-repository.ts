@@ -48,6 +48,10 @@ export function createOwnRecordsRepository() {
       }
     },
     purge,
+    invalidate() {
+      generation++;
+      for (const entry of active) entry.start();
+    },
     subscribe(
       owner: object,
       uid: string,

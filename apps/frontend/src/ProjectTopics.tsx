@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { MoveDialog } from './MoveDialog';
+import { getAuth } from 'firebase/auth';
 import { projectMutation } from './project-mutation';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -38,6 +40,10 @@ export function ProjectTopics({
   projectId: string;
   project: Record<string, unknown>;
 }) {
+  const [movingTopic, setMovingTopic] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const catalog = objects(project.topics);
   const active = catalog.filter((t) => !t.archived && !t.mergedIntoTopicId);
   const [params] = useSearchParams(),
@@ -155,17 +161,51 @@ export function ProjectTopics({
         <Typography component="h3" variant="h6">
           Assuntos do projeto
         </Typography>
-        <Box component="ul" sx={{ pl: 3 }}>
+        {movingTopic && (
+          <MoveDialog
+            functions={functions}
+            uid={getAuth(functions.app).currentUser?.uid ?? ''}
+            projectId={projectId}
+            subjectId={String(movingTopic.id)}
+            originLabel={text(project.title) + ' · ' + text(movingTopic.title)}
+            onClose={() => setMovingTopic(null)}
+          />
+        )}
+        <Box component="ul" sx={{ pl: 0, listStyle: 'none' }}>
           {catalog.map((t, i) => (
-            <li key={i}>
-              {text(t.title, 'Assunto')}
-              {t.mergedIntoTopicId
-                ? ' · alias histórico de ' +
-                  label(text(t.mergedIntoTopicId, ''))
-                : t.archived
-                  ? ' · arquivado'
-                  : ''}
-            </li>
+            <Box
+              component="li"
+              key={i}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                flexWrap: 'wrap',
+                mb: 1,
+                overflowWrap: 'anywhere',
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                {text(t.title, 'Assunto')}
+                {t.mergedIntoTopicId
+                  ? ' · alias histórico de ' +
+                    label(text(t.mergedIntoTopicId, ''))
+                  : t.archived
+                    ? ' · arquivado'
+                    : ''}
+              </Box>
+              {!t.archived && !t.mergedIntoTopicId && (
+                <Button
+                  variant="outlined"
+                  disabled={busy || !!movingTopic}
+                  sx={{ minHeight: 44, flexShrink: 0 }}
+                  aria-label={'Transferir assunto ' + text(t.title)}
+                  onClick={() => setMovingTopic(t)}
+                >
+                  Transferir
+                </Button>
+              )}
+            </Box>
           ))}
         </Box>
         <Typography variant="body2">

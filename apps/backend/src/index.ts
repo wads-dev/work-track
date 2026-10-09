@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirestoreRecordMovementRepository } from './modules/registration/infrastructure/firestore-record-movement.js';
+import { movementHandler } from './modules/registration/presentation/record-movement.js';
 import { changeProjectScopeHandler } from './modules/registration/presentation/change-project-scope.js';
 import { FirestoreProjectScopeRepository } from './modules/registration/infrastructure/firestore-project-scope.js';
 import { FirestoreRemovalRepository } from './modules/removal/infrastructure/firestore-removal.js';
@@ -30,6 +32,38 @@ import { FirestoreOAuthStore } from './core/auth/infrastructure/firestore-oauth-
 import { FirestoreWorkRepository } from './modules/registration/infrastructure/firestore-work.js';
 
 initializeApp();
+export const moveSubject = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    movementHandler(
+      new FirestoreRecordMovementRepository(getFirestore()),
+      'move_subject',
+      request.data as unknown,
+      request.auth,
+    ),
+);
+export const moveRecord = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    movementHandler(
+      new FirestoreRecordMovementRepository(getFirestore()),
+      'move_record',
+      request.data as unknown,
+      request.auth,
+    ),
+);
 export const changeProjectScope = onCall(
   {
     region: 'southamerica-east1',
@@ -186,6 +220,7 @@ export const api = onRequest(
     new FirestorePauseRepository(getFirestore()),
     new FirestoreSplitRepository(getFirestore()),
     new FirestoreRemovalRepository(getFirestore()),
+    new FirestoreRecordMovementRepository(getFirestore()),
   ),
 );
 export const createProject = onCall(

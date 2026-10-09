@@ -1,4 +1,6 @@
 import express from 'express';
+import type { MovementRepository } from '../../modules/registration/domain/record-movement.js';
+import { registerMovementTools } from '../../modules/registration/presentation/record-movement.js';
 import type { RemovalRepository } from '../../modules/removal/domain/removal.js';
 import { registerRemovalTool } from '../../modules/removal/presentation/removal-tool.js';
 import type { SplitRepository } from '../../modules/split/domain/split.js';
@@ -29,6 +31,7 @@ export function createApp(
   pauseRepository?: PauseRepository,
   splitRepository?: SplitRepository,
   removalRepository?: RemovalRepository,
+  movementRepository?: MovementRepository,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -145,6 +148,12 @@ export function createApp(
         /^[A-Za-z0-9_-]{1,128}$/.test(uid)
       )
         registerRemovalTool(server, removalRepository, uid);
+      if (
+        movementRepository &&
+        typeof uid === 'string' &&
+        /^[A-Za-z0-9_-]{1,128}$/.test(uid)
+      )
+        registerMovementTools(server, movementRepository, uid);
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });
