@@ -1,6 +1,6 @@
 # Backlog
 
-## Em implementação
+## Entregas concluídas
 
 - [x] Gerenciamento de projetos: editar título/descrição, categoria pessoal/trabalho e URL GitHub HTTPS validada. Publicado na entrega 3.
 - [x] Mesclagem de projetos: preview, confirmação, migração auditável e retomável de registros/tópicos e arquivamento da origem. Cancelamento libera locks sem rollback de lotes.
@@ -8,8 +8,8 @@
 
 ## Próximas entregas planejadas
 
-- [ ] Dashboard pessoal: distribuição de tempo por projeto em dia, semana e mês.
-- [ ] Calendário pessoal semanal/mensal com atividades coloridas, sobreposições e estimativas identificadas.
+- [x] Dashboard pessoal: distribuição de tempo por projeto em dia, semana e mês, via relatório calculado e paginação explícita.
+- [x] Calendário pessoal semanal/mensal com atividades coloridas, sobreposições e estimativas identificadas. Visualização responsiva por dia, sem drag-and-drop.
 - [ ] Refinar reconciliação e limites de relatórios para considerar o contexto completo entre projetos/páginas.
 - [ ] Testes completos das regras no Firebase Emulator e execução real do Docker Compose, além da validação estática atual.
 - [ ] Refinamento visual e redução do bundle frontend; ícones consistentes nas ações de detalhe/auditoria.
