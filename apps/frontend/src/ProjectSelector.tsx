@@ -48,8 +48,13 @@ export function ProjectSelector({
     input?.id === projectId && input.label === selected.label
       ? input.query
       : selected.label;
+  // The selected label is display text, not a user-entered search query.
+  const searchQuery =
+    input?.id === projectId && input.label === selected.label
+      ? input.query
+      : '';
   const filtered = options.filter((option) =>
-    matchesProject(option, inputValue),
+    matchesProject(option, searchQuery),
   );
   function choose(option: ProjectOption) {
     setInput(null);
@@ -86,7 +91,10 @@ export function ProjectSelector({
           placeholder="Pesquisar projeto"
           disabled={disabled}
           value={inputValue}
-          onFocus={() => setOpen(true)}
+          onFocus={(event) => {
+            setOpen(true);
+            event.currentTarget.select();
+          }}
           onChange={(event) => {
             setInput({
               id: projectId,

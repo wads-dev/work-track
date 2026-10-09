@@ -18,6 +18,15 @@ describe('privacy query lifetime regressions', () => {
     expect(source('ProjectEditor.tsx')).toContain('String(revealed)');
     expect(source('PersonalPage.tsx')).toContain('key={String(revealed)}');
   });
+  it('shows all projects until the user types a search, not just the selected label', () => {
+    const selector = source('ProjectSelector.tsx');
+    expect(selector.replace(/\s+/g, ' ')).toContain(
+      "input?.id === projectId && input.label === selected.label ? input.query : ''",
+    );
+    expect(selector).toContain('matchesProject(option, searchQuery)');
+    expect(selector).not.toContain('matchesProject(option, inputValue)');
+    expect(selector).toContain('event.currentTarget.select()');
+  });
   it('never clears selection due to programmatic reset', () => {
     const selector = source('ProjectSelector.tsx');
     expect(selector).toContain(
