@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run test --workspaces --if-present && node --test scripts/demo-generator.test.mjs",
+    "test": "npm run test --workspaces --if-present && npm run build --workspace @work-track/backend && node --test scripts/demo-generator.test.mjs",
     "test:watch": "vitest",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "prepare": "node scripts/prepare.mjs",
