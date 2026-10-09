@@ -462,9 +462,7 @@ export function RecordDrawer({
                           <Typography>
                             {date(row.data.updatedAt)} · {text(row.data.reason)}
                           </Typography>
-                          <Typography variant="body2">
-                            Autor: {text(row.data.authorUid)}
-                          </Typography>
+                          <Typography variant="body2">Autor: Pessoa</Typography>
                           <Typography variant="body2">
                             Fim antes: {text(object(row.data.before).endedAt)}
                             <br />
