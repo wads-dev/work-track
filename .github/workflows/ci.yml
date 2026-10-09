@@ -1,9 +1,12 @@
-name: CI
+name: CI and Firebase deploy
 on:
   push:
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: firebase-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -15,3 +18,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
+          service_account: github-deploy@wadsworktrack.iam.gserviceaccount.com
+      - run: npx -y firebase-tools@latest deploy --only functions,hosting,firestore --project wadsworktrack --non-interactive
