@@ -12,9 +12,17 @@ export function UiIcon({
     | 'eyeoff'
     | 'sun'
     | 'moon'
-    | 'refresh';
+    | 'refresh'
+    | 'menu'
+    | 'previous'
+    | 'next'
+    | 'filter';
 }) {
   const paths = {
+    menu: 'M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2',
+    previous: 'm15.4 7.4-1.4-1.4-6 6 6 6 1.4-1.4-4.6-4.6z',
+    next: 'm8.6 16.6 1.4 1.4 6-6-6-6-1.4 1.4 4.6 4.6z',
+    filter: 'M3 5h18v2H3V5m3 6h12v2H6v-2m4 6h4v2h-4v-2',
     eye: 'M12 4C6 4 2 12 2 12s4 8 10 8 10-8 10-8-4-8-10-8m0 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6',
     eyeoff:
       'M3 2 22 21l-1 1-5-5c-6 4-12-2-14-5l4-5-4-4m6 4c6-4 12 2 14 5l-4 5-2-2 3-3c-2-3-5-5-9-3',

@@ -191,7 +191,7 @@ export function PersonalPage({
       </Alert>
     );
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2}>
       <Stack
         direction="row"
         spacing={1}
@@ -201,13 +201,80 @@ export function PersonalPage({
           flexWrap: 'wrap',
         }}
       >
-        <Typography variant="h5">
+        <Typography
+          variant="h5"
+          sx={{ fontWeight: 600, whiteSpace: 'nowrap', flexGrow: 1 }}
+        >
           {report && !loading ? hours(report.totalMinutes) : '—'}
         </Typography>
-        <Stack direction="row" spacing={1}>
-          <Button onClick={() => setFiltersOpen((value) => !value)}>
-            Filtros
-          </Button>
+        {!calendar && (
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 1,
+              alignItems: 'center',
+              order: { xs: 3, md: 0 },
+              width: { xs: '100%', md: 'auto' },
+              pt: { xs: 1, md: 0 },
+              flexWrap: { xs: 'wrap', md: 'nowrap' },
+            }}
+          >
+            <TextField
+              size="small"
+              type="date"
+              label="De"
+              value={firstDate}
+              onChange={(e) => update('fromDate', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{
+                flex: { xs: 1, md: 'none' },
+                width: { md: 158 },
+                minWidth: 130,
+              }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="Até"
+              value={lastDate}
+              onChange={(e) => update('toDate', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{
+                flex: { xs: 1, md: 'none' },
+                width: { md: 158 },
+                minWidth: 130,
+              }}
+            />
+            <Tooltip title="Incluir projetos arquivados">
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={includeArchived}
+                    onChange={(e) =>
+                      update('includeArchived', String(e.target.checked))
+                    }
+                  />
+                }
+                label="Arquivados"
+                sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: 13 } }}
+              />
+            </Tooltip>
+          </Box>
+        )}
+        <Stack direction="row" spacing={0.25}>
+          {calendar && (
+            <Tooltip title="Filtros">
+              <IconButton
+                aria-label="Filtros"
+                aria-expanded={filtersOpen}
+                color={filtersOpen ? 'primary' : 'default'}
+                onClick={() => setFiltersOpen((value) => !value)}
+              >
+                <UiIcon kind="filter" />
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title="Atualizar">
             <IconButton
               aria-label="Atualizar relatório"
@@ -226,85 +293,95 @@ export function PersonalPage({
           </Tooltip>
         </Stack>
       </Stack>
-      <Collapse in={filtersOpen || calendar}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          {calendar ? (
-            <>
-              <Button
+      {calendar && (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: 'minmax(0,1fr) minmax(0,1fr)',
+              md: 'minmax(240px,1fr) 150px 180px',
+            },
+            gap: 1.25,
+            alignItems: 'center',
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.25,
+              gridColumn: { xs: '1 / -1', md: 'auto' },
+              minWidth: 0,
+            }}
+          >
+            <Tooltip title="Período anterior">
+              <IconButton
+                aria-label="Período anterior"
                 onClick={() =>
                   update('date', moveReference(selected, view, -1))
                 }
               >
-                Anterior
-              </Button>
-              <TextField
-                type="date"
-                label="Data de referência"
-                value={selected}
-                onChange={(e) => update('date', e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
-              <TextField
-                select
-                label="Visualização"
-                value={view}
-                onChange={(e) => update('view', e.target.value)}
-              >
-                {['day', 'week', 'month'].map((v) => (
-                  <MenuItem key={v} value={v}>
-                    {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button
+                <UiIcon kind="previous" />
+              </IconButton>
+            </Tooltip>
+            <TextField
+              size="small"
+              type="date"
+              label="Data"
+              value={selected}
+              onChange={(e) => update('date', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{ flex: 1, minWidth: 0, maxWidth: { md: 200 } }}
+            />
+            <Tooltip title="Próximo período">
+              <IconButton
+                aria-label="Próximo período"
                 onClick={() => update('date', moveReference(selected, view, 1))}
               >
-                Próximo
-              </Button>
-            </>
-          ) : (
-            <>
-              <TextField
-                type="date"
-                label="Data inicial (inclusiva)"
-                value={firstDate}
-                onChange={(e) => update('fromDate', e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
+                <UiIcon kind="next" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <TextField
+            size="small"
+            select
+            label="Período"
+            value={view}
+            onChange={(e) => update('view', e.target.value)}
+          >
+            <MenuItem value="day">Dia</MenuItem>
+            <MenuItem value="week">Semana</MenuItem>
+            <MenuItem value="month">Mês</MenuItem>
+          </TextField>
+          <TextField
+            size="small"
+            select
+            label="Formato"
+            value={density}
+            onChange={(e) => update('density', e.target.value)}
+          >
+            <MenuItem value="supercompact">Supercompacto</MenuItem>
+            <MenuItem value="compact">Compacto</MenuItem>
+            <MenuItem value="timeline">Régua</MenuItem>
+          </TextField>
+        </Box>
+      )}
+      {calendar && (
+        <Collapse in={filtersOpen}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={includeArchived}
+                onChange={(e) =>
+                  update('includeArchived', String(e.target.checked))
+                }
               />
-              <TextField
-                type="date"
-                label="Data final (inclusiva)"
-                value={lastDate}
-                onChange={(e) => update('toDate', e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
-            </>
-          )}
-          {calendar && (
-            <TextField
-              select
-              label="Densidade"
-              value={density}
-              onChange={(e) => update('density', e.target.value)}
-            >
-              <MenuItem value="supercompact">Supercompacto</MenuItem>
-              <MenuItem value="compact">Compacto</MenuItem>
-              <MenuItem value="timeline">Linha do tempo</MenuItem>
-            </TextField>
-          )}
-        </Stack>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={includeArchived}
-              onChange={(e) =>
-                update('includeArchived', String(e.target.checked))
-              }
-            />
-          }
-          label="Incluir projetos arquivados nesta consulta"
-        />
-      </Collapse>
+            }
+            label="Incluir arquivados"
+          />
+        </Collapse>
+      )}
       {loading ? (
         <CircularProgress aria-label="Carregando relatório pessoal" />
       ) : error ? (
@@ -485,14 +562,30 @@ export function PersonalPage({
                       key={day}
                       sx={{
                         p: 1,
-                        minHeight: density === 'supercompact' ? 80 : 140,
+                        minHeight: {
+                          xs: entries.length ? 80 : 44,
+                          sm: density === 'supercompact' ? 88 : 116,
+                        },
+                        boxShadow: 'none',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 2,
                         minWidth: 0,
                         overflow: 'hidden',
                         opacity: outside ? 0.55 : 1,
                       }}
                     >
-                      <Typography component="h3" variant="subtitle2">
-                        {day}
+                      <Typography
+                        component="h3"
+                        variant="subtitle2"
+                        sx={{ mb: 0.5, color: 'text.secondary' }}
+                      >
+                        {new Intl.DateTimeFormat('pt-BR', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short',
+                          timeZone: zone,
+                        }).format(new Date(day + 'T12:00:00Z'))}
                       </Typography>
                       {outside ? (
                         <Typography variant="caption">
@@ -500,7 +593,7 @@ export function PersonalPage({
                         </Typography>
                       ) : entries.length === 0 ? (
                         <Typography variant="caption">
-                          Sem intervalos nesta página
+                          Sem atividades
                         </Typography>
                       ) : (
                         entries.map((item) => (
@@ -652,9 +745,6 @@ export function PersonalPage({
                   Próxima página (substitui dados)
                 </Button>
               )}
-              <Button onClick={() => setAttempt((v) => v + 1)}>
-                Atualizar
-              </Button>
             </Stack>
           </>
         )

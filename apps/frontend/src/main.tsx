@@ -222,7 +222,14 @@ function App() {
         {authorized && services ? (
           <>
             <AppBar position="static" elevation={0}>
-              <Toolbar sx={{ gap: 2, flexWrap: 'wrap', py: 1 }}>
+              <Toolbar
+                sx={{
+                  gap: { xs: 0.25, sm: 1 },
+                  minHeight: { xs: 60, sm: 64 },
+                  px: { xs: 1, sm: 2 },
+                  flexWrap: 'nowrap',
+                }}
+              >
                 <IconButton
                   color="inherit"
                   aria-label="Abrir menu de navegação"
@@ -230,10 +237,32 @@ function App() {
                   aria-controls={menuOpen ? 'menu-principal' : undefined}
                   onClick={() => setMenuOpen(true)}
                 >
-                  <span aria-hidden="true">☰</span>
+                  <UiIcon kind="menu" />
                 </IconButton>
-                <Typography component="h1" variant="h6" sx={{ flexGrow: 1 }}>
-                  Work Track ›{' '}
+                <Typography
+                  component="h1"
+                  variant="h6"
+                  noWrap
+                  sx={{
+                    flexGrow: 1,
+                    minWidth: 0,
+                    fontSize: { xs: 17, sm: 19 },
+                    fontWeight: 600,
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      display: { xs: 'none', sm: 'inline' },
+                      color: 'text.secondary',
+                      fontWeight: 400,
+                    }}
+                  >
+                    Work Track{' '}
+                    <Box component="span" sx={{ mx: 1 }}>
+                      ›
+                    </Box>
+                  </Box>
                   {location.pathname.startsWith('/projects')
                     ? 'Projetos'
                     : location.pathname.startsWith('/records')
@@ -269,7 +298,18 @@ function App() {
                     <UiIcon kind={revealed ? 'eye' : 'eyeoff'} />
                   </IconButton>
                 </Tooltip>
-                <Typography variant="body2">{user.email}</Typography>
+                <Typography
+                  variant="body2"
+                  noWrap
+                  sx={{
+                    display: { xs: 'none', md: 'block' },
+                    ml: 1,
+                    maxWidth: 240,
+                    color: 'text.secondary',
+                  }}
+                >
+                  {user.email}
+                </Typography>
               </Toolbar>
             </AppBar>
             <Drawer open={menuOpen} onClose={() => setMenuOpen(false)}>
@@ -280,6 +320,16 @@ function App() {
                 sx={{ width: 280, maxWidth: '85vw', p: 2 }}
               >
                 <Typography variant="h6">Work Track</Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: 'text.secondary',
+                    overflowWrap: 'anywhere',
+                    mb: 2,
+                  }}
+                >
+                  {user.email}
+                </Typography>
                 <Button onClick={() => setMenuOpen(false)}>Fechar menu</Button>
                 <Button onClick={() => setThemeOverride(null)}>
                   Tema do sistema
@@ -331,7 +381,7 @@ function App() {
               id="conteudo"
               tabIndex={-1}
               maxWidth="xl"
-              sx={{ py: 3 }}
+              sx={{ py: { xs: 2, sm: 3 } }}
             >
               {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
