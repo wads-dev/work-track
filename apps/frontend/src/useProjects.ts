@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { projectRepository, StaleProjectResponse } from './project-repository';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { type Row, text } from './data';
 import {
@@ -15,53 +16,70 @@ export function useProjects(
   const [state, setState] = useState<{
     uid: string;
     scope: ProjectScope;
+    functions: Functions;
     rows: Row[];
     loading: boolean;
     error: string;
-  }>({ uid, scope, rows: [], loading: true, error: '' });
+  }>({ uid, scope, functions, rows: [], loading: true, error: '' });
+  useEffect(
+    () => projectRepository.subscribe(() => setAttempt((value) => value + 1)),
+    [],
+  );
   useEffect(() => {
     let active = true;
-    setState({ uid, scope, rows: [], loading: true, error: '' });
-    void loadAllProjects(
-      async (cursor) =>
-        (
-          await httpsCallable<
-            {
-              scope: ProjectScope;
-              limit: number;
-              includeArchived: boolean;
-              cursor?: string;
-            },
-            ProjectPage
-          >(
-            functions,
-            'listProjects',
-          )({
-            scope,
-            limit: 100,
-            includeArchived: true,
-            ...(cursor ? { cursor } : {}),
-          })
-        ).data,
-    )
+    setState({ uid, scope, functions, rows: [], loading: true, error: '' });
+    void projectRepository
+      .load(functions, uid, scope, () =>
+        loadAllProjects(
+          async (cursor) =>
+            (
+              await httpsCallable<
+                {
+                  scope: ProjectScope;
+                  limit: number;
+                  includeArchived: boolean;
+                  cursor?: string;
+                },
+                ProjectPage
+              >(
+                functions,
+                'listProjects',
+              )({
+                scope: 'all',
+                limit: 100,
+                includeArchived: true,
+                ...(cursor ? { cursor } : {}),
+              })
+            ).data,
+        ),
+      )
       .then((projects) => {
         if (active)
           setState({
             uid,
             scope,
-            rows: projects.map((project) => ({
-              id: text(project.id, ''),
-              data: project,
-            })),
+            functions,
+            rows: projects
+              .filter(
+                (project) =>
+                  scope === 'all' ||
+                  (project.type === 'personal' ? 'personal' : 'work') === scope,
+              )
+              .map((project) => ({
+                id: text(project.id, ''),
+                data: project,
+              })),
             loading: false,
             error: '',
           });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (error instanceof StaleProjectResponse) return;
         if (active)
           setState({
             uid,
             scope,
+            functions,
             rows: [],
             loading: false,
             error:
@@ -73,9 +91,11 @@ export function useProjects(
     };
   }, [functions, uid, scope, attempt]);
   return {
-    ...(state.uid === uid && state.scope === scope
+    ...(state.uid === uid &&
+    state.scope === scope &&
+    state.functions === functions
       ? state
       : { rows: [], loading: true, error: '' }),
-    retry: () => setAttempt((value) => value + 1),
+    retry: () => projectRepository.invalidate(),
   };
 }

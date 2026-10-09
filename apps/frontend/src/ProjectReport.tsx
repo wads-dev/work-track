@@ -236,8 +236,8 @@ export function ProjectReport({
   if (hidden)
     return (
       <Alert severity="info" sx={{ mt: 2 }}>
-        Relatório, tópicos e avisos ocultos no modo seguro. Revele dados no topo
-        para visualizar. Esta ofuscação não altera permissões de acesso.
+        Relatório, tópicos e avisos ocultos na apresentação atual. Revele dados
+        no topo para visualizar. Esta ofuscação não altera permissões de acesso.
       </Alert>
     );
   return (

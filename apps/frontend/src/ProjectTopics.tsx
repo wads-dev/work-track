@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { projectMutation } from './project-mutation';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -93,7 +94,7 @@ export function ProjectTopics({
     if (execute && intent.current?.key !== key)
       intent.current = { key, id: crypto.randomUUID() };
     try {
-      const result = await httpsCallable(
+      const result = await projectMutation(
         functions,
         'mergeTopics',
       )({

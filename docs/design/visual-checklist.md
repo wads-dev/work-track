@@ -173,3 +173,19 @@ Os últimos sete screenshots mobile de B foram abertos e inspecionados, mas o ha
 ## Produção P — smoke visual público encerrado
 
 URL https://wadsworktrack.web.app/?release=9e64b8d; script servido index-BohQojQt.js confirmado no browser. [Login1440](../../.playwright-mcp/production-login-1440.png) e [login390](../../.playwright-mcp/production-login-390.png) capturados, abertos e inspecionados: PASS, card/CTA/textos legíveis, semoverflow e sembanneremulator. Nenhum click Google, autenticação, consentimento, troca de conta ou escrita em produção. Esta prova é **somente login público**, não auditoria autenticada em produção.
+
+## Filtro de projeto no calendário — revisão funcional única, local
+
+READY do Lead e hash servido/browser index-C2yk9atH.js, backend anterior sem mudança. Conta colega demo, nenhum acesso de produção/OAuth ou alteração de registro. Escopo somente novo autocomplete; calendário aprovado permanece congelado.
+
+**PASS:** pesquisar Atlas restringe opção a Plataforma Atlas; selecionar escreve projectId=design-demo-plataforma; reload recupera seleção depois dos dados carregarem. Semana mostra apenas Atlas1,75h; Dia/Régua em8/10 mostra apenas Atlas0,5h. Mudança de data8→9, visualizações Dia/Mês e back/forward preservamprojectId; voltar/avançar após limpar restaura/remove seleção respectivamente. Apagar entrada e botão Mostrar todos os projetos removemprojectId, mantendo data/view/density e restaurando3projetos.
+
+Evidências capturadas, abertas e vistas:
+
+- [Semana1440](../../.playwright-mcp/calendar-filter-week-1440.png) — filtro e resultado carregados.
+- [Régua1440](../../.playwright-mcp/calendar-filter-timeline-1440.png) e [régua390](../../.playwright-mcp/calendar-filter-timeline-390.png) — Atlas selecionado, apenas sua atividade; filtro cabe semoverflow.
+- [Limpo390](../../.playwright-mcp/calendar-filter-cleared-390.png) — Todos os projetos e3atividades restituídas.
+- [Pesquisa390 estabilizada](../../.playwright-mcp/calendar-filter-search-settled-390.png) — entrada Atlas e opção correspondente legíveis.
+- [Pesquisa390 transitória](../../.playwright-mcp/calendar-filter-search-390.png) **não é evidência de pesquisaAtlas**: depois de back/forward imediato houve reset para Todos os projetos entre a leitura do DOM e a captura, possivelmente por resultado assíncrono anterior; repetição com dados já carregados funcionou. Causa não investigada neste lote limitado; ressalva P2 enviada ao Lead.
+
+Limites: não houve conta com estimativa aberta neste recorte; preservação do orçamento global e privacidade backend são auditoria independente. Não foram reabertos estilos, densidade, recortes do calendário ou todas combinações de máscara/arquivados. Browser liberado após uma rodada.

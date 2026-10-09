@@ -32,6 +32,8 @@ import { EmptyState } from './Surface';
 import { RecordDrawer } from './RecordDrawer';
 import { contextualRecordPath } from './routes';
 import { CalendarTimeline } from './CalendarTimeline';
+import { CalendarProjectFilter } from './CalendarProjectFilter';
+import { updatePersonalFilters } from './calendar-project-filter';
 import { date, text } from './data';
 import { safeProject, usePrivacy } from './privacy';
 import { hours, pieSlices } from './report-chart';
@@ -207,18 +209,7 @@ export function PersonalPage({
       Array.from(id).reduce((n, c) => n + c.charCodeAt(0), 0) % 6
     ];
   function update(key: string, value: string) {
-    const next = new URLSearchParams(params);
-    if (key === 'clear') {
-      next.delete('fromDate');
-      next.delete('toDate');
-      next.delete('projectId');
-    } else if (value) next.set(key, value);
-    else next.delete(key);
-    if (key === 'view') {
-      next.set('density', value === 'month' ? 'supercompact' : 'timeline');
-    }
-    next.delete('cursor');
-    setParams(next);
+    setParams(updatePersonalFilters(params, key, value));
   }
   if (invalid)
     return (
@@ -259,6 +250,8 @@ export function PersonalPage({
           projects={projects.rows.map((p) => ({
             id: p.id,
             label: label(p.id),
+            searchText:
+              text(p.data.title, '') + ' ' + text(p.data.description, ''),
           }))}
           onFilter={update}
           onRefresh={() => setAttempt((v) => v + 1)}
@@ -337,6 +330,19 @@ export function PersonalPage({
               </MenuItem>
             ))}
           </TextField>
+          <CalendarProjectFilter
+            key={String(revealed)}
+            projectId={projectId}
+            projects={projects.rows.map((p) => ({
+              id: p.id,
+              label: label(p.id),
+              searchText:
+                text(p.data.title, '') + ' ' + text(p.data.description, ''),
+            }))}
+            loading={projects.loading}
+            error={projects.error}
+            onChange={(id) => update('projectId', id)}
+          />
           <FormControlLabel
             sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: 12 } }}
             control={
@@ -400,7 +406,7 @@ export function PersonalPage({
                   ))
                 ) : (
                   <Typography>
-                    Avisos detalhados ocultos no modo seguro.
+                    Avisos detalhados ocultos na apresentação atual.
                   </Typography>
                 )}
               </Stack>

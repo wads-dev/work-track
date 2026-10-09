@@ -1,5 +1,7 @@
+import { PageHeader } from './PageHeader';
 import { useProjects } from './useProjects';
 import { ProjectCreate } from './ProjectCreate';
+import { ProjectSelector } from './ProjectSelector';
 import { writeUrlTab } from './url-tabs';
 import { useEffect, useState, type ReactNode } from 'react';
 import { isOpen } from './pending-utils';
@@ -45,11 +47,13 @@ import { ProjectEditor } from './ProjectEditor';
 import { matchesArchive } from './project-archive';
 
 function DataTable({
+  hideHeading = false,
   title,
   headers,
   state,
   render,
 }: {
+  hideHeading?: boolean;
   title: string;
   headers: string[];
   state: ReturnType<typeof useRows>;
@@ -57,9 +61,11 @@ function DataTable({
 }) {
   return (
     <Box component="section" aria-label={title} sx={{ mb: 4 }}>
-      <Typography component="h2" variant="h5" sx={{ mb: 2 }}>
-        {title}
-      </Typography>
+      {!hideHeading && (
+        <Typography component="h2" variant="h5" sx={{ mb: 2 }}>
+          {title}
+        </Typography>
+      )}
       {state.loading ? (
         <Stack direction="row" sx={{ gap: 2 }} role="status">
           <CircularProgress size={24} aria-label="Carregando" />
@@ -107,8 +113,11 @@ function DataTable({
           >
             <Table sx={{ minWidth: 720 }}>
               <caption>
-                {title} — até 100 itens. A ordem não representa os mais
-                recentes.
+                {title}
+                {title === 'Projetos'
+                  ? ' — catálogo autorizado'
+                  : ' — até 100 itens'}
+                . A ordem não representa os mais recentes.
               </caption>
               <TableHead>
                 <TableRow>
@@ -141,7 +150,7 @@ function DataTable({
               </TableBody>
             </Table>
           </TableContainer>
-          {state.rows.length === 100 && (
+          {title !== 'Projetos' && state.rows.length === 100 && (
             <Alert severity="info" sx={{ mt: 1 }}>
               Limite de 100 itens atingido. Esta visão não representa
               necessariamente todos os dados.
@@ -186,6 +195,8 @@ export function Dashboard({
   const { revealed } = usePrivacy();
   const rawProjects = useProjects(functions, uid);
   const rawRecords = useRows(db, 'users/' + uid + '/records');
+  const rawProjectsById = new Map(rawProjects.rows.map((row) => [row.id, row]));
+  const rawRecordsById = new Map(rawRecords.rows.map((row) => [row.id, row]));
   const projects = {
     ...rawProjects,
     rows: rawProjects.rows.map((row) => ({
@@ -200,8 +211,7 @@ export function Dashboard({
       data: safeRecord(
         row.data,
         isHidden(
-          rawProjects.rows.find((project) => project.id === row.data.projectId)
-            ?.data,
+          rawProjectsById.get(text(row.data.projectId, ''))?.data,
           revealed,
         ),
       ),
@@ -242,23 +252,27 @@ export function Dashboard({
     location.pathname,
     location.hash,
   ]);
-  const [localFilter, setLocalFilter] = useState('');
-  const filter = revealed ? localFilter : '';
+  const [query, setQuery] = useState({ uid, revealed, text: '' });
+  useEffect(() => {
+    setQuery({ uid, revealed, text: '' });
+  }, [uid, revealed]);
+  const filter =
+    query.uid === uid && query.revealed === revealed ? query.text : '';
+  const setLocalFilter = (text: string) => setQuery({ uid, revealed, text });
   const projectFilter = params.get('project') ?? '';
   const archiveFilter = params.get('status') ?? 'active';
   const projectScope = params.get('scope') === 'personal' ? 'personal' : 'work';
   useEffect(() => {
-    if (!revealed) setLocalFilter('');
     if (params.has('q')) {
       const next = new URLSearchParams(params);
       next.delete('q');
       setParams(next, { replace: true });
     }
-  }, [revealed, params, setParams]);
+  }, [params, setParams]);
   function updateFilter(key: string, value: string) {
     const next = new URLSearchParams(params);
     if (key === 'q') {
-      if (revealed) setLocalFilter(value);
+      setLocalFilter(value);
       return;
     }
     if (value) next.set(key, value);
@@ -291,8 +305,7 @@ export function Dashboard({
         {!rawProjects.loading &&
           rawProjects.rows.some((row) => row.id === projectId) && (
             <Typography variant="body2" sx={{ mt: 1 }}>
-              {rawProjects.rows.find((row) => row.id === projectId)?.data
-                .type === 'personal'
+              {rawProjectsById.get(projectId)?.data.type === 'personal'
                 ? 'Pessoal · acesso somente ao dono'
                 : 'Compartilhado · usuários autorizados da empresa'}
             </Typography>
@@ -325,13 +338,8 @@ export function Dashboard({
           <ProjectEditor
             functions={functions}
             projectId={projectId}
-            project={
-              rawProjects.rows.find((item) => item.id === projectId)?.data
-            }
-            hidden={isHidden(
-              rawProjects.rows.find((item) => item.id === projectId)?.data,
-              revealed,
-            )}
+            project={rawProjectsById.get(projectId)?.data}
+            hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
           />
         </Box>
         <Box
@@ -348,10 +356,7 @@ export function Dashboard({
             key={projectId}
             projectId={projectId}
             functions={functions}
-            hidden={isHidden(
-              rawProjects.rows.find((item) => item.id === projectId)?.data,
-              revealed,
-            )}
+            hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
             search={location.search}
             uid={uid}
           />
@@ -362,20 +367,18 @@ export function Dashboard({
     ...projects,
     rows: projects.rows.filter(
       (row) =>
-        (rawProjects.rows.find((project) => project.id === row.id)?.data
-          .type === 'personal'
+        (rawProjectsById.get(row.id)?.data.type === 'personal'
           ? 'personal'
           : 'work') === projectScope &&
-        matchesArchive(
-          rawProjects.rows.find((project) => project.id === row.id)?.data,
-          archiveFilter,
-        ) &&
+        matchesArchive(rawProjectsById.get(row.id)?.data, archiveFilter) &&
         matchesFilter(
           [
             row.id,
-            row.data.title,
-            row.data.description,
-            ...objects(row.data.topics).map((topic) => topic.title),
+            rawProjectsById.get(row.id)?.data.title,
+            rawProjectsById.get(row.id)?.data.description,
+            ...objects(rawProjectsById.get(row.id)?.data.topics).map(
+              (topic) => topic.title,
+            ),
           ],
           filter,
         ),
@@ -389,10 +392,10 @@ export function Dashboard({
         matchesFilter(
           [
             row.id,
-            row.data.originalText,
-            row.data.interpretation,
-            object(row.data.projectSnapshot).title,
-            topicLabels(row.data),
+            rawRecordsById.get(row.id)?.data.originalText,
+            rawRecordsById.get(row.id)?.data.interpretation,
+            object(rawRecordsById.get(row.id)?.data.projectSnapshot).title,
+            topicLabels(rawRecordsById.get(row.id)?.data ?? {}),
           ],
           filter,
         ),
@@ -401,37 +404,87 @@ export function Dashboard({
   return (
     <>
       {mode === 'projects' && (
-        <Box sx={{ mb: 2 }}>
-          <Tabs
-            value={projectScope}
-            onChange={(_, value: string) => updateFilter('scope', value)}
-            aria-label="Acesso aos projetos"
+        <PageHeader
+          title="Projetos"
+          context={
+            projectScope === 'personal'
+              ? 'Seus projetos, com acesso exclusivo.'
+              : 'Projetos compartilhados com a empresa.'
+          }
+          actions={
+            <ProjectCreate
+              functions={functions}
+              onCreated={(id, type) => {
+                navigate(
+                  '/projects/' +
+                    encodeURIComponent(id) +
+                    '?tab=details&scope=' +
+                    type,
+                );
+              }}
+            />
+          }
+        >
+          <Box
+            sx={{ my: 2, '& .MuiTab-root': { minWidth: 0, flex: 1, px: 1 } }}
           >
-            <Tab value="work" label="Compartilhados" />
-            <Tab value="personal" label="Meus projetos pessoais" />
-          </Tabs>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {projectScope === 'personal'
-              ? 'Acesso somente ao dono. Outros usuários não podem consultar estes projetos.'
-              : 'Projetos corporativos acessíveis aos usuários autorizados da empresa.'}{' '}
-            Confidencialidade é uma ofuscação visual separada; não modifica o
-            acesso.
-          </Typography>
-        </Box>
-      )}
-      {mode === 'projects' && (
-        <ProjectCreate
-          functions={functions}
-          onCreated={(id, type) => {
-            rawProjects.retry();
-            navigate(
-              '/projects/' +
-                encodeURIComponent(id) +
-                '?tab=details&scope=' +
-                type,
-            );
-          }}
-        />
+            <Tabs
+              value={projectScope}
+              onChange={(_, value: string) => updateFilter('scope', value)}
+              aria-label="Acesso aos projetos"
+            >
+              <Tab value="work" label="Compartilhados" />
+              <Tab value="personal" label="Meus projetos pessoais" />
+            </Tabs>
+          </Box>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'minmax(0,1fr)',
+                md: 'minmax(280px,1fr) 280px auto',
+              },
+              gap: 2,
+              alignItems: 'start',
+            }}
+          >
+            {mode === 'projects' && (
+              <TextField
+                select
+                label="Estado dos projetos"
+                value={archiveFilter}
+                onChange={(e) => updateFilter('status', e.target.value)}
+                size="small"
+                sx={{ minWidth: 0, gridColumn: { md: 2 }, gridRow: { md: 1 } }}
+              >
+                <MenuItem value="active">Ativos</MenuItem>
+                <MenuItem value="archived">Arquivados</MenuItem>
+                <MenuItem value="all">Todos</MenuItem>
+              </TextField>
+            )}
+
+            <TextField
+              label="Pesquisar projetos"
+              value={filter}
+              onChange={(event) => updateFilter('q', event.target.value)}
+              fullWidth
+              sx={{ gridColumn: { md: 1 }, gridRow: { md: 1 } }}
+            />
+
+            <Button
+              sx={{ whiteSpace: 'nowrap', minHeight: { xs: 44, md: 40 } }}
+              onClick={() => {
+                const next = new URLSearchParams(params);
+                setLocalFilter('');
+                next.delete('q');
+                next.delete('project');
+                setParams(next);
+              }}
+            >
+              Limpar filtros
+            </Button>
+          </Box>
+        </PageHeader>
       )}
       {recordId && (
         <RecordDrawer
@@ -475,60 +528,59 @@ export function Dashboard({
           global.
         </Alert>
       )}
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
-        {mode === 'projects' && (
+      {mode !== 'projects' && (
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          sx={{ mb: 2 }}
+        >
           <TextField
-            select
-            label="Projetos por estado (lista carregada)"
-            value={archiveFilter}
-            onChange={(e) => updateFilter('status', e.target.value)}
-            size="small"
-            sx={{ minWidth: 180 }}
-          >
-            <MenuItem value="active">Ativos</MenuItem>
-            <MenuItem value="archived">Arquivados</MenuItem>
-            <MenuItem value="all">Todos</MenuItem>
-          </TextField>
-        )}
-
-        <TextField
-          label={
-            revealed
-              ? 'Filtrar texto local (não compartilhado)'
-              : 'Filtro textual indisponível no modo seguro'
-          }
-          disabled={!revealed}
-          value={filter}
-          onChange={(event) => updateFilter('q', event.target.value)}
-          fullWidth
-        />
-        {mode !== 'projects' && (
-          <TextField
-            label="ID do projeto (registros)"
-            value={projectFilter}
-            onChange={(event) => updateFilter('project', event.target.value)}
+            label="Pesquisar registros"
+            value={filter}
+            onChange={(event) => updateFilter('q', event.target.value)}
             fullWidth
           />
-        )}
-        <Button
-          onClick={() => {
-            const next = new URLSearchParams(params);
-            next.delete('q');
-            next.delete('project');
-            setParams(next);
-          }}
-        >
-          Limpar filtros
-        </Button>
-      </Stack>
-      {(projects.rows.length === 100 || records.rows.length === 100) && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Uma lista atingiu o limite de leitura; filtros não incluem itens fora
-          desse limite.
-        </Alert>
+          <>
+            <ProjectSelector
+              key={uid + String(revealed)}
+              projects={rawProjects.rows.map((row) => ({
+                id: row.id,
+                label: text(
+                  safeProject(row.data, revealed).title,
+                  'Projeto reservado',
+                ),
+                searchText:
+                  text(row.data.title, '') +
+                  ' ' +
+                  text(row.data.description, ''),
+              }))}
+              projectId={projectFilter}
+              loading={rawProjects.loading}
+              error={rawProjects.error}
+              onChange={(id) => updateFilter('project', id)}
+            />
+          </>
+          <Button
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              setLocalFilter('');
+              next.delete('q');
+              next.delete('project');
+              setParams(next);
+            }}
+          >
+            Limpar filtros
+          </Button>
+        </Stack>
+      )}
+      {mode !== 'projects' && records.rows.length === 100 && (
+        <Typography variant="caption" color="text.secondary">
+          Até 100 registros carregados. A busca considera esta lista.
+        </Typography>
       )}
       {mode !== 'records' && (
         <DataTable
+          hideHeading={mode === 'projects'}
           title="Projetos"
           headers={['Projeto', 'Descrição', 'Tópicos', 'Criado em']}
           state={filteredProjects}

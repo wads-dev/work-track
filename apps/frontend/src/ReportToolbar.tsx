@@ -1,6 +1,5 @@
 import {
   IconButton,
-  MenuItem,
   Stack,
   TextField,
   Tooltip,
@@ -10,6 +9,9 @@ import {
   FormControlLabel,
 } from '@mui/material';
 import { UiIcon } from './UiIcons';
+import { ProjectSelector } from './ProjectSelector';
+import { usePrivacy } from './privacy';
+import type { ProjectOption } from './project-search';
 export function ReportToolbar({
   total,
   fromDate,
@@ -25,12 +27,13 @@ export function ReportToolbar({
   fromDate: string;
   toDate: string;
   projectId: string;
-  projects: { id: string; label: string }[];
+  projects: ProjectOption[];
   onFilter: (key: string, value: string) => void;
   onRefresh: () => void;
   onInfo: () => void;
   includeArchived?: boolean;
 }) {
+  const { revealed } = usePrivacy();
   return (
     <Stack
       direction="row"
@@ -76,25 +79,17 @@ export function ReportToolbar({
         onChange={(e) => onFilter('toDate', e.target.value)}
         slotProps={{ inputLabel: { shrink: true } }}
       />
-      <TextField
-        size="small"
-        select
-        label="Projeto"
-        value={projectId}
-        onChange={(e) => onFilter('projectId', e.target.value)}
+      <ProjectSelector
+        key={String(revealed)}
+        projects={projects}
+        projectId={projectId}
+        onChange={(id) => onFilter('projectId', id)}
         sx={{
           minWidth: 0,
           width: { xs: '100%', sm: 200 },
           gridColumn: { xs: '1 / -1', sm: 'auto' },
         }}
-      >
-        <MenuItem value="">Todos</MenuItem>
-        {projects.map((p) => (
-          <MenuItem key={p.id} value={p.id}>
-            {p.label}
-          </MenuItem>
-        ))}
-      </TextField>
+      />
       {(fromDate || toDate || projectId) && (
         <Tooltip title="Limpar filtros">
           <IconButton

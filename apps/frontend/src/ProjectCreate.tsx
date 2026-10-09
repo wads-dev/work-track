@@ -1,5 +1,6 @@
+import { projectMutation } from './project-mutation';
 import { useState } from 'react';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { type Functions } from 'firebase/functions';
 import {
   Alert,
   Box,
@@ -29,7 +30,7 @@ export function ProjectCreate({
     setBusy(true);
     setError('');
     try {
-      const result = await httpsCallable<
+      const result = await projectMutation<
         { title: string; description: string; type: 'personal' | 'work' },
         { id: string }
       >(
@@ -50,16 +51,28 @@ export function ProjectCreate({
     }
   };
   return (
-    <Box sx={{ mb: 2 }}>
+    <Box
+      sx={{
+        minWidth: 0,
+        width: { xs: '100%', sm: open ? 'auto' : 'fit-content' },
+        justifySelf: { xs: 'stretch', sm: 'end' },
+        textAlign: { sm: 'right' },
+      }}
+    >
       <Button
-        variant="outlined"
+        variant="contained"
+        sx={{
+          width: { xs: '100%', sm: 'auto' },
+          minHeight: 44,
+          whiteSpace: 'nowrap',
+        }}
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="create-project-panel"
       >
         Novo projeto
       </Button>
-      <Collapse in={open}>
+      <Collapse in={open} unmountOnExit sx={{ textAlign: 'left' }}>
         <Box
           component="form"
           id="create-project-panel"

@@ -1,3 +1,4 @@
+import { projectMutation } from './project-mutation';
 import { useRef, useState } from 'react';
 import { UiIcon } from './UiIcons';
 import {
@@ -14,7 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { type Functions } from 'firebase/functions';
 import { archivedProject } from './project-archive';
 export function ProjectArchive({
   functions,
@@ -47,7 +48,7 @@ export function ProjectArchive({
       });
       if (intent.current?.key !== key)
         intent.current = { key, requestId: crypto.randomUUID() };
-      await httpsCallable(
+      await projectMutation(
         functions,
         'archiveProject',
       )({

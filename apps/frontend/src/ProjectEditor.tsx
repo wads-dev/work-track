@@ -1,3 +1,4 @@
+import { projectMutation } from './project-mutation';
 import { useRef, useState } from 'react';
 import {
   Alert,
@@ -11,10 +12,14 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import { type Functions } from 'firebase/functions';
 import { text } from './data';
 import { ProjectArchive } from './ProjectArchive';
 import { ProjectTopics } from './ProjectTopics';
+import { ProjectSelector } from './ProjectSelector';
+import { useProjects } from './useProjects';
+import { getAuth } from 'firebase/auth';
+import { safeProject, usePrivacy } from './privacy';
 export function ProjectEditor({
   functions,
   projectId,
@@ -29,8 +34,8 @@ export function ProjectEditor({
   if (hidden)
     return (
       <Alert severity="info" sx={{ my: 2 }}>
-        Metadados e gerenciamento ocultos no modo seguro. O alias exibido é
-        neutro; esta ofuscação visual não altera acesso.
+        Metadados e gerenciamento ocultos na apresentação atual. O alias exibido
+        é neutro; esta ofuscação visual não altera acesso.
       </Alert>
     );
   if (!project)
@@ -73,6 +78,11 @@ function ProjectForm({
   projectId: string;
   project: Record<string, unknown>;
 }) {
+  const catalog = useProjects(
+    functions,
+    getAuth(functions.app).currentUser?.uid ?? '',
+  );
+  const { revealed } = usePrivacy();
   const [title, setTitle] = useState(text(project.title, ''));
   const [description, setDescription] = useState(text(project.description, ''));
   const type = project.type === 'personal' ? 'personal' : 'work';
@@ -135,7 +145,7 @@ function ProjectForm({
       });
       if (saveIntent.current?.key !== key)
         saveIntent.current = { key, requestId: crypto.randomUUID() };
-      await httpsCallable(
+      await projectMutation(
         functions,
         'updateProject',
       )({
@@ -171,7 +181,7 @@ function ProjectForm({
         throw new Error('Confira preview, motivo e confirmação explícita.');
       if (cancel && !cancelConfirmed)
         throw new Error('Confirme cancelamento sem rollback.');
-      const result = await httpsCallable(
+      const result = await projectMutation(
         functions,
         'mergeProjects',
       )({
@@ -261,16 +271,31 @@ function ProjectForm({
         </Typography>
         <Alert severity="warning">
           Se origem ou destino for confidencial, destino ficará confidencial.
-          Origem: este projeto. Destino deve ser informado por ID. Preview não
+          Origem: este projeto. Escolha um destino autorizado. Preview não
           altera dados. Execução migra um lote por clique, preserva originais e
           arquiva origem ao concluir; não há execução automática.
         </Alert>
-        <TextField
-          label="ID do projeto destino"
-          value={target}
+        <ProjectSelector
+          key={getAuth(functions.app).currentUser?.uid + String(revealed)}
+          label="Projeto destino"
+          projects={catalog.rows
+            .filter((row) => row.id !== projectId)
+            .map((row) => ({
+              id: row.id,
+              label: text(
+                safeProject(row.data, revealed).title,
+                'Projeto reservado',
+              ),
+              searchText:
+                text(row.data.title, '') + ' ' + text(row.data.description, ''),
+            }))}
+          projectId={target}
+          allowAll={false}
+          loading={catalog.loading}
+          error={catalog.error}
           disabled={busy || !!job}
-          onChange={(e) => {
-            setTarget(e.target.value);
+          onChange={(id) => {
+            setTarget(id);
             setPreview(null);
             setConfirmed(false);
           }}

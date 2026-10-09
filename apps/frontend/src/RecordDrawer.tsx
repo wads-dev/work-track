@@ -251,8 +251,8 @@ export function RecordDrawer({
             revealed,
           ) && (
             <Alert severity="info">
-              Detalhes, edição e auditoria ocultos no modo seguro. Revele dados
-              no topo para continuar.
+              Detalhes, edição e auditoria ocultos no apresentação com dados
+              ocultos. Revele dados no topo para continuar.
             </Alert>
           )}
         {record &&
@@ -427,7 +427,7 @@ export function RecordDrawer({
               >
                 {!revealed ? (
                   <Alert severity="info">
-                    Auditoria oculta no modo seguro, pois pode conter
+                    Auditoria oculta na apresentação atual, pois pode conter
                     referências históricas confidenciais.
                   </Alert>
                 ) : (

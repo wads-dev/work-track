@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { projectRepository } from './project-repository';
 import { createRoot } from 'react-dom/client';
 import {
   Alert,
@@ -124,6 +125,7 @@ function App() {
           result.auth,
           (next) => {
             if (!active) return;
+            projectRepository.account(next?.uid ?? '');
             setUser(next);
             setRevealed(false);
             setLoading(false);
@@ -159,6 +161,7 @@ function App() {
       });
       const result = await signInWithPopup(services.auth, provider);
       if (!allowed(result.user)) {
+        projectRepository.account('');
         await signOut(services.auth);
         setError('Use uma conta Google verificada @wads.dev.');
       }
@@ -173,6 +176,7 @@ function App() {
     setBusy(true);
     setError('');
     try {
+      projectRepository.account('');
       await signOut(services.auth);
     } catch (failure) {
       setError(errorMessage(failure));
