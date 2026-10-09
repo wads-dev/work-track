@@ -1,0 +1,39 @@
+{
+  "kind": "identitytoolkit#DownloadAccountResponse",
+  "users": [
+    {
+      "localId": "35DvlWmc9p9KBKl6KD6i41aVGHPT",
+      "createdAt": "1790852400000",
+      "displayName": "Revisão visual (DEMO)",
+      "providerUserInfo": [
+        {
+          "providerId": "google.com",
+          "rawId": "design-demo-35DvlWmc9p9KBKl6KD6i41aVGHPT",
+          "email": "frontend.review@wads.dev",
+          "displayName": "Revisão visual (DEMO)"
+        }
+      ],
+      "validSince": "1791523968",
+      "email": "frontend.review@wads.dev",
+      "emailVerified": true,
+      "disabled": false
+    },
+    {
+      "localId": "design-demo-colleague",
+      "createdAt": "1790852400000",
+      "displayName": "Colega sintético (DEMO)",
+      "providerUserInfo": [
+        {
+          "providerId": "google.com",
+          "rawId": "design-demo-design-demo-colleague",
+          "email": "demo.colleague@wads.dev",
+          "displayName": "Colega sintético (DEMO)"
+        }
+      ],
+      "validSince": "1791523968",
+      "email": "demo.colleague@wads.dev",
+      "emailVerified": true,
+      "disabled": false
+    }
+  ]
+}

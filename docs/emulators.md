@@ -24,21 +24,32 @@ O primeiro build instala o Firebase CLI na imagem. Na inicialização, o contain
 | Serviço     | URL local                                                    |
 | ----------- | ------------------------------------------------------------ |
 | Hosting     | http://127.0.0.1:5000                                        |
-| Emulator UI | http://127.0.0.1:4000                                        |
+| Emulator UI | http://127.0.0.1:4001                                        |
 | Auth        | http://127.0.0.1:9099                                        |
 | Firestore   | http://127.0.0.1:8081                                        |
 | Functions   | http://127.0.0.1:5001/demo-work-track/southamerica-east1/api |
 
 Dentro do container os serviços escutam 0.0.0.0 para permitir o encaminhamento Docker. **No host, todas as portas publicadas usam 127.0.0.1.** Hub/logging ficam internos, sem publicação. Não use proxies/túneis públicos: emuladores e sua UI não são serviços de produção autenticados.
 
+A porta da UI no host é configurável: `FIREBASE_UI_PORT=4010 docker compose up --build`. O padrão 4001 evita disputar a porta 4000 usada por outros projetos. A porta interna permanece 4000; nenhum outro serviço muda de porta.
+
 ## Dados e isolamento
 
 - Volumes separados preservam dependências root/backend/frontend, cache de npm/emuladores e dados em /data.
-- O export automático ocorre no encerramento gracioso; um export existente é importado na próxima inicialização. Evite kill forçado, que pode impedir exportação.
+- Na primeira inicialização, sem export local, o container importa a fixture sintética versionável em `docker/firebase/demo-data/` (Auth e Firestore). Ela não contém dados de produção nem sessões OAuth.
+- O export automático ocorre no encerramento gracioso e é salvo somente no volume privado `/data`, nunca sobre a fixture do repositório. Nas próximas inicializações esse export local tem prioridade, preservando suas alterações. Evite kill forçado, que pode impedir exportação.
 - docker compose down preserva volumes. **docker compose down --volumes apaga dependências, cache e dados locais definitivamente**; só execute quando quiser explicitamente esse reset.
 - Apenas fontes/configs específicas são montadas. Não montamos .env, .firebaserc, credenciais Google, HOME host, socket Docker nem o checkout inteiro.
 - Não altere o project demo-work-track para um ID real, não forneça credenciais e não execute deploy neste container.
 - Firebase Admin nas Functions é direcionado pelos hosts definidos pelo Emulator Suite; recursos não emulados em projetos demo devem falhar em vez de acessar serviços reais. Chamadas HTTP externas arbitrárias feitas pelo código não são bloqueadas por Docker: isolamento demo não equivale a firewall.
+
+## Massa demonstrativa reproduzível
+
+A fixture contém projetos ativos, arquivados, confidenciais e pessoais; registros curtos, fechados e abertos; intervalos sobrepostos e atravessando meia-noite; tópicos e exemplos de auditoria. As datas são fixas em outubro de 2026, para comparações visuais reproduzíveis. Abra o calendário na semana de 8 de outubro de 2026 para ver os cenários. O segundo participante é apenas sintético, não um usuário de produção.
+
+O gerador `scripts/design-demo.mjs` é a fonte legível da massa: o modo padrão é dry-run sem rede, e a gravação exige `--write --confirm-local-demo`. Ele aceita apenas o emulador local `demo-work-track`, usa IDs estáveis e não sobrescreve documentos existentes. A fixture nativa permite restaurar tanto Auth quanto Firestore sem passos manuais após clonar.
+
+Não versione um export bruto de sessões reais de desenvolvimento: o volume local pode incluir dados alterados e fluxos OAuth temporários. Atualizações da fixture devem partir do gerador sintético em um emulador limpo e isolado. Não use exports de produção nem copie credenciais.
 
 ## Dashboard e OAuth: limites atuais
 
@@ -52,4 +63,4 @@ O backend OAuth ainda fixa issuer/resource/login de produção em seu bootstrap.
 
 Com autorização do usuário, a imagem foi construída e os emuladores iniciados. Foram verificados bootstrap demo, relatórios via SDK e revisão visual desktop/mobile com dados sintéticos locais. A porta Firestore foi alterada para 8081 e respondeu ao teste HTTP. Não foi utilizado login de produção na revisão local.
 
-Persistência de export/import ainda requer teste específico: após um reinício anterior, a conta/dados de teste precisaram ser recriados. Testes adversariais completos das regras permanecem pendentes.
+A fixture nativa foi exportada e importada em containers novos isolados; a comparação recursiva confirmou os 56 documentos exatos (7 projetos, 44 registros, 5 auditorias) e os 2 usuários Google sintéticos, sem coleções OAuth ou credenciais. O modo de verificação também passou com o snapshot montado somente leitura. O Hosting e a Emulator UI nas portas 5000 e 4001 responderam após a importação inicial. O ciclo automático de encerramento/exportação e reinício a partir do volume privado ainda está em validação. Testes adversariais completos das regras permanecem pendentes.

@@ -17,8 +17,13 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run build
 mkdir -p /data
 if [ -f /data/firebase-export-metadata.json ]; then
+  echo "[firebase] Restoring private local data from /data"
   set -- --import=/data
+elif [ -f /input/docker/firebase/demo-data/firebase-export-metadata.json ]; then
+  echo "[firebase] Importing the repository synthetic demo fixture"
+  set -- --import=/input/docker/firebase/demo-data
 else
+  echo "[firebase] No local export or repository fixture; starting empty"
   set --
 fi
 exec firebase emulators:start --config firebase.emulators.json \

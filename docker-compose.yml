@@ -17,7 +17,7 @@ services:
       - '127.0.0.1:8081:8081' # Firestore
       - '127.0.0.1:5001:5001' # Functions
       - '127.0.0.1:5000:5000' # Hosting
-      - '127.0.0.1:4000:4000' # Emulator UI
+      - '127.0.0.1:${FIREBASE_UI_PORT:-4001}:4000' # Emulator UI (host configurable)
     volumes:
       - ./package.json:/input/package.json:ro
       - ./package-lock.json:/input/package-lock.json:ro
@@ -34,6 +34,7 @@ services:
       - ./firestore.rules:/input/firestore.rules:ro
       - ./firestore.indexes.json:/input/firestore.indexes.json:ro
       - ./docker/firebase/start-emulators.sh:/input/docker/firebase/start-emulators.sh:ro
+      - ./docker/firebase/demo-data:/input/docker/firebase/demo-data:ro
       - root_dependencies:/workspace/node_modules
       - backend_dependencies:/workspace/apps/backend/node_modules
       - frontend_dependencies:/workspace/apps/frontend/node_modules
