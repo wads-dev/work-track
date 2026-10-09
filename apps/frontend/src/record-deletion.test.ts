@@ -8,6 +8,11 @@ const recordListeners = vi.hoisted(
       next: (snapshot: unknown) => void;
     }[],
 );
+const functions = vi.hoisted(() => ({}));
+vi.mock('firebase/functions', () => ({
+  getFunctions: () => functions,
+  httpsCallable: () => vi.fn(),
+}));
 vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, ...path: string[]) => path.join('/'),
   query: (base: string, ...constraints: unknown[]) => ({ base, constraints }),
@@ -124,7 +129,9 @@ it('record editor hides deleted parent, audit is not filtered; reports guard rev
   expect(pending).toContain('setNextCursor(page.cursor)');
   expect(pending).toContain('setHasMore(page.hasMore)');
 });
-it('caps merged raw pages and advances past tombstones without skipping live rows or repeating cursors', () => {
+it('caps merged raw pages and advances past tombstones without skipping live rows or repeating cursors', async () => {
+  // Typed projects are delivered by the live catalogs; no legacy parent reads.
+  const loadCatalog = vi.spyOn(projectRepository, 'load').mockResolvedValue([]);
   const facts = Array.from({ length: 103 }, (_, i) => ({
     id: String(i).padStart(3, '0'),
     data: {
@@ -160,6 +167,7 @@ it('caps merged raw pages and advances past tombstones without skipping live row
       ]),
     );
     recordListeners[1].next(snapshot([]));
+    await Promise.resolve(); // Wait for authorized catalog discovery to hydrate.
     for (const listener of recordListeners.slice(2)) {
       const project = listener.query.constraints.find(
         (constraint) =>
@@ -204,6 +212,8 @@ it('caps merged raw pages and advances past tombstones without skipping live row
   }
   expect(active).toEqual(['100', '101', '102']);
   expect(seen.size).toBe(103);
+  expect(loadCatalog).toHaveBeenCalledTimes(2);
+  loadCatalog.mockRestore();
 });
 it('observed deletion invalidates two project subscribers and purge fences old observer', () => {
   let first = 0;
