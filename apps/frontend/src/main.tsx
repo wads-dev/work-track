@@ -26,6 +26,15 @@ import {
 import { initializeServices, type Services } from './firebase';
 import { Dashboard } from './Dashboard';
 import './styles.css';
+import {
+  BrowserRouter,
+  Link as RouterLink,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom';
+import { safeReturnTo } from './routes';
 
 const theme = createTheme({
   palette: {
@@ -56,6 +65,10 @@ function errorMessage(error: unknown): string {
     : 'Não foi possível concluir a operação. Tente novamente.';
 }
 function App() {
+  const location = useLocation();
+  const returnTo = safeReturnTo(
+    new URLSearchParams(location.search).get('returnTo'),
+  );
   const [services, setServices] = useState<Services | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +141,17 @@ function App() {
     }
   }
   const authorized = user && allowed(user);
+  if (!loading && !authorized && location.pathname !== '/') {
+    const target = location.pathname + location.search + location.hash;
+    return (
+      <Navigate
+        replace
+        to={'/?returnTo=' + encodeURIComponent(safeReturnTo(target))}
+      />
+    );
+  }
+  if (!loading && authorized && location.pathname === '/')
+    return <Navigate replace to={returnTo} />;
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -171,7 +195,98 @@ function App() {
                 {error}
               </Alert>
             )}
-            <Dashboard key={user.uid} db={services.db} uid={user.uid} />
+            <Stack
+              component="nav"
+              direction="row"
+              spacing={1}
+              aria-label="Navegação principal"
+              sx={{ mb: 3, flexWrap: 'wrap' }}
+            >
+              {[
+                ['/app', 'Visão geral'],
+                ['/projects', 'Projetos'],
+                ['/records', 'Meus registros'],
+              ].map(([to, label]) => (
+                <Button
+                  key={to}
+                  component={RouterLink}
+                  to={to}
+                  variant={
+                    location.pathname === to ||
+                    location.pathname.startsWith(to + '/')
+                      ? 'contained'
+                      : 'outlined'
+                  }
+                >
+                  {label}
+                </Button>
+              ))}
+            </Stack>
+            <Routes>
+              <Route
+                path="/app"
+                element={
+                  <Dashboard
+                    key={user.uid}
+                    db={services.db}
+                    uid={user.uid}
+                    mode="overview"
+                  />
+                }
+              />
+              <Route
+                path="/projects"
+                element={
+                  <Dashboard
+                    key={user.uid}
+                    db={services.db}
+                    uid={user.uid}
+                    mode="projects"
+                  />
+                }
+              />
+              <Route
+                path="/projects/:projectId"
+                element={
+                  <Dashboard
+                    key={user.uid}
+                    db={services.db}
+                    uid={user.uid}
+                    mode="projects"
+                  />
+                }
+              />
+              <Route
+                path="/records"
+                element={
+                  <Dashboard
+                    key={user.uid}
+                    db={services.db}
+                    uid={user.uid}
+                    mode="records"
+                  />
+                }
+              />
+              <Route
+                path="/records/:recordId"
+                element={
+                  <Dashboard
+                    key={user.uid}
+                    db={services.db}
+                    uid={user.uid}
+                    mode="records"
+                  />
+                }
+              />
+              <Route
+                path="*"
+                element={
+                  <Alert severity="info">
+                    Página não encontrada. Use a navegação para voltar.
+                  </Alert>
+                }
+              />
+            </Routes>
           </Container>
         </>
       ) : (
@@ -253,4 +368,9 @@ function App() {
   );
 }
 const root = document.getElementById('root');
-if (root) createRoot(root).render(<App />);
+if (root)
+  createRoot(root).render(
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>,
+  );

@@ -1,0 +1,49 @@
+services:
+  firebase:
+    build:
+      context: ./docker/firebase
+    init: true
+    working_dir: /workspace
+    environment:
+      CI: 'true'
+      FIREBASE_CLI_DISABLE_UPDATE_CHECK: 'true'
+      FIREBASE_EMULATORS_PATH: /cache/emulators
+      npm_config_cache: /cache/npm
+      XDG_CONFIG_HOME: /cache/config
+      GCLOUD_PROJECT: demo-work-track
+      GOOGLE_CLOUD_PROJECT: demo-work-track
+    ports:
+      - '127.0.0.1:9099:9099' # Auth
+      - '127.0.0.1:8080:8080' # Firestore
+      - '127.0.0.1:5001:5001' # Functions
+      - '127.0.0.1:5000:5000' # Hosting
+      - '127.0.0.1:4000:4000' # Emulator UI
+    volumes:
+      - ./package.json:/input/package.json:ro
+      - ./package-lock.json:/input/package-lock.json:ro
+      - ./apps/backend/package.json:/input/apps/backend/package.json:ro
+      - ./apps/backend/tsconfig.json:/input/apps/backend/tsconfig.json:ro
+      - ./apps/backend/tsconfig.build.json:/input/apps/backend/tsconfig.build.json:ro
+      - ./apps/backend/src:/input/apps/backend/src:ro
+      - ./apps/frontend/package.json:/input/apps/frontend/package.json:ro
+      - ./apps/frontend/tsconfig.json:/input/apps/frontend/tsconfig.json:ro
+      - ./apps/frontend/index.html:/input/apps/frontend/index.html:ro
+      - ./apps/frontend/src:/input/apps/frontend/src:ro
+      - ./apps/frontend/public:/input/apps/frontend/public:ro
+      - ./firebase.emulators.json:/input/firebase.emulators.json:ro
+      - ./firestore.rules:/input/firestore.rules:ro
+      - ./firestore.indexes.json:/input/firestore.indexes.json:ro
+      - ./docker/firebase/start-emulators.sh:/input/docker/firebase/start-emulators.sh:ro
+      - root_dependencies:/workspace/node_modules
+      - backend_dependencies:/workspace/apps/backend/node_modules
+      - frontend_dependencies:/workspace/apps/frontend/node_modules
+      - firebase_cache:/cache
+      - emulator_data:/data
+    stop_grace_period: 60s
+
+volumes:
+  root_dependencies:
+  backend_dependencies:
+  frontend_dependencies:
+  firebase_cache:
+  emulator_data:

@@ -3,22 +3,7 @@
     {
       "source": "apps/backend",
       "codebase": "default",
-      "runtime": "nodejs22",
-      "ignore": [
-        "node_modules",
-        ".npm-cache",
-        ".git",
-        ".github",
-        ".husky",
-        "src",
-        "*-debug.log*",
-        ".env*",
-        ".agents",
-        ".firebase-cli",
-        "gha-creds-*.json",
-        "public"
-      ],
-      "predeploy": ["npm run build --workspace @work-track/backend"]
+      "runtime": "nodejs22"
     }
   ],
   "firestore": {
@@ -27,23 +12,39 @@
   },
   "emulators": {
     "auth": {
+      "host": "0.0.0.0",
       "port": 9099
     },
-    "functions": {
-      "port": 5001
-    },
     "firestore": {
+      "host": "0.0.0.0",
       "port": 8080
     },
+    "functions": {
+      "host": "0.0.0.0",
+      "port": 5001
+    },
+    "hosting": {
+      "host": "0.0.0.0",
+      "port": 5000
+    },
     "ui": {
-      "enabled": true
+      "enabled": true,
+      "host": "0.0.0.0",
+      "port": 4000
+    },
+    "hub": {
+      "host": "0.0.0.0",
+      "port": 4400
+    },
+    "logging": {
+      "host": "0.0.0.0",
+      "port": 4500
     },
     "singleProjectMode": true
   },
   "hosting": {
     "public": "apps/frontend/dist",
     "cleanUrls": true,
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
         "source": "/mcp",
@@ -112,38 +113,6 @@
         "source": "**",
         "destination": "/index.html"
       }
-    ],
-    "headers": [
-      {
-        "source": "**",
-        "headers": [
-          {
-            "key": "Referrer-Policy",
-            "value": "no-referrer"
-          },
-          {
-            "key": "X-Content-Type-Options",
-            "value": "nosniff"
-          },
-          {
-            "key": "Cache-Control",
-            "value": "no-store"
-          }
-        ]
-      }
-    ],
-    "predeploy": ["npm run build --workspace @work-track/frontend"]
-  },
-  "auth": {
-    "providers": {
-      "googleSignIn": {
-        "oAuthBrandDisplayName": "Work Track",
-        "supportEmail": "victor@wads.dev",
-        "authorizedRedirectUris": [
-          "https://wadsworktrack.firebaseapp.com/__/auth/handler",
-          "https://wadsworktrack.web.app/__/auth/handler"
-        ]
-      }
-    }
+    ]
   }
 }
