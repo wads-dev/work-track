@@ -40,7 +40,7 @@ export async function initializeServices() {
   const functions = getFunctions(app, 'southamerica-east1');
   if (emulator) {
     connectAuthEmulator(auth, 'http://' + location.hostname + ':9099');
-    connectFirestoreEmulator(db, location.hostname, 8080);
+    connectFirestoreEmulator(db, location.hostname, 8081);
     connectFunctionsEmulator(functions, location.hostname, 5001);
   }
   await setPersistence(auth, browserLocalPersistence);

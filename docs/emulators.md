@@ -26,7 +26,7 @@ O primeiro build instala o Firebase CLI na imagem. Na inicialização, o contain
 | Hosting     | http://127.0.0.1:5000                                        |
 | Emulator UI | http://127.0.0.1:4000                                        |
 | Auth        | http://127.0.0.1:9099                                        |
-| Firestore   | http://127.0.0.1:8080                                        |
+| Firestore   | http://127.0.0.1:8081                                        |
 | Functions   | http://127.0.0.1:5001/demo-work-track/southamerica-east1/api |
 
 Dentro do container os serviços escutam 0.0.0.0 para permitir o encaminhamento Docker. **No host, todas as portas publicadas usam 127.0.0.1.** Hub/logging ficam internos, sem publicação. Não use proxies/túneis públicos: emuladores e sua UI não são serviços de produção autenticados.
@@ -42,7 +42,7 @@ Dentro do container os serviços escutam 0.0.0.0 para permitir o encaminhamento 
 
 ## Dashboard e OAuth: limites atuais
 
-O frontend conecta explicitamente Auth e Firestore aos emuladores quando a configuração usa projectId demo-work-track e o hostname é localhost ou 127.0.0.1. Usa portas 9099 e 8080. Projeto demo em outro hostname falha fechado. O startup Docker ainda não foi testado; confirme que o Hosting Emulator fornece configuração demo válida antes de autenticar. Não teste com configuração de produção nem suponha que /__/firebase/init.json configure os conectores. No telefone/outro host, os endereços precisariam de adaptação deliberada; as portas loopback não oferecem acesso remoto.
+O frontend conecta explicitamente Auth e Firestore aos emuladores quando a configuração usa projectId demo-work-track e o hostname é localhost ou 127.0.0.1. Usa portas 9099 e 8081. Projeto demo em outro hostname falha fechado. O startup Docker ainda não foi testado; confirme que o Hosting Emulator fornece configuração demo válida antes de autenticar. Não teste com configuração de produção nem suponha que /__/firebase/init.json configure os conectores. No telefone/outro host, os endereços precisariam de adaptação deliberada; as portas loopback não oferecem acesso remoto.
 
 As regras permitem projetos somente para token Google com email verificado @wads.dev e registros apenas para o UID do caminho. Use identidades de teste compatíveis no Auth Emulator; não enfraqueça regras para testar o dashboard. O fluxo Google local é simulado pelo emulador, não um login de produção.
 

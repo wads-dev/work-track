@@ -14,7 +14,7 @@ services:
       GOOGLE_CLOUD_PROJECT: demo-work-track
     ports:
       - '127.0.0.1:9099:9099' # Auth
-      - '127.0.0.1:8080:8080' # Firestore
+      - '127.0.0.1:8081:8081' # Firestore
       - '127.0.0.1:5001:5001' # Functions
       - '127.0.0.1:5000:5000' # Hosting
       - '127.0.0.1:4000:4000' # Emulator UI
