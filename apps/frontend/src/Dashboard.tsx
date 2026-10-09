@@ -1,4 +1,3 @@
-import { PageHeader } from './PageHeader';
 import { useProjects } from './useProjects';
 import { ProjectCreate } from './ProjectCreate';
 import { ProjectSelector } from './ProjectSelector';
@@ -404,14 +403,28 @@ export function Dashboard({
   return (
     <>
       {mode === 'projects' && (
-        <PageHeader
-          title="Projetos"
-          context={
-            projectScope === 'personal'
-              ? 'Seus projetos, com acesso exclusivo.'
-              : 'Projetos compartilhados com a empresa.'
-          }
-          actions={
+        <>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'minmax(0,1fr)',
+                sm: 'minmax(0,1fr) auto',
+              },
+              gap: 2,
+              alignItems: 'start',
+              mb: 2,
+            }}
+          >
+            <Tabs
+              value={projectScope}
+              onChange={(_, value: string) => updateFilter('scope', value)}
+              aria-label="Acesso aos projetos"
+              sx={{ minWidth: 0, '& .MuiTab-root': { minWidth: 0, px: 2 } }}
+            >
+              <Tab value="work" label="Compartilhados" />
+              <Tab value="personal" label="Meus projetos pessoais" />
+            </Tabs>
             <ProjectCreate
               functions={functions}
               onCreated={(id, type) => {
@@ -423,22 +436,17 @@ export function Dashboard({
                 );
               }}
             />
-          }
-        >
-          <Box
-            sx={{ my: 2, '& .MuiTab-root': { minWidth: 0, flex: 1, px: 1 } }}
-          >
-            <Tabs
-              value={projectScope}
-              onChange={(_, value: string) => updateFilter('scope', value)}
-              aria-label="Acesso aos projetos"
-            >
-              <Tab value="work" label="Compartilhados" />
-              <Tab value="personal" label="Meus projetos pessoais" />
-            </Tabs>
           </Box>
           <Box
+            component="section"
+            aria-label="Filtros de projetos"
             sx={{
+              mb: 2,
+              p: { xs: 2, sm: 3 },
+              bgcolor: 'background.paper',
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: '12px',
               display: 'grid',
               gridTemplateColumns: {
                 xs: 'minmax(0,1fr)',
@@ -484,7 +492,7 @@ export function Dashboard({
               Limpar filtros
             </Button>
           </Box>
-        </PageHeader>
+        </>
       )}
       {recordId && (
         <RecordDrawer
