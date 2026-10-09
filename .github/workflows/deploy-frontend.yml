@@ -7,6 +7,7 @@ on:
       - 'apps/backend/src/modules/reports/**'
       - 'firestore.indexes.json'
       - 'scripts/wait-firestore-indexes*.mjs'
+      - 'scripts/wait-firestore-deploy*.mjs'
       - 'package.json'
       - 'package-lock.json'
       - 'firebase.json'
@@ -14,6 +15,7 @@ on:
       - '.github/workflows/deploy-frontend.yml'
 permissions:
   contents: read
+  actions: read
   id-token: write
 concurrency:
   group: deploy-frontend
@@ -23,13 +25,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: node --test scripts/wait-firestore-indexes.test.mjs
+      - run: node --test scripts/wait-firestore-indexes.test.mjs scripts/wait-firestore-deploy.test.mjs
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
@@ -38,4 +42,10 @@ jobs:
       - name: Wait for required Firestore indexes before publishing Hosting
         timeout-minutes: 22
         run: node scripts/wait-firestore-indexes.mjs wadsworktrack
+      - name: Wait for same-push Firestore deployment before publishing Hosting
+        timeout-minutes: 21
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: node scripts/wait-firestore-deploy.mjs
       - run: npx -y firebase-tools@latest deploy --only hosting --project wadsworktrack --non-interactive
