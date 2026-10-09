@@ -258,10 +258,15 @@ export function CalendarTimeline({
                             asChild
                             variant="ghost"
                             className={cn(
-                              'absolute min-h-0 min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-[11px] leading-[1.15]',
+                              'absolute min-h-[22px] hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-[11px] leading-[1.15]',
                             )}
                             style={{
                               top: projectMinute(e.wallStart, segments),
+                              minHeight: Math.max(
+                                22,
+                                projectMinute(e.wallEnd, segments) -
+                                  projectMinute(e.wallStart, segments),
+                              ),
                               height:
                                 projectMinute(e.wallEnd, segments) -
                                 projectMinute(e.wallStart, segments),
@@ -272,29 +277,18 @@ export function CalendarTimeline({
                           >
                             {e.item.uid && e.item.uid !== viewerUid ? (
                               <span tabIndex={0}>
-                                {(e.wallEnd - e.wallStart) * px >= 22 ? (
-                                  <span
-                                    className={cn(
-                                      'text-base block whitespace-nowrap overflow-hidden text-ellipsis text-[11px] px-1',
-                                    )}
-                                  >
-                                    {e.item.uid
-                                      ? authorLabel(e.item.uid) + ' · '
-                                      : ''}
-                                    {time(e.start)}
-                                    {label(e.item.projectId)}
-                                    {e.item.estimated ? ' ◷' : ''}
-                                    {e.overlap ? ' ⇆' : ''}
-                                  </span>
-                                ) : (
-                                  <span
-                                    aria-hidden="true"
-                                    className={cn('block w-full h-full')}
-                                    style={{
-                                      backgroundColor: color(e.item.projectId),
-                                    }}
-                                  />
-                                )}
+                                <span
+                                  className={cn(
+                                    'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
+                                  )}
+                                >
+                                  {e.item.uid
+                                    ? authorLabel(e.item.uid) + ' · '
+                                    : ''}
+                                  {time(e.start)} · {label(e.item.projectId)}
+                                  {e.item.estimated ? ' ◷' : ''}
+                                  {e.overlap ? ' ⇆' : ''}
+                                </span>
                               </span>
                             ) : (
                               <RouterLink
@@ -309,29 +303,18 @@ export function CalendarTimeline({
                                   ) ?? '#'
                                 }
                               >
-                                {(e.wallEnd - e.wallStart) * px >= 22 ? (
-                                  <span
-                                    className={cn(
-                                      'text-base block whitespace-nowrap overflow-hidden text-ellipsis text-[11px] px-1',
-                                    )}
-                                  >
-                                    {e.item.uid
-                                      ? authorLabel(e.item.uid) + ' · '
-                                      : ''}
-                                    {time(e.start)}
-                                    {label(e.item.projectId)}
-                                    {e.item.estimated ? ' ◷' : ''}
-                                    {e.overlap ? ' ⇆' : ''}
-                                  </span>
-                                ) : (
-                                  <span
-                                    aria-hidden="true"
-                                    className={cn('block w-full h-full')}
-                                    style={{
-                                      backgroundColor: color(e.item.projectId),
-                                    }}
-                                  />
-                                )}
+                                <span
+                                  className={cn(
+                                    'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
+                                  )}
+                                >
+                                  {e.item.uid
+                                    ? authorLabel(e.item.uid) + ' · '
+                                    : ''}
+                                  {time(e.start)} · {label(e.item.projectId)}
+                                  {e.item.estimated ? ' ◷' : ''}
+                                  {e.overlap ? ' ⇆' : ''}
+                                </span>
                               </RouterLink>
                             )}
                           </Button>
