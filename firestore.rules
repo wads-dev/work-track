@@ -9,15 +9,6 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
-    // TEMP rollout compatibility: remove together with the canonical read clause
-    // after the new project-constrained frontend is deployed.
-    function isCompanyGoogleUser() {
-      return request.auth != null
-        && request.auth.token.email is string
-        && request.auth.token.email_verified == true
-        && request.auth.token.email.lower().matches('^[^@]+@wads[.]dev$')
-        && request.auth.token.firebase.sign_in_provider == 'google.com';
-    }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
     function isWorkProject(data) { return !('type' in data) || data.type == 'work'; }
     function isPersonalProjectOwner(data) {
@@ -78,8 +69,6 @@ service cloud.firestore {
       allow delete: if projectAccess(resource.data);
     }
     match /users/{uid}/records/{recordId} {
-      // TEMP: previous canonical owner history access, not collectionGroup access.
-      allow get, list: if isCompanyGoogleUser() && isOwner(uid);
       allow create: if signedIn() && validId(recordId)
         && validRecord(request.resource.data, uid, recordId) && recordProjectAccess(request.resource.data);
       allow update: if recordProjectAccess(resource.data) && recordProjectAccess(request.resource.data)
@@ -93,8 +82,7 @@ service cloud.firestore {
     }
     // Required for collectionGroup('records'). Only record documents whose
     // current parent is authorized are granted; no grant extends to their children.
-    // Final project policy denies orphans; TEMP canonical owner exception above
-    // preserves the old frontend until project-constrained reads are deployed.
+    // Orphans and unauthorized current parents are denied, including record owners.
     match /{path=**}/records/{recordId} {
       allow get, list: if recordProjectAccess(resource.data);
     }

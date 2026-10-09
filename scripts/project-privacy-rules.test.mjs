@@ -410,35 +410,10 @@ test('project authorization: public authenticated and own personal', async (t) =
         'empty-project',
         'path-project',
       ]) {
-        for (const token of [externalAliceToken, bobToken])
+        for (const token of [aliceToken, externalAliceToken, bobToken])
           await denied(get('users/' + alice + '/records/' + id, token));
       }
       await denied(get('projects/bad-type', aliceToken));
-    },
-  );
-  await t.test(
-    'TEMP canonical corporate owner reads preserve old frontend, not collectionGroup or foreign history',
-    async () => {
-      await allowed(list('users/' + alice + '/records', aliceToken));
-      await allowed(get('users/' + alice + '/records/orphan', aliceToken));
-      for (const token of [externalAliceToken, bobToken]) {
-        await denied(list('users/' + alice + '/records', token));
-        await denied(get('users/' + alice + '/records/orphan', token));
-      }
-      await denied(
-        query('', 'records', aliceToken, {
-          allDescendants: true,
-          where: equal('uid', alice),
-        }),
-      );
-      for (const changes of [
-        { email_verified: false },
-        { email: 'alice@example.net' },
-        { firebase: { sign_in_provider: 'password' } },
-        { email: '' },
-      ]) {
-        await denied(list('users/' + alice + '/records', jwt(alice, changes)));
-      }
     },
   );
   await t.test(
@@ -483,12 +458,25 @@ test('project authorization: public authenticated and own personal', async (t) =
           where: equal('projectId', 'personal-alice'),
         }),
       );
-      await denied(
-        query('', 'records', aliceToken, {
-          allDescendants: true,
-          where: equal('uid', alice),
-        }),
-      );
+      for (const token of [aliceToken, externalAliceToken, bobToken]) {
+        await denied(
+          query('', 'records', token, {
+            allDescendants: true,
+            where: equal('uid', alice),
+          }),
+        );
+        await denied(list('users/' + alice + '/records', token));
+        await denied(
+          query('users/' + alice, 'records', token, {
+            where: equal('uid', alice),
+          }),
+        );
+        await allowed(
+          query('users/' + alice, 'records', token, {
+            where: equal('projectId', 'work'),
+          }),
+        );
+      }
       await denied(query('', 'records', undefined, options));
       await allowed(
         write(
@@ -631,7 +619,8 @@ test('project authorization: public authenticated and own personal', async (t) =
       );
       await allowed(get(path, aliceToken));
       await allowed(request(documentUrl(p), 'owner', 'DELETE'));
-      await denied(get(path, externalAliceToken));
+      for (const token of [aliceToken, externalAliceToken, bobToken])
+        await denied(get(path, token));
       await denied(write(path, validRecord('work'), aliceToken));
       await denied(request(documentUrl(path), aliceToken, 'DELETE'));
     },
