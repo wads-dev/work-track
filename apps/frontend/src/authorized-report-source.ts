@@ -246,7 +246,10 @@ export function subscribeAuthorizedReport(
                 });
                 emit();
               },
-              error,
+              (e) => {
+                if (disposed || groups.get(id) !== g) return;
+                error(e);
+              },
             ),
           ),
         );
