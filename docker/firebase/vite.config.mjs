@@ -7,6 +7,7 @@ export const demoConfig = Object.freeze({
   appId: 'demo-work-track-dashboard',
 });
 import tailwindcss from '@tailwindcss/vite';
+import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 export default {
   resolve: {
@@ -22,6 +23,7 @@ export default {
   },
   plugins: [
     tailwindcss(),
+    VitePWA({ injectRegister: false, devOptions: { enabled: false } }),
     {
       name: 'local-demo-firebase-bootstrap',
       apply: 'serve',
@@ -31,7 +33,20 @@ export default {
             return next();
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Cache-Control', 'no-store');
-          res.end(JSON.stringify(demoConfig));
+          res.end(
+            JSON.stringify({
+              ...demoConfig,
+              emulatorPorts: {
+                auth: Number(process.env.WORK_TRACK_AUTH_PORT || 9099),
+                firestore: Number(
+                  process.env.WORK_TRACK_FIRESTORE_PORT || 8081,
+                ),
+                functions: Number(
+                  process.env.WORK_TRACK_FUNCTIONS_PORT || 5001,
+                ),
+              },
+            }),
+          );
         });
       },
     },
