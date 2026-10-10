@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirebaseCompanyPeopleRepository } from './modules/people/infrastructure/firebase-company-people.js';
+import { listCompanyPeopleHandler } from './modules/people/presentation/list-company-people.js';
 import { FirestoreMergeRepository } from './modules/merge/infrastructure/firestore-merge.js';
 import { FirestoreTopicReportRepository } from './modules/reports/infrastructure/firestore-topic-report.js';
 import { getTopicReportHandler } from './modules/reports/presentation/get-topic-report.js';
@@ -40,6 +42,21 @@ import { FirestoreProjectDeletionRepository } from './modules/registration/infra
 import { projectDeletionHandler } from './modules/registration/presentation/project-deletion.js';
 
 initializeApp();
+export const listCompanyPeople = onCall(
+  {
+    region: 'southamerica-east1',
+    invoker: 'public',
+    maxInstances: 3,
+    timeoutSeconds: 60,
+    memory: '256MiB',
+  },
+  (request) =>
+    listCompanyPeopleHandler(
+      new FirebaseCompanyPeopleRepository(getAuth()),
+      request.data as unknown,
+      request.auth,
+    ),
+);
 // Frontend callables only: intentionally absent from the MCP tool registry.
 export const exportProjectForDeletion = onCall(
   {
