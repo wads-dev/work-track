@@ -22,4 +22,4 @@ Consulta corporativa usa `collectionGroup(records)` filtrada por `projectId` ap�
 
 ## Publicação
 
-Este PR não executa migração de dados nem deploy manual. Após revisão/merge e deploy backend+frontend, reconectar clientes MCP, obter nova prévia e confirmar migração real. O callable legado pode permanecer fisicamente publicado até retirada operacional; clientes novos usam apenas `moveTopic`.
+Este PR não executa migração de dados nem deploy manual. Após revisão/merge e deploy backend+frontend, reconectar clientes MCP, obter nova prévia e confirmar migração real. O callable legado `moveSubject` permanece exportado como alias de `moveTopic` para impedir que o Firebase tente apagá-lo no deploy não interativo. Ele usa o contrato canônico `topic_*`, autenticação e confirmação da mesma implementação; não aceita automaticamente payloads antigos `subject_*`. Clientes novos usam apenas `moveTopic`. A retirada do alias exige uma etapa operacional explícita, não `--force` na esteira.
