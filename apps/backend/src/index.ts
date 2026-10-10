@@ -136,6 +136,9 @@ export const moveTopic = onCall(
       request.auth,
     ),
 );
+// Keep the deployed callable during the rename rollout. MCP exposes only move_topic.
+// Remove this alias only through an explicitly planned Firebase function retirement.
+export const moveSubject = moveTopic;
 export const moveRecord = onCall(
   {
     region: 'southamerica-east1',
