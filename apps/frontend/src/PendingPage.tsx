@@ -31,8 +31,7 @@ import { contextualRecordPath } from './routes';
 import type { Functions } from 'firebase/functions';
 import { UiIcon } from './UiIcons';
 export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
-  // This header is mounted on every route. Its deliberately partial counter
-  // must not connect the entire history repository just to use its first 100.
+  // Fetch only indexed open records, never a sample of the history.
   const [bellError, setBellError] = useState(false);
   const [snapshot, setSnapshot] = useState<{ uid: string; rows: Row[] }>({
     uid: '',
@@ -59,7 +58,7 @@ export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
           setSnapshot({ uid, rows: [] });
         }
       },
-      { size: 100 },
+      { openOnly: true },
     );
     return () => {
       active = false;
@@ -67,17 +66,15 @@ export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
     };
   }, [db, uid]);
   const now = useClock();
-  const count = (snapshot.uid === uid ? snapshot.rows : [])
-    .slice(0, 100)
-    .filter((row) => isAlertOpen(row.data, now)).length;
+  const count = (snapshot.uid === uid ? snapshot.rows : []).filter((row) =>
+    isAlertOpen(row.data, now),
+  ).length;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           aria-label={
-            'Ver pendências: ' +
-            count +
-            ' abertos há mais de 8 horas nos até 100 registros carregados'
+            'Ver pendências: ' + count + ' abertos há mais de 8 horas'
           }
           asChild
           variant="ghost"
@@ -87,9 +84,7 @@ export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
           <RouterLink
             to={'/pending'}
             aria-label={
-              'Ver pendências: ' +
-              count +
-              ' abertos há mais de 8 horas nos até 100 registros carregados'
+              'Ver pendências: ' + count + ' abertos há mais de 8 horas'
             }
           >
             <span>
@@ -106,7 +101,7 @@ export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
       <TooltipContent>
         {bellError
           ? 'Não foi possível consultar pendências.'
-          : 'Abertos há mais de 8 horas nos até 100 registros carregados, não contagem global'}
+          : 'Registros abertos há mais de 8 horas'}
       </TooltipContent>
     </Tooltip>
   );
@@ -122,11 +117,8 @@ export function PendingPage({
 }) {
   const [params, setParams] = useSearchParams();
   const revision = useDeletionRevision(uid);
-  const cursor = params.get('after') ?? '';
   const recordId = params.get('record');
   const [rows, setRows] = useState<Row[]>([]);
-  const [nextCursor, setNextCursor] = useState('');
-  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -137,15 +129,12 @@ export function PendingPage({
     setLoading(true);
     setError('');
     setRows([]);
-    setHasMore(false);
     const stop = subscribeAuthorizedOwnRecords(
       db,
       uid,
       (page) => {
         if (!active) return;
         setRows(page.rows.filter((r) => !isDeletedRecord(r.data)));
-        setNextCursor(page.cursor);
-        setHasMore(page.hasMore);
         setLoading(false);
       },
       () => {
@@ -155,13 +144,13 @@ export function PendingPage({
           setLoading(false);
         }
       },
-      { size: 100, after: cursor },
+      { openOnly: true },
     );
     return () => {
       active = false;
       stop();
     };
-  }, [db, uid, cursor, attempt, revision]);
+  }, [db, uid, attempt, revision]);
   const open = rows.filter((row) => isOpen(row.data));
   return (
     <div className={cn('flex flex-col gap-4')}>
@@ -202,14 +191,15 @@ export function PendingPage({
       ) : (
         <>
           <p className={cn('text-base')}>
-            {rows.length} registros examinados nesta página; {open.length}{' '}
-            abertos encontrados.
+            {open.length}{' '}
+            {open.length === 1
+              ? 'registro sem finalização'
+              : 'registros sem finalização'}
           </p>
           {open.length === 0 ? (
             <Alert>
               <AlertDescription>
-                Nenhum aberto nesta página examinada. Pode haver abertos em
-                outras páginas.
+                Tudo em dia. Você não tem registros sem finalização.
               </AlertDescription>
             </Alert>
           ) : (
@@ -316,29 +306,11 @@ export function PendingPage({
               </div>
             </>
           )}
-          <div className={cn('flex flex-row gap-4')}>
-            {cursor && (
-              <Button onClick={() => setParams({})} variant="ghost">
-                Primeira página
-              </Button>
-            )}
-            {hasMore && (
-              <Button
-                onClick={() => setParams({ after: nextCursor })}
-                variant="ghost"
-              >
-                Examinar próxima página
-              </Button>
-            )}
-            <Button onClick={() => setAttempt((v) => v + 1)} variant="ghost">
-              Atualizar página
-            </Button>
-          </div>
         </>
       )}
       <span className={cn('text-xs text-muted-foreground')}>
-        Até 100 registros examinados por página; contagem carregada, não global.
-        Sino: abertos há mais de 8h.
+        Os registros são atualizados em tempo real. O sino destaca os abertos há
+        mais de 8 horas.
       </span>
     </div>
   );

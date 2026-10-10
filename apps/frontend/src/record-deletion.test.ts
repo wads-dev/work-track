@@ -121,13 +121,13 @@ it('record editor hides deleted parent, audit is not filtered; reports guard rev
     expect(source(name)).toContain('reportOwner === uid');
   }
   const pending = source('./PendingPage.tsx');
-  expect(pending).toContain('{ size: 100, after: cursor }');
+  expect(pending).toContain('{ openOnly: true }');
+  expect(pending).not.toContain('size: 100');
   expect(pending).toContain(
     'page.rows.filter((r) => !isDeletedRecord(r.data))',
   );
-  // Advance over examined raw records even when the page contains only tombstones.
-  expect(pending).toContain('setNextCursor(page.cursor)');
-  expect(pending).toContain('setHasMore(page.hasMore)');
+  expect(pending).not.toContain('setNextCursor');
+  expect(pending).not.toContain('Examinar próxima página');
 });
 it('caps merged raw pages and advances past tombstones without skipping live rows or repeating cursors', async () => {
   // Typed projects are delivered by the live catalogs; no legacy parent reads.
@@ -214,6 +214,59 @@ it('caps merged raw pages and advances past tombstones without skipping live row
   expect(seen.size).toBe(103);
   expect(loadCatalog).toHaveBeenCalledTimes(2);
   loadCatalog.mockRestore();
+});
+it('pending queries null in Firestore without limits and stays live beyond 100 opens', async () => {
+  const catalog = vi.spyOn(projectRepository, 'load').mockResolvedValue([]);
+  recordListeners.splice(0);
+  const next = vi.fn();
+  const stop = subscribeAuthorizedOwnRecords(
+    {} as Firestore,
+    'alice',
+    next,
+    vi.fn(),
+    { openOnly: true },
+  );
+  const snapshot = (rows: Row[]) => ({
+    docs: rows.map((row) => ({ id: row.id, data: () => row.data })),
+    metadata: { fromCache: false, hasPendingWrites: false },
+  });
+  recordListeners[0].next(snapshot([{ id: 'p', data: {} }]));
+  recordListeners[1].next(snapshot([]));
+  await Promise.resolve();
+  const listener = recordListeners[2];
+  expect(listener.query.base).toBe('users/alice/records');
+  expect(listener.query.constraints).toContainEqual([
+    'where',
+    'projectId',
+    '==',
+    'p',
+  ]);
+  expect(listener.query.constraints).toContainEqual([
+    'where',
+    'endedAt',
+    '==',
+    null,
+  ]);
+  expect(
+    listener.query.constraints.some(
+      (c) => Array.isArray(c) && ['limit', 'after'].includes(c[0]),
+    ),
+  ).toBe(false);
+  const rows = Array.from({ length: 151 }, (_, i) => ({
+    id: String(i),
+    data: { projectId: 'p', endedAt: null },
+  }));
+  listener.next(snapshot(rows));
+  expect(next.mock.lastCall![0].rows).toHaveLength(151);
+  expect(next.mock.lastCall![0].hasMore).toBe(false);
+  listener.next(snapshot(rows.slice(1)));
+  expect(next.mock.lastCall![0].rows).toHaveLength(150);
+  stop();
+  catalog.mockRestore();
+});
+it('non-null malformed endings are not open', () => {
+  for (const endedAt of ['', false, 0, {}, []])
+    expect(isOpen({ endedAt })).toBe(false);
 });
 it('observed deletion invalidates two project subscribers and purge fences old observer', () => {
   let first = 0;

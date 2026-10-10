@@ -613,3 +613,28 @@ it('explicit parent revocation overrides stale work catalog regardless callback 
     await next.mock.lastCall![0].repository.loadContext(['alice']),
   ).toEqual([]);
 });
+
+it.each([undefined, null, '2026-10-08T13:00:00Z'])(
+  'normalizes authorized persisted endedAt %s',
+  async (endedAt) => {
+    const next = vi.fn(),
+      fail = vi.fn();
+    const stop = subscribeAuthorizedReport(db, 'viewer', next, fail);
+    mock.listeners[0].next(catalog([['a', { type: 'work', topics: [] }]]));
+    mock.listeners[1].next(catalog([]));
+    const value = { ...fact, endedAt };
+    mock.listeners[2].next(
+      batch([
+        { id: 'r', ref: { path: 'users/alice/records/r' }, data: () => value },
+      ]),
+    );
+    expect(fail).not.toHaveBeenCalled();
+    const context = await next.mock.lastCall![0].repository.loadContext([
+      'alice',
+    ]);
+    expect(context).toHaveLength(1);
+    expect(context[0]?.endedAt).toBe(endedAt ?? undefined);
+    expect(value.endedAt).toBe(endedAt);
+    stop();
+  },
+);

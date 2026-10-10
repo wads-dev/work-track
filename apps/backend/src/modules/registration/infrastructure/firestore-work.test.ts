@@ -51,6 +51,9 @@ it('persists default topics and isolates idempotent records by user', async () =
   const saved = await repo.register(input, 'alice');
   expect(saved.topics).toEqual([{ topicId: 'general' }]);
   expect(saved.endedAt).toBeUndefined();
+  expect(
+    data.get('users/alice/records/' + String(saved.id))?.endedAt,
+  ).toBeNull();
   expect(saved.uid).toBe('alice');
   expect((await repo.register(input, 'alice')).duplicate).toBe(true);
   expect(

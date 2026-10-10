@@ -241,7 +241,9 @@ export function subscribePersonalReport(
                 !/^[^/]+$/.test(data.projectId) ||
                 typeof data.startedAt !== 'string' ||
                 typeof data.timeZone !== 'string' ||
-                (data.endedAt !== undefined && typeof data.endedAt !== 'string')
+                (data.endedAt !== undefined &&
+                  data.endedAt !== null &&
+                  typeof data.endedAt !== 'string')
               )
                 throw new Error('Contexto global contém registro inválido.');
               const topics = data.topics ?? [];
@@ -265,7 +267,7 @@ export function subscribePersonalReport(
                   uid,
                   projectId: data.projectId,
                   startedAt: data.startedAt,
-                  endedAt: data.endedAt,
+                  endedAt: data.endedAt ?? undefined,
                   timeZone: data.timeZone,
                   topics,
                 },

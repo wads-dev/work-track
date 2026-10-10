@@ -4,6 +4,14 @@
       "collectionGroup": "records",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "projectId", "order": "ASCENDING" },
+        { "fieldPath": "endedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "records",
+      "queryScope": "COLLECTION",
+      "fields": [
         {
           "fieldPath": "endedAt",
           "order": "ASCENDING"
