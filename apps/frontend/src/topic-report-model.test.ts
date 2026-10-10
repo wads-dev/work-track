@@ -47,6 +47,16 @@ it('personal drilldown contains only self with neutral label and never synthesiz
   expect(result[0].people).toEqual([{ key: '0', label: 'Você', minutes: 60 }]);
   expect(result.every((b) => b.topicId !== null)).toBe(true);
 });
+it('includes self identity for the reusable component only when revealed', () => {
+  const result = topicBuckets(
+    [topic],
+    () => ({ title: 'Project' }),
+    true,
+    'raw-user',
+  );
+  expect(result[0].people[0].uid).toBe('raw-user');
+  expect(result[0].people).toHaveLength(1);
+});
 it('missing label does not fall back to uid', () => {
   const result = topicBuckets(
     [{ ...topic, byUser: [{ uid: 'secretuid', label: '', minutes: 60 }] }],

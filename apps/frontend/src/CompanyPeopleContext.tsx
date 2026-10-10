@@ -19,6 +19,7 @@ type Directory = {
   error: string;
   refresh: () => void;
   name: (uid: string) => string | undefined;
+  person: (uid: string) => CompanyPerson | undefined;
 };
 const Context = createContext<Directory>({
   people: [],
@@ -26,6 +27,7 @@ const Context = createContext<Directory>({
   error: '',
   refresh: () => {},
   name: () => undefined,
+  person: () => undefined,
 });
 export const useCompanyPeople = () => useContext(Context);
 
@@ -80,6 +82,7 @@ export function CompanyPeopleProvider({
       value={{
         ...current,
         refresh: () => setAttempt((value) => value + 1),
+        person: (id) => byUid.get(id),
         name: (id) => {
           const person = byUid.get(id);
           return person ? personName(person) : undefined;

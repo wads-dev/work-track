@@ -1,3 +1,4 @@
+import { PersonIdentity } from './PersonIdentity';
 import { cn } from './lib/utils';
 import { Button } from './components/ui/button';
 import { Card } from './components/ui/card';
@@ -325,6 +326,7 @@ export function ProjectReport({
                 variant="pie"
                 data={report.byUser.map((person, index) => ({
                   key: person.uid,
+                  uid: hidden ? undefined : person.uid,
                   label: hidden ? 'Pessoa ' + (index + 1) : person.label,
                   minutes: person.minutes,
                   href: hidden
@@ -357,8 +359,13 @@ export function ProjectReport({
             {report.records.map((record) => (
               <Card key={record.id + record.uid} className={cn('gap-0 p-4')}>
                 <p className={cn('text-lg font-semibold')}>
-                  {report.byUser.find((item) => item.uid === record.uid)
-                    ?.label || 'Pessoa'}
+                  <PersonIdentity
+                    uid={hidden ? undefined : record.uid}
+                    fallback={
+                      report.byUser.find((item) => item.uid === record.uid)
+                        ?.label || 'Pessoa'
+                    }
+                  />
                 </p>
                 <p className={cn('text-sm text-muted-foreground')}>
                   {date(record.startedAt)} —{' '}
@@ -404,8 +411,13 @@ export function ProjectReport({
                 {report.records.map((record) => (
                   <TableRow key={record.id + record.uid}>
                     <TableCell>
-                      {report.byUser.find((item) => item.uid === record.uid)
-                        ?.label || 'Pessoa'}
+                      <PersonIdentity
+                        uid={hidden ? undefined : record.uid}
+                        fallback={
+                          report.byUser.find((item) => item.uid === record.uid)
+                            ?.label || 'Pessoa'
+                        }
+                      />
                       {record.uid === uid && (
                         <Tooltip>
                           <TooltipTrigger asChild>

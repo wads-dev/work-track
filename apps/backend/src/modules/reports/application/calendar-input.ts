@@ -6,7 +6,6 @@ export const calendarInput = z
     userIds: z
       .array(id)
       .min(1)
-      .max(10)
       .refine((v) => new Set(v).size === v.length)
       .optional(),
     from: z.iso.datetime({ offset: true }).optional(),

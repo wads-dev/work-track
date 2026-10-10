@@ -1,4 +1,7 @@
 import { cn } from './lib/utils';
+import { PersonIdentity } from './PersonIdentity';
+import { useCompanyPeople } from './CompanyPeopleContext';
+import { usePrivacy } from './privacy';
 import { Button } from './components/ui/button';
 import {
   Tooltip,
@@ -38,6 +41,7 @@ export function CalendarTimeline({
   viewerUid,
   authorLabel,
   renderProject,
+  detailsAvailable,
 }: {
   items: Event[];
   day: string;
@@ -48,8 +52,11 @@ export function CalendarTimeline({
   returnTo: string;
   viewerUid: string;
   authorLabel: (uid: string) => string;
+  detailsAvailable?: (projectId: string) => boolean;
   renderProject?: (id: string) => import('react').ReactNode;
 }) {
+  const directory = useCompanyPeople();
+  const { revealed } = usePrivacy();
   const [expansion, setExpansion] = useState<{
     period: string;
     keys: string[];
@@ -227,6 +234,19 @@ export function CalendarTimeline({
                   style={{ height }}
                 >
                   {d.events.map((e) => {
+                    const identityAvailable = detailsAvailable
+                      ? detailsAvailable(e.item.projectId)
+                      : label(e.item.projectId) !== 'Projeto reservado';
+                    const personUid = identityAvailable
+                      ? e.item.uid || viewerUid
+                      : undefined;
+                    const fallback = personUid
+                      ? authorLabel(personUid)
+                      : 'Pessoa';
+                    const personLabel =
+                      revealed && personUid
+                        ? directory.name(personUid) || fallback
+                        : 'Pessoa';
                     const caption =
                       label(e.item.projectId) +
                       ' · ' +
@@ -250,11 +270,7 @@ export function CalendarTimeline({
                         <TooltipTrigger asChild>
                           <Button
                             tabIndex={0}
-                            aria-label={
-                              (e.item.uid
-                                ? authorLabel(e.item.uid) + ' · '
-                                : '') + caption
-                            }
+                            aria-label={personLabel + ' · ' + caption}
                             asChild
                             variant="ghost"
                             className={cn(
@@ -282,9 +298,11 @@ export function CalendarTimeline({
                                     'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
                                   )}
                                 >
-                                  {e.item.uid
-                                    ? authorLabel(e.item.uid) + ' · '
-                                    : ''}
+                                  <PersonIdentity
+                                    uid={personUid}
+                                    fallback={fallback}
+                                  />
+                                  {' · '}
                                   {time(e.start)} · {label(e.item.projectId)}
                                   {e.item.estimated ? ' ◷' : ''}
                                   {e.overlap ? ' ⇆' : ''}
@@ -308,9 +326,11 @@ export function CalendarTimeline({
                                     'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
                                   )}
                                 >
-                                  {e.item.uid
-                                    ? authorLabel(e.item.uid) + ' · '
-                                    : ''}
+                                  <PersonIdentity
+                                    uid={personUid}
+                                    fallback={fallback}
+                                  />
+                                  {' · '}
                                   {time(e.start)} · {label(e.item.projectId)}
                                   {e.item.estimated ? ' ◷' : ''}
                                   {e.overlap ? ' ⇆' : ''}
@@ -320,8 +340,9 @@ export function CalendarTimeline({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          {(e.item.uid ? authorLabel(e.item.uid) + ' · ' : '') +
-                            caption}
+                          <PersonIdentity uid={personUid} fallback={fallback} />
+                          {' · '}
+                          {caption}
                         </TooltipContent>
                       </Tooltip>
                     );

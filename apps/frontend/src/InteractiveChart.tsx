@@ -12,8 +12,12 @@ import {
   Tooltip,
 } from 'recharts';
 import { hours, colors } from './report-chart';
+import { PersonIdentity } from './PersonIdentity';
+import { useCompanyPeople } from './CompanyPeopleContext';
+import { usePrivacy } from './privacy';
 export type ChartDatum = {
   key: string;
+  uid?: string;
   label: string;
   minutes: number;
   href?: string;
@@ -29,9 +33,23 @@ export function InteractiveChart({
   variant?: 'pie' | 'bar';
 }) {
   const navigate = useNavigate();
-  const values = data.filter(
-    (item) => Number.isFinite(item.minutes) && item.minutes > 0,
-  );
+  const directory = useCompanyPeople();
+  const { revealed } = usePrivacy();
+  const values = data
+    .filter((item) => Number.isFinite(item.minutes) && item.minutes > 0)
+    .map((item) =>
+      item.uid
+        ? {
+            ...item,
+            label: revealed
+              ? directory.name(item.uid) || 'Pessoa da empresa'
+              : 'Pessoa',
+            uid: revealed ? item.uid : undefined,
+          }
+        : item,
+    );
+  const label = (item: ChartDatum) =>
+    item.uid ? <PersonIdentity uid={item.uid} /> : item.label;
   const activate = (item: ChartDatum) => {
     if (item.href) navigate(item.href);
     else item.onSelect?.();
@@ -49,7 +67,7 @@ export function InteractiveChart({
         const item = payload?.[0]?.payload as ChartDatum | undefined;
         return active && item ? (
           <div className="rounded-md border bg-popover p-3 text-sm text-popover-foreground shadow-md">
-            <p className="font-medium">{item.label}</p>
+            <p className="font-medium">{label(item)}</p>
             <p>
               {hours(item.minutes)} ·{' '}
               {new Intl.NumberFormat('pt-BR', {
@@ -74,9 +92,7 @@ export function InteractiveChart({
         className="my-4 w-full"
         style={{
           height:
-            variant === 'pie'
-              ? 260
-              : Math.max(180, Math.min(values.length * 42 + 40, 480)),
+            variant === 'pie' ? 260 : Math.max(180, values.length * 42 + 40),
         }}
       >
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -120,7 +136,33 @@ export function InteractiveChart({
                 type="category"
                 dataKey="label"
                 width={120}
-                tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+                tick={
+                  values.some((item) => item.uid)
+                    ? ({
+                        x,
+                        y,
+                        index,
+                      }: {
+                        x?: string | number;
+                        y?: string | number;
+                        index?: number;
+                      }) => {
+                        const item = values[index ?? 0];
+                        return (
+                          <foreignObject
+                            x={Number(x) - 116}
+                            y={Number(y) - 16}
+                            width={112}
+                            height={32}
+                          >
+                            <div className="flex h-full items-center text-xs text-muted-foreground">
+                              {item ? label(item) : null}
+                            </div>
+                          </foreignObject>
+                        );
+                      }
+                    : { fontSize: 12, fill: 'var(--muted-foreground)' }
+                }
                 tickFormatter={(label: string) =>
                   label.length > 18 ? label.slice(0, 17) + '…' : label
                 }
@@ -156,7 +198,7 @@ export function InteractiveChart({
                 className="text-primary underline underline-offset-4 focus-visible:outline-2"
                 to={item.href}
               >
-                {item.label}: {hours(item.minutes)}
+                {label(item)}: {hours(item.minutes)}
               </Link>
             ) : item.onSelect ? (
               <button
@@ -164,11 +206,11 @@ export function InteractiveChart({
                 className="text-primary underline underline-offset-4 focus-visible:outline-2"
                 onClick={() => activate(item)}
               >
-                {item.label}: {hours(item.minutes)}
+                {label(item)}: {hours(item.minutes)}
               </button>
             ) : (
               <span>
-                {item.label}: {hours(item.minutes)}
+                {label(item)}: {hours(item.minutes)}
               </span>
             )}
           </li>

@@ -213,14 +213,25 @@ it('scopeconversion deletion move and archive affect next request; privacy midfl
     getCalendarReportHandler(g.repo, { ...input, mode: 'global' }, auth),
   ).rejects.toMatchObject({ code: 'failed-precondition' });
 });
-it('max10 selected despite picker>10; physical scans bounded no hidden partial', async () => {
+it('all and explicit selections include more than10 people; physical scans bounded no hidden partial', async () => {
   const f = fixture();
   f.setRecords(
     Array.from({ length: 11 }, (_, i) => record('person' + i, 'r' + i)),
   );
-  await expect(
-    getCalendarReportHandler(f.repo, { ...input, mode: 'global' }, auth),
-  ).rejects.toMatchObject({ code: 'resource-exhausted' });
+  for (const userIds of [
+    undefined,
+    Array.from({ length: 11 }, (_, i) => 'person' + i),
+  ]) {
+    const all = await getCalendarReportHandler(
+      f.repo,
+      { ...input, mode: 'global', ...(userIds ? { userIds } : {}) },
+      auth,
+    );
+    expect(all.participants).toHaveLength(11);
+    expect(all.intervals).toHaveLength(11);
+    expect(all.totalMinutes).toBe(660);
+    expect(all.page).toMatchObject({ partial: false, nextCursor: null });
+  }
   const filtered = await getCalendarReportHandler(
     f.repo,
     { ...input, mode: 'global', userIds: ['person1'] },
@@ -302,9 +313,14 @@ it('Global viewer discovery supports11participants, duplicate record IDs keep au
     result.participants.every((p) => p.label === 'Participante sem nome'),
   ).toBe(true);
   expect(JSON.stringify(result)).not.toContain('privateperson');
-  await expect(
-    getCalendarReportHandler(f.repo, { ...input, mode: 'global' }, auth),
-  ).rejects.toMatchObject({ code: 'resource-exhausted' });
+  const all = await getCalendarReportHandler(
+    f.repo,
+    { ...input, mode: 'global' },
+    auth,
+  );
+  expect(all.intervals).toHaveLength(11);
+  expect(all.totalMinutes).toBe(660);
+  expect(JSON.stringify(all)).not.toContain('privateperson');
   const own = await getCalendarReportHandler(f.repo, input, auth);
   expect(own.participants).toHaveLength(11);
   expect(own.intervals.every((r) => r.uid === 'alice')).toBe(true);
@@ -348,7 +364,7 @@ it('archive change midcontext fails closed for selection and directory; includeA
     ).totalMinutes,
   ).toBe(120);
 });
-it('optional own directory scan exceeding2000 physical pages or100people degrades truthfully not own hours; own cap/auth/privacy still fail', async () => {
+it('optional own directory scan budget degrades truthfully; over100people remain complete and own cap/auth/privacy still fail', async () => {
   const f = fixture();
   f.setRecords([record('alice', 'a')]);
   let n = 0;
@@ -377,13 +393,21 @@ it('optional own directory scan exceeding2000 physical pages or100people degrade
     record('alice', 'a'),
     ...Array.from({ length: 101 }, (_, i) => record('person' + i, 'r' + i)),
   ]);
-  const capped = await getCalendarReportHandler(g.repo, input, auth);
-  expect(capped).toMatchObject({
+  const complete = await getCalendarReportHandler(g.repo, input, auth);
+  expect(complete).toMatchObject({
     totalMinutes: 60,
-    participantsUnavailable: true,
-    participants: [{ uid: 'alice', label: 'Alice' }],
+    participantsUnavailable: false,
   });
-  expect(JSON.stringify(capped)).not.toContain('person100');
+  expect(complete.participants).toHaveLength(102);
+  expect(complete.participants.some((p) => p.uid === 'person100')).toBe(true);
+  const all = await getCalendarReportHandler(
+    g.repo,
+    { ...input, mode: 'global' },
+    auth,
+  );
+  expect(all.participants).toHaveLength(102);
+  expect(all.intervals).toHaveLength(102);
+  expect(all.totalMinutes).toBe(6120);
   const h = fixture();
   h.repo.own.readPage = () =>
     Promise.resolve({

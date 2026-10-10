@@ -91,7 +91,7 @@ export async function executeCalendarReport(
       directoryRaw = { records: [], scannedCount: 0, nextCursor: null };
     }
   }
-  let directoryValid =
+  const directoryValid =
     input.mode === 'own'
       ? await repository.revalidate(directoryRaw.records, uid, 'global')
       : valid;
@@ -100,36 +100,22 @@ export async function executeCalendarReport(
     : await repository.company.archivedProjectIds([
         ...new Set(directoryValid.map((r) => r.projectId)),
       ]);
-  let directory = directoryValid.filter(
+  const directory = directoryValid.filter(
     (r) =>
       (!input.projectId || r.projectId === input.projectId) &&
       (input.includeArchived || !directoryArchived.includes(r.projectId)),
   );
-  let participantUids = [
+  const participantUids = [
     ...new Set([
       ...(input.mode === 'own' ? [uid] : []),
       ...directory.map((r) => r.uid),
     ]),
   ];
-  if (participantUids.length > 100) {
-    if (input.mode === 'global')
-      throw new ReportContextError(
-        'Mais de100 participantes; selecione um projeto.',
-      );
-    participantsUnavailable = true;
-    participantUids = [uid];
-    directory = [];
-    directoryValid = [];
-  }
   const labels = await repository.company.userLabels(participantUids);
   const selected = visible.filter(
       (r) => !input.userIds || input.userIds.includes(r.uid),
     ),
     uids = [...new Set(selected.map((r) => r.uid))];
-  if (uids.length > 10)
-    throw new ReportContextError(
-      'Mais de10 pessoas na seleção; escolha pessoas ou projeto.',
-    );
   const context =
     input.mode === 'own'
       ? await repository.own.loadContext([uid])

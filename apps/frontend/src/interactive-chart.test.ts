@@ -34,9 +34,7 @@ describe('interactive charts', () => {
     expect(source('TopicReport.tsx')).not.toContain(
       'encodeURIComponent(person.key)',
     );
-    expect(source('topic-report-model.ts')).toContain(
-      'revealed && !hidden && !personalUid',
-    );
+    expect(source('topic-report-model.ts')).toContain('revealed && !hidden');
   });
   it('keeps profile target fixed while reusing authorized calendar and viewer identity', () => {
     const profile = source('PersonPage.tsx');
