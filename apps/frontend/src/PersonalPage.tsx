@@ -1009,18 +1009,6 @@ export function PersonalPage({
                             : undefined,
                       }))}
                     />
-                    <ul className={cn('list-none p-0 m-0')}>
-                      {report.byUser.map((person, index) => (
-                        <li key={person.uid} className={cn('py-3 border-b')}>
-                          {revealed ? (
-                            <PersonIdentity uid={person.uid} />
-                          ) : (
-                            'Pessoa ' + (index + 1)
-                          )}
-                          : {hours(person.minutes)}
-                        </li>
-                      ))}
-                    </ul>
                   </Card>
                 )}
             </div>

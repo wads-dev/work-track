@@ -34,7 +34,14 @@ test('Vite demo bootstrap is dev-only and only intercepts exact init endpoint', 
   middleware({ url: '/__/firebase/init.json?local=1' }, response, () => next++);
   assert.equal(next, 0);
   assert.equal(headers['Content-Type'], 'application/json');
-  assert.deepEqual(JSON.parse(body), demoConfig);
+  assert.deepEqual(JSON.parse(body), {
+    ...demoConfig,
+    emulatorPorts: { auth: 9099, firestore: 8081, functions: 5001 },
+  });
+  process.env.WORK_TRACK_AUTH_PORT = '9100';
+  middleware({ url: '/__/firebase/init.json' }, response, () => next++);
+  assert.equal(JSON.parse(body).emulatorPorts.auth, 9100);
+  delete process.env.WORK_TRACK_AUTH_PORT;
   assert.equal(demoConfig.projectId, 'demo-work-track');
   for (const url of [
     '/__/auth/handler',

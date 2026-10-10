@@ -26,6 +26,15 @@ const render = (uid = 'user-id', revealed = true, label?: string) =>
     </PrivacyContext.Provider>,
   );
 describe('person identity', () => {
+  it('avatar-only mode retains the accessible name without visible text', () => {
+    const html = renderToStaticMarkup(
+      <PrivacyContext.Provider value={{ revealed: true }}>
+        <PersonIdentity uid="user-id" avatarOnly />
+      </PrivacyContext.Provider>,
+    );
+    expect(html).toContain('class="sr-only">Ana Silva</span>');
+    expect(html).toContain('https://example.org/ana.jpg');
+  });
   it('resolves UID into name and safe photo without showing UID or Você', () => {
     const html = render();
     expect(html).toContain('Ana Silva');

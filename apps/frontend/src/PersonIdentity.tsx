@@ -7,10 +7,12 @@ export function PersonIdentity({
   uid,
   fallback,
   label,
+  avatarOnly = false,
 }: {
   uid?: string;
   fallback?: string;
   label?: string;
+  avatarOnly?: boolean;
 }) {
   const directory = useCompanyPeople();
   const { revealed } = usePrivacy();
@@ -45,7 +47,9 @@ export function PersonIdentity({
           {identity.initials}
         </span>
       )}
-      <span className="min-w-0 truncate">{name}</span>
+      <span className={avatarOnly ? 'sr-only' : 'min-w-0 truncate'}>
+        {name}
+      </span>
     </span>
   );
 }

@@ -135,7 +135,7 @@ export function InteractiveChart({
               <YAxis
                 type="category"
                 dataKey="label"
-                width={120}
+                width={values.some((item) => item.uid) ? 44 : 120}
                 tick={
                   values.some((item) => item.uid)
                     ? ({
@@ -150,13 +150,15 @@ export function InteractiveChart({
                         const item = values[index ?? 0];
                         return (
                           <foreignObject
-                            x={Number(x) - 116}
+                            x={Number(x) - 36}
                             y={Number(y) - 16}
-                            width={112}
+                            width={32}
                             height={32}
                           >
                             <div className="flex h-full items-center text-xs text-muted-foreground">
-                              {item ? label(item) : null}
+                              {item?.uid ? (
+                                <PersonIdentity uid={item.uid} avatarOnly />
+                              ) : null}
                             </div>
                           </foreignObject>
                         );
