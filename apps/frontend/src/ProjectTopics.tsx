@@ -167,7 +167,7 @@ export function ProjectTopics({
             functions={functions}
             uid={getAuth(functions.app).currentUser?.uid ?? ''}
             projectId={projectId}
-            subjectId={String(movingTopic.id)}
+            topicId={String(movingTopic.id)}
             originLabel={text(project.title) + ' · ' + text(movingTopic.title)}
             onClose={() => setMovingTopic(null)}
           />

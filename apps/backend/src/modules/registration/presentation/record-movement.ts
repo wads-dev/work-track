@@ -7,25 +7,25 @@ import {
 import { ProjectManagementError } from '../domain/project-management.js';
 import {
   moveRecordInput,
-  moveSubjectInput,
+  moveTopicInput,
   type MovementRepository,
 } from '../domain/record-movement.js';
 export async function movementHandler(
   repository: MovementRepository,
-  kind: 'move_subject' | 'move_record',
+  kind: 'move_topic' | 'move_record',
   data: unknown,
   auth?: ReportAuth,
 ) {
   authorizeReport(auth);
   try {
-    if (kind === 'move_subject') {
-      const parsed = moveSubjectInput.safeParse(data);
+    if (kind === 'move_topic') {
+      const parsed = moveTopicInput.safeParse(data);
       if (!parsed.success)
         throw new HttpsError(
           'invalid-argument',
           parsed.error.issues[0]?.message ?? 'Entrada inválida.',
         );
-      return await repository.moveSubject(parsed.data, auth!.uid);
+      return await repository.moveTopic(parsed.data, auth!.uid);
     }
     const parsed = moveRecordInput.safeParse(data);
     if (!parsed.success)
@@ -53,7 +53,7 @@ export function registerMovementTools(
     openWorldHint: false,
   };
   const description =
-    'Consulte get_instructions. Move somente registros próprios entre projetos de mesmo escopo, com auditoria em cada registro. Prévia sem escrita por padrão; apresente destino, contagem e avisos e peça confirmação humana. Só depois confirmed true com mesmo previewToken/requestId/motivo. subject_target opcional reutiliza nome exato normalizado único ativo ou cria tópico com nome original. Múltiplos tópicos/aliases/mais de100 bloqueados; origem preservada para outros participantes. Nunca confirme automaticamente.';
+    'Consulte get_instructions. Move registros entre projetos de mesmo escopo com auditoria do ator e proprietário em cada registro. Em projetos corporativos, move_topic inclui todos os participantes e move_record aceita recordOwnerUid explícito; em pessoais somente o proprietário pode mover seus registros. Prévia sem escrita por padrão; apresente destino, contagem e avisos e peça confirmação humana. Só depois confirmed true com mesmo previewToken/requestId/motivo. topic_target opcional reutiliza nome exato normalizado único ativo ou cria tópico com nome original. Múltiplos tópicos/aliases/mais de100 bloqueados; origem preservada para outros participantes. Nunca confirme automaticamente.';
   const run = async (fn: () => Promise<Record<string, unknown>>) => {
     try {
       return {
@@ -81,9 +81,9 @@ export function registerMovementTools(
     }
   };
   server.registerTool(
-    'move_subject',
-    { description, inputSchema: moveSubjectInput, annotations },
-    (input) => run(() => repository.moveSubject(input, uid)),
+    'move_topic',
+    { description, inputSchema: moveTopicInput, annotations },
+    (input) => run(() => repository.moveTopic(input, uid)),
   );
   server.registerTool(
     'move_record',

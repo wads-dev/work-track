@@ -103,7 +103,7 @@ export const getCalendarReport = onCall(
       request.auth,
     ),
 );
-export const moveSubject = onCall(
+export const moveTopic = onCall(
   {
     region: 'southamerica-east1',
     invoker: 'public',
@@ -114,7 +114,7 @@ export const moveSubject = onCall(
   (request) =>
     movementHandler(
       new FirestoreRecordMovementRepository(getFirestore()),
-      'move_subject',
+      'move_topic',
       request.data as unknown,
       request.auth,
     ),
