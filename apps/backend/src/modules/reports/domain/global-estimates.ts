@@ -1,6 +1,6 @@
 import { activeRecords } from '../../registration/domain/record-lifecycle.js';
 import type { ReportSourceRecord } from './project-report.js';
-import { localDay, nextMidnight } from './report-time.js';
+import { nextMidnight } from './report-time.js';
 export class ReportContextError extends Error {}
 export const recordKey = (r: ReportSourceRecord) => r.uid + '/' + r.id;
 export function assertContext(
@@ -37,7 +37,6 @@ export function globalEstimates(
   );
   const zones = new Map<string, string>(),
     warnings = new Set<string>(),
-    used = new Map<string, number>(),
     ends = new Map<string, number>();
   for (const r of sorted) {
     if (!zones.has(r.uid)) zones.set(r.uid, reportZone ?? r.timeZone);
@@ -56,11 +55,10 @@ export function globalEstimates(
       zone = zones.get(r.uid)!;
     let end = r.endedAt === undefined ? undefined : Date.parse(r.endedAt);
     try {
-      const day = localDay(start, zone),
-        dayEnd = nextMidnight(start, zone);
+      const dayEnd = nextMidnight(start, zone);
       if (r.timeZone !== zone)
         warnings.add(
-          'Fusos mistos: orçamento usa um fuso canônico por pessoa; estimativas limitadas também à meia-noite desse fuso.',
+          'Fusos mistos: contexto global usa um fuso canônico por pessoa; estimativas limitadas também à meia-noite desse fuso.',
         );
       if (end === undefined) {
         const next = sorted.find(
@@ -72,39 +70,16 @@ export function globalEstimates(
               Date.parse(other.endedAt) - Date.parse(other.startedAt) >=
                 15 * 60000),
         );
-        let low = start - 48 * 3600000,
-          high = start;
-        while (high - low > 1) {
-          const mid = Math.floor((low + high) / 2);
-          if (localDay(mid, zone) === day) high = mid;
-          else low = mid;
-        }
-        const facts = sorted
-          .filter((other) => other.uid === r.uid && other.endedAt !== undefined)
-          .reduce(
-            (sum, other) =>
-              sum +
-              Math.max(
-                0,
-                Math.min(Date.parse(other.endedAt!), dayEnd) -
-                  Math.max(Date.parse(other.startedAt), high),
-              ) /
-                60000,
-            0,
-          );
-        const key = r.uid + '/' + day;
         end = Math.max(
           start,
           Math.min(
             asOf,
-            start + 4 * 3600000,
+            start + 6 * 3600000,
             nextMidnight(start, r.timeZone),
             dayEnd,
             next ? Date.parse(next.startedAt) : Infinity,
-            start + Math.max(0, 480 - facts - (used.get(key) ?? 0)) * 60000,
           ),
         );
-        used.set(key, (used.get(key) ?? 0) + (end - start) / 60000);
       }
       ends.set(recordKey(r), end);
     } catch (error) {

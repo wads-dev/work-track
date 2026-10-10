@@ -45,7 +45,7 @@ export function CalendarHistory({
           <p className={cn('text-sm')}>
             {occurrences.find((o) => o.week === week)?.occurrenceCount ?? 0}{' '}
             registros iniciados nesta semana. Registros sem duração computável
-            não geram barras nem horas.
+            não somam horas; abertos aparecem como marcadores de início.
           </p>
           <CalendarTimeline {...props} day={week} view="week" />
         </div>

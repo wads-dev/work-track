@@ -154,7 +154,7 @@ describe('daily-hours factual versus estimated totals', () => {
     });
     expect(report.warnings).toContain('Há intervalos sobrepostos no dia.');
   });
-  it('caps open estimates by now, four hours and midnight but preserves factual >8h', () => {
+  it('caps open estimates by now, six hours and midnight but preserves factual >8h', () => {
     expect(
       buildDailyHours(
         input(),
@@ -178,7 +178,7 @@ describe('daily-hours factual versus estimated totals', () => {
         uid,
         asOf,
       ).estimatedMinutes,
-    ).toBe(240);
+    ).toBe(360);
     expect(
       buildDailyHours(
         input(),
@@ -195,7 +195,7 @@ describe('daily-hours factual versus estimated totals', () => {
       ).closedMinutes,
     ).toBe(600);
   });
-  it('applies all-project budget before project and archived filtering', () => {
+  it('does not spend a daily budget before project and archived filtering', () => {
     const history = context([
       record(
         'closed',
@@ -206,9 +206,9 @@ describe('daily-hours factual versus estimated totals', () => {
       record('open', 'a', '2026-10-09T14:00:00-03:00'),
     ]);
     expect(buildDailyHours(input(), history, uid, asOf)).toMatchObject({
-      totalMinutes: 480,
+      totalMinutes: 720,
       closedMinutes: 360,
-      estimatedMinutes: 120,
+      estimatedMinutes: 360,
     });
     expect(
       buildDailyHours(
@@ -218,10 +218,10 @@ describe('daily-hours factual versus estimated totals', () => {
         asOf,
       ),
     ).toMatchObject({
-      totalMinutes: 120,
+      totalMinutes: 360,
       closedMinutes: 0,
-      estimatedMinutes: 120,
-      byProject: [{ projectId: 'a', estimatedMinutes: 120, estimatedHours: 2 }],
+      estimatedMinutes: 360,
+      byProject: [{ projectId: 'a', estimatedMinutes: 360, estimatedHours: 6 }],
     });
     const opens = context([
       record('first', 'b', '2026-10-09T08:00:00-03:00'),
@@ -230,7 +230,7 @@ describe('daily-hours factual versus estimated totals', () => {
     ]);
     expect(
       buildDailyHours(input({ projectId: 'a' }), opens, uid, asOf).totalMinutes,
-    ).toBe(0);
+    ).toBe(300);
   });
   it('excludes foreign personal, malformed type and foreign UID before parsing', () => {
     const projects = new Map([

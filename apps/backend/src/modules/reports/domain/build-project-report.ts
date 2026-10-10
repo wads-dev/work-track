@@ -22,7 +22,7 @@ export function buildProjectReport(
   assertContext(page.records, context);
   const warnings = new Set<string>();
   warnings.add(
-    'Orçamento estimado global de8h por pessoa/dia America/Sao_Paulo: todos projetos e páginas, saldo cronológico start/id; fatos preservados e descontados.',
+    'Estimativas sem teto diário: até agora e no máximo6h por registro aberto, com cortes por meia-noite e próximo início próprio no mesmo projeto; fatos preservados.',
   );
   if (hasCursor || page.nextCursor)
     warnings.add(

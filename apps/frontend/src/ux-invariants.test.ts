@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
+import { CalendarTimeline } from './CalendarTimeline';
+import { TooltipProvider } from './components/ui/tooltip';
 import { contextualRecordPath, detailPath, safeReturnTo } from './routes';
 import { isHidden, safeProject, safeRecord } from './privacy';
 import { endToLocal, localEndToIso, validateEnd } from './record-edit';
@@ -161,6 +166,124 @@ describe('meaningful status and report states remain independent of their visual
 });
 
 describe('timeline stays mathematically faithful while surfaces change', () => {
+  const dayStart = Date.parse('2026-10-08T00:00:00-03:00');
+  const makePoint = (id: string, minute: number, estimated = true) => ({
+    id,
+    projectId: 'p',
+    estimated,
+    effectiveStartedAt: new Date(dayStart + minute * 60000).toISOString(),
+    effectiveEndedAt: new Date(dayStart + minute * 60000).toISOString(),
+  });
+  const renderTimeline = (items: ReturnType<typeof makePoint>[]) =>
+    renderToStaticMarkup(
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(
+          TooltipProvider,
+          null,
+          createElement(CalendarTimeline, {
+            items,
+            day: '2026-10-08',
+            view: 'day',
+            zone,
+            label: () => 'Projeto',
+            color: () => '#123456',
+            returnTo: '/calendar?view=day',
+            viewerUid: 'me',
+            authorLabel: () => 'Autor',
+          }),
+        ),
+      ),
+    );
+
+  it.each([3, 4, 8])(
+    'renders all %i simultaneous zero estimates as separate accessible links',
+    (count) => {
+      const items = Array.from({ length: count }, (_, i) =>
+        makePoint(String(i), 600),
+      );
+      const result = layoutDay(items, dayStart, dayStart + 86400000);
+      expect(result).toHaveLength(count);
+      expect(
+        result.every((e) => e.point && e.height === 0 && e.start === e.end),
+      ).toBe(true);
+      expect(commonSpan(result)).toBeNull();
+      const html = renderTimeline(items);
+      expect(html.match(/<li>/g)).toHaveLength(count);
+      expect(html.match(/<a /g)).toHaveLength(count);
+      expect(
+        html.match(
+          /aria-label="Pessoa · 10:00 · Projeto · Estimado · sem duração"/g,
+        ),
+      ).toHaveLength(count);
+      expect(html).not.toContain('Nenhum intervalo');
+      expect(html).not.toContain('NaN');
+    },
+  );
+
+  it('owns midnight points only in the half-open day and rejects non-estimated or invalid zeros', () => {
+    const items = [
+      makePoint('before', -1),
+      makePoint('midnight', 0),
+      makePoint('future', 1439),
+      makePoint('next', 1440),
+      makePoint('closed', 600, false),
+      { ...makePoint('invalid', 600), effectiveStartedAt: 'invalid' },
+    ];
+    const result = layoutDay(items, dayStart, dayStart + 86400000);
+    expect(result.map((e) => e.item.id)).toEqual(['midnight', 'future']);
+    expect(
+      layoutDay(items, dayStart + 86400000, dayStart + 2 * 86400000).map(
+        (e) => e.item.id,
+      ),
+    ).toEqual(['next']);
+    const ending = {
+      ...makePoint('ending', -60),
+      effectiveEndedAt: new Date(dayStart).toISOString(),
+    };
+    expect(layoutDay([ending], dayStart, dayStart + 86400000)).toEqual([]);
+    expect(renderTimeline(items)).toContain('23:59 · Projeto');
+    expect(renderTimeline(items)).toContain('00:00 · Projeto');
+  });
+
+  it('keeps points outside span and in collapsed gaps without changing interval geometry', () => {
+    const intervals = [
+      {
+        ...makePoint('early', 480),
+        effectiveEndedAt: new Date(dayStart + 540 * 60000).toISOString(),
+      },
+      {
+        ...makePoint('late', 1200),
+        effectiveEndedAt: new Date(dayStart + 1260 * 60000).toISOString(),
+      },
+    ];
+    const points = [
+      makePoint('outside', 0),
+      makePoint('gap', 720),
+      makePoint('after', 1439),
+    ];
+    const result = layoutDay(
+      [...intervals, ...points],
+      dayStart,
+      dayStart + 86400000,
+    );
+    const wall = result.map((e) => ({
+      start: (e.start - dayStart) / 60000,
+      end: (e.end - dayStart) / 60000,
+    }));
+    expect(commonSpan(wall)).toEqual({ first: 480, last: 1260 });
+    expect(commonGaps(wall, 480, 1260)).toEqual([{ start: 540, end: 1200 }]);
+    expect(
+      result
+        .filter((e) => !e.point)
+        .every((e) => e.columns === 1 && !e.overlap),
+    ).toBe(true);
+    const html = renderTimeline([...intervals, ...points]);
+    expect(html).toContain('12:00 · Projeto · Estimado · sem duração');
+    expect(html).toContain('23:59 · Projeto · Estimado · sem duração');
+    expect(html.match(/<li>/g)).toHaveLength(3);
+  });
   it('collapses only shared internal gaps of four hours or more', () => {
     const items = [
       { start: 0, end: 120 },

@@ -9,7 +9,7 @@ const auth = {
     firebase: { sign_in_provider: 'google.com' },
   },
 };
-it('active selection excludes archive totals but archived closed facts still spend global budget', async () => {
+it('active selection excludes archive totals but archived closed facts do not reduce open estimates', async () => {
   const closed = {
     id: 'closed',
     uid: 'alice',
@@ -48,14 +48,14 @@ it('active selection excludes archive totals but archived closed facts still spe
     auth,
     Date.parse(input.to),
   );
-  expect(active.totalMinutes).toBe(120);
-  expect(active.byProject).toEqual([{ projectId: 'active', minutes: 120 }]);
+  expect(active.totalMinutes).toBe(360);
+  expect(active.byProject).toEqual([{ projectId: 'active', minutes: 360 }]);
   const all = await getPersonalReportHandler(
     repo,
     { ...input, includeArchived: true },
     auth,
     Date.parse(input.to),
   );
-  expect(all.totalMinutes).toBe(480);
+  expect(all.totalMinutes).toBe(720);
   expect(all.intervals).toHaveLength(2);
 });

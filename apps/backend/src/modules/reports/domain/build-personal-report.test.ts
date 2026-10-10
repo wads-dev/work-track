@@ -32,16 +32,16 @@ const run = (records: ReportSourceRecord[]) =>
     { records, scannedCount: records.length, nextCursor: null },
     Date.parse('2026-10-08T20:00:00Z'),
   );
-it('uses next own start across projects and returns original facts without mutation', () => {
+it('does not cut at starts in other projects and returns original facts without mutation', () => {
   const records = [
     make('one', '2026-10-08T10:00:00Z'),
     make('two', '2026-10-08T11:00:00Z', 'b'),
   ];
   const result = run(records);
-  expect(result.intervals[0]?.minutes).toBe(240);
+  expect(result.intervals[0]?.minutes).toBe(360);
   expect(result.byProject).toEqual([
-    { projectId: 'a', minutes: 240 },
-    { projectId: 'b', minutes: 240 },
+    { projectId: 'a', minutes: 360 },
+    { projectId: 'b', minutes: 360 },
   ]);
   expect(records[0]).not.toHaveProperty('endedAt');
   expect(result.policy).toBe('personal-v3');
@@ -59,13 +59,13 @@ it('clamps visualization only, includes intersecting closed facts, excludes outs
   });
   expect(result.page.excludedCount).toBe(1);
 });
-it('preserves closed facts beyond8h and spends their budget across projects', () => {
+it('preserves closed facts beyond8h without reducing open estimates', () => {
   const result = run([
     make('fact', '2026-10-08T00:00:00Z', 'a', '2026-10-08T12:00:00Z'),
     make('open', '2026-10-08T13:00:00Z', 'b'),
   ]);
-  expect(result.totalMinutes).toBe(720);
-  expect(result.estimatedCount).toBe(0);
+  expect(result.totalMinutes).toBe(1080);
+  expect(result.estimatedCount).toBe(1);
 });
 it('warns overlaps and partial page, zeroes future opens', () => {
   const result = buildPersonalReport(

@@ -154,17 +154,17 @@ export function buildDailyHours(
     !canReadDailyProject(context.projects.get(input.projectId), uid)
   )
     throw new DailyHoursError('not-found', 'Projeto não encontrado.');
-  // Baseline personal-v3: all authorized projects/history (including archived) affect the canonical SP budget.
+  // Baseline personal-v3: resolve estimates from all authorized history before selection filters.
   const estimates = globalEstimates(records, asOf);
   const warnings = new Set([
-    'Política personal-v3: orçamento global de 8h por pessoa/dia America/Sao_Paulo, antes dos filtros de projeto e arquivados. Fatos fechados nunca são truncados por esse orçamento.',
-    'Abertos são estimativas não persistidas: até 4h, agora, meia-noite do registro e do orçamento, próximo início próprio no mesmo projeto (fechados menores que 15min não cortam) e saldo diário cronológico.',
+    'Política personal-v3: contexto global America/Sao_Paulo antes dos filtros de projeto e arquivados, sem teto diário. Fatos fechados são preservados.',
+    'Abertos são estimativas não persistidas: até 6h, agora, meia-noite do registro e do fuso canônico, próximo início próprio no mesmo projeto (fechados menores que 15min não cortam).',
     'Somente o recorte do dia solicitado é somado; sobreposições são somadas e não representam horas únicas. Nenhum fim original é inventado.',
     ...estimates.warnings,
   ]);
   if (!input.includeArchived)
     warnings.add(
-      'Projetos arquivados/mesclados foram excluídos da seleção, mas continuam no orçamento global.',
+      'Projetos arquivados/mesclados foram excluídos da seleção, mas continuam no contexto global de estimativas.',
     );
   const result = {
     scope: 'own' as const,

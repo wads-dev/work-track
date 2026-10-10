@@ -33,7 +33,7 @@ const make = (
   timeZone: 'America/Sao_Paulo',
   topics: [],
 });
-it('aggregates multipleUIDs but keeps global budgets and archived facts, no transcript/email', async () => {
+it('aggregates multipleUIDs but keeps independent estimates and archived facts, no transcript/email', async () => {
   const selected = [
       make('same', 'alice', 'active', 11),
       make('same', 'bob', 'active', 11),
@@ -56,12 +56,12 @@ it('aggregates multipleUIDs but keeps global budgets and archived facts, no tran
     auth,
     Date.parse(input.to),
   );
-  expect(result.totalMinutes).toBe(360);
+  expect(result.totalMinutes).toBe(720);
   expect(result.byUser).toEqual([
-    { uid: 'alice', label: 'Alice', minutes: 120 },
-    { uid: 'bob', label: 'Bob', minutes: 240 },
+    { uid: 'alice', label: 'Alice', minutes: 360 },
+    { uid: 'bob', label: 'Bob', minutes: 360 },
   ]);
-  expect(result.byProject).toEqual([{ projectId: 'active', minutes: 360 }]);
+  expect(result.byProject).toEqual([{ projectId: 'active', minutes: 720 }]);
   expect(result.page.partial).toBe(false);
   expect(result.scope).toBe('all-selected');
   expect(result.policy).toBe('company-v3');

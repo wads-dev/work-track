@@ -225,8 +225,8 @@ describe('actual calendar use case: adversarial numeric bounded-context parity',
       '2026-10-08T00:00:00Z',
       '2026-10-09T00:00:00Z',
     );
-    expect(limited.intervals.find((r) => r.id === 'a')?.minutes).toBe(180);
-    expect(limited.intervals.some((r) => r.id === 'z')).toBe(false);
+    expect(limited.intervals.find((r) => r.id === 'a')?.minutes).toBe(360);
+    expect(limited.intervals.find((r) => r.id === 'z')?.minutes).toBe(360);
     expect(
       numeric(
         await run(
@@ -279,8 +279,11 @@ describe('actual calendar use case: adversarial numeric bounded-context parity',
       'UTC',
       'p',
     );
-    expect(limited.totalMinutes).toBe(30);
-    expect(limited.intervals.map((r) => r.id)).toEqual(['selected-fact']);
+    expect(limited.totalMinutes).toBe(90);
+    expect(limited.intervals.map((r) => r.id)).toEqual([
+      'open',
+      'selected-fact',
+    ]);
     const context = await repository(records).own.loadContext([uid]);
     expect(context.map((r) => r.id)).toContain('archive-facts');
     expect(context.map((r) => r.id)).not.toContain('deleted');
@@ -289,7 +292,7 @@ describe('actual calendar use case: adversarial numeric bounded-context parity',
       globalEstimates(context, Date.parse('2026-10-09T00:00:00Z')).ends.get(
         uid + '/open',
       ),
-    ).toBe(Date.parse('2026-10-08T13:00:00Z'));
+    ).toBe(Date.parse('2026-10-08T14:00:00Z'));
   });
 });
 

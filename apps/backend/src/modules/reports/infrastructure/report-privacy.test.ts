@@ -417,10 +417,10 @@ describe('company reports use only current work-project metadata', () => {
       AS_OF,
     );
     expect(result).toEqual(baseline);
-    expect(result).toMatchObject({ totalMinutes: 300, estimatedCount: 1 });
+    expect(result).toMatchObject({ totalMinutes: 420, estimatedCount: 1 });
     expect(result.intervals.find((r) => r.uid === 'alice')).toMatchObject({
-      minutes: 240,
-      effectiveEndedAt: '2026-10-08T17:00:00.000Z',
+      minutes: 360,
+      effectiveEndedAt: '2026-10-08T19:00:00.000Z',
     });
     expect(result.page.scannedCount).toBe(2);
     expect(result.byUser.map((r) => r.uid)).toEqual([...UIDS]);

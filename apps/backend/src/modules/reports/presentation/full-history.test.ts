@@ -30,7 +30,7 @@ const records = [
     topics: [],
   },
 ];
-it('allhistory has no invented bounds, projectfilter preserves global budget, one-sided dates work', async () => {
+it('allhistory has no invented bounds, projectfilter preserves open estimates, one-sided dates work', async () => {
   const repo: PersonalReportRepository = {
     readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi.fn().mockResolvedValue(records),
@@ -44,7 +44,7 @@ it('allhistory has no invented bounds, projectfilter preserves global budget, on
     auth,
     now,
   );
-  expect(all.totalMinutes).toBe(480);
+  expect(all.totalMinutes).toBe(720);
   expect(all.from).toBeUndefined();
   expect(all.to).toBeUndefined();
   expect(all.scope).toBe('all-selected');
@@ -54,7 +54,7 @@ it('allhistory has no invented bounds, projectfilter preserves global budget, on
     auth,
     now,
   );
-  expect(filtered.totalMinutes).toBe(120);
+  expect(filtered.totalMinutes).toBe(360);
   const from = await getPersonalReportHandler(
     repo,
     { timeZone: 'UTC', from: '2026-02-01T00:00:00Z' },
@@ -68,7 +68,7 @@ it('allhistory has no invented bounds, projectfilter preserves global budget, on
     auth,
     now,
   );
-  expect(to.totalMinutes).toBe(480);
+  expect(to.totalMinutes).toBe(720);
 });
 it('company aggregates all internal pages and fails rather than partial if cap exceeded', async () => {
   const readPage = vi
@@ -96,7 +96,7 @@ it('company aggregates all internal pages and fails rather than partial if cap e
     auth,
     Date.parse('2026-10-09T00:00:00Z'),
   );
-  expect(report.totalMinutes).toBe(480);
+  expect(report.totalMinutes).toBe(720);
   expect(report.page).toMatchObject({
     partial: false,
     nextCursor: null,

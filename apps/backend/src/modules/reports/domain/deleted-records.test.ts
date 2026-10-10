@@ -19,7 +19,7 @@ const open: ReportSourceRecord = {
 };
 const input = { timeZone: 'America/Sao_Paulo', includeArchived: true };
 it.each(['now', 0, false, {}, []])(
-  'rejects deleted marker %j before all root calculations next cut budget and topic allocation',
+  'rejects deleted marker %j before all root calculations next cut estimates and topic allocation',
   (deletedAt) => {
     const deleted = [
       {
@@ -44,7 +44,7 @@ it.each(['now', 0, false, {}, []])(
     const global = globalEstimates(records, now);
     expect(global.ends.size).toBe(1);
     expect(global.ends.get(recordKey(open))).toBe(
-      Date.parse('2026-10-08T13:00:00-03:00'),
+      Date.parse('2026-10-08T15:00:00-03:00'),
     );
     const personal = buildPersonalReport(
       input,
@@ -52,7 +52,7 @@ it.each(['now', 0, false, {}, []])(
       now,
       records,
     );
-    expect(personal.totalMinutes).toBe(240);
+    expect(personal.totalMinutes).toBe(360);
     expect(personal.intervals.map((r) => r.id)).toEqual(['open']);
     const project = buildProjectReport(
       'p',
@@ -63,7 +63,7 @@ it.each(['now', 0, false, {}, []])(
       false,
       records,
     );
-    expect(project.totalMinutes).toBe(240);
+    expect(project.totalMinutes).toBe(360);
     expect(project.records.map((r) => r.id)).toEqual(['open']);
     const company = buildCompanyReport(
       input,
@@ -73,7 +73,7 @@ it.each(['now', 0, false, {}, []])(
       {},
       [],
     );
-    expect(company.totalMinutes).toBe(240);
+    expect(company.totalMinutes).toBe(360);
     expect(company.intervals.map((r) => r.id)).toEqual(['open']);
     const daily = buildDailyHours(
       {
@@ -91,7 +91,7 @@ it.each(['now', 0, false, {}, []])(
       'alice',
       now,
     );
-    expect(daily.totalMinutes).toBe(240);
+    expect(daily.totalMinutes).toBe(360);
     const breakdown = buildTopicBreakdown(
       records,
       deleted.map((r) => ({ ...r, minutes: 60 })),
