@@ -101,8 +101,8 @@ export function CalendarTimeline({
     data.flatMap((d) =>
       d.events.map((e) => ({ start: e.wallStart, end: e.wallEnd })),
     ),
-  );
-  if (!span)
+  ) ?? { first: 0, last: 0 };
+  if (!data.some((d) => d.events.length))
     return (
       <Alert>
         <AlertDescription>
@@ -122,7 +122,7 @@ export function CalendarTimeline({
   const segments = axisSegments(span.first, span.last, gaps, expanded, px);
   const height = segments.reduce((sum, segment) => sum + segment.height, 0);
   const ticks = Array.from(
-    { length: (span.last - span.first) / 60 + 1 },
+    { length: span.last > span.first ? (span.last - span.first) / 60 + 1 : 0 },
     (_, i) => span.first + i * 60,
   ).filter(
     (minute) =>
@@ -226,72 +226,157 @@ export function CalendarTimeline({
                   className={cn('absolute top-[15px] left-12 right-0')}
                   style={{ height }}
                 >
-                  {d.events.map((e) => {
-                    const caption =
-                      label(e.item.projectId) +
-                      ' · ' +
-                      time(e.start) +
-                      ' — ' +
-                      time(e.end) +
-                      ' · ' +
-                      new Intl.NumberFormat('pt-BR', {
-                        maximumFractionDigits: 1,
-                      }).format((e.end - e.start) / 60000) +
-                      ' min' +
-                      (e.item.estimated ? ' · Estimado' : '') +
-                      (e.overlap ? ' · Sobreposição' : '');
-                    return (
-                      <Tooltip
-                        key={JSON.stringify([
-                          e.item.uid || viewerUid,
-                          e.item.id,
-                        ])}
-                      >
-                        <TooltipTrigger asChild>
-                          <Button
-                            tabIndex={0}
-                            aria-label={
-                              (e.item.uid
-                                ? authorLabel(e.item.uid) + ' · '
-                                : '') + caption
-                            }
-                            asChild
-                            variant="ghost"
-                            className={cn(
-                              'absolute min-h-[22px] hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-[11px] leading-[1.15]',
-                            )}
-                            style={{
-                              top: projectMinute(e.wallStart, segments),
-                              minHeight: Math.max(
-                                22,
-                                projectMinute(e.wallEnd, segments) -
+                  {d.events
+                    .filter((e) => !e.point)
+                    .map((e) => {
+                      const caption =
+                        label(e.item.projectId) +
+                        ' · ' +
+                        time(e.start) +
+                        ' — ' +
+                        time(e.end) +
+                        ' · ' +
+                        new Intl.NumberFormat('pt-BR', {
+                          maximumFractionDigits: 1,
+                        }).format((e.end - e.start) / 60000) +
+                        ' min' +
+                        (e.item.estimated ? ' · Estimado' : '') +
+                        (e.overlap ? ' · Sobreposição' : '');
+                      return (
+                        <Tooltip
+                          key={JSON.stringify([
+                            e.item.uid || viewerUid,
+                            e.item.id,
+                          ])}
+                        >
+                          <TooltipTrigger asChild>
+                            <Button
+                              tabIndex={0}
+                              aria-label={
+                                (e.item.uid
+                                  ? authorLabel(e.item.uid) + ' · '
+                                  : '') + caption
+                              }
+                              asChild
+                              variant="ghost"
+                              className={cn(
+                                'absolute min-h-[22px] hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-[11px] leading-[1.15]',
+                              )}
+                              style={{
+                                top: projectMinute(e.wallStart, segments),
+                                minHeight: Math.max(
+                                  22,
+                                  projectMinute(e.wallEnd, segments) -
+                                    projectMinute(e.wallStart, segments),
+                                ),
+                                height:
+                                  projectMinute(e.wallEnd, segments) -
                                   projectMinute(e.wallStart, segments),
-                              ),
-                              height:
-                                projectMinute(e.wallEnd, segments) -
-                                projectMinute(e.wallStart, segments),
-                              left: (e.column / e.columns) * 100 + '%',
-                              width: 100 / e.columns + '%',
-                              borderColor: color(e.item.projectId),
-                            }}
+                                left: (e.column / e.columns) * 100 + '%',
+                                width: 100 / e.columns + '%',
+                                borderColor: color(e.item.projectId),
+                              }}
+                            >
+                              {e.item.uid && e.item.uid !== viewerUid ? (
+                                <span tabIndex={0}>
+                                  <span
+                                    className={cn(
+                                      'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
+                                    )}
+                                  >
+                                    {e.item.uid
+                                      ? authorLabel(e.item.uid) + ' · '
+                                      : ''}
+                                    {time(e.start)} · {label(e.item.projectId)}
+                                    {e.item.estimated ? ' ◷' : ''}
+                                    {e.overlap ? ' ⇆' : ''}
+                                  </span>
+                                </span>
+                              ) : (
+                                <RouterLink
+                                  to={
+                                    contextualRecordPath(
+                                      returnTo.split('?')[0],
+                                      returnTo.includes('?')
+                                        ? '?' +
+                                            returnTo
+                                              .split('?')
+                                              .slice(1)
+                                              .join('?')
+                                        : '',
+                                      e.item.id,
+                                    ) ?? '#'
+                                  }
+                                >
+                                  <span
+                                    className={cn(
+                                      'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
+                                    )}
+                                  >
+                                    {e.item.uid
+                                      ? authorLabel(e.item.uid) + ' · '
+                                      : ''}
+                                    {time(e.start)} · {label(e.item.projectId)}
+                                    {e.item.estimated ? ' ◷' : ''}
+                                    {e.overlap ? ' ⇆' : ''}
+                                  </span>
+                                </RouterLink>
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {(e.item.uid
+                              ? authorLabel(e.item.uid) + ' · '
+                              : '') + caption}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                </div>
+              </div>
+              {/* Normal flow keeps simultaneous points reachable even inside
+                  collapsed gaps or outside the interval axis span. */}
+              {d.events.some((e) => e.point) && (
+                <section
+                  aria-label={'Marcadores estimados de ' + d.key}
+                  className="mt-2 min-w-0"
+                >
+                  <h4 className="text-xs font-medium mb-1">
+                    Estimados · sem duração
+                  </h4>
+                  <ul className="flex flex-col gap-1">
+                    {d.events
+                      .filter((e) => e.point)
+                      .map((e) => {
+                        const caption =
+                          (e.item.uid ? authorLabel(e.item.uid) + ' · ' : '') +
+                          time(e.start) +
+                          ' · ' +
+                          label(e.item.projectId) +
+                          ' · Estimado · sem duração';
+                        const className =
+                          'block min-h-8 rounded border border-l-4 px-2 py-1 text-xs whitespace-normal [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-ring';
+                        return (
+                          <li
+                            key={JSON.stringify([
+                              e.item.uid || viewerUid,
+                              e.item.id,
+                            ])}
                           >
                             {e.item.uid && e.item.uid !== viewerUid ? (
-                              <span tabIndex={0}>
-                                <span
-                                  className={cn(
-                                    'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
-                                  )}
-                                >
-                                  {e.item.uid
-                                    ? authorLabel(e.item.uid) + ' · '
-                                    : ''}
-                                  {time(e.start)} · {label(e.item.projectId)}
-                                  {e.item.estimated ? ' ◷' : ''}
-                                  {e.overlap ? ' ⇆' : ''}
-                                </span>
+                              <span
+                                tabIndex={0}
+                                aria-label={caption}
+                                className={className}
+                                style={{ borderColor: color(e.item.projectId) }}
+                              >
+                                {caption}
                               </span>
                             ) : (
                               <RouterLink
+                                aria-label={caption}
+                                className={className}
+                                style={{ borderColor: color(e.item.projectId) }}
                                 to={
                                   contextualRecordPath(
                                     returnTo.split('?')[0],
@@ -303,31 +388,15 @@ export function CalendarTimeline({
                                   ) ?? '#'
                                 }
                               >
-                                <span
-                                  className={cn(
-                                    'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
-                                  )}
-                                >
-                                  {e.item.uid
-                                    ? authorLabel(e.item.uid) + ' · '
-                                    : ''}
-                                  {time(e.start)} · {label(e.item.projectId)}
-                                  {e.item.estimated ? ' ◷' : ''}
-                                  {e.overlap ? ' ⇆' : ''}
-                                </span>
+                                {caption}
                               </RouterLink>
                             )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {(e.item.uid ? authorLabel(e.item.uid) + ' · ' : '') +
-                            caption}
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              </div>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                </section>
+              )}
             </Card>
           ))}
         </div>

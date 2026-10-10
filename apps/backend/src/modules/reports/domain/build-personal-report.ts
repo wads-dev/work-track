@@ -22,7 +22,7 @@ export function buildPersonalReport(
   const from = input.from ? Date.parse(input.from) : -Infinity,
     to = input.to ? Date.parse(input.to) : Infinity,
     warnings = new Set<string>([
-      'Política personal-v3: orçamento global8h pessoa/dia America/Sao_Paulo allprojects/full-context, saldo cronológico start/id e próximo início próprio no mesmo projeto; fechados menores que15min ignorados como corte.',
+      'Política personal-v3: contexto global America/Sao_Paulo allprojects/full-context, sem teto diário; abertos limitados a6h, agora, meia-noite e próximo início próprio no mesmo projeto; fechados menores que15min ignorados como corte.',
       'Estimativas não persistidas; fatos fechados preservados. Intervalos são recortados somente para visualização no período.',
       'Sobreposições são somadas; interrupções não são descontadas automaticamente.',
     ]);

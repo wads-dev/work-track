@@ -248,7 +248,7 @@ it('canonical aliases converge cycle fails finalmerge race fails archive explici
     getTopicReportHandler(race.repo, request, auth),
   ).rejects.toMatchObject({ code: 'failed-precondition' });
 });
-it('authorfullglobalcontext budgets unchanged duplicateidentical sources dedupe; malformedotherprojectcontext failclosed notextraestimation', async () => {
+it('authorfullglobalcontext estimates independent of closed facts duplicateidentical sources dedupe; malformedotherprojectcontext failclosed notextraestimation', async () => {
   const own = { ...record('alice', 'open'), endedAt: undefined },
     bob = { ...record('bob', 'open'), endedAt: undefined };
   const f = fixture([own, bob, own]);
@@ -273,10 +273,10 @@ it('authorfullglobalcontext budgets unchanged duplicateidentical sources dedupe;
   expect(result).toMatchObject({
     occurrenceCount: 2,
     hoursPolicy: 'company-v3',
-    estimatedMinutes: 360,
+    estimatedMinutes: 720,
     participants: [
-      { uid: 'alice', assignedMinutes: 120 },
-      { uid: 'bob', assignedMinutes: 240 },
+      { uid: 'alice', assignedMinutes: 360 },
+      { uid: 'bob', assignedMinutes: 360 },
     ],
   });
   f.repo.loadContext = () =>

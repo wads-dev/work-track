@@ -3,7 +3,11 @@ import { resolveTopic } from '../domain/topic-breakdown.js';
 import { occupiedWeeks, calendarWeekAt } from '../domain/calendar-weeks.js';
 import { buildCompanyReport } from '../domain/build-company-report.js';
 import { buildPersonalReport } from '../domain/build-personal-report.js';
-import { ReportContextError } from '../domain/global-estimates.js';
+import {
+  ReportContextError,
+  globalEstimates,
+  recordKey,
+} from '../domain/global-estimates.js';
 import type { PersonalReportRepository } from '../domain/personal-report.js';
 import type { CompanyReportRepository } from '../domain/company-report.js';
 import type { ReportSourceRecord } from '../domain/project-report.js';
@@ -199,7 +203,39 @@ export async function executeCalendarReport(
       'Tópicos alterados durante leitura; atualize a seleção.',
     );
   const topicWarnings = new Set<string>();
-  const intervals = report.intervals
+  // Calendar-only points preserve open occurrences without adding hours to reports.
+  const estimates = globalEstimates(context, asOf);
+  const calendarIntervals = [
+    ...report.intervals,
+    ...selected
+      .filter((r) => {
+        const start = Date.parse(r.startedAt);
+        return (
+          r.endedAt === undefined &&
+          Number.isFinite(start) &&
+          estimates.ends.get(recordKey(r)) === start &&
+          (!input.from || start >= Date.parse(input.from)) &&
+          (!input.to || start < Date.parse(input.to)) &&
+          !report.intervals.some(
+            (i) =>
+              i.id === r.id &&
+              i.projectId === r.projectId &&
+              (!('uid' in i) || i.uid === r.uid),
+          )
+        );
+      })
+      .map((r) => ({
+        id: r.id,
+        uid: r.uid,
+        projectId: r.projectId,
+        startedAt: r.startedAt,
+        effectiveStartedAt: new Date(Date.parse(r.startedAt)).toISOString(),
+        effectiveEndedAt: new Date(Date.parse(r.startedAt)).toISOString(),
+        estimated: true,
+        minutes: 0,
+      })),
+  ];
+  const intervals = calendarIntervals
     .map((r) => {
       const authorUid = 'uid' in r ? r.uid : uid;
       const source = selected.find(

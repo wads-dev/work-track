@@ -95,6 +95,7 @@ export type Timed = {
   id: string;
   effectiveStartedAt: string;
   effectiveEndedAt: string;
+  estimated?: boolean;
 };
 export function layoutDay<T extends Timed>(
   items: T[],
@@ -106,12 +107,25 @@ export function layoutDay<T extends Timed>(
       item,
       start: Math.max(start, Date.parse(item.effectiveStartedAt)),
       end: Math.min(end, Date.parse(item.effectiveEndedAt)),
+      // Only an original estimated zero is a point; clipping an interval at
+      // midnight must not manufacture one on the adjacent day.
+      point:
+        item.estimated === true &&
+        Date.parse(item.effectiveStartedAt) ===
+          Date.parse(item.effectiveEndedAt),
       column: 0,
       columns: 1,
     }))
     .filter(
       (x) =>
-        Number.isFinite(x.start) && Number.isFinite(x.end) && x.end > x.start,
+        Number.isFinite(x.start) &&
+        Number.isFinite(x.end) &&
+        (x.point
+          ? x.start === x.end &&
+            x.start >= start &&
+            x.start < end &&
+            Date.parse(x.item.effectiveStartedAt) === x.start
+          : x.end > x.start),
     )
     .sort(
       (a, b) =>
@@ -126,6 +140,8 @@ export function layoutDay<T extends Timed>(
     for (const item of group) item.columns = columnEnds.length;
   };
   for (const item of sorted) {
+    // Points render in normal flow, not in interval collision columns.
+    if (item.point) continue;
     if (item.start >= groupEnd) {
       finish();
       group = [];

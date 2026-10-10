@@ -42,6 +42,27 @@ const data: CalendarResponse = {
     partial: false,
   },
 };
+it('accepts only open estimated zero-minute start markers', () => {
+  const point = {
+    ...data.intervals[0],
+    estimated: true,
+    minutes: 0,
+    effectiveEndedAt: data.intervals[0].effectiveStartedAt,
+  };
+  expect(() =>
+    calendarReport({ ...data, intervals: [point] }, 'me', 'own'),
+  ).not.toThrow();
+  for (const invalid of [
+    { ...point, estimated: false },
+    { ...point, minutes: 1 },
+    { ...point, endedAt: point.startedAt },
+  ]) {
+    expect(() =>
+      calendarReport({ ...data, intervals: [invalid] }, 'me', 'own'),
+    ).toThrow();
+  }
+});
+
 describe('calendar people default and safe scope', () => {
   it('omits optional project and all-mode userIds at SDK boundary, never encodes undefined to null', () => {
     const own = calendarRequest(

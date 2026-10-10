@@ -128,8 +128,13 @@ export function calendarReport(
       !Number.isFinite(Date.parse(item.startedAt)) ||
       !Number.isFinite(Date.parse(item.effectiveStartedAt)) ||
       !Number.isFinite(Date.parse(item.effectiveEndedAt)) ||
-      Date.parse(item.effectiveEndedAt) <=
-        Date.parse(item.effectiveStartedAt) ||
+      Date.parse(item.effectiveEndedAt) < Date.parse(item.effectiveStartedAt) ||
+      (item.effectiveEndedAt === item.effectiveStartedAt &&
+        (!item.estimated ||
+          item.endedAt !== undefined ||
+          item.minutes !== 0 ||
+          Date.parse(item.startedAt) !==
+            Date.parse(item.effectiveStartedAt))) ||
       (item.endedAt && !Number.isFinite(Date.parse(item.endedAt)))
     )
       throw new Error('Intervalo de calendário inválido.');

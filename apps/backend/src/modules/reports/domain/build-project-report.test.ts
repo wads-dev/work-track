@@ -25,17 +25,17 @@ const report = (records: ReportSourceRecord[], asOf = '2026-10-09T20:00:00Z') =>
     records,
   );
 describe('project-report-v3', () => {
-  it('caps open work at four hours and never persists estimates', () => {
+  it('caps open work at six hours and never persists estimates', () => {
     const input = [make('open', '2026-10-08T10:00:00Z')];
     const result = report(input);
-    expect(result.totalMinutes).toBe(240);
+    expect(result.totalMinutes).toBe(360);
     expect(result.estimatedCount).toBe(1);
     expect(input[0]).not.toHaveProperty('endedAt');
     expect(result.byUser).toEqual([
-      { uid: 'alice', label: 'Alice', minutes: 240 },
+      { uid: 'alice', label: 'Alice', minutes: 360 },
     ]);
     expect(result.byTopic).toEqual([]);
-    expect(result.unassignedMinutes).toBe(240);
+    expect(result.unassignedMinutes).toBe(360);
   });
   it('caps at now and next same user/project start, not another user', () => {
     const result = report(
@@ -66,7 +66,7 @@ describe('project-report-v3', () => {
     ]);
     expect(result.totalMinutes).toBe(30);
   });
-  it('caps only estimates at eight hours, preserving a closed twelve-hour fact', () => {
+  it('does not cap daily estimates, preserving a closed twelve-hour fact', () => {
     const result = report([
       make('closed', '2026-10-08T00:00:00-03:00', {
         endedAt: '2026-10-08T12:00:00-03:00',
@@ -80,8 +80,8 @@ describe('project-report-v3', () => {
       result.records
         .filter((r) => r.estimated)
         .reduce((sum, r) => sum + r.minutes, 0),
-    ).toBe(0);
-    expect(result.totalMinutes).toBe(720);
+    ).toBe(660);
+    expect(result.totalMinutes).toBe(1380);
     expect(result.warnings.some((w) => w.includes('sobreposições'))).toBe(true);
     expect(result.warnings.some((w) => w.includes('global'))).toBe(true);
   });

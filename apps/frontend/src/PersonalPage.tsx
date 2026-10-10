@@ -1068,7 +1068,10 @@ export function PersonalPage({
                   const entries = report.intervals.filter(
                     (item) =>
                       Date.parse(item.effectiveStartedAt) < end &&
-                      Date.parse(item.effectiveEndedAt) > start,
+                      (Date.parse(item.effectiveEndedAt) > start ||
+                        (item.estimated &&
+                          item.effectiveStartedAt === item.effectiveEndedAt &&
+                          Date.parse(item.effectiveStartedAt) >= start)),
                   );
                   return (
                     <Card
@@ -1313,6 +1316,13 @@ export function PersonalPage({
                             </Tooltip>
                             <span className={cn('text-xs block px-2')}>
                               {projectLink(item.projectId)}
+                              {item.estimated &&
+                                item.effectiveStartedAt ===
+                                  item.effectiveEndedAt && (
+                                  <span className="block text-muted-foreground">
+                                    Registro aberto · sem duração estimada
+                                  </span>
+                                )}
                             </span>
                           </div>
                         ))

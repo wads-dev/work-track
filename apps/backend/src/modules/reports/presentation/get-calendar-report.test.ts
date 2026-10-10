@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import { executeCalendarReport } from '../application/get-calendar-report.js';
 import {
   getCalendarReportHandler,
   type CalendarRepository,
@@ -108,6 +109,51 @@ function fixture() {
     },
   };
 }
+it('keeps open zero-duration starts visible without adding hours or exposing private records', async () => {
+  const f = fixture();
+  const start = '2026-10-02T12:00:00Z';
+  f.setRecords([
+    { ...record('alice', 'open'), endedAt: undefined },
+    { ...record('alice', 'closed-zero'), endedAt: start },
+    { ...record('bob', 'private', 'foreign'), endedAt: undefined },
+  ]);
+  const result = await executeCalendarReport(
+    f.repo,
+    {
+      ...input,
+      mode: 'own',
+      allWeeks: false,
+      includeArchived: false,
+    },
+    'alice',
+    Date.parse(start),
+  );
+  expect(result.totalMinutes).toBe(0);
+  expect(result.intervals).toHaveLength(1);
+  expect(result.intervals[0]).toMatchObject({
+    id: 'open',
+    uid: 'alice',
+    estimated: true,
+    minutes: 0,
+    effectiveStartedAt: start.replace('Z', '.000Z'),
+    effectiveEndedAt: start.replace('Z', '.000Z'),
+  });
+  expect(result.intervals[0]).not.toHaveProperty('endedAt');
+  const outside = await executeCalendarReport(
+    f.repo,
+    {
+      ...input,
+      from: '2026-10-03T00:00:00Z',
+      mode: 'own',
+      allWeeks: false,
+      includeArchived: false,
+    },
+    'alice',
+    Date.parse(start),
+  );
+  expect(outside.intervals).toEqual([]);
+});
+
 it('defaults own includes ownpersonal only; Global explicit org never foreignpersonal', async () => {
   const f = fixture();
   const own = await getCalendarReportHandler(f.repo, input, auth);
@@ -469,7 +515,7 @@ it('allWeeks true oldhistory gaps canonical aliases multishares preservefullinte
       getCalendarReportHandler(f.repo, bad, auth),
     ).rejects.toMatchObject({ code: 'invalid-argument' });
 });
-it('topic filtering afterengine preserves global8h budget and fails unsafe aliases or midread merges', async () => {
+it('topic filtering afterengine preserves six-hour estimates without daily cap and fails unsafe aliases or midread merges', async () => {
   const f = fixture();
   f.setRecords([
     {
@@ -508,7 +554,7 @@ it('topic filtering afterengine preserves global8h budget and fails unsafe alias
       .filter((r) => r.id === 'second')
       .map((r) => ({ ...r, subjectAssignedMinutes: r.minutes })),
   );
-  expect(filtered.totalMinutes).toBe(240);
+  expect(filtered.totalMinutes).toBe(360);
   f.repo.own.readTopics = () =>
     Promise.resolve({
       w: [{ id: 'wanted', title: 'Bad', mergedIntoTopicId: 'wanted' }],

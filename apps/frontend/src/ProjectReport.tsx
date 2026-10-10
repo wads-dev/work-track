@@ -269,10 +269,10 @@ export function ProjectReport({
         Referência: {date(report.asOf)}. Política: {report.policy}.
       </p>
       <p className={cn('text-base mb-4')}>
-        Estimativas não alteram fatos: orçamento global de 8 horas por
-        pessoa/dia entre todos os projetos, com contexto completo. Fatos
-        fechados consomem margem sem truncamento; o total exibido considera
-        todos os registros selecionados.{' '}
+        Estimativas não alteram fatos: até agora, limitadas a 6 horas por
+        registro aberto, sem teto diário, com os cortes por meia-noite e próximo
+        início no mesmo projeto. Fatos fechados não são truncados; o total
+        exibido considera todos os registros selecionados.{' '}
         <RouterLink
           to="/rules"
           className={cn('text-primary underline-offset-4 hover:underline')}

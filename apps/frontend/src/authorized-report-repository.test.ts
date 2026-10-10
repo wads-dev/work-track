@@ -52,7 +52,7 @@ it('uses complete work-only cross-project context and shared company budget', as
     { timeZone: 'UTC', projectId: 'b' },
     Date.parse('2026-10-09T00:00:00Z'),
   );
-  expect(report.totalMinutes).toBe(120);
+  expect(report.totalMinutes).toBe(360);
   expect((await repo.loadContext(['alice'])).map((x) => x.projectId)).toEqual([
     'a',
     'b',
@@ -85,7 +85,7 @@ it('executes real global calendar selection with separate complete context and U
     'viewer',
     Date.parse('2026-10-09T00:00:00Z'),
   );
-  expect(report.totalMinutes).toBe(120);
+  expect(report.totalMinutes).toBe(360);
   expect(report.participants).toEqual([{ uid: 'alice', label: 'alice' }]);
 });
 it('executes real project use case without callable for arbitrary authorized authors', async () => {

@@ -36,7 +36,7 @@ it('reuses the project use case with full personal budget context before selecti
     Date.parse('2026-10-08T22:00:00Z'),
     'alice',
   );
-  expect(report.totalMinutes).toBe(60);
+  expect(report.totalMinutes).toBe(240);
   expect(report.records).toHaveLength(1);
   expect(report.page.partial).toBe(false);
   await expect(
