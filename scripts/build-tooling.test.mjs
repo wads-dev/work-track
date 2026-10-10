@@ -88,6 +88,60 @@ test('Vite development resolves shared source, production resolves built default
 });
 
 test(
+  'Vite transforms refactored app paths, shared source and the PWA module without a listening server',
+  { timeout: 30_000 },
+  async () => {
+    const server = await createServer({
+      ...demoVite,
+      configFile: false,
+      root: join(root, 'apps/frontend'),
+      server: {
+        ...demoVite.server,
+        middlewareMode: true,
+        ws: false,
+        watch: null,
+      },
+      optimizeDeps: {
+        noDiscovery: true,
+        include: [],
+        exclude: demoVite.optimizeDeps.exclude,
+      },
+    });
+    try {
+      const urls = [
+        '/src/main.tsx',
+        '/src/features/reports/PersonalPage.tsx',
+        '/src/features/records/RecordDrawer.tsx',
+        '/src/infrastructure/firebase/callable-command-gateway.ts',
+        '/@fs' +
+          root +
+          'packages/core/src/reports/application/get-personal-report.ts',
+        '/@fs' +
+          root +
+          'packages/data/src/repositories/snapshots/authorized-report-repository.ts',
+      ];
+      for (const url of urls) {
+        const transformed = await server.transformRequest(url);
+        assert(transformed?.code, 'Missing Vite transformation: ' + url);
+        assert(
+          !transformed.code.includes('/apps/backend/src/'),
+          'Browser module imports backend source: ' + url,
+        );
+      }
+      const pwa = await server.environments.client.pluginContainer.resolveId(
+        'virtual:pwa-register',
+      );
+      assert(
+        pwa?.id.includes('virtual:pwa-register'),
+        'PWA virtual module must resolve after app moves',
+      );
+    } finally {
+      await server.close();
+    }
+  },
+);
+
+test(
   'Vitest shared source supports spies across the data -> core boundary',
   { timeout: 30_000 },
   async () => {
