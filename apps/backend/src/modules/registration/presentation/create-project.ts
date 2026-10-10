@@ -3,8 +3,11 @@ import {
   authorizeReport,
   type ReportAuth,
 } from '../../reports/presentation/get-project-report.js';
-import { ProjectManagementError } from '../domain/project-management.js';
-import { projectInput, type WorkRepository } from '../domain/work-model.js';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
+import {
+  projectInput,
+  type WorkRepository,
+} from '@work-track/core/registration/domain/work-model';
 export async function createProjectHandler(
   repository: Pick<WorkRepository, 'createProject'>,
   data: unknown,

@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto';
 import type { Firestore } from 'firebase-admin/firestore';
-import { assertProjectAccess } from '../../registration/domain/project-access.js';
+import { assertProjectAccess } from '@work-track/core/registration/domain/project-access';
 import {
   assertProjectWritable,
   safeId,
-} from '../../registration/domain/project-management.js';
+} from '@work-track/core/registration/domain/project-management';
 import {
   registerInput,
   type Project,
-} from '../../registration/domain/work-model.js';
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+} from '@work-track/core/registration/domain/work-model';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { canonical } from '../../split/infrastructure/firestore-split.js';
 import {
   mergeInput,
@@ -17,7 +17,7 @@ import {
   type MergeInput,
   type MergeRepository,
   type MergeResult,
-} from '../domain/merge.js';
+} from '@work-track/core/merge/domain/merge';
 const hash = (v: unknown) =>
   createHash('sha256').update(canonical(v)).digest('hex');
 export class FirestoreMergeRepository implements MergeRepository {

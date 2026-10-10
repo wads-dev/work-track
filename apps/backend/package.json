@@ -8,11 +8,18 @@
     "node": "22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "prebuild": "npm run build:packages --prefix ../..",
+    "build": "npm run build:modules && npm run package:functions",
+    "build:modules": "tsc -p tsconfig.build.json",
+    "package:functions": "node ../../scripts/package-functions.mjs",
+    "pretypecheck": "npm run build:packages --prefix ../..",
+    "pretest": "npm run build:packages --prefix ../..",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --config ../../scripts/build-vitest.config.mjs"
   },
   "dependencies": {
+    "@work-track/core": "0.1.0",
+    "@work-track/data": "0.1.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "express": "^5.2.1",
     "firebase-admin": "^14.5.0",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreDailyHoursRepository } from './firestore-daily-hours.js';
-import { type DailyProject } from '../domain/daily-hours.js';
+import { type DailyProject } from '@work-track/core/daily-hours/domain/daily-hours';
 function setup(
   pages: { id: string; value: Record<string, unknown> }[][],
   projects: Record<string, DailyProject> = { a: {} },

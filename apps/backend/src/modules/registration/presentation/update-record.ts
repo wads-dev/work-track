@@ -1,5 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import { ProjectManagementError } from '../domain/project-management.js';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
 import {
   authorizeReport,
   type ReportAuth,
@@ -8,7 +8,7 @@ import {
   RecordEditError,
   updateRecordInput,
   type RecordEditingRepository,
-} from '../domain/record-edit.js';
+} from '@work-track/core/registration/domain/record-edit';
 export async function updateRecordHandler(
   repository: RecordEditingRepository,
   data: unknown,

@@ -11,11 +11,18 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 export default {
   resolve: {
+    conditions: ['module', 'browser', 'development'],
     alias: {
       '@': fileURLToPath(new URL('../../apps/frontend/src', import.meta.url)),
     },
   },
+  optimizeDeps: { exclude: ['@work-track/core', '@work-track/data'] },
+  ssr: {
+    resolve: { conditions: ['node', 'development'] },
+    noExternal: [/^@work-track\//],
+  },
   server: {
+    fs: { allow: [fileURLToPath(new URL('../..', import.meta.url))] },
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,

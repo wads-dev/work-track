@@ -3,7 +3,7 @@ import {
   getProjectReportHandler,
   type ReportAuth,
 } from './get-project-report.js';
-import type { ProjectReportRepository } from '../domain/project-report.js';
+import type { ProjectReportRepository } from '@work-track/core/reports/domain/project-report';
 const auth: ReportAuth = {
   uid: 'alice',
   token: {

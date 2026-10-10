@@ -2,7 +2,7 @@ import type { Auth } from 'firebase-admin/auth';
 import type {
   CompanyPeoplePage,
   CompanyPeopleRepository,
-} from '../domain/company-person.js';
+} from '@work-track/core/people/domain/company-person';
 
 export class FirebaseCompanyPeopleRepository implements CompanyPeopleRepository {
   constructor(private readonly auth: Pick<Auth, 'listUsers'>) {}

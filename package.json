@@ -8,18 +8,22 @@
     "node": "22"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build:packages": "npm run build --workspace @work-track/core && npm run build --workspace @work-track/data",
+    "build": "npm run build:packages && npm run build --workspace @work-track/backend && npm run build --workspace @work-track/frontend",
+    "pretypecheck": "npm run build:packages",
+    "pretest": "npm run build:packages",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run test --workspaces --if-present && npm run build --workspace @work-track/backend && node --test scripts/demo-generator.test.mjs",
+    "test": "npm run test --workspaces --if-present && npm run build --workspace @work-track/backend && node --test scripts/demo-generator.test.mjs scripts/package-functions.test.mjs scripts/build-tooling.test.mjs scripts/package-boundaries.test.mjs",
+    "test:tooling": "node --test scripts/package-functions.test.mjs scripts/build-tooling.test.mjs scripts/package-boundaries.test.mjs",
     "test:watch": "vitest",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "prepare": "node scripts/prepare.mjs",
     "emulators": "npm run build --workspace @work-track/backend && npx -y firebase-tools@15.33.0 emulators:start --config firebase.emulators.json --project demo-work-track --only functions,firestore,auth",
-    "dev:frontend": "npm run dev --workspace @work-track/frontend -- --config ../../docker/firebase/vite.config.mjs",
+    "dev:frontend": "npm run build:packages && npm run dev --workspace @work-track/frontend -- --config ../../docker/firebase/vite.config.mjs",
     "deploy": "npm run check && XDG_CONFIG_HOME=./.firebase-cli npx -y firebase-tools@latest deploy --only functions,hosting,auth,firestore:rules --project wadsworktrack",
     "smoke:mcp": "node scripts/smoke-mcp.mjs"
   },
@@ -28,6 +32,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
     "@types/supertest": "^7.2.1",
+    "esbuild": "^0.28.2",
     "eslint": "^10.12.0",
     "globals": "^16.0.0",
     "husky": "^9.1.7",
@@ -50,6 +55,7 @@
     "@grpc/grpc-js": "^1.14.0"
   },
   "workspaces": [
+    "packages/*",
     "apps/*"
   ]
 }

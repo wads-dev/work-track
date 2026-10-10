@@ -9,7 +9,7 @@ import {
   archiveProjectInput,
   mergeProjectsInput,
   type ProjectManagementRepository,
-} from '../domain/project-management.js';
+} from '@work-track/core/registration/domain/project-management';
 export async function manageProjectHandler(
   repository: ProjectManagementRepository,
   kind: 'update' | 'merge' | 'archive',

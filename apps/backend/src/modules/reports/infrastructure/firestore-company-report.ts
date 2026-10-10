@@ -1,28 +1,14 @@
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import type { Auth } from 'firebase-admin/auth';
-import { z } from 'zod';
-import {
-  readProjectCatalog,
-  reportTopicsSchema,
-  selectReportRecords,
-} from './project-catalog.js';
-import { effectiveProjectType } from '../../registration/domain/project-access.js';
-import type { CompanyReportRepository } from '../domain/company-report.js';
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
+import { readProjectCatalog, selectReportRecords } from './project-catalog.js';
+import { effectiveProjectType } from '@work-track/core/registration/domain/project-access';
+import type { CompanyReportRepository } from '@work-track/core/reports/domain/company-report';
 import { FirestorePersonalReportRepository } from './firestore-personal-report.js';
 import { FirestoreProjectReportRepository } from './firestore-project-report.js';
 import { loadGlobalContext } from './firestore-global-context.js';
-const schema = z.object({
-  uid: z.string(),
-  projectId: z.string(),
-  startedAt: z.string(),
-  endedAt: z
-    .string()
-    .nullish()
-    .transform((value) => value ?? undefined),
-  timeZone: z.string(),
-  topics: reportTopicsSchema,
-});
+const schema = reportRecordSchema('admin-company');
 export class FirestoreCompanyReportRepository implements CompanyReportRepository {
   constructor(
     private readonly db: Firestore,

@@ -5,6 +5,7 @@ services:
     init: true
     command: >-
       sh -c "npm ci --ignore-scripts --no-audit --no-fund &&
+      npm run build:packages &&
       npm run dev --workspace @work-track/frontend --
       --config /workspace/docker/firebase/vite.config.mjs"
     environment:
@@ -47,6 +48,8 @@ services:
       - ./apps/backend/tsconfig.build.json:/input/apps/backend/tsconfig.build.json:ro
       - ./apps/backend/src:/input/apps/backend/src:ro
       - ./apps/frontend/package.json:/input/apps/frontend/package.json:ro
+      - ./packages:/input/packages:ro
+      - ./scripts:/input/scripts:ro
       - ./firebase.emulators.json:/input/firebase.emulators.json:ro
       - ./firestore.rules:/input/firestore.rules:ro
       - ./firestore.indexes.json:/input/firestore.indexes.json:ro

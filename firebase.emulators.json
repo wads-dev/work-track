@@ -1,7 +1,7 @@
 {
   "functions": [
     {
-      "source": "apps/backend",
+      "source": "apps/backend/dist/functions",
       "codebase": "default",
       "runtime": "nodejs22"
     }

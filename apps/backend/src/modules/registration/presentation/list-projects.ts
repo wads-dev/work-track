@@ -7,12 +7,12 @@ import {
 import {
   ProjectManagementError,
   safeId,
-} from '../domain/project-management.js';
+} from '@work-track/core/registration/domain/project-management';
 import {
   canAccessProject,
   effectiveProjectType,
-} from '../domain/project-access.js';
-import type { WorkRepository } from '../domain/work-model.js';
+} from '@work-track/core/registration/domain/project-access';
+import type { WorkRepository } from '@work-track/core/registration/domain/work-model';
 export const listProjectsInput = z
   .object({
     scope: z.enum(['all', 'personal', 'work']).default('all'),

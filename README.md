@@ -46,7 +46,7 @@ Região Functions: southamerica-east1. O banco existente fica em nam5; nenhuma m
 
 ## Arquitetura
 
-Monorepo npm com apps/backend (Express/MCP) e apps/frontend (React/Vite). Backend organizado em core, shared e modules/registration, com camadas domain, application, infrastructure e presentation. Consulte [arquitetura](docs/architecture.md).
+Monorepo npm com apps/backend (Express/MCP), apps/frontend (React/Vite), packages/core (modelos, contratos, schemas e domínio/aplicação pura) e packages/data (codecs, portas e repositórios compartilháveis). Apps usam exports públicos dos pacotes, sem imports cruzados. SDKs Firebase e comandos autoritativos continuam nas aplicações. Consulte [arquitetura](docs/architecture.md) e [deploy](docs/deployment.md).
 
 ## Desenvolvimento
 

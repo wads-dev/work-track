@@ -1,7 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import type { Auth } from 'firebase-admin/auth';
-import type { ReportSourceRecord } from '../domain/project-report.js';
+import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
 import { FirestoreProjectReportRepository } from './firestore-project-report.js';
 import { readProjectCatalog, selectReportRecords } from './project-catalog.js';
 export class FirestoreTopicReportRepository extends FirestoreProjectReportRepository {

@@ -1,9 +1,9 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import { executeCompanyReport } from '../application/get-company-report.js';
+import { executeCompanyReport } from '@work-track/core/reports/application/get-company-report';
 import { z } from 'zod';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
-import { ReportContextError } from '../domain/global-estimates.js';
-import type { CompanyReportRepository } from '../domain/company-report.js';
+import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
+import type { CompanyReportRepository } from '@work-track/core/reports/domain/company-report';
 const schema = z
   .object({
     from: z.iso.datetime({ offset: true }).optional(),

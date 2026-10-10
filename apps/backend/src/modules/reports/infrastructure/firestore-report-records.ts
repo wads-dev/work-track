@@ -1,13 +1,13 @@
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
   canAccessProject,
   effectiveProjectType,
-} from '../../registration/domain/project-access.js';
+} from '@work-track/core/registration/domain/project-access';
 import type {
   ReportRecord,
   ReportRecordsRepository,
-} from '../domain/report-record.js';
+} from '@work-track/core/reports/domain/report-record';
 export class FirestoreReportRecordsRepository implements ReportRecordsRepository {
   constructor(private readonly db: Firestore) {}
   async listByProject(

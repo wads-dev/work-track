@@ -1,12 +1,13 @@
+import type { TopicDetailReport } from '@work-track/core/contracts/report-responses';
 import { z } from 'zod';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
-import { ReportContextError } from '../domain/global-estimates.js';
-import { buildTopicDetails } from '../domain/topic-details.js';
+import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
+import { buildTopicDetails } from '@work-track/core/reports/domain/topic-details';
 import type {
   ProjectReportRepository,
   ReportSourceRecord,
-} from '../domain/project-report.js';
+} from '@work-track/core/reports/domain/project-report';
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 export const topicInput = z
   .object({
@@ -142,7 +143,7 @@ export async function getTopicReportHandler(
       asOf: new Date(asOf).toISOString(),
       ...result,
       page: { limit: 2000, nextCursor: null, partial: false },
-    };
+    } satisfies TopicDetailReport;
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     if (error instanceof ReportContextError)

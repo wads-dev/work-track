@@ -4,7 +4,7 @@ import {
   authorizeReport,
   type ReportAuth,
 } from '../../reports/presentation/get-project-report.js';
-import type { CompanyPeopleRepository } from '../domain/company-person.js';
+import type { CompanyPeopleRepository } from '@work-track/core/people/domain/company-person';
 
 const schema = z
   .object({

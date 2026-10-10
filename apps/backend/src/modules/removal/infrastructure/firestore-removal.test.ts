@@ -1,7 +1,7 @@
 import { it, expect, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreRemovalRepository } from './firestore-removal.js';
-import { removalInput } from '../domain/removal.js';
+import { removalInput } from '@work-track/core/removal/domain/removal';
 import { FirestoreWorkRepository } from '../../registration/infrastructure/firestore-work.js';
 import { FirestoreRecordEditingRepository } from '../../registration/infrastructure/firestore-record-editing.js';
 import { FirestoreSplitRepository } from '../../split/infrastructure/firestore-split.js';

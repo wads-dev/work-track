@@ -1,10 +1,10 @@
-import { isDeletedRecord } from '../domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
 import {
   assertProjectAccess,
   assertProjectMergeAccess,
   effectiveProjectType,
-} from '../domain/project-access.js';
+} from '@work-track/core/registration/domain/project-access';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import {
   assertProjectWritable,
@@ -15,8 +15,8 @@ import {
   type ProjectManagementRepository,
   type UpdateProjectInput,
   type MergeProjectsInput,
-} from '../domain/project-management.js';
-import type { Project } from '../domain/work-model.js';
+} from '@work-track/core/registration/domain/project-management';
+import type { Project } from '@work-track/core/registration/domain/work-model';
 type ManagedProject = Project & {
   mergeLock?: string;
   archived?: boolean;

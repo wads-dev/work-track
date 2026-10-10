@@ -1,0 +1,66 @@
+{
+  "name": "@work-track/data",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./repositories/snapshots/personal-report-repository": {
+      "types": "./lib/repositories/snapshots/personal-report-repository.d.ts",
+      "development": "./src/repositories/snapshots/personal-report-repository.ts",
+      "default": "./lib/repositories/snapshots/personal-report-repository.js"
+    },
+    "./repositories/snapshots/authorized-report-repository": {
+      "types": "./lib/repositories/snapshots/authorized-report-repository.d.ts",
+      "development": "./src/repositories/snapshots/authorized-report-repository.ts",
+      "default": "./lib/repositories/snapshots/authorized-report-repository.js"
+    },
+    "./repositories/snapshots/own-calendar-repository": {
+      "types": "./lib/repositories/snapshots/own-calendar-repository.d.ts",
+      "development": "./src/repositories/snapshots/own-calendar-repository.ts",
+      "default": "./lib/repositories/snapshots/own-calendar-repository.js"
+    },
+    "./repositories/snapshots/personal-project-report-repository": {
+      "types": "./lib/repositories/snapshots/personal-project-report-repository.d.ts",
+      "development": "./src/repositories/snapshots/personal-project-report-repository.ts",
+      "default": "./lib/repositories/snapshots/personal-project-report-repository.js"
+    },
+    "./codecs/report-project-metadata": {
+      "types": "./lib/codecs/report-project-metadata.d.ts",
+      "development": "./src/codecs/report-project-metadata.ts",
+      "default": "./lib/codecs/report-project-metadata.js"
+    },
+    "./codecs/report-record": {
+      "types": "./lib/codecs/report-record.d.ts",
+      "development": "./src/codecs/report-record.ts",
+      "default": "./lib/codecs/report-record.js"
+    },
+    "./ports/document-read-port": {
+      "types": "./lib/ports/document-read-port.d.ts",
+      "development": "./src/ports/document-read-port.ts",
+      "default": "./lib/ports/document-read-port.js"
+    },
+    "./repositories/base-read-repository": {
+      "types": "./lib/repositories/base-read-repository.d.ts",
+      "development": "./src/repositories/base-read-repository.ts",
+      "default": "./lib/repositories/base-read-repository.js"
+    },
+    "./repositories/project-catalog-repository": {
+      "types": "./lib/repositories/project-catalog-repository.d.ts",
+      "development": "./src/repositories/project-catalog-repository.ts",
+      "default": "./lib/repositories/project-catalog-repository.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@work-track/core": "0.1.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^5.0.3"
+  }
+}

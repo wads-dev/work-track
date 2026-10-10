@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildProjectReport } from '../domain/build-project-report.js';
-import type { CompanyReportRepository } from '../domain/company-report.js';
-import type { PersonalReportRepository } from '../domain/personal-report.js';
+import { buildProjectReport } from '@work-track/core/reports/domain/build-project-report';
+import type { CompanyReportRepository } from '@work-track/core/reports/domain/company-report';
+import type { PersonalReportRepository } from '@work-track/core/reports/domain/personal-report';
 import type {
   ProjectReportRepository,
   ReportPage,
   ReportSourceRecord,
-} from '../domain/project-report.js';
-import type { TopicBreakdown } from '../domain/topic-breakdown.js';
+} from '@work-track/core/reports/domain/project-report';
+import type { TopicBreakdown } from '@work-track/core/reports/domain/topic-breakdown';
 import { getCompanyReportHandler } from './get-company-report.js';
 import { getPersonalReportHandler } from './get-personal-report.js';
 import {

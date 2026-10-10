@@ -1,26 +1,26 @@
 import express from 'express';
-import type { MergeRepository } from '../../modules/merge/domain/merge.js';
+import type { MergeRepository } from '@work-track/core/merge/domain/merge';
 import { registerMergeTool } from '../../modules/merge/presentation/merge-tool.js';
-import type { MovementRepository } from '../../modules/registration/domain/record-movement.js';
+import type { MovementRepository } from '@work-track/core/registration/domain/record-movement';
 import { registerMovementTools } from '../../modules/registration/presentation/record-movement.js';
-import type { RemovalRepository } from '../../modules/removal/domain/removal.js';
+import type { RemovalRepository } from '@work-track/core/removal/domain/removal';
 import { registerRemovalTool } from '../../modules/removal/presentation/removal-tool.js';
-import type { SplitRepository } from '../../modules/split/domain/split.js';
+import type { SplitRepository } from '@work-track/core/split/domain/split';
 import { registerSplitTool } from '../../modules/split/presentation/split-tool.js';
-import type { PauseRepository } from '../../modules/pause/domain/pause.js';
+import type { PauseRepository } from '@work-track/core/pause/domain/pause';
 import { registerPauseTool } from '../../modules/pause/presentation/pause-tool.js';
-import type { DailyHoursRepository } from '../../modules/daily-hours/domain/daily-hours.js';
+import type { DailyHoursRepository } from '@work-track/core/daily-hours/domain/daily-hours';
 import { registerDailyHoursTool } from '../../modules/daily-hours/presentation/daily-hours-tool.js';
-import type { TopicManagementRepository } from '../../modules/registration/domain/topic-management.js';
-import type { ProjectManagementRepository } from '../../modules/registration/domain/project-management.js';
-import type { RecordEditingRepository } from '../../modules/registration/domain/record-edit.js';
+import type { TopicManagementRepository } from '@work-track/core/registration/domain/topic-management';
+import type { ProjectManagementRepository } from '@work-track/core/registration/domain/project-management';
+import type { RecordEditingRepository } from '@work-track/core/registration/domain/record-edit';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import type { WorkTrackOAuth } from '../auth/application/oauth-provider.js';
 import { z } from 'zod';
-import type { WorkRepository } from '../../modules/registration/domain/work-model.js';
+import type { WorkRepository } from '@work-track/core/registration/domain/work-model';
 import { registerWorkTools } from '../../modules/registration/presentation/work-tools.js';
 
 export function createApp(

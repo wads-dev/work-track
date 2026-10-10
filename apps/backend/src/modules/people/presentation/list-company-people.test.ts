@@ -1,7 +1,7 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReportAuth } from '../../reports/presentation/get-project-report.js';
-import type { CompanyPeopleRepository } from '../domain/company-person.js';
+import type { CompanyPeopleRepository } from '@work-track/core/people/domain/company-person';
 import { listCompanyPeopleHandler } from './list-company-people.js';
 
 const auth: ReportAuth = {

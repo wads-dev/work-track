@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { registerWorkTools } from './work-tools.js';
-import type { WorkRepository } from '../domain/work-model.js';
+import type { WorkRepository } from '@work-track/core/registration/domain/work-model';
 import { instructionPrefix } from './instructions.js';
 it('serves conceptual plain text with SDK, prefixes work descriptions, never touches repositories', async () => {
   const listProjects = vi.fn<WorkRepository['listProjects']>(),

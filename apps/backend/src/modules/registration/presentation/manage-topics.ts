@@ -3,12 +3,12 @@ import {
   authorizeReport,
   type ReportAuth,
 } from '../../reports/presentation/get-project-report.js';
-import { ProjectManagementError } from '../domain/project-management.js';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
 import {
   mergeTopicsInput,
   listTopicMergesInput,
   type TopicManagementRepository,
-} from '../domain/topic-management.js';
+} from '@work-track/core/registration/domain/topic-management';
 export async function manageTopicsHandler(
   repository: TopicManagementRepository,
   kind: 'merge' | 'history',

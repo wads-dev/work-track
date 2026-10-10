@@ -1,8 +1,8 @@
-import { ownRecordsRepository } from './own-records-repository';
-import { deletionAccount } from './record-deletion';
+import { ownRecordsRepository } from './data/cache/own-records-repository';
+import { deletionAccount } from './data/cache/record-deletion';
 import { useEffect, useState } from 'react';
-import { projectRepository } from './project-repository';
-import { TopicDetails } from './TopicDetails';
+import { projectRepository } from './data/cache/project-repository';
+import { TopicDetails } from './features/reports/TopicDetails';
 import { createRoot } from 'react-dom/client';
 import { Button } from './components/ui/button';
 import { Card, CardContent } from './components/ui/card';
@@ -27,7 +27,7 @@ import {
   SheetDescription,
 } from './components/ui/sheet';
 import { cn } from './lib/utils';
-import { useMediaQuery } from './theme';
+import { useMediaQuery } from './shared/ui/theme';
 
 import {
   GoogleAuthProvider,
@@ -36,9 +36,12 @@ import {
   signOut,
   type User,
 } from 'firebase/auth';
-import { initializeServices, type Services } from './firebase';
-import { RecordDrawer } from './RecordDrawer';
-import { Dashboard } from './Dashboard';
+import {
+  initializeServices,
+  type Services,
+} from './infrastructure/firebase/firebase';
+import { RecordDrawer } from './features/records/RecordDrawer';
+import { Dashboard } from './features/dashboard/Dashboard';
 import '@fontsource-variable/geist';
 import './styles.css';
 import {
@@ -50,20 +53,20 @@ import {
   useLocation,
   useParams,
 } from 'react-router-dom';
-import { safeReturnTo } from './routes';
-import { PrivacyContext } from './privacy';
+import { safeReturnTo } from './app/routes';
+import { PrivacyContext } from './shared/ui/privacy';
 import {
   readPrivacyPreference,
   savePrivacyPreference,
-} from './privacy-preference';
-import { PendingBell, PendingPage } from './PendingPage';
-import { RulesPage } from './RulesPage';
-import { UiIcon } from './UiIcons';
-import { PersonalPage } from './PersonalPage';
-import { PersonPage } from './PersonPage';
-import { PeoplePage } from './PeoplePage';
-import { CompanyPeopleProvider } from './CompanyPeopleContext';
-import { PwaControls } from './PwaControls';
+} from './shared/ui/privacy-preference';
+import { PendingBell, PendingPage } from './features/pending/PendingPage';
+import { RulesPage } from './features/rules/RulesPage';
+import { UiIcon } from './shared/ui/UiIcons';
+import { PersonalPage } from './features/reports/PersonalPage';
+import { PersonPage } from './features/people/PersonPage';
+import { PeoplePage } from './features/people/PeoplePage';
+import { CompanyPeopleProvider } from './features/people/CompanyPeopleContext';
+import { PwaControls } from './app/pwa/PwaControls';
 
 function allowed(user: User) {
   return (

@@ -4,12 +4,12 @@ import {
   authorizeReport,
   type ReportAuth,
 } from '../../reports/presentation/get-project-report.js';
-import { ProjectManagementError } from '../domain/project-management.js';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
 import {
   moveRecordInput,
   moveTopicInput,
   type MovementRepository,
-} from '../domain/record-movement.js';
+} from '@work-track/core/registration/domain/record-movement';
 export async function movementHandler(
   repository: MovementRepository,
   kind: 'move_topic' | 'move_record',

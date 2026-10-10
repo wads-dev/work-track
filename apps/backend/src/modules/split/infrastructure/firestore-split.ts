@@ -1,8 +1,8 @@
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
 import type { Firestore } from 'firebase-admin/firestore';
-import { assertProjectAccess } from '../../registration/domain/project-access.js';
-import type { Project } from '../../registration/domain/work-model.js';
+import { assertProjectAccess } from '@work-track/core/registration/domain/project-access';
+import type { Project } from '@work-track/core/registration/domain/work-model';
 import {
   planSplit,
   splitInput,
@@ -10,7 +10,7 @@ import {
   type SplitInput,
   type SplitRepository,
   type SplitResult,
-} from '../domain/split.js';
+} from '@work-track/core/split/domain/split';
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
   if (value && typeof value === 'object')

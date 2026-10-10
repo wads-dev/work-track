@@ -1,23 +1,10 @@
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
-import { z } from 'zod';
-import {
-  readProjectCatalog,
-  reportTopicsSchema,
-  selectReportRecords,
-} from './project-catalog.js';
-import { ReportContextError } from '../domain/global-estimates.js';
-import type { ReportSourceRecord } from '../domain/project-report.js';
-const schema = z.object({
-  projectId: z.string(),
-  startedAt: z.string(),
-  endedAt: z
-    .string()
-    .nullish()
-    .transform((value) => value ?? undefined),
-  timeZone: z.string(),
-  topics: reportTopicsSchema,
-});
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
+import { readProjectCatalog, selectReportRecords } from './project-catalog.js';
+import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
+import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
+const schema = reportRecordSchema('admin-owned');
 export async function loadGlobalContext(
   db: Firestore,
   uids: string[],

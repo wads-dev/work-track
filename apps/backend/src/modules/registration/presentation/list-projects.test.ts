@@ -1,8 +1,11 @@
 import { expect, it, vi } from 'vitest';
 import { listProjectsHandler } from './list-projects.js';
-import type { Project, WorkRepository } from '../domain/work-model.js';
-import { RegistrationService } from '../application/registration-service.js';
-import { projectInput } from '../domain/work-model.js';
+import type {
+  Project,
+  WorkRepository,
+} from '@work-track/core/registration/domain/work-model';
+import { RegistrationService } from '@work-track/core/registration/application/registration-service';
+import { projectInput } from '@work-track/core/registration/domain/work-model';
 const auth = (uid: string) => ({
   uid,
   token: {

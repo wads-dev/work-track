@@ -1,14 +1,14 @@
-import { isDeletedRecord } from '../domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { assertProjectWritable } from '../domain/project-management.js';
-import { assertProjectAccess } from '../domain/project-access.js';
+import { assertProjectWritable } from '@work-track/core/registration/domain/project-management';
+import { assertProjectAccess } from '@work-track/core/registration/domain/project-access';
 import {
   applyRecordPatch,
   recordSummary,
   RecordEditError,
   type RecordEditingRepository,
   type UpdateRecordInput,
-} from '../domain/record-edit.js';
+} from '@work-track/core/registration/domain/record-edit';
 export class FirestoreRecordEditingRepository implements RecordEditingRepository {
   constructor(private readonly db: Firestore) {}
   async updateRecord(input: UpdateRecordInput, uid: string) {

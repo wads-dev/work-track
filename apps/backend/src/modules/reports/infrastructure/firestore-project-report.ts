@@ -1,36 +1,19 @@
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { loadGlobalContext } from './firestore-global-context.js';
 import type { Auth } from 'firebase-admin/auth';
-import { z } from 'zod';
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
+import { decodeReportProjectMetadata } from '@work-track/data/codecs/report-project-metadata';
 import {
   canAccessProject,
   effectiveProjectType,
-} from '../../registration/domain/project-access.js';
+} from '@work-track/core/registration/domain/project-access';
 import { readProjectCatalog, selectReportRecords } from './project-catalog.js';
 import type {
   ProjectReportRepository,
   ReportPage,
-} from '../domain/project-report.js';
-const recordSchema = z.object({
-  uid: z.string(),
-  projectId: z.string(),
-  startedAt: z.string(),
-  endedAt: z
-    .string()
-    .nullish()
-    .transform((value) => value ?? undefined),
-  timeZone: z.string(),
-  topics: z
-    .array(
-      z.object({
-        topicId: z.string(),
-        percentage: z.number().optional(),
-        durationMinutes: z.number().optional(),
-      }),
-    )
-    .default([]),
-});
+} from '@work-track/core/reports/domain/project-report';
+const recordSchema = reportRecordSchema('admin-project');
 export class FirestoreProjectReportRepository implements ProjectReportRepository {
   constructor(
     private readonly db: Firestore,
@@ -93,16 +76,7 @@ export class FirestoreProjectReportRepository implements ProjectReportRepository
           throw new Error('Invalid record ownership');
         return { ...value, id: doc.id };
       });
-    const parsedTopics = z
-      .array(
-        z.object({
-          id: z.string(),
-          title: z.string(),
-          mergedIntoTopicId: z.string().optional(),
-        }),
-      )
-      .safeParse(project.data()?.topics ?? []);
-    const topics = parsedTopics.success ? parsedTopics.data : [];
+    const topics = decodeReportProjectMetadata(project.data()!, 'admin').topics;
     const topicLabels = Object.fromEntries(
       topics.map((topic) => [topic.id, topic.title]),
     );

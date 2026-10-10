@@ -1,24 +1,11 @@
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
-import { canAccessProject } from '../../registration/domain/project-access.js';
+import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 import { loadGlobalContext } from './firestore-global-context.js';
-import { z } from 'zod';
-import {
-  readProjectCatalog,
-  reportTopicsSchema,
-  selectReportRecords,
-} from './project-catalog.js';
-import type { PersonalReportRepository } from '../domain/personal-report.js';
-const source = z.object({
-  projectId: z.string(),
-  startedAt: z.string(),
-  endedAt: z
-    .string()
-    .nullish()
-    .transform((value) => value ?? undefined),
-  timeZone: z.string(),
-  topics: reportTopicsSchema,
-});
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
+import { readProjectCatalog, selectReportRecords } from './project-catalog.js';
+import type { PersonalReportRepository } from '@work-track/core/reports/domain/personal-report';
+const source = reportRecordSchema('admin-owned');
 export class FirestorePersonalReportRepository implements PersonalReportRepository {
   constructor(private readonly db: Firestore) {}
   async archivedProjectIds(projectIds: string[]) {

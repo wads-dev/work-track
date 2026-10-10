@@ -1,7 +1,11 @@
 import { expect, it, vi } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerPauseTool } from './pause-tool.js';
-import { PauseError, pauseInput, type PauseInput } from '../domain/pause.js';
+import {
+  PauseError,
+  pauseInput,
+  type PauseInput,
+} from '@work-track/core/pause/domain/pause';
 it('registers strict retrospective tool using trusted OAuth UID only', async () => {
   let callback: ((input: PauseInput) => Promise<unknown>) | undefined;
   const registerTool = vi.fn(

@@ -8,7 +8,7 @@ import {
   type DocumentSnapshot,
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
-import { effectiveProjectType } from '../domain/project-access.js';
+import { effectiveProjectType } from '@work-track/core/registration/domain/project-access';
 
 export const DELETION_LIMITS = {
   scanPerCollection: 1000,

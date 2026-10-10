@@ -15,4 +15,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: docker compose config --quiet
+      - run: npm run build:packages
       - run: npm run check

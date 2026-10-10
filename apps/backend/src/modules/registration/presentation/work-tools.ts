@@ -4,25 +4,25 @@ import {
   mergeTopicsInput,
   listTopicMergesInput,
   type TopicManagementRepository,
-} from '../domain/topic-management.js';
+} from '@work-track/core/registration/domain/topic-management';
 import { instructionPrefix, workInstructions } from './instructions.js';
 import {
   updateProjectInput,
   archiveProjectInput,
   mergeProjectsInput,
   type ProjectManagementRepository,
-} from '../domain/project-management.js';
+} from '@work-track/core/registration/domain/project-management';
 import {
   updateRecordInput,
   type RecordEditingRepository,
-} from '../domain/record-edit.js';
-import type { WorkRepository } from '../domain/work-model.js';
+} from '@work-track/core/registration/domain/record-edit';
+import type { WorkRepository } from '@work-track/core/registration/domain/work-model';
 import {
   projectInput,
   topicInput,
   registerInput,
-} from '../domain/work-model.js';
-import { RegistrationService } from '../application/registration-service.js';
+} from '@work-track/core/registration/domain/work-model';
+import { RegistrationService } from '@work-track/core/registration/application/registration-service';
 export function registerWorkTools(
   server: McpServer,
   repository: WorkRepository,

@@ -1,7 +1,7 @@
 import { it, expect, vi } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerSplitTool } from './split-tool.js';
-import { SplitError } from '../domain/split.js';
+import { SplitError } from '@work-track/core/split/domain/split';
 it('registers split_record preview-safe instructions and injects only trusted UID', async () => {
   const registerTool = vi.fn();
   const splitRecord = vi
