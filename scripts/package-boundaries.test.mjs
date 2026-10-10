@@ -85,6 +85,28 @@ test('apps use public package exports, never sibling source or package deep impo
     }
   }
 });
+test('all public package exports load as compiled ESM without a source loader', async () => {
+  for (const name of ['core', 'data']) {
+    const pkg = JSON.parse(
+      readFileSync(resolve(root, 'packages', name, 'package.json'), 'utf8'),
+    );
+    for (const key of Object.keys(pkg.exports)) {
+      const specifier = '@work-track/' + name + key.slice(1);
+      await assert.doesNotReject(() => import(specifier), specifier);
+    }
+    for (const privatePath of [
+      'src/private-module',
+      'lib/private-module',
+      'package.json',
+    ]) {
+      await assert.rejects(
+        () => import('@work-track/' + name + '/' + privatePath),
+        { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' },
+      );
+    }
+  }
+});
+
 test('package exports explicitly pair source, declarations and runnable JavaScript', () => {
   for (const name of ['core', 'data']) {
     const dir = resolve(root, 'packages', name);
