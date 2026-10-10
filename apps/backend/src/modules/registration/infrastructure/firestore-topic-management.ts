@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
-import { assertProjectAccess } from '../domain/project-access.js';
+import { assertProjectAccess } from '@work-track/core/registration/domain/project-access';
 import type { Firestore } from 'firebase-admin/firestore';
-import type { Project, Topic } from '../domain/work-model.js';
-import { ProjectManagementError } from '../domain/project-management.js';
+import type {
+  Project,
+  Topic,
+} from '@work-track/core/registration/domain/work-model';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
 import {
   previewTopicMerge,
   type TopicManagementRepository,
@@ -10,7 +13,7 @@ import {
   type ListTopicMergesInput,
   type TopicMergeAudit,
   type TopicMergeExecution,
-} from '../domain/topic-management.js';
+} from '@work-track/core/registration/domain/topic-management';
 export class FirestoreTopicManagementRepository implements TopicManagementRepository {
   constructor(private readonly db: Firestore) {}
   async mergeTopics(input: MergeTopicsInput, uid: string) {

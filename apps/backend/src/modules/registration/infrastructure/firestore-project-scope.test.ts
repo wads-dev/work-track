@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreProjectScopeRepository } from './firestore-project-scope.js';
-import { projectScopeInput } from '../domain/project-scope.js';
+import { projectScopeInput } from '@work-track/core/registration/domain/project-scope';
 import { changeProjectScopeHandler } from '../presentation/change-project-scope.js';
 function fixture() {
   const values = new Map<string, Record<string, unknown>>([

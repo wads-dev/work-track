@@ -3,7 +3,7 @@ import {
   getTopicReportHandler,
   type TopicReportRepository,
 } from './get-topic-report.js';
-import type { ReportSourceRecord } from '../domain/project-report.js';
+import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
 const auth = {
   uid: 'alice',
   token: {

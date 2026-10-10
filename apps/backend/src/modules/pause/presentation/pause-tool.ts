@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ProjectManagementError } from '../../registration/domain/project-management.js';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
 import {
   PauseError,
   pauseInput,
   type PauseRepository,
-} from '../domain/pause.js';
+} from '@work-track/core/pause/domain/pause';
 export function registerPauseTool(
   server: McpServer,
   repository: PauseRepository,

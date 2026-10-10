@@ -1,4 +1,4 @@
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import {
@@ -8,8 +8,8 @@ import {
   validTimeZone,
   type DailyProject,
   type DailyHoursRepository,
-} from '../domain/daily-hours.js';
-import type { ReportSourceRecord } from '../../reports/domain/project-report.js';
+} from '@work-track/core/daily-hours/domain/daily-hours';
+import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
 const source = z
   .object({
     projectId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),

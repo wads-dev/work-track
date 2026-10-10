@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { getCompanyReportHandler } from './get-company-report.js';
-import type { CompanyReportRepository } from '../domain/company-report.js';
+import type { CompanyReportRepository } from '@work-track/core/reports/domain/company-report';
 const auth = {
   uid: 'alice',
   token: {

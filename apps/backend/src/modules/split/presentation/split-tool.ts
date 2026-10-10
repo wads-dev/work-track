@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ProjectManagementError } from '../../registration/domain/project-management.js';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
 import {
   splitInput,
   SplitError,
   type SplitRepository,
-} from '../domain/split.js';
+} from '@work-track/core/split/domain/split';
 export function registerSplitTool(
   server: McpServer,
   repository: SplitRepository,

@@ -1,0 +1,245 @@
+{
+  "name": "@work-track/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./daily-hours/domain/daily-hours": {
+      "types": "./lib/daily-hours/domain/daily-hours.d.ts",
+      "development": "./src/daily-hours/domain/daily-hours.ts",
+      "default": "./lib/daily-hours/domain/daily-hours.js"
+    },
+    "./merge/domain/merge": {
+      "types": "./lib/merge/domain/merge.d.ts",
+      "development": "./src/merge/domain/merge.ts",
+      "default": "./lib/merge/domain/merge.js"
+    },
+    "./pause/domain/pause": {
+      "types": "./lib/pause/domain/pause.d.ts",
+      "development": "./src/pause/domain/pause.ts",
+      "default": "./lib/pause/domain/pause.js"
+    },
+    "./people/domain/company-person": {
+      "types": "./lib/people/domain/company-person.d.ts",
+      "development": "./src/people/domain/company-person.ts",
+      "default": "./lib/people/domain/company-person.js"
+    },
+    "./registration/domain/close-previous": {
+      "types": "./lib/registration/domain/close-previous.d.ts",
+      "development": "./src/registration/domain/close-previous.ts",
+      "default": "./lib/registration/domain/close-previous.js"
+    },
+    "./registration/domain/project-access": {
+      "types": "./lib/registration/domain/project-access.d.ts",
+      "development": "./src/registration/domain/project-access.ts",
+      "default": "./lib/registration/domain/project-access.js"
+    },
+    "./registration/domain/project-management": {
+      "types": "./lib/registration/domain/project-management.d.ts",
+      "development": "./src/registration/domain/project-management.ts",
+      "default": "./lib/registration/domain/project-management.js"
+    },
+    "./registration/domain/project-scope": {
+      "types": "./lib/registration/domain/project-scope.d.ts",
+      "development": "./src/registration/domain/project-scope.ts",
+      "default": "./lib/registration/domain/project-scope.js"
+    },
+    "./registration/domain/project-search": {
+      "types": "./lib/registration/domain/project-search.d.ts",
+      "development": "./src/registration/domain/project-search.ts",
+      "default": "./lib/registration/domain/project-search.js"
+    },
+    "./registration/domain/record-edit": {
+      "types": "./lib/registration/domain/record-edit.d.ts",
+      "development": "./src/registration/domain/record-edit.ts",
+      "default": "./lib/registration/domain/record-edit.js"
+    },
+    "./registration/domain/record-lifecycle": {
+      "types": "./lib/registration/domain/record-lifecycle.d.ts",
+      "development": "./src/registration/domain/record-lifecycle.ts",
+      "default": "./lib/registration/domain/record-lifecycle.js"
+    },
+    "./registration/domain/record-movement": {
+      "types": "./lib/registration/domain/record-movement.d.ts",
+      "development": "./src/registration/domain/record-movement.ts",
+      "default": "./lib/registration/domain/record-movement.js"
+    },
+    "./registration/domain/topic-management": {
+      "types": "./lib/registration/domain/topic-management.d.ts",
+      "development": "./src/registration/domain/topic-management.ts",
+      "default": "./lib/registration/domain/topic-management.js"
+    },
+    "./registration/domain/work-model": {
+      "types": "./lib/registration/domain/work-model.d.ts",
+      "development": "./src/registration/domain/work-model.ts",
+      "default": "./lib/registration/domain/work-model.js"
+    },
+    "./removal/domain/removal": {
+      "types": "./lib/removal/domain/removal.d.ts",
+      "development": "./src/removal/domain/removal.ts",
+      "default": "./lib/removal/domain/removal.js"
+    },
+    "./reports/domain/build-company-report": {
+      "types": "./lib/reports/domain/build-company-report.d.ts",
+      "development": "./src/reports/domain/build-company-report.ts",
+      "default": "./lib/reports/domain/build-company-report.js"
+    },
+    "./reports/domain/build-personal-report": {
+      "types": "./lib/reports/domain/build-personal-report.d.ts",
+      "development": "./src/reports/domain/build-personal-report.ts",
+      "default": "./lib/reports/domain/build-personal-report.js"
+    },
+    "./reports/domain/build-project-report": {
+      "types": "./lib/reports/domain/build-project-report.d.ts",
+      "development": "./src/reports/domain/build-project-report.ts",
+      "default": "./lib/reports/domain/build-project-report.js"
+    },
+    "./reports/domain/calendar-topics": {
+      "types": "./lib/reports/domain/calendar-topics.d.ts",
+      "development": "./src/reports/domain/calendar-topics.ts",
+      "default": "./lib/reports/domain/calendar-topics.js"
+    },
+    "./reports/domain/calendar-weeks": {
+      "types": "./lib/reports/domain/calendar-weeks.d.ts",
+      "development": "./src/reports/domain/calendar-weeks.ts",
+      "default": "./lib/reports/domain/calendar-weeks.js"
+    },
+    "./reports/domain/company-report": {
+      "types": "./lib/reports/domain/company-report.d.ts",
+      "development": "./src/reports/domain/company-report.ts",
+      "default": "./lib/reports/domain/company-report.js"
+    },
+    "./reports/domain/global-estimates": {
+      "types": "./lib/reports/domain/global-estimates.d.ts",
+      "development": "./src/reports/domain/global-estimates.ts",
+      "default": "./lib/reports/domain/global-estimates.js"
+    },
+    "./reports/domain/personal-report": {
+      "types": "./lib/reports/domain/personal-report.d.ts",
+      "development": "./src/reports/domain/personal-report.ts",
+      "default": "./lib/reports/domain/personal-report.js"
+    },
+    "./reports/domain/project-report": {
+      "types": "./lib/reports/domain/project-report.d.ts",
+      "development": "./src/reports/domain/project-report.ts",
+      "default": "./lib/reports/domain/project-report.js"
+    },
+    "./reports/domain/report-record": {
+      "types": "./lib/reports/domain/report-record.d.ts",
+      "development": "./src/reports/domain/report-record.ts",
+      "default": "./lib/reports/domain/report-record.js"
+    },
+    "./reports/domain/report-time": {
+      "types": "./lib/reports/domain/report-time.d.ts",
+      "development": "./src/reports/domain/report-time.ts",
+      "default": "./lib/reports/domain/report-time.js"
+    },
+    "./reports/domain/topic-breakdown": {
+      "types": "./lib/reports/domain/topic-breakdown.d.ts",
+      "development": "./src/reports/domain/topic-breakdown.ts",
+      "default": "./lib/reports/domain/topic-breakdown.js"
+    },
+    "./reports/domain/topic-details": {
+      "types": "./lib/reports/domain/topic-details.d.ts",
+      "development": "./src/reports/domain/topic-details.ts",
+      "default": "./lib/reports/domain/topic-details.js"
+    },
+    "./split/domain/split": {
+      "types": "./lib/split/domain/split.d.ts",
+      "development": "./src/split/domain/split.ts",
+      "default": "./lib/split/domain/split.js"
+    },
+    "./registration/application/registration-service": {
+      "types": "./lib/registration/application/registration-service.d.ts",
+      "development": "./src/registration/application/registration-service.ts",
+      "default": "./lib/registration/application/registration-service.js"
+    },
+    "./reports/application/calendar-input": {
+      "types": "./lib/reports/application/calendar-input.d.ts",
+      "development": "./src/reports/application/calendar-input.ts",
+      "default": "./lib/reports/application/calendar-input.js"
+    },
+    "./reports/application/complete-selection": {
+      "types": "./lib/reports/application/complete-selection.d.ts",
+      "development": "./src/reports/application/complete-selection.ts",
+      "default": "./lib/reports/application/complete-selection.js"
+    },
+    "./reports/application/get-calendar-report": {
+      "types": "./lib/reports/application/get-calendar-report.d.ts",
+      "development": "./src/reports/application/get-calendar-report.ts",
+      "default": "./lib/reports/application/get-calendar-report.js"
+    },
+    "./reports/application/get-company-report": {
+      "types": "./lib/reports/application/get-company-report.d.ts",
+      "development": "./src/reports/application/get-company-report.ts",
+      "default": "./lib/reports/application/get-company-report.js"
+    },
+    "./reports/application/get-personal-report": {
+      "types": "./lib/reports/application/get-personal-report.d.ts",
+      "development": "./src/reports/application/get-personal-report.ts",
+      "default": "./lib/reports/application/get-personal-report.js"
+    },
+    "./reports/application/get-project-report": {
+      "types": "./lib/reports/application/get-project-report.d.ts",
+      "development": "./src/reports/application/get-project-report.ts",
+      "default": "./lib/reports/application/get-project-report.js"
+    },
+    "./reports/application/list-project-records": {
+      "types": "./lib/reports/application/list-project-records.d.ts",
+      "development": "./src/reports/application/list-project-records.ts",
+      "default": "./lib/reports/application/list-project-records.js"
+    },
+    "./shared/text/normalize": {
+      "types": "./lib/shared/text/normalize.d.ts",
+      "development": "./src/shared/text/normalize.ts",
+      "default": "./lib/shared/text/normalize.js"
+    },
+    "./models/work": {
+      "types": "./lib/models/work.d.ts",
+      "development": "./src/models/work.ts",
+      "default": "./lib/models/work.js"
+    },
+    "./models/company-person": {
+      "types": "./lib/models/company-person.d.ts",
+      "development": "./src/models/company-person.ts",
+      "default": "./lib/models/company-person.js"
+    },
+    "./schemas/registration": {
+      "types": "./lib/schemas/registration.d.ts",
+      "development": "./src/schemas/registration.ts",
+      "default": "./lib/schemas/registration.js"
+    },
+    "./contracts/work-repository": {
+      "types": "./lib/contracts/work-repository.d.ts",
+      "development": "./src/contracts/work-repository.ts",
+      "default": "./lib/contracts/work-repository.js"
+    },
+    "./contracts/company-people-repository": {
+      "types": "./lib/contracts/company-people-repository.d.ts",
+      "development": "./src/contracts/company-people-repository.ts",
+      "default": "./lib/contracts/company-people-repository.js"
+    },
+    "./contracts/report-responses": {
+      "types": "./lib/contracts/report-responses.d.ts",
+      "development": "./src/contracts/report-responses.ts",
+      "default": "./lib/contracts/report-responses.js"
+    },
+    "./contracts/command-gateway": {
+      "types": "./lib/contracts/command-gateway.d.ts",
+      "development": "./src/contracts/command-gateway.ts",
+      "default": "./lib/contracts/command-gateway.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^5.0.3"
+  }
+}

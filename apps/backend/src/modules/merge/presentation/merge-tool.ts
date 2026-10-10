@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ProjectManagementError } from '../../registration/domain/project-management.js';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
 import {
   mergeInput,
   MergeError,
   type MergeRepository,
-} from '../domain/merge.js';
+} from '@work-track/core/merge/domain/merge';
 export function registerMergeTool(
   server: McpServer,
   repository: MergeRepository,

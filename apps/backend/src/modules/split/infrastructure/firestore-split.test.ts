@@ -2,7 +2,7 @@ import { it, expect } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreSplitRepository } from './firestore-split.js';
 import { FirestoreWorkRepository } from '../../registration/infrastructure/firestore-work.js';
-import { splitInput } from '../domain/split.js';
+import { splitInput } from '@work-track/core/split/domain/split';
 const now = Date.parse('2026-10-09T18:00:00Z');
 const input = splitInput.parse({
   recordId: 'source',

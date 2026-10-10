@@ -1,11 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ReportContextError } from '../../reports/domain/global-estimates.js';
+import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
 import {
   dailyHoursInput,
   getDailyHours,
   DailyHoursError,
   type DailyHoursRepository,
-} from '../domain/daily-hours.js';
+} from '@work-track/core/daily-hours/domain/daily-hours';
 export function registerDailyHoursTool(
   server: McpServer,
   repository: DailyHoursRepository,

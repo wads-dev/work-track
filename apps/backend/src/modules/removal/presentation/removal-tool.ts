@@ -3,7 +3,7 @@ import {
   removalInput,
   RemovalError,
   type RemovalRepository,
-} from '../domain/removal.js';
+} from '@work-track/core/removal/domain/removal';
 export function registerRemovalTool(
   server: McpServer,
   repository: RemovalRepository,

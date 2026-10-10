@@ -1,12 +1,14 @@
 #!/bin/sh
 set -eu
 # /input contains only explicitly mounted sources, never host credentials or .env.
-mkdir -p /workspace/apps/backend /workspace/apps/frontend
+mkdir -p /workspace/apps/backend /workspace/apps/frontend /workspace/scripts
 cp /input/package.json /input/package-lock.json /workspace/
 cp /input/apps/backend/package.json /input/apps/backend/tsconfig*.json /workspace/apps/backend/
 cp /input/apps/frontend/package.json /workspace/apps/frontend/
 # Replace only container-private source trees; host input is read-only.
-rm -rf /workspace/apps/backend/src
+rm -rf /workspace/apps/backend/src /workspace/packages
+cp -R /input/packages /workspace/packages
+cp /input/scripts/build*.mjs /input/scripts/package*.mjs /workspace/scripts/
 cp -R /input/apps/backend/src /workspace/apps/backend/src
 cp /input/firebase.emulators.json /input/firestore.rules /input/firestore.indexes.json /workspace/
 cd /workspace

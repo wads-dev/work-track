@@ -1,7 +1,7 @@
 import { it, expect } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreMergeRepository } from './firestore-merge.js';
-import { mergeInput } from '../domain/merge.js';
+import { mergeInput } from '@work-track/core/merge/domain/merge';
 const now = Date.parse('2026-10-09T18:00:00Z');
 const input = mergeInput.parse({
   sourceRecordId: 'source',

@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { manageProjectHandler } from './manage-projects.js';
-import type { ProjectManagementRepository } from '../domain/project-management.js';
+import type { ProjectManagementRepository } from '@work-track/core/registration/domain/project-management';
 it('guards callables and requires explicit merge confirmation inputs', async () => {
   const updateProject = vi.fn<ProjectManagementRepository['updateProject']>(),
     mergeProjects = vi.fn<ProjectManagementRepository['mergeProjects']>();

@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { manageTopicsHandler } from './manage-topics.js';
-import type { TopicManagementRepository } from '../domain/topic-management.js';
+import type { TopicManagementRepository } from '@work-track/core/registration/domain/topic-management';
 const auth = {
   uid: 'u',
   token: {

@@ -1,30 +1,30 @@
-import { isDeletedRecord } from '../domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
 import {
   assertProjectAccess,
   canAccessProject,
   effectiveProjectType,
-} from '../domain/project-access.js';
-import { ProjectManagementError } from '../domain/project-management.js';
-import { canonicalizeTopics } from '../domain/topic-management.js';
+} from '@work-track/core/registration/domain/project-access';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
+import { canonicalizeTopics } from '@work-track/core/registration/domain/topic-management';
 import {
   selectPrevious,
   type PreviousRecord,
-} from '../domain/close-previous.js';
-import { assertProjectWritable } from '../domain/project-management.js';
+} from '@work-track/core/registration/domain/close-previous';
+import { assertProjectWritable } from '@work-track/core/registration/domain/project-management';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import type {
   Project,
   Topic,
   WorkRepository,
   RegisterInput,
-} from '../domain/work-model.js';
+} from '@work-track/core/registration/domain/work-model';
 import {
   projectInput,
   topicInput,
   registerInput,
-} from '../domain/work-model.js';
-import { normalize } from '../../../shared/text/normalize.js';
+} from '@work-track/core/registration/domain/work-model';
+import { normalize } from '@work-track/core/shared/text/normalize';
 export class FirestoreWorkRepository implements WorkRepository {
   constructor(private readonly db: Firestore) {}
   async listProjects(uid: string): Promise<Project[]> {

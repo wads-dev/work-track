@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { WorkRepository } from '../../modules/registration/domain/work-model.js';
+import type { WorkRepository } from '@work-track/core/registration/domain/work-model';
 import request from 'supertest';
 import { InvalidGrantError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { createApp } from './app.js';

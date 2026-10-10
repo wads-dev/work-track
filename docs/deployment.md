@@ -6,4 +6,8 @@ A autenticação usa GitHub OIDC e Workload Identity Federation do Google Cloud,
 
 Auth providers não são alterados pela esteira. Deploys são serializados para evitar versões concorrentes. Roles de deploy incluem administração de Functions, Hosting, regras, índices e Artifact Registry; não foi concedido Editor ou Owner. A conta pode atuar como a conta runtime Compute específica.
 
-Monorepo preserva npm run check na raiz, source apps/backend e public apps/frontend/dist, sem alterar federação.
+O código autoral permanece em apps/backend; o upload Firebase usa o artefato standalone gerado em apps/backend/dist/functions. O build compila core, data e módulos backend e prepara um bundle com código local embutido e terceiros externos. O manifesto runtime e seu lock são projetados do lock raiz, sem links/workspaces, sem pacotes @work-track no registry e sem modificar o manifesto da aplicação. O predeploy repete a preparação de modo idempotente. Hosting permanece em apps/frontend/dist; federação/OIDC não muda.
+
+Os testes de packaging instalam o artefato em diretório temporário fora do monorepo e verificam import e descoberta de metadados pelo runtime oficial Firebase Functions, com configuração demo e sem deploy. O build modular lib permanece disponível para probes e testes locais. Dependências core/data e scripts de packaging disparam os workflows relevantes de backend/frontend.
+
+Desenvolvimento Vite resolve os sources compartilhados por condição development, sem prebundle dos pacotes locais; build de produção resolve os JS compilados. As declarações dos pacotes são compiladas antes de typecheck/test/build dos consumidores. Não use imports diretos entre apps ou para packages/src.

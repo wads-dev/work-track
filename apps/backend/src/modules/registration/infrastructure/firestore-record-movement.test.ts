@@ -1,7 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreRecordMovementRepository } from './firestore-record-movement.js';
-import { moveTopicInput, moveRecordInput } from '../domain/record-movement.js';
+import {
+  moveTopicInput,
+  moveRecordInput,
+} from '@work-track/core/registration/domain/record-movement';
 import { movementHandler } from '../presentation/record-movement.js';
 function fixture() {
   const data = new Map<string, Record<string, unknown>>([

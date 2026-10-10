@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     tailwindcss(),
     VitePWA({
@@ -60,5 +60,19 @@ export default defineConfig({
       },
     }),
   ],
-  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-});
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    conditions: [
+      'module',
+      'browser',
+      command === 'serve' ? 'development' : 'production',
+    ],
+  },
+  optimizeDeps: { exclude: ['@work-track/core', '@work-track/data'] },
+  server: { fs: { allow: [fileURLToPath(new URL('../..', import.meta.url))] } },
+  ssr: {
+    resolve: { conditions: ['node', 'development|production'] },
+    noExternal: [/^@work-track\//],
+  },
+  test: { server: { deps: { inline: [/^@work-track\//] } } },
+}));

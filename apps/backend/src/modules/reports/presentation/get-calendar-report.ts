@@ -1,14 +1,14 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import { authorizeReport, type ReportAuth } from './get-project-report.js';
-import { ReportContextError } from '../domain/global-estimates.js';
-import { calendarInput } from '../application/calendar-input.js';
+import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
+import { calendarInput } from '@work-track/core/reports/application/calendar-input';
 import {
   executeCalendarReport,
   CalendarReportError,
   type CalendarRepository,
-} from '../application/get-calendar-report.js';
-export { calendarInput } from '../application/calendar-input.js';
-export type { CalendarRepository } from '../application/get-calendar-report.js';
+} from '@work-track/core/reports/application/get-calendar-report';
+export { calendarInput } from '@work-track/core/reports/application/calendar-input';
+export type { CalendarRepository } from '@work-track/core/reports/application/get-calendar-report';
 export async function getCalendarReportHandler(
   repository: CalendarRepository,
   data: unknown,

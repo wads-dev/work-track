@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import {
   projectInput,
   registerInput,
-} from '../apps/backend/lib/modules/registration/domain/work-model.js';
+} from '@work-track/core/registration/domain/work-model';
 const projectId = 'demo-work-track',
   uid = '35DvlWmc9p9KBKl6KD6i41aVGHPT',
   host = 'http://127.0.0.1:8081';

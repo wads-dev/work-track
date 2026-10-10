@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { executeCalendarReport } from '../application/get-calendar-report.js';
+import { executeCalendarReport } from '@work-track/core/reports/application/get-calendar-report';
 import {
   getCalendarReportHandler,
   type CalendarRepository,
@@ -8,8 +8,8 @@ import {
   selectReportRecords,
   type ReportProjectMetadata,
 } from '../infrastructure/project-catalog.js';
-import type { ReportSourceRecord } from '../domain/project-report.js';
-import { ReportContextError } from '../domain/global-estimates.js';
+import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
+import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
 const auth = {
   uid: 'alice',
   token: {

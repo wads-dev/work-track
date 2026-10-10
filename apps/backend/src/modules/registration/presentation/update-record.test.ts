@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { updateRecordHandler } from './update-record.js';
-import type { RecordEditingRepository } from '../domain/record-edit.js';
+import type { RecordEditingRepository } from '@work-track/core/registration/domain/record-edit';
 const auth = {
   uid: 'alice',
   token: {

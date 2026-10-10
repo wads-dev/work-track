@@ -1,10 +1,10 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import { ReportContextError } from '../domain/global-estimates.js';
-import type { ProjectReportRepository } from '../domain/project-report.js';
+import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
+import type { ProjectReportRepository } from '@work-track/core/reports/domain/project-report';
 import {
   getProjectReport,
   ReportRequestError,
-} from '../application/get-project-report.js';
+} from '@work-track/core/reports/application/get-project-report';
 export interface ReportAuth {
   uid: string;
   token: {

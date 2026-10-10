@@ -3,14 +3,14 @@ import type { Firestore } from 'firebase-admin/firestore';
 import {
   ProjectManagementError,
   assertProjectWritable,
-} from '../domain/project-management.js';
-import { effectiveProjectType } from '../domain/project-access.js';
+} from '@work-track/core/registration/domain/project-management';
+import { effectiveProjectType } from '@work-track/core/registration/domain/project-access';
 import {
   projectScopeInput,
   type ProjectScopeInput,
   type ProjectScopeRepository,
   type ScopeExecution,
-} from '../domain/project-scope.js';
+} from '@work-track/core/registration/domain/project-scope';
 function canonical(v: unknown): string {
   if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
   if (v && typeof v === 'object')

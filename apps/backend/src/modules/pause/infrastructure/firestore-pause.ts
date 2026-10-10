@@ -1,11 +1,11 @@
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
   assertProjectAccess,
   canAccessProject,
-} from '../../registration/domain/project-access.js';
-import { type Project } from '../../registration/domain/work-model.js';
+} from '@work-track/core/registration/domain/project-access';
+import { type Project } from '@work-track/core/registration/domain/work-model';
 import {
   pauseInput,
   PauseError,
@@ -14,7 +14,7 @@ import {
   type PauseInput,
   type PauseResult,
   type PauseRepository,
-} from '../domain/pause.js';
+} from '@work-track/core/pause/domain/pause';
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';

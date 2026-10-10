@@ -3,11 +3,11 @@ import {
   authorizeReport,
   type ReportAuth,
 } from '../../reports/presentation/get-project-report.js';
-import { ProjectManagementError } from '../domain/project-management.js';
+import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
 import {
   projectScopeInput,
   type ProjectScopeRepository,
-} from '../domain/project-scope.js';
+} from '@work-track/core/registration/domain/project-scope';
 export async function changeProjectScopeHandler(
   repository: ProjectScopeRepository,
   data: unknown,

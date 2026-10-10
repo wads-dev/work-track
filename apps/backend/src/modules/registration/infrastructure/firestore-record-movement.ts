@@ -4,20 +4,20 @@ import {
   assertProjectAccess,
   canAccessProject,
   effectiveProjectType,
-} from '../domain/project-access.js';
-import { isDeletedRecord } from '../domain/record-lifecycle.js';
+} from '@work-track/core/registration/domain/project-access';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import {
   assertProjectWritable,
   ProjectManagementError,
-} from '../domain/project-management.js';
+} from '@work-track/core/registration/domain/project-management';
 import {
   moveRecordInput,
   moveTopicInput,
   type MoveRecordInput,
   type MoveTopicInput,
   type MovementRepository,
-} from '../domain/record-movement.js';
-import type { Topic } from '../domain/work-model.js';
+} from '@work-track/core/registration/domain/record-movement';
+import type { Topic } from '@work-track/core/registration/domain/work-model';
 function canonical(v: unknown): string {
   if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
   if (v && typeof v === 'object')

@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import type { Firestore } from 'firebase-admin/firestore';
-import { isDeletedRecord } from '../../registration/domain/record-lifecycle.js';
+import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import {
   removalInput,
   RemovalError,
   type RemovalInput,
   type RemovalRepository,
   type RemovalResult,
-} from '../domain/removal.js';
+} from '@work-track/core/removal/domain/removal';
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
   if (value && typeof value === 'object')
