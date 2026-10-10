@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
 import { PersonalPage } from './PersonalPage';
+import { useCompanyPeople } from './CompanyPeopleContext';
+import { usePrivacy } from './privacy';
 export function PersonPage({
   db,
   functions,
@@ -14,6 +16,8 @@ export function PersonPage({
   uid: string;
 }) {
   const { personId = '' } = useParams();
+  const directory = useCompanyPeople();
+  const { revealed } = usePrivacy();
   const [params, setParams] = useSearchParams();
   const matches = params.get('uid') === personId;
   useEffect(() => {
@@ -32,7 +36,11 @@ export function PersonPage({
       >
         Voltar ao contexto
       </Link>
-      <h2 className="text-2xl font-semibold mb-2">Perfil de pessoa</h2>
+      <h2 className="text-2xl font-semibold mb-2">
+        {revealed
+          ? directory.name(personId) || 'Perfil de pessoa'
+          : 'Perfil de pessoa'}
+      </h2>
       <p className="text-sm text-muted-foreground mb-4">
         Atividades da pessoa selecionada. Para terceiros, somente projetos
         corporativos autorizados; registros pessoais não são consultados.

@@ -1,4 +1,5 @@
 import { cn } from './lib/utils';
+import { useCompanyPeople } from './CompanyPeopleContext';
 import { Button } from './components/ui/button';
 import {
   Tooltip,
@@ -146,6 +147,7 @@ export function PersonalPage({
       setParams(updateCalendarPerson(params, uid), { replace: true });
   }, [calendar, params, uid, setParams]);
   const { revealed } = usePrivacy();
+  const companyPeople = useCompanyPeople();
   const projects = useProjects(functions, uid, company ? 'work' : 'all');
   const zone = 'America/Sao_Paulo';
   const density =
@@ -222,13 +224,29 @@ export function PersonalPage({
     subject,
     allWeeks,
   ]);
-  const participants =
+  const scopedParticipants =
     directory.owner === uid &&
     directory.revision === accessRevision &&
     directory.partition === directoryPartition &&
     !privacyBlocked
-      ? directory.rows
+      ? directory.rows.map((person) => ({
+          ...person,
+          label: companyPeople.name(person.uid) || person.label,
+        }))
       : [];
+  const participants = revealed
+    ? [
+        ...new Map(
+          [
+            ...scopedParticipants,
+            ...companyPeople.people.map((person) => ({
+              uid: person.uid,
+              label: companyPeople.name(person.uid) || person.email,
+            })),
+          ].map((person) => [person.uid, person]),
+        ).values(),
+      ]
+    : [];
   const [reportQuery, setReportQuery] = useState('');
   const queryIdentity = JSON.stringify([
     calendar,
@@ -694,11 +712,13 @@ export function PersonalPage({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={uid}>Meu calendário</SelectItem>
-                  {participants.length > 0 && !directory.unavailable && (
-                    <SelectItem value="all">
-                      Todas as pessoas · até 10
-                    </SelectItem>
-                  )}
+                  {participants.length > 0 &&
+                    (!directory.unavailable ||
+                      companyPeople.people.length > 0) && (
+                      <SelectItem value="all">
+                        Todas as pessoas · até 10
+                      </SelectItem>
+                    )}
                   {participants
                     .filter((p) => p.uid !== uid)
                     .map((p) => (
@@ -794,13 +814,14 @@ export function PersonalPage({
       )}
       {calendar &&
         directory.unavailable &&
+        companyPeople.people.length === 0 &&
         directory.partition === directoryPartition &&
         directory.owner === uid &&
         directory.revision === accessRevision && (
           <Alert className={cn('border-amber-500/50')}>
             <AlertDescription>
               {person.mode === 'own'
-                ? 'Lista de outras pessoas indisponível na leitura direta atual. Seu calendário usa seus registros; o diretório de participantes precisa de uma fonte autorizada pelas Rules.'
+                ? 'Lista de outras pessoas indisponível. Seu calendário continua usando seus registros. Consulte Pessoas para tentar carregar o diretório novamente.'
                 : 'Lista de pessoas indisponível para este escopo. Escolha um projeto para reduzir a consulta.'}
             </AlertDescription>
           </Alert>
