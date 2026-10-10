@@ -61,6 +61,7 @@ import { RulesPage } from './RulesPage';
 import { UiIcon } from './UiIcons';
 import { PersonalPage } from './PersonalPage';
 import { PersonPage } from './PersonPage';
+import { PwaControls } from './PwaControls';
 
 function allowed(user: User) {
   return (
@@ -233,7 +234,11 @@ function App() {
       className="flex h-full flex-col gap-2 p-5"
     >
       <div className="mb-6">
-        <h2 className="text-xl font-semibold tracking-tight">Work Track</h2>
+        <div className="flex items-center gap-3">
+          <img src="/brand.svg" alt="" className="size-10" />
+          <h2 className="text-xl font-semibold tracking-tight">Work Track</h2>
+        </div>
+        <PwaControls />
         <p className="mt-1 text-sm text-muted-foreground">
           Projetos, tempo e contexto
         </p>
@@ -495,6 +500,7 @@ function App() {
             <Card className="w-full max-w-md">
               <CardContent className="space-y-6 pt-6">
                 <div>
+                  <img src="/brand.svg" alt="" className="mb-4 size-16" />
                   <h1 className="text-3xl font-semibold tracking-tight">
                     Work Track
                   </h1>
@@ -524,6 +530,7 @@ function App() {
                     {busy ? 'Entrando…' : 'Entrar com Google'}
                   </Button>
                 )}
+                <PwaControls />
                 <p className="text-xs text-muted-foreground">
                   Use sua conta Google corporativa @wads.dev. Nenhum registro é
                   criado ao entrar.

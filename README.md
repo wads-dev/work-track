@@ -78,6 +78,14 @@ Execute `npm run smoke:mcp` para testar o proxy real `npx mcp-remote`. O navegad
 
 O build usa a conta padrão Compute com `roles/cloudbuild.builds.builder`; o runtime usa `roles/datastore.user` e `roles/firebaseauth.viewer`. Não foi concedido papel Editor. O hook de preparação pula Husky em produção. A limpeza de imagens do Artifact Registry está configurada para um dia.
 
+## Aplicativo instalável (PWA)
+
+A interface React inclui uma identidade visual própria, favicon SVG/ICO, ícones Apple/Android e manifest com abertura em janela independente. Em Chrome/Edge/Android, use **Instalar aplicativo** quando o navegador oferecer a instalação (ou o menu do navegador). No iPhone/iPad, use Safari → Compartilhar → Adicionar à Tela de Início.
+
+O service worker armazena apenas ícones públicos e uma tela informativa sem conexão. Registros, respostas de APIs, OAuth e Firebase Auth não são armazenados no cache do PWA. Consultar ou alterar atividades requer internet; as permissões e o login continuam os mesmos. Atualizações pedem confirmação antes de recarregar. O service worker é gerado apenas no build de produção.
+
+Validação: `npm run test --workspace @work-track/frontend` e `npm run build --workspace @work-track/frontend`. Publicação somente da interface: `XDG_CONFIG_HOME="$PWD/.firebase-cli" npx -y firebase-tools@latest deploy --only hosting --project wadsworktrack`.
+
 ## Limites atuais
 
 Teste real do login precisa de interação humana com a conta Google. Rate limiting do SDK é por instância, não global; Functions limita o número de instâncias. Documentos de credenciais expiradas são recusados, mas limpeza automática/TTL ainda deve ser configurada antes de uso em escala.
