@@ -1,3 +1,4 @@
+import { PersonIdentity } from './PersonIdentity';
 import { cn } from './lib/utils';
 import { Label } from './components/ui/label';
 import {
@@ -208,6 +209,7 @@ export function TopicReport({
                     variant="bar"
                     data={active.people.map((person) => ({
                       ...person,
+                      uid: active.detailsAvailable ? person.uid : undefined,
                       href:
                         !personal && active.detailsAvailable && person.uid
                           ? '/people/' +
@@ -223,7 +225,12 @@ export function TopicReport({
                         className={cn('flex justify-between gap-4 py-2')}
                       >
                         <p className={cn('text-base [overflow-wrap:anywhere]')}>
-                          {person.label}
+                          <PersonIdentity
+                            uid={
+                              active.detailsAvailable ? person.uid : undefined
+                            }
+                            fallback={person.label}
+                          />
                         </p>
                         <p className={cn('text-base whitespace-nowrap')}>
                           {hours(person.minutes)}

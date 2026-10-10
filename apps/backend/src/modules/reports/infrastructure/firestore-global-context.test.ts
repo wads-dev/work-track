@@ -34,5 +34,41 @@ it('fails closed for oversized context instead of estimating on first pages', as
       db,
       Array.from({ length: 11 }, (_, i) => String(i)),
     ),
-  ).rejects.toThrow('Mais de10');
+  ).rejects.toThrow('Limite operacional');
+});
+
+it('loads every UID above10 sequentially without a Firestore in query or truncation', async () => {
+  const reads: string[] = [];
+  const db = {
+    collection: () => ({
+      doc: (uid: string) => ({
+        collection: () => ({
+          orderBy: () => ({ limit: () => ({ uid }) }),
+        }),
+      }),
+    }),
+    runTransaction: async (work: (tx: unknown) => Promise<unknown>) =>
+      work({
+        get: ({ uid }: { uid: string }) => {
+          reads.push(uid);
+          return Promise.resolve({
+            docs: [
+              {
+                id: 'record',
+                data: () => ({
+                  projectId: 'project',
+                  startedAt: '2026-10-08T00:00:00Z',
+                  timeZone: 'UTC',
+                  topics: [],
+                }),
+              },
+            ],
+          });
+        },
+      }),
+  } as unknown as Firestore;
+  const uids = Array.from({ length: 31 }, (_, i) => 'person' + i);
+  const records = await loadGlobalContext(db, uids);
+  expect(reads).toEqual(uids);
+  expect(records.map((r) => r.uid)).toEqual(uids);
 });
