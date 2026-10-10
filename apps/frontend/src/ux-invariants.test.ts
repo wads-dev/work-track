@@ -213,7 +213,9 @@ describe('timeline stays mathematically faithful while surfaces change', () => {
       expect(html.match(/<li>/g)).toHaveLength(count);
       expect(html.match(/<a /g)).toHaveLength(count);
       expect(
-        html.match(/aria-label="10:00 · Projeto · Estimado · sem duração"/g),
+        html.match(
+          /aria-label="Pessoa · 10:00 · Projeto · Estimado · sem duração"/g,
+        ),
       ).toHaveLength(count);
       expect(html).not.toContain('Nenhum intervalo');
       expect(html).not.toContain('NaN');

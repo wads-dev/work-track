@@ -42,7 +42,7 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
     undefined,
     undefined,
     undefined,
-    { moveRecord, moveSubject: vi.fn().mockResolvedValue({ mode: 'preview' }) },
+    { moveRecord, moveTopic: vi.fn().mockResolvedValue({ mode: 'preview' }) },
   );
   const mcp = (method: string, params?: unknown) =>
     request(app)
@@ -55,6 +55,8 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
     result: { tools: { name: string; description: string }[] };
   };
   expect(listed.result.tools.map((t) => t.name)).toContain('move_record');
+  expect(listed.result.tools.map((t) => t.name)).toContain('move_topic');
+  expect(listed.result.tools.map((t) => t.name)).not.toContain('move_subject');
   expect(listed.result.tools.map((t) => t.name)).toContain('get_daily_hours');
   expect(
     listed.result.tools.find((t) => t.name === 'move_record')!.description,

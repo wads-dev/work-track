@@ -41,7 +41,7 @@ export class FirestoreTopicReportRepository extends FirestoreProjectReportReposi
           data.uid !== record.uid ||
           data.projectId !== record.projectId ||
           data.startedAt !== record.startedAt ||
-          data.endedAt !== record.endedAt ||
+          (data.endedAt ?? undefined) !== record.endedAt ||
           JSON.stringify(data.topics ?? []) !== JSON.stringify(record.topics)
         )
           continue;

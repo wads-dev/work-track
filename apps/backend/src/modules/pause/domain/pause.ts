@@ -115,7 +115,10 @@ export function validateSource(
       'failed-precondition',
       'Pausa exige registro próprio aberto iniciado há menos de24h; pausa não pode preceder início.',
     );
-  const valid = registerInput.safeParse(source);
+  const valid = registerInput.safeParse({
+    ...source,
+    endedAt: source.endedAt === null ? undefined : source.endedAt,
+  });
   if (
     !valid.success ||
     !source.projectSnapshot ||

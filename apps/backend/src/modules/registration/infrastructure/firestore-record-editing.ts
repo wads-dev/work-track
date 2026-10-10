@@ -94,9 +94,8 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
       const after = applyRecordPatch(before, input, uid, project);
       const summary = recordSummary(after, input.recordId);
       const patch: Record<string, unknown> = { updatedAt, updatedBy: uid };
-      if (input.endedAt !== undefined)
-        patch.endedAt =
-          input.endedAt === null ? FieldValue.delete() : input.endedAt;
+      if (input.endedAt !== undefined) patch.endedAt = input.endedAt;
+      else if (before.endedAt === undefined) patch.endedAt = null;
       if (input.projectId !== undefined) {
         patch.projectId = input.projectId;
         patch.projectSnapshot = {
@@ -139,7 +138,8 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
     const open = snapshot.docs
       .filter(
         (doc) =>
-          !isDeletedRecord(doc.data()) && doc.data().endedAt === undefined,
+          !isDeletedRecord(doc.data()) &&
+          (doc.data().endedAt === undefined || doc.data().endedAt === null),
       )
       .map((doc) => {
         const data = doc.data();

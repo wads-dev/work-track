@@ -31,7 +31,7 @@ export function subscribeAuthorizedOwnRecords(
   uid: string,
   next: (page: OwnRecordPage) => void,
   fail: () => void,
-  options: { size?: number; after?: string } = {},
+  options: { size?: number; after?: string; openOnly?: boolean } = {},
 ): Unsubscribe {
   let disposed = false;
   let catalogReady = false;
@@ -111,6 +111,7 @@ export function subscribeAuthorizedOwnRecords(
           query(
             collection(db, 'users', uid, 'records'),
             where('projectId', '==', id),
+            ...(options.openOnly ? [where('endedAt', '==', null)] : []),
             orderBy(documentId()),
             ...(options.after ? [startAfter(options.after)] : []),
             ...(options.size ? [limit(options.size)] : []),

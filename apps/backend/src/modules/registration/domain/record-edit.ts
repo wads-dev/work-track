@@ -99,6 +99,8 @@ export function applyRecordPatch(
       'Registro alterado. Recarregue antes de salvar.',
     );
   const after = { ...existing };
+  // Firestore stores explicit null; the domain keeps an optional end instant.
+  if (after.endedAt === null) delete after.endedAt;
   if (input.endedAt === null) delete after.endedAt;
   else if (input.endedAt !== undefined) after.endedAt = input.endedAt;
   if (input.projectId !== undefined) after.projectId = input.projectId;
@@ -122,7 +124,10 @@ export function recordSummary(
   record: Record<string, unknown>,
   id: string,
 ): EditableRecord {
-  const value = registerInput.parse(record);
+  const value = registerInput.parse({
+    ...record,
+    endedAt: record.endedAt === null ? undefined : record.endedAt,
+  });
   return {
     id,
     uid: record.uid as string,

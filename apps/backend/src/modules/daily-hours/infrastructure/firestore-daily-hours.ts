@@ -14,7 +14,10 @@ const source = z
   .object({
     projectId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
     startedAt: z.iso.datetime({ offset: true }),
-    endedAt: z.iso.datetime({ offset: true }).optional(),
+    endedAt: z.iso
+      .datetime({ offset: true })
+      .nullish()
+      .transform((value) => value ?? undefined),
     timeZone: z.string().min(1).max(100).refine(validTimeZone),
   })
   .refine(

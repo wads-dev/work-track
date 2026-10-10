@@ -275,7 +275,11 @@ export class FirestoreWorkRepository implements WorkRepository {
           recordedAt: FieldValue.serverTimestamp(),
         });
       }
-      tx.create(ref, { ...record, recordedAt: FieldValue.serverTimestamp() });
+      tx.create(ref, {
+        ...record,
+        endedAt: record.endedAt ?? null,
+        recordedAt: FieldValue.serverTimestamp(),
+      });
       return {
         ...record,
         duplicate: false,

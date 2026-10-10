@@ -19,7 +19,7 @@ export function selectPrevious(
         !isDeletedRecord(r) &&
         r.uid === uid &&
         r.projectId === projectId &&
-        r.endedAt === undefined &&
+        (r.endedAt === undefined || r.endedAt === null) &&
         Date.parse(r.startedAt) < Date.parse(start),
     )
     .sort(

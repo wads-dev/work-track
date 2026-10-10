@@ -12,7 +12,10 @@ import type { PersonalReportRepository } from '../domain/personal-report.js';
 const source = z.object({
   projectId: z.string(),
   startedAt: z.string(),
-  endedAt: z.string().optional(),
+  endedAt: z
+    .string()
+    .nullish()
+    .transform((value) => value ?? undefined),
   timeZone: z.string(),
   topics: reportTopicsSchema,
 });

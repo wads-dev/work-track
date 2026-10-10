@@ -1,5 +1,6 @@
 import {
   Bell,
+  Users,
   Info,
   Folder,
   House,
@@ -27,6 +28,7 @@ const icons = {
   bell: Bell,
   rules: BookOpen,
   projects: Folder,
+  people: Users,
   home: House,
   eye: Eye,
   eyeoff: EyeOff,

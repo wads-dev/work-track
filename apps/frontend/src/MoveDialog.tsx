@@ -34,8 +34,9 @@ export function MoveDialog({
   functions,
   uid,
   projectId,
-  subjectId,
+  topicId,
   recordId,
+  recordOwnerUid,
   originLabel,
   onClose,
   mutationBusy,
@@ -44,8 +45,9 @@ export function MoveDialog({
   functions: Functions;
   uid: string;
   projectId: string;
-  subjectId?: string;
+  topicId?: string;
   recordId?: string;
+  recordOwnerUid?: string;
   originLabel: string;
   onClose: () => void;
   mutationBusy?: { current: boolean };
@@ -117,14 +119,15 @@ export function MoveDialog({
       const fields = recordId
         ? {
             recordId,
+            ...(recordOwnerUid ? { recordOwnerUid } : {}),
             project_target: target,
-            ...(topic ? { subject_target: topic } : {}),
+            ...(topic ? { topic_target: topic } : {}),
           }
         : {
             project_origin: projectId,
-            subject_origin: subjectId,
+            topic_origin: topicId,
             project_target: target,
-            ...(topic ? { subject_target: topic } : {}),
+            ...(topic ? { topic_target: topic } : {}),
           };
       const key = JSON.stringify({ ...fields, reason: reason.trim() });
       if (!intent.current || intent.current.key !== key)
@@ -141,7 +144,7 @@ export function MoveDialog({
         : { ...intent.current.payload, confirmed: false };
       const result = await httpsCallable(
         functions,
-        recordId ? 'moveRecord' : 'moveSubject',
+        recordId ? 'moveRecord' : 'moveTopic',
       )(payload);
       if (execute) {
         const response = result.data as { mode?: string };
@@ -158,7 +161,7 @@ export function MoveDialog({
           response.mode !== 'preview' ||
           response.project_origin !== projectId ||
           response.project_target !== target ||
-          response.operation !== (recordId ? 'move_record' : 'move_subject') ||
+          response.operation !== (recordId ? 'move_record' : 'move_topic') ||
           !response.previewToken ||
           !Array.isArray(response.recordIds) ||
           !Array.isArray(response.warnings)
@@ -251,11 +254,15 @@ export function MoveDialog({
             <p className="text-sm leading-relaxed">Origem: {originLabel}</p>
             <Alert className="my-2">
               <AlertDescription>
-                Somente seus registros ativos serão movidos entre projetos do
-                mesmo escopo. Registros com múltiplos tópicos são bloqueados.
-                Horários, textos e autoria serão preservados; não haverá
-                duplicação de horas. O tópico de origem permanece para histórico
-                e outras pessoas.
+                {recordId
+                  ? 'Este registro será movido entre projetos do mesmo escopo.'
+                  : source?.type === 'personal'
+                    ? 'A migração de tópico pessoal move somente seus registros ativos entre projetos do mesmo escopo.'
+                    : 'A migração de tópico corporativo move os registros ativos de todos os participantes entre projetos do mesmo escopo.'}{' '}
+                Registros com múltiplos tópicos são bloqueados. Horários,
+                textos, autoria e propriedade dos registros serão preservados;
+                não haverá duplicação de horas. O tópico de origem permanece
+                para histórico.
               </AlertDescription>
             </Alert>
             {done ? (
@@ -359,12 +366,18 @@ export function MoveDialog({
                         safeProject(destination ?? {}, revealed).title,
                         'Projeto reservado',
                       )}{' '}
-                      · {preview.resolvedSubject.title}(
-                      {preview.resolvedSubject.willCreate
+                      · {preview.resolvedTopic.title}(
+                      {preview.resolvedTopic.willCreate
                         ? 'será criado'
                         : 'será reutilizado'}
                       ).
                     </p>
+                    {preview.participantUids && (
+                      <p className="text-sm">
+                        Participantes afetados:{' '}
+                        {preview.participantUids.join(', ')}
+                      </p>
+                    )}
                     {preview.warnings.map((warning, index) => (
                       <Alert key={index} className="my-2">
                         <AlertDescription>{warning}</AlertDescription>

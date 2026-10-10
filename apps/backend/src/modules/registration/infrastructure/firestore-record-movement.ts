@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Firestore, DocumentSnapshot } from 'firebase-admin/firestore';
 import {
   assertProjectAccess,
+  canAccessProject,
   effectiveProjectType,
 } from '../domain/project-access.js';
 import { isDeletedRecord } from '../domain/record-lifecycle.js';
@@ -11,9 +12,9 @@ import {
 } from '../domain/project-management.js';
 import {
   moveRecordInput,
-  moveSubjectInput,
+  moveTopicInput,
   type MoveRecordInput,
-  type MoveSubjectInput,
+  type MoveTopicInput,
   type MovementRepository,
 } from '../domain/record-movement.js';
 import type { Topic } from '../domain/work-model.js';
@@ -85,15 +86,21 @@ const version = (
 ];
 export class FirestoreRecordMovementRepository implements MovementRepository {
   constructor(private readonly db: Firestore) {}
-  moveSubject(input: MoveSubjectInput, uid: string) {
-    return this.move('move_subject', moveSubjectInput.parse(input), uid);
+  moveTopic(
+    input: MoveTopicInput,
+    uid: string,
+  ): Promise<Record<string, unknown>> {
+    return this.move('move_topic', moveTopicInput.parse(input), uid);
   }
-  moveRecord(input: MoveRecordInput, uid: string) {
+  moveRecord(
+    input: MoveRecordInput,
+    uid: string,
+  ): Promise<Record<string, unknown>> {
     return this.move('move_record', moveRecordInput.parse(input), uid);
   }
   private async move(
-    operation: 'move_subject' | 'move_record',
-    input: MoveSubjectInput | MoveRecordInput,
+    operation: 'move_topic' | 'move_record',
+    input: MoveTopicInput | MoveRecordInput,
     uid: string,
   ) {
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid))
@@ -126,6 +133,8 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
           fail('Retry exige a mesma operação, intenção e confirmação.');
         for (const entry of [...p.after, ...p.projects]) {
           const current = await tx.get(this.db.doc(entry.path));
+          if (entry.path.startsWith('projects/'))
+            assertProjectAccess(current.data(), uid);
           if (!current.exists || hash(current.data()) !== entry.hash)
             fail('Estado alterado após movimento; retry indisponível.');
         }
@@ -133,14 +142,42 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
       }
       let originId: string, sourceId: string, candidates: DocumentSnapshot[];
       if ('recordId' in input) {
-        const s = await tx.get(own.doc(input.recordId));
+        const ownerUid = input.recordOwnerUid ?? uid;
+        const s = await tx.get(
+          this.db
+            .collection('users')
+            .doc(ownerUid)
+            .collection('records')
+            .doc(input.recordId),
+        );
         if (!s.exists || isDeletedRecord(s.data()!))
           throw new ProjectManagementError(
             'not-found',
-            'Registro próprio ativo não encontrado.',
+            'Registro autorizado ativo não encontrado.',
           );
         const data = s.data()!;
-        if (data.uid !== uid) fail('Propriedade do registro inválida.');
+        if (data.uid !== ownerUid)
+          throw new ProjectManagementError(
+            'not-found',
+            'Registro autorizado ativo não encontrado.',
+          );
+        if (typeof data.projectId !== 'string')
+          throw new ProjectManagementError(
+            'not-found',
+            'Registro autorizado ativo não encontrado.',
+          );
+        const recordProject = await tx.get(
+          this.db.collection('projects').doc(data.projectId),
+        );
+        if (
+          !canAccessProject(recordProject.data(), uid) ||
+          (ownerUid !== uid &&
+            effectiveProjectType(recordProject.data()!) !== 'work')
+        )
+          throw new ProjectManagementError(
+            'not-found',
+            'Registro autorizado ativo não encontrado.',
+          );
         const rs = recordTopics(data);
         if (rs.length !== 1)
           fail(
@@ -153,20 +190,8 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
         candidates = [s];
       } else {
         originId = input.project_origin;
-        sourceId = input.subject_origin;
-        const scan = await tx.get(
-          own.where('projectId', '==', originId).limit(2001),
-        );
-        if (scan.docs.length > 2000)
-          throw new ProjectManagementError(
-            'resource-exhausted',
-            'Contexto excede 2000 registros físicos; movimento indisponível.',
-          );
-        candidates = scan.docs.filter(
-          (d) =>
-            !isDeletedRecord(d.data()) &&
-            recordTopics(d.data()).some((t) => t.topicId === sourceId),
-        );
+        sourceId = input.topic_origin;
+        candidates = []; // Query only after project access and scope validation.
       }
       if (originId === input.project_target)
         fail('Escolha outro projeto de destino.');
@@ -217,8 +242,25 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
         fail(
           'Origem com aliases exige conciliação dedicada; nenhuma atividade movida.',
         );
+      const corporate = effectiveProjectType(source) === 'work';
+      if (!('recordId' in input)) {
+        const query = corporate ? this.db.collectionGroup('records') : own;
+        const scan = await tx.get(
+          query.where('projectId', '==', originId).limit(2001),
+        );
+        if (scan.docs.length > 2000)
+          throw new ProjectManagementError(
+            'resource-exhausted',
+            'Contexto excede 2000 registros físicos; movimento indisponível.',
+          );
+        candidates = scan.docs.filter(
+          (d) =>
+            !isDeletedRecord(d.data()) &&
+            recordTopics(d.data()).some((t) => t.topicId === sourceId),
+        );
+      }
       if (candidates.length === 0)
-        fail('Nenhum registro próprio ativo neste tópico.');
+        fail('Nenhum registro ativo autorizado neste tópico.');
       if (candidates.length > 100)
         throw new ProjectManagementError(
           'resource-exhausted',
@@ -226,8 +268,18 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
         );
       for (const s of candidates) {
         const d = s.data()!;
-        if (d.uid !== uid || s.ref.path !== 'users/' + uid + '/records/' + s.id)
+        const ownerUid: unknown = d.uid;
+        if (
+          typeof ownerUid !== 'string' ||
+          !/^[A-Za-z0-9_-]{1,128}$/.test(ownerUid) ||
+          s.ref.path !== 'users/' + ownerUid + '/records/' + s.id
+        )
           fail('Propriedade inválida.');
+        if ((!corporate && ownerUid !== uid) || d.projectId !== originId)
+          throw new ProjectManagementError(
+            'not-found',
+            'Registro autorizado ativo não encontrado.',
+          );
         if (d.topicResolution !== undefined)
           fail(
             'Registro com resolução histórica de alias exige revisão dedicada.',
@@ -237,8 +289,8 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
       }
       let dest: Topic | undefined,
         willCreate = false;
-      if (input.subject_target) {
-        dest = targetTopics.find((t) => t.id === input.subject_target);
+      if (input.topic_target) {
+        dest = targetTopics.find((t) => t.id === input.topic_target);
         if (!dest || dest.archived || dest.mergedIntoTopicId)
           fail('Tópico de destino deve existir, ser canônico e ativo.');
       } else {
@@ -249,7 +301,7 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
             normalize(t.title) === normalize(sourceTopic.title),
         );
         if (matches.length > 1)
-          fail('Nome de destino ambíguo; selecione subject_target explícito.');
+          fail('Nome de destino ambíguo; selecione topic_target explícito.');
         dest = matches[0];
         if (!dest) {
           const id =
@@ -278,9 +330,22 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
         candidates.map(version).sort((a, b) => a[0].localeCompare(b[0])),
         destination,
       ]);
-      const recordIds = candidates.map((s) => s.id).sort();
+      const records = candidates
+        .map((s) => ({
+          recordId: s.id,
+          ownerUid: s.data()!.uid as string,
+          path: s.ref.path,
+        }))
+        .sort((a, b) => a.path.localeCompare(b.path));
+      const recordIds = records.map((r) => r.recordId);
+      const participantUids = [
+        ...new Set(records.map((r) => r.ownerUid)),
+      ].sort();
       const warnings = [
-        'Somente seus registros serão movidos. O tópico original permanece para histórico e outros participantes.',
+        corporate
+          ? 'Registros corporativos de todos os participantes deste tópico serão movidos; a propriedade de cada registro será preservada.'
+          : 'Somente seus registros pessoais serão movidos.',
+        'O tópico original permanece para histórico; nenhum projeto será arquivado ou apagado.',
         'Identidade, textos, tempos e distribuições são preservados; relatórios por projeto e estimativas podem mudar.',
       ];
       const updatedAt = new Date().toISOString(),
@@ -308,6 +373,8 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
             audit: {
               action: operation,
               authorUid: uid,
+              recordOwnerUid: before.uid,
+              recordPath: s.ref.path,
               reason: input.reason,
               requestId: input.requestId,
               operationId: opId,
@@ -360,9 +427,11 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
         operation,
         project_origin: originId,
         project_target: input.project_target,
-        subject_target: destination.id,
+        topic_target: destination.id,
         recordCount: candidates.length,
         recordIds,
+        records,
+        participantUids,
         updatedAt,
       };
       const targetAudit = {
@@ -387,16 +456,18 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
           mode: 'preview',
           operation,
           project_origin: originId,
-          subject_origin: sourceId,
+          topic_origin: sourceId,
           project_target: input.project_target,
-          subject_target: destination.id,
-          resolvedSubject: {
+          topic_target: destination.id,
+          resolvedTopic: {
             id: destination.id,
             title: destination.title,
             willCreate,
           },
           recordCount: candidates.length,
           recordIds,
+          records,
+          participantUids,
           warnings,
           previewToken: token,
         };

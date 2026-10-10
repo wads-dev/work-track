@@ -21,3 +21,4 @@ skills-lock.json
 task30-fixed-*.png
 .release-check
 .release-coordination.md
+.pnpm-store

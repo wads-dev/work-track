@@ -99,7 +99,6 @@ export function calendarReport(
     !Array.isArray(data.intervals) ||
     !Array.isArray(data.participants) ||
     !Array.isArray(data.warnings) ||
-    data.participants.length > 100 ||
     !Number.isFinite(data.totalMinutes) ||
     data.totalMinutes < 0 ||
     !Number.isFinite(data.estimatedCount) ||
