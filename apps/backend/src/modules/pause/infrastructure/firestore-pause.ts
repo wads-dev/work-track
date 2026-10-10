@@ -197,6 +197,7 @@ export class FirestorePauseRepository implements PauseRepository {
         id: key,
         uid,
         startedAt: input.resumedAt,
+        endedAt: null,
         requestId: input.requestId,
         receivedAt: recordedAt,
         pausedFrom: sourceRef.id,

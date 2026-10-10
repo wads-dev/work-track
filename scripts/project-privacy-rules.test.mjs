@@ -122,13 +122,15 @@ function query(parent, collectionId, token, options = {}) {
   return request(url, token, 'POST', {
     structuredQuery: {
       from: [{ collectionId, allDescendants }],
-      limit,
+      ...(limit === null ? {} : { limit }),
       ...(where ? { where } : {}),
       ...(orderBy ? { orderBy } : {}),
     },
   });
 }
 function equal(fieldPath, field) {
+  if (field === null)
+    return { unaryFilter: { field: { fieldPath }, op: 'IS_NULL' } };
   return {
     fieldFilter: { field: { fieldPath }, op: 'EQUAL', value: value(field) },
   };
@@ -658,6 +660,40 @@ test('project authorization: public authenticated and own personal', async (t) =
   await t.test(
     'anonymous provider and endedAt overlap constraints',
     async () => {
+      const pendingPath = 'users/' + alice + '/records/indexed-pending';
+      const pending = { ...validRecord('work'), endedAt: null };
+      await allowed(write(pendingPath, pending, aliceToken));
+      await allowed(
+        write(
+          pendingPath,
+          { ...pending, interpretation: 'Updated open record' },
+          aliceToken,
+        ),
+      );
+      const opened = await allowed(
+        query('users/' + alice, 'records', aliceToken, {
+          limit: null,
+          where: and(equal('projectId', 'work'), equal('endedAt', null)),
+          orderBy: [
+            { field: { fieldPath: '__name__' }, direction: 'ASCENDING' },
+          ],
+        }),
+      );
+      assert.ok(
+        opened.some((row) => row.document?.name.endsWith('/indexed-pending')),
+      );
+      await denied(
+        query('users/' + alice, 'records', bobToken, {
+          limit: null,
+          where: and(
+            equal('projectId', 'personal-alice'),
+            equal('endedAt', null),
+          ),
+        }),
+      );
+      await denied(
+        write(pendingPath, { ...pending, endedAt: false }, aliceToken),
+      );
       const anonymous = jwt(alice, {
         firebase: { sign_in_provider: 'anonymous' },
       });

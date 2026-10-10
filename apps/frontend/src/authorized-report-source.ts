@@ -53,7 +53,10 @@ const schema = z.object({
   uid: z.string(),
   projectId: z.string(),
   startedAt: z.string(),
-  endedAt: z.string().optional(),
+  endedAt: z
+    .string()
+    .nullish()
+    .transform((value) => value ?? undefined),
   timeZone: z.string(),
   topics: z
     .array(

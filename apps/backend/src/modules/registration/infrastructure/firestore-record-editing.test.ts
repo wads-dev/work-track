@@ -94,4 +94,59 @@ it('atomically audits edits, preserves immutable fields, and replays the same re
   ).rejects.toThrow('Recarregue');
   expect(updates).toBe(1);
   expect(audits).toBe(1);
+  const reopened = await repo.updateRecord(
+    {
+      recordId: 'record',
+      endedAt: null,
+      reason: 'Explicit reopening',
+      requestId: 'reopen',
+    },
+    'alice',
+  );
+  expect(values.get(recordPath)?.endedAt).toBeNull();
+  expect(reopened.record).not.toHaveProperty('endedAt');
+  await repo.updateRecord(
+    {
+      recordId: 'record',
+      topics: [{ topicId: 'general' }],
+      reason: 'Edit nullable open record',
+      requestId: 'open-edit',
+    },
+    'alice',
+  );
+  expect(values.get(recordPath)).toMatchObject({
+    endedAt: null,
+    originalText: 'original evidence',
+    recordedAt: 'original-time',
+  });
+});
+
+it('lists nullable and legacy open records but not closed or deleted records', async () => {
+  const rows = [
+    { id: 'legacy' },
+    { id: 'nullable', endedAt: null },
+    { id: 'closed', endedAt: '2026-10-08T11:00:00Z' },
+    { id: 'deleted', endedAt: null, deletedAt: '2026-10-08T11:00:00Z' },
+  ];
+  const collection = {
+    get: () =>
+      Promise.resolve({
+        docs: rows.map((row) => ({
+          id: row.id,
+          data: () => ({
+            projectId: 'p',
+            startedAt: '2026-10-08T10:00:00Z',
+            ...row,
+          }),
+        })),
+      }),
+  };
+  const db = {
+    collection: () => ({ doc: () => ({ collection: () => collection }) }),
+  } as unknown as Firestore;
+  const repo = new FirestoreRecordEditingRepository(db);
+  expect(
+    (await repo.listOpenRecords('alice', 10)).records.map((r) => r.id),
+  ).toEqual(['legacy', 'nullable']);
+  expect((await repo.listOpenRecords('alice', 1)).partial).toBe(true);
 });

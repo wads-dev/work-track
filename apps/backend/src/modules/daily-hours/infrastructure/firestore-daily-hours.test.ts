@@ -68,6 +68,28 @@ const source = (id: string, value: Record<string, unknown> = {}) => ({
   },
 });
 describe('read-only daily-hours own canonical repository', () => {
+  it.each([undefined, null, '2026-10-09T09:00:00-03:00'])(
+    'normalizes persisted end %s without mutating facts',
+    async (endedAt) => {
+      const fact = source('open', { endedAt });
+      const { records } = await setup([[fact]]).repository.loadOwnHistory(
+        'alice',
+      );
+      expect(records).toHaveLength(1);
+      expect(records[0]?.endedAt).toBe(endedAt ?? undefined);
+      expect((fact.value as Record<string, unknown>).endedAt).toBe(endedAt);
+    },
+  );
+  it.each([false, 42, '', 'invalid', '2026-10-09T07:00:00-03:00'])(
+    'still rejects invalid persisted end %s',
+    async (endedAt) => {
+      await expect(
+        setup([[source('bad', { endedAt })]]).repository.loadOwnHistory(
+          'alice',
+        ),
+      ).rejects.toMatchObject({ code: 'resource-exhausted' });
+    },
+  );
   it('skips malformed tombstones before parsing and advances physical all-deleted pages', async () => {
     const mock = setup([
       Array.from({ length: 500 }, (_, i) =>

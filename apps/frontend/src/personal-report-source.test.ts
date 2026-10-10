@@ -175,3 +175,26 @@ it('still disposes globally for other project listener errors', () => {
   expect(fail).toHaveBeenCalledWith(error);
   for (const l of listeners.values()) expect(l.stop).toHaveBeenCalled();
 });
+
+it.each([undefined, null, '2026-10-08T13:00:00Z'])(
+  'normalizes own persisted endedAt %s',
+  async (endedAt) => {
+    const next = vi.fn<(snapshot: PersonalReportSnapshot) => void>(),
+      fail = vi.fn();
+    const stop = subscribePersonalReport({} as Firestore, 'alice', next, fail);
+    const fact = { ...records(false).docs[0].data(), endedAt };
+    listeners.get('users/alice/records')!.next({
+      metadata: metadata(false),
+      docs: [{ id: 'r1', data: () => fact }],
+    });
+    listeners.get('projects/p1')!.next(project(false));
+    expect(fail).not.toHaveBeenCalled();
+    const context = await next.mock.lastCall![0].repository.loadContext([
+      'alice',
+    ]);
+    expect(context).toHaveLength(1);
+    expect(context[0]?.endedAt).toBe(endedAt ?? undefined);
+    expect(fact.endedAt).toBe(endedAt);
+    stop();
+  },
+);

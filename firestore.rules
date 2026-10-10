@@ -43,7 +43,7 @@ service cloud.firestore {
         && validId(data.projectId) && validId(data.requestId)
         && data.fingerprint is string && data.fingerprint.size() > 0
         && data.startedAt is string && data.startedAt.size() >= 20 && data.startedAt.size() <= 40
-        && (!('endedAt' in data) || (data.endedAt is string && data.endedAt.size() >= 20 && data.endedAt.size() <= 40))
+        && (!('endedAt' in data) || data.endedAt == null || (data.endedAt is string && data.endedAt.size() >= 20 && data.endedAt.size() <= 40))
         && data.timeZone is string && data.timeZone.size() > 0 && data.timeZone.size() <= 100
         && data.originalText is string && data.originalText.size() > 0 && data.originalText.size() <= 12000
         && data.interpretation is string && data.interpretation.size() > 0 && data.interpretation.size() <= 6000

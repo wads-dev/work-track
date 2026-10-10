@@ -72,3 +72,29 @@ it('loads every UID above10 sequentially without a Firestore in query or truncat
   expect(reads).toEqual(uids);
   expect(records.map((r) => r.uid)).toEqual(uids);
 });
+
+it.each([undefined, null, '2026-10-08T11:00:00Z'])(
+  'normalizes canonical endedAt %s in global context',
+  async (endedAt) => {
+    const fact = {
+      projectId: 'p',
+      startedAt: '2026-10-08T10:00:00Z',
+      timeZone: 'UTC',
+      endedAt,
+    };
+    const query = { limit: () => query };
+    const db = {
+      collection: () => ({
+        doc: () => ({ collection: () => ({ orderBy: () => query }) }),
+      }),
+      runTransaction: async (work: (tx: unknown) => Promise<unknown>) =>
+        work({
+          get: () => Promise.resolve({ docs: [{ id: 'r', data: () => fact }] }),
+        }),
+    } as unknown as Firestore;
+    const records = await loadGlobalContext(db, ['alice']);
+    expect(records).toHaveLength(1);
+    expect(records[0]?.endedAt).toBe(endedAt ?? undefined);
+    expect(fact.endedAt).toBe(endedAt);
+  },
+);

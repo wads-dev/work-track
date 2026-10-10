@@ -108,6 +108,7 @@ it('more than1000 malformed tombstones cannot starve or inflate implicit eligibl
 });
 it('atomically preserves source evidence, resumes same context and retries exact intent', async () => {
   const f = fixture();
+  f.data.get('users/a/records/source')!.endedAt = null;
   const result = await f.repo.registerPause(input, 'a', now);
   expect(f.data.get('users/a/records/source')).toMatchObject({
     endedAt: '2026-10-09T14:30:00.000Z',
@@ -121,7 +122,7 @@ it('atomically preserves source evidence, resumes same context and retries exact
     topics: f.source.topics,
     projectSnapshot: f.source.projectSnapshot,
   });
-  expect(successor).not.toHaveProperty('endedAt');
+  expect(successor?.endedAt).toBeNull();
   expect(f.data.size).toBe(4);
   expect(await f.repo.registerPause(input, 'a', now + 86400000)).toEqual(
     result,
