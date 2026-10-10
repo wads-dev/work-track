@@ -16,7 +16,8 @@ export const DELETION_LIMITS = {
   bytes: 2_000_000,
   tokenLifetimeMs: 30 * 60_000,
 } as const;
-// Actual persisted application locations. Reports are computed, not persisted views.
+export const DELETION_INVENTORY_VERSION = 2 as const;
+// Persisted canonical facts, complete audit evidence and server-owned report views.
 const GROUPS = [
   'records',
   'audit',
@@ -24,6 +25,8 @@ const GROUPS = [
   'pauseAudits',
   'splitAudits',
   'removalAudits',
+  'recordMergeAudits',
+  'reportRecords',
 ];
 const ROOTS = ['projects', 'recordMovements', 'project_merge_jobs'];
 const fail = (message: string): never => {
@@ -170,6 +173,76 @@ export class FirestoreProjectDeletionRepository {
       ...new Map(associated.map((s) => [s.ref.path, s])).values(),
     ].sort((a, b) => a.ref.path.localeCompare(b.ref.path));
     if (docs.length > DELETION_LIMITS.documents) oversized();
+    // Validate only associated evidence; unrelated malformed data is not exported.
+    // Never silently omit orphan evidence from a supposedly complete inventory.
+    const validIdentity = (value: unknown): value is string =>
+      typeof value === 'string' &&
+      value.length > 0 &&
+      value.length <= 128 &&
+      !value.includes('/') &&
+      value !== '.' &&
+      value !== '..';
+    const personal = effectiveProjectType(project.data()!) === 'personal';
+    for (const s of docs) {
+      const parts = s.ref.path.split('/');
+      const group = parts.at(-2);
+      if (group !== 'recordMergeAudits' && group !== 'reportRecords') continue;
+      const data = s.data()!;
+      if (!validIdentity(data.uid))
+        fail(
+          'Identidade inválida no histórico associado; nenhuma exportação/exclusão.',
+        );
+      if (group === 'recordMergeAudits') {
+        if (
+          parts.length !== 4 ||
+          parts[0] !== 'users' ||
+          !validIdentity(parts[1]) ||
+          parts[1] !== data.uid ||
+          !parts[3] ||
+          parts[3] === '.' ||
+          parts[3] === '..'
+        )
+          fail(
+            'Caminho/autor inválido no histórico de merge; nenhuma exportação/exclusão.',
+          );
+        // The real receipt duplicates complete source/target facts in these slots.
+        // Every present slot must agree with the canonical ledger author.
+        for (const container of ['before', 'after', 'result']) {
+          const value: unknown = data[container];
+          if (value === undefined) continue;
+          if (!value || typeof value !== 'object' || Array.isArray(value))
+            fail('Histórico de merge inválido; nenhuma exportação/exclusão.');
+          for (const key of ['source', 'target']) {
+            const record = (value as Record<string, unknown>)[key];
+            if (record === undefined) continue;
+            if (
+              !record ||
+              typeof record !== 'object' ||
+              Array.isArray(record) ||
+              (record as Record<string, unknown>).uid !== data.uid
+            )
+              fail(
+                'Autor divergente no histórico de merge; nenhuma exportação/exclusão.',
+              );
+          }
+        }
+      } else if (
+        parts.length !== 4 ||
+        parts[0] !== 'projects' ||
+        parts[1] !== projectId ||
+        data.projectId !== projectId ||
+        !parts[3] ||
+        parts[3] === '.' ||
+        parts[3] === '..'
+      )
+        fail(
+          'Caminho/projeto inválido na projeção; nenhuma exportação/exclusão.',
+        );
+      if (personal && data.uid !== uid)
+        fail(
+          'Projeto pessoal contém histórico de outros autores; migração administrativa necessária.',
+        );
+    }
     // Unknown schema cannot be safely cascaded. Discovery is validation only; all known
     // membership queries and writes are transactional. Current trusted writers create
     // only the explicitly inventoried groups. Client writes are denied by rules.
@@ -182,6 +255,16 @@ export class FirestoreProjectDeletionRepository {
           'Histórico vinculado a outro projeto exige migração administrativa; nenhuma exclusão.',
         );
       const children = await s.ref.listCollections();
+      // These leaf schemas have no child collections. Even a known group name
+      // could otherwise leave evidence behind when it lacks a project reference.
+      const group = s.ref.path.split('/').at(-2);
+      if (
+        children.length > 0 &&
+        (group === 'recordMergeAudits' || group === 'reportRecords')
+      )
+        fail(
+          'Subcoleção em histórico de merge/projeção: exportação/exclusão exige migração administrativa integral; nenhuma alteração.',
+        );
       if (children.some((c) => !GROUPS.includes(c.id)))
         fail(
           'Subcoleção desconhecida: exportação/exclusão exige migração administrativa integral; nenhuma alteração.',
@@ -202,7 +285,14 @@ export class FirestoreProjectDeletionRepository {
     return {
       docs,
       documents,
-      digest: createHash('sha256').update(serialized).digest('hex'),
+      digest: createHash('sha256')
+        .update(
+          JSON.stringify({
+            inventoryVersion: DELETION_INVENTORY_VERSION,
+            documents,
+          }),
+        )
+        .digest('hex'),
       sharedHistory: docs.some((s) => otherProjects(s.data(), projectId)),
       project,
     };
@@ -215,18 +305,21 @@ export class FirestoreProjectDeletionRepository {
       tx.create(this.db.doc('projectDeletionExports/' + token), {
         projectId,
         uid,
+        inventoryVersion: DELETION_INVENTORY_VERSION,
         digest: snapshot.digest,
         expiresAt: this.now() + DELETION_LIMITS.tokenLifetimeMs,
       });
       return {
-        schemaVersion: 1,
+        schemaVersion: DELETION_INVENTORY_VERSION,
+        inventoryVersion: DELETION_INVENTORY_VERSION,
         projectId,
         exportedAt,
         snapshotToken: token,
         documentCount: snapshot.documents.length,
         export: {
           format: 'work-track-project-export',
-          version: 1,
+          version: DELETION_INVENTORY_VERSION,
+          inventoryVersion: DELETION_INVENTORY_VERSION,
           projectId,
           exportedAt,
           snapshotToken: token,
@@ -244,6 +337,7 @@ export class FirestoreProjectDeletionRepository {
       );
       if (
         !receipt.exists ||
+        receipt.data()!.inventoryVersion !== DELETION_INVENTORY_VERSION ||
         receipt.data()!.uid !== uid ||
         receipt.data()!.projectId !== projectId ||
         receipt.data()!.expiresAt <= this.now()

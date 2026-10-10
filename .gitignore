@@ -19,3 +19,5 @@ gha-creds-*.json
 skills-lock.json
 .playwright-mcp/
 task30-fixed-*.png
+.release-check
+.release-coordination.md
