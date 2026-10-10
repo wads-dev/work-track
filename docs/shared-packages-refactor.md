@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Extrair o núcleo neutro e repositórios reutilizáveis da main `393c78b` sem alterar contratos públicos, permissões, dados persistidos ou algoritmos. Trabalho na branch/worktree `refactor-shared-core-data`.
+Extrair o núcleo neutro e repositórios reutilizáveis da main `393c78b`, incorporando a correção posterior `7d7c652` sem alterar contratos públicos, permissões, dados persistidos ou algoritmos. Trabalho na branch/worktree `refactor-shared-core-data`.
 
 ## Fronteiras
 
@@ -34,7 +34,8 @@ Schemas de escrita não substituem decoders tolerantes de leitura. Ausência/nul
 - Referência completa `npm run check`: exit 0; 470 testes backend, 256 frontend e 4 testes do gerador.
 - Extração inicial core: 54 arquivos movidos; 146 testes core, 324 backend e 256 frontend passaram (726 testes preservados).
 - Snapshots, codecs e catálogo extraídos para data; frontend reorganizado por funcionalidades, sources, cache e infraestrutura. Gateway Callable centraliza chamadas sem substituir comandos por writes diretos.
-- `npm run check` e `git diff --check` passaram após a reorganização; testes de packaging verificaram instalação fora do workspace e descoberta oficial do Firebase Functions.
+- Instalação limpa `npm ci --ignore-scripts --no-audit --no-fund`, `npm run check` e `git diff --check` passaram após rebase em origin/main `7d7c652`; testes de packaging verificaram instalação fora do workspace e descoberta oficial do Firebase Functions, incluindo o alias legado moveSubject.
+- Testes atuais: core146/data28/backend327/frontend263 +12 scripts Node, antes da regressão adicional de apresentação calendário.
 - Reviews independentes: sem regressão funcional bloqueante; gate backend corrigido para testar core/data antes de publicar.
 - Validação Docker/browser pendente: buildx precisa gravar em ~/.docker fora do sandbox; solicitações de aprovação expiraram. Nenhum container foi iniciado.
 - Portas reservadas localmente: frontend5184/Auth9114/Firestore8094/Functions5014/UI4014; projeto Compose worktrack-refactor-shared-core-data. .env.worktree ignorado.

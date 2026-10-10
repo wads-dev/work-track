@@ -7,6 +7,10 @@ import {
   calendarReport,
   type CalendarResponse,
 } from '../../features/reports/calendar-people';
+import { ClientPersonalReportRepository } from '@work-track/data/repositories/snapshots/personal-report-repository';
+import { ownCalendarRepository } from '@work-track/data/repositories/snapshots/own-calendar-repository';
+import { executeCalendarReport } from '@work-track/core/reports/application/get-calendar-report';
+
 const data: CalendarResponse = {
   policy: 'calendar-v3',
   mode: 'own',
@@ -223,4 +227,36 @@ describe('calendar people default and safe scope', () => {
     expect(timeline).toContain('authorLabel(personUid)');
     expect(timeline).toContain('uid={personUid}');
   });
+});
+it('formats a factual calendar from the public shared repository and use case', async () => {
+  const repository = new ClientPersonalReportRepository(
+    'alice',
+    [
+      {
+        id: 'a',
+        uid: 'alice',
+        projectId: 'p1',
+        startedAt: '2026-10-08T12:00:00Z',
+        endedAt: '2026-10-08T13:30:00Z',
+        timeZone: 'UTC',
+        topics: [],
+      },
+    ],
+    new Map([['p1', { topics: [] }]]),
+  );
+  const result = await executeCalendarReport(
+    ownCalendarRepository(repository, 'alice'),
+    {
+      mode: 'own',
+      allWeeks: false,
+      includeArchived: true,
+      from: '2026-10-08T00:00:00Z',
+      to: '2026-10-09T00:00:00Z',
+      timeZone: 'UTC',
+    },
+    'alice',
+    Date.parse('2026-10-09T00:00:00Z'),
+  );
+  expect(calendarReport(result, 'alice', 'own').totalMinutes).toBe(90);
+  expect(result.participantsUnavailable).toBe(true);
 });
