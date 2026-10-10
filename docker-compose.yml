@@ -9,8 +9,11 @@ services:
       --config /workspace/docker/firebase/vite.config.mjs"
     environment:
       npm_config_cache: /cache/npm
+      WORK_TRACK_AUTH_PORT: '${FIREBASE_AUTH_PORT:-9099}'
+      WORK_TRACK_FIRESTORE_PORT: '${FIREBASE_FIRESTORE_PORT:-8081}'
+      WORK_TRACK_FUNCTIONS_PORT: '${FIREBASE_FUNCTIONS_PORT:-5001}'
     ports:
-      - '127.0.0.1:5173:5173' # Vite frontend + HMR
+      - '127.0.0.1:${FRONTEND_PORT:-5173}:5173' # Vite frontend + HMR
     volumes:
       - .:/workspace
       - vite_root_dependencies:/workspace/node_modules
@@ -32,9 +35,9 @@ services:
       GCLOUD_PROJECT: demo-work-track
       GOOGLE_CLOUD_PROJECT: demo-work-track
     ports:
-      - '127.0.0.1:9099:9099' # Auth
-      - '127.0.0.1:8081:8081' # Firestore
-      - '127.0.0.1:5001:5001' # Functions
+      - '127.0.0.1:${FIREBASE_AUTH_PORT:-9099}:9099' # Auth
+      - '127.0.0.1:${FIREBASE_FIRESTORE_PORT:-8081}:8081' # Firestore
+      - '127.0.0.1:${FIREBASE_FUNCTIONS_PORT:-5001}:5001' # Functions
       - '127.0.0.1:${FIREBASE_UI_PORT:-4001}:4000' # Emulator UI (host configurable)
     volumes:
       - ./package.json:/input/package.json:ro

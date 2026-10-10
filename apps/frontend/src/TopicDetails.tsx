@@ -1,3 +1,4 @@
+import { PersonIdentity } from './PersonIdentity';
 import { TableHead } from './components/ui/table';
 import { cn } from './lib/utils';
 import { Button } from './components/ui/button';
@@ -283,7 +284,10 @@ export function TopicDetails({
                   {data.participants.map((p) => (
                     <TableRow key={p.uid}>
                       <TableCell>
-                        {p.uid === uid ? 'Você' : p.label || 'Pessoa'}
+                        <PersonIdentity
+                          uid={hidden ? undefined : p.uid}
+                          fallback={p.label || 'Pessoa'}
+                        />
                       </TableCell>
                       <TableCell>{p.occurrenceCount}</TableCell>
                       <TableCell>

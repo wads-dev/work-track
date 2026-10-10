@@ -1,4 +1,6 @@
 import { cn } from './lib/utils';
+import { useCompanyPeople } from './CompanyPeopleContext';
+import { PersonIdentity } from './PersonIdentity';
 import { Button } from './components/ui/button';
 import {
   Tooltip,
@@ -146,6 +148,7 @@ export function PersonalPage({
       setParams(updateCalendarPerson(params, uid), { replace: true });
   }, [calendar, params, uid, setParams]);
   const { revealed } = usePrivacy();
+  const companyPeople = useCompanyPeople();
   const projects = useProjects(functions, uid, company ? 'work' : 'all');
   const zone = 'America/Sao_Paulo';
   const density =
@@ -222,13 +225,29 @@ export function PersonalPage({
     subject,
     allWeeks,
   ]);
-  const participants =
+  const scopedParticipants =
     directory.owner === uid &&
     directory.revision === accessRevision &&
     directory.partition === directoryPartition &&
     !privacyBlocked
-      ? directory.rows
+      ? directory.rows.map((person) => ({
+          ...person,
+          label: companyPeople.name(person.uid) || person.label,
+        }))
       : [];
+  const participants = revealed
+    ? [
+        ...new Map(
+          [
+            ...scopedParticipants,
+            ...companyPeople.people.map((person) => ({
+              uid: person.uid,
+              label: companyPeople.name(person.uid) || person.email,
+            })),
+          ].map((person) => [person.uid, person]),
+        ).values(),
+      ]
+    : [];
   const [reportQuery, setReportQuery] = useState('');
   const queryIdentity = JSON.stringify([
     calendar,
@@ -693,24 +712,26 @@ export function PersonalPage({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={uid}>Meu calendário</SelectItem>
-                  {participants.length > 0 && !directory.unavailable && (
-                    <SelectItem value="all">
-                      Todas as pessoas · até 10
-                    </SelectItem>
-                  )}
+                  <SelectItem value={uid}>
+                    <PersonIdentity uid={uid} label="Meu calendário" />
+                  </SelectItem>
+                  {participants.length > 0 &&
+                    (!directory.unavailable ||
+                      companyPeople.people.length > 0) && (
+                      <SelectItem value="all">Todas as pessoas</SelectItem>
+                    )}
                   {participants
                     .filter((p) => p.uid !== uid)
                     .map((p) => (
                       <SelectItem key={p.uid} value={p.uid}>
-                        {p.label || 'Pessoa da organização'}
+                        <PersonIdentity uid={p.uid} fallback={p.label} />
                       </SelectItem>
                     ))}
                   {person.selected !== uid &&
                     person.selected !== 'all' &&
                     !participants.some((p) => p.uid === person.selected) && (
                       <SelectItem value={person.selected}>
-                        Pessoa selecionada · projetos globais
+                        <PersonIdentity uid={person.selected} />
                       </SelectItem>
                     )}
                 </SelectContent>
@@ -794,13 +815,14 @@ export function PersonalPage({
       )}
       {calendar &&
         directory.unavailable &&
+        companyPeople.people.length === 0 &&
         directory.partition === directoryPartition &&
         directory.owner === uid &&
         directory.revision === accessRevision && (
           <Alert className={cn('border-amber-500/50')}>
             <AlertDescription>
               {person.mode === 'own'
-                ? 'Lista de outras pessoas indisponível na leitura direta atual. Seu calendário usa seus registros; o diretório de participantes precisa de uma fonte autorizada pelas Rules.'
+                ? 'Lista de outras pessoas indisponível. Seu calendário continua usando seus registros. Consulte Pessoas para tentar carregar o diretório novamente.'
                 : 'Lista de pessoas indisponível para este escopo. Escolha um projeto para reduzir a consulta.'}
             </AlertDescription>
           </Alert>
@@ -857,7 +879,7 @@ export function PersonalPage({
             {error}
             {calendar &&
               person.mode === 'global' &&
-              ' Escolha uma pessoa ou um projeto se a seleção ultrapassar 10 pessoas; não exibimos totais parciais.'}
+              ' Se o volume de registros exceder o orçamento de leitura, reduza o período ou escolha um projeto; não exibimos totais parciais.'}
             <div className="mt-2">
               <Button onClick={() => setAttempt((v) => v + 1)} variant="ghost">
                 Tentar novamente
@@ -973,8 +995,10 @@ export function PersonalPage({
                       variant="bar"
                       data={report.byUser.map((person, index) => ({
                         key: person.uid,
+                        uid: revealed ? person.uid : undefined,
                         label: revealed
-                          ? person.label
+                          ? companyPeople.name(person.uid) ||
+                            'Pessoa da empresa'
                           : 'Pessoa ' + (index + 1),
                         minutes: person.minutes,
                         href:
@@ -985,14 +1009,6 @@ export function PersonalPage({
                             : undefined,
                       }))}
                     />
-                    <ul className={cn('list-none p-0 m-0')}>
-                      {report.byUser.map((person, index) => (
-                        <li key={person.uid} className={cn('py-3 border-b')}>
-                          {revealed ? person.label : 'Pessoa ' + (index + 1)}:{' '}
-                          {hours(person.minutes)}
-                        </li>
-                      ))}
-                    </ul>
                   </Card>
                 )}
             </div>
@@ -1012,6 +1028,12 @@ export function PersonalPage({
             )}
             {calendar && allWeeks && (
               <CalendarHistory
+                detailsAvailable={(id) =>
+                  !isHidden(
+                    projects.rows.find((row) => row.id === id)?.data,
+                    revealed,
+                  )
+                }
                 weeks={report.occupiedWeeks ?? []}
                 occurrences={report.weekOccurrences ?? []}
                 items={report.intervals}
@@ -1029,6 +1051,12 @@ export function PersonalPage({
             )}
             {calendar && !allWeeks && density === 'timeline' && (
               <CalendarTimeline
+                detailsAvailable={(id) =>
+                  !isHidden(
+                    projects.rows.find((row) => row.id === id)?.data,
+                    revealed,
+                  )
+                }
                 items={report.intervals}
                 day={selected}
                 view={view}
@@ -1167,10 +1195,18 @@ export function PersonalPage({
                                           ),
                                         )}{' '}
                                         {item.uid &&
-                                          (participants.find(
-                                            (p) => p.uid === item.uid,
-                                          )?.label || 'Pessoa da organização') +
-                                            ' · '}
+                                          !isHidden(
+                                            projects.rows.find(
+                                              (row) =>
+                                                row.id === item.projectId,
+                                            )?.data,
+                                            revealed,
+                                          ) && (
+                                            <>
+                                              <PersonIdentity uid={item.uid} />
+                                              {' · '}
+                                            </>
+                                          )}
                                         {label(item.projectId)}
                                         {density !== 'supercompact' && (
                                           <>
@@ -1247,10 +1283,18 @@ export function PersonalPage({
                                           ),
                                         )}{' '}
                                         {item.uid &&
-                                          (participants.find(
-                                            (p) => p.uid === item.uid,
-                                          )?.label || 'Pessoa da organização') +
-                                            ' · '}
+                                          !isHidden(
+                                            projects.rows.find(
+                                              (row) =>
+                                                row.id === item.projectId,
+                                            )?.data,
+                                            revealed,
+                                          ) && (
+                                            <>
+                                              <PersonIdentity uid={item.uid} />
+                                              {' · '}
+                                            </>
+                                          )}
                                         {label(item.projectId)}
                                         {density !== 'supercompact' && (
                                           <>

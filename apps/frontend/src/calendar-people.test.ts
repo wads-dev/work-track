@@ -138,6 +138,26 @@ describe('calendar people default and safe scope', () => {
     );
     expect(result.intervals).toHaveLength(2);
   });
+  it('all-mode accepts a complete response above100 participants without truncation', () => {
+    const participants = Array.from({ length: 101 }, (_, i) => ({
+      uid: 'person' + i,
+      label: 'Pessoa ' + i,
+    }));
+    const intervals = participants.map((p) => ({
+      ...data.intervals[0],
+      uid: p.uid,
+      readOnly: true,
+    }));
+    const result = calendarReport(
+      { ...data, mode: 'global', participants, intervals, totalMinutes: 6060 },
+      'me',
+      'global',
+    );
+    expect(result.participants).toEqual(participants);
+    expect(result.intervals).toEqual(intervals);
+    expect(result.totalMinutes).toBe(6060);
+    expect(result.byProject).toEqual([{ projectId: 'project', minutes: 6060 }]);
+  });
   it('calendar API isolated and foreign event cannot become authenticated drawer', () => {
     const source = readFileSync(
       new URL('./PersonalPage.tsx', import.meta.url),
@@ -165,7 +185,7 @@ describe('calendar people default and safe scope', () => {
     expect(source).toContain('privacyBlocked');
     expect(source).toContain('directory.owner === uid');
     expect(source).toContain('directory.revision === accessRevision');
-    expect(source).toContain('Todas as pessoas · até 10');
+    expect(source).toContain('Todas as pessoas');
     const timeline = readFileSync(
       new URL('./CalendarTimeline.tsx', import.meta.url),
       'utf8',
@@ -179,6 +199,7 @@ describe('calendar people default and safe scope', () => {
     expect(timeline).toMatch(
       /JSON.stringify\(\[\s*e.item.uid \|\| viewerUid,\s*e.item.id,/,
     );
-    expect(timeline).toContain('authorLabel(e.item.uid)');
+    expect(timeline).toContain('authorLabel(personUid)');
+    expect(timeline).toContain('uid={personUid}');
   });
 });

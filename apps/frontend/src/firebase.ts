@@ -43,9 +43,31 @@ export async function initializeServices() {
   const db = getFirestore(app);
   const functions = getFunctions(app, 'southamerica-east1');
   if (emulator) {
-    connectAuthEmulator(auth, 'http://' + location.hostname + ':9099');
-    connectFirestoreEmulator(db, location.hostname, 8081);
-    connectFunctionsEmulator(functions, location.hostname, 5001);
+    const ports =
+      'emulatorPorts' in config
+        ? (config.emulatorPorts as Record<string, unknown>)
+        : {};
+    const port = (key: string, fallback: number) => {
+      const value = ports?.[key] ?? fallback;
+      if (
+        typeof value !== 'number' ||
+        !Number.isInteger(value) ||
+        value < 1 ||
+        value > 65535
+      )
+        throw new Error('Porta de emulador inválida.');
+      return value;
+    };
+    connectAuthEmulator(
+      auth,
+      'http://' + location.hostname + ':' + port('auth', 9099),
+    );
+    connectFirestoreEmulator(db, location.hostname, port('firestore', 8081));
+    connectFunctionsEmulator(
+      functions,
+      location.hostname,
+      port('functions', 5001),
+    );
   }
   await setPersistence(auth, browserLocalPersistence);
   return { auth, db, functions };

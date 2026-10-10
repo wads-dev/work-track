@@ -61,6 +61,8 @@ import { RulesPage } from './RulesPage';
 import { UiIcon } from './UiIcons';
 import { PersonalPage } from './PersonalPage';
 import { PersonPage } from './PersonPage';
+import { PeoplePage } from './PeoplePage';
+import { CompanyPeopleProvider } from './CompanyPeopleContext';
 import { PwaControls } from './PwaControls';
 
 function allowed(user: User) {
@@ -253,6 +255,7 @@ function App() {
             ['/me', 'Meu relatório', 'chart'],
             ['/calendar', 'Calendário', 'calendar'],
             ['/projects', 'Projetos', 'projects'],
+            ['/people', 'Pessoas', 'people'],
             ['/records', 'Meus registros', 'records'],
             ['/pending', 'Pendências', 'bell'],
             ['/rules', 'Regras', 'rules'],
@@ -370,124 +373,131 @@ function App() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              <Routes>
-                <Route
-                  path="/people/:personId"
-                  element={
-                    <PersonPage
-                      key={user.uid}
-                      db={services.db}
-                      functions={services.functions}
-                      uid={user.uid}
-                    />
-                  }
-                />
-                <Route
-                  path="/me"
-                  element={
-                    <PersonalPage
-                      key={user.uid}
-                      db={services.db}
-                      functions={services.functions}
-                      uid={user.uid}
-                    />
-                  }
-                />
-                <Route path="/rules" element={<RulesPage />} />
-                <Route
-                  path="/pending"
-                  element={
-                    <PendingPage
-                      functions={services.functions}
-                      key={user.uid}
-                      db={services.db}
-                      uid={user.uid}
-                    />
-                  }
-                />
-                <Route
-                  path="/app"
-                  element={
-                    <PersonalPage
-                      company
-                      key={user.uid}
-                      db={services.db}
-                      functions={services.functions}
-                      uid={user.uid}
-                    />
-                  }
-                />
-                <Route
-                  path="/calendar"
-                  element={
-                    <PersonalPage
-                      key={user.uid}
-                      db={services.db}
-                      functions={services.functions}
-                      uid={user.uid}
-                      calendar
-                    />
-                  }
-                />
-                <Route
-                  path="/projects"
-                  element={
-                    <Dashboard
-                      key={user.uid}
-                      db={services.db}
-                      functions={services.functions}
-                      uid={user.uid}
-                      mode="projects"
-                    />
-                  }
-                />
-                <Route
-                  path="/projects/:projectId/topics/:topicId"
-                  element={
-                    <TopicDetails
-                      key={user.uid}
-                      functions={services.functions}
-                      uid={user.uid}
-                    />
-                  }
-                />
-                <Route
-                  path="/projects/:projectId"
-                  element={
-                    <Dashboard
-                      key={user.uid}
-                      db={services.db}
-                      functions={services.functions}
-                      uid={user.uid}
-                      mode="projects"
-                    />
-                  }
-                />
-                <Route
-                  path="/records"
-                  element={
-                    <Dashboard
-                      key={user.uid}
-                      db={services.db}
-                      functions={services.functions}
-                      uid={user.uid}
-                      mode="records"
-                    />
-                  }
-                />
-                <Route
-                  path="/records/:recordId"
-                  element={<RecordPage services={services} uid={user.uid} />}
-                />
-                <Route
-                  path="*"
-                  element={
-                    <Alert>
-                      Página não encontrada. Use a navegação para voltar.
-                    </Alert>
-                  }
-                />
-              </Routes>
+              <CompanyPeopleProvider
+                key={user.uid}
+                functions={services.functions}
+                uid={user.uid}
+              >
+                <Routes>
+                  <Route path="/people" element={<PeoplePage />} />
+                  <Route
+                    path="/people/:personId"
+                    element={
+                      <PersonPage
+                        key={user.uid}
+                        db={services.db}
+                        functions={services.functions}
+                        uid={user.uid}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/me"
+                    element={
+                      <PersonalPage
+                        key={user.uid}
+                        db={services.db}
+                        functions={services.functions}
+                        uid={user.uid}
+                      />
+                    }
+                  />
+                  <Route path="/rules" element={<RulesPage />} />
+                  <Route
+                    path="/pending"
+                    element={
+                      <PendingPage
+                        functions={services.functions}
+                        key={user.uid}
+                        db={services.db}
+                        uid={user.uid}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/app"
+                    element={
+                      <PersonalPage
+                        company
+                        key={user.uid}
+                        db={services.db}
+                        functions={services.functions}
+                        uid={user.uid}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/calendar"
+                    element={
+                      <PersonalPage
+                        key={user.uid}
+                        db={services.db}
+                        functions={services.functions}
+                        uid={user.uid}
+                        calendar
+                      />
+                    }
+                  />
+                  <Route
+                    path="/projects"
+                    element={
+                      <Dashboard
+                        key={user.uid}
+                        db={services.db}
+                        functions={services.functions}
+                        uid={user.uid}
+                        mode="projects"
+                      />
+                    }
+                  />
+                  <Route
+                    path="/projects/:projectId/topics/:topicId"
+                    element={
+                      <TopicDetails
+                        key={user.uid}
+                        functions={services.functions}
+                        uid={user.uid}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/projects/:projectId"
+                    element={
+                      <Dashboard
+                        key={user.uid}
+                        db={services.db}
+                        functions={services.functions}
+                        uid={user.uid}
+                        mode="projects"
+                      />
+                    }
+                  />
+                  <Route
+                    path="/records"
+                    element={
+                      <Dashboard
+                        key={user.uid}
+                        db={services.db}
+                        functions={services.functions}
+                        uid={user.uid}
+                        mode="records"
+                      />
+                    }
+                  />
+                  <Route
+                    path="/records/:recordId"
+                    element={<RecordPage services={services} uid={user.uid} />}
+                  />
+                  <Route
+                    path="*"
+                    element={
+                      <Alert>
+                        Página não encontrada. Use a navegação para voltar.
+                      </Alert>
+                    }
+                  />
+                </Routes>
+              </CompanyPeopleProvider>
             </main>
           </>
         ) : (

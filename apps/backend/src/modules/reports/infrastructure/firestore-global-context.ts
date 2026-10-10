@@ -20,10 +20,6 @@ export async function loadGlobalContext(
   uids: string[],
   scope?: { viewerUid: string } | { companyOnly: true },
 ): Promise<ReportSourceRecord[]> {
-  if (uids.length > 10)
-    throw new ReportContextError(
-      'Mais de10 pessoas nesta página; reduza o limite de registros.',
-    );
   const records: ReportSourceRecord[] = [];
   // Sequential UIDs bound concurrency; read-only transaction yields one consistent
   // snapshot across internal pages, including facts starting before any report day.

@@ -1,3 +1,4 @@
+import { PersonIdentity } from './PersonIdentity';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { safeReturnTo } from './routes';
 import { useEffect } from 'react';
@@ -32,7 +33,9 @@ export function PersonPage({
       >
         Voltar ao contexto
       </Link>
-      <h2 className="text-2xl font-semibold mb-2">Perfil de pessoa</h2>
+      <h2 className="text-2xl font-semibold mb-2">
+        <PersonIdentity uid={personId} fallback="Perfil de pessoa" />
+      </h2>
       <p className="text-sm text-muted-foreground mb-4">
         Atividades da pessoa selecionada. Para terceiros, somente projetos
         corporativos autorizados; registros pessoais não são consultados.

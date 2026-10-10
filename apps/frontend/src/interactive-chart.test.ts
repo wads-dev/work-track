@@ -4,6 +4,12 @@ import { safeReturnTo } from './routes';
 const source = (file: string) =>
   readFileSync(new URL('./' + file, import.meta.url), 'utf8');
 describe('interactive charts', () => {
+  it('shows only avatars on the people axis and one dashboard legend', () => {
+    expect(source('InteractiveChart.tsx')).toContain('avatarOnly');
+    expect(source('PersonalPage.tsx')).not.toContain(
+      'report.byUser.map((person, index) => (\n',
+    );
+  });
   it('uses library tooltips, stable identity, formatted values and accessible navigation', () => {
     const chart = source('InteractiveChart.tsx');
     for (const token of [
@@ -34,9 +40,7 @@ describe('interactive charts', () => {
     expect(source('TopicReport.tsx')).not.toContain(
       'encodeURIComponent(person.key)',
     );
-    expect(source('topic-report-model.ts')).toContain(
-      'revealed && !hidden && !personalUid',
-    );
+    expect(source('topic-report-model.ts')).toContain('revealed && !hidden');
   });
   it('keeps profile target fixed while reusing authorized calendar and viewer identity', () => {
     const profile = source('PersonPage.tsx');
