@@ -482,6 +482,9 @@ export function RecordDrawer({
                   uid={uid}
                   projectId={String(record.projectId)}
                   recordId={recordId}
+                  recordOwnerUid={
+                    record.uid !== uid ? String(record.uid) : undefined
+                  }
                   originLabel={
                     text(object(record.projectSnapshot).title) +
                     ' · ' +
@@ -732,12 +735,14 @@ export function RecordDrawer({
                             </p>
                             <p className="text-sm">Autor: Pessoa</p>
                             <p className="text-sm">
-                              {['move_subject', 'move_record'].includes(
-                                String(row.data.action),
-                              ) && (
+                              {[
+                                'move_topic',
+                                'move_subject',
+                                'move_record',
+                              ].includes(String(row.data.action)) && (
                                 <>
                                   Ação:{' '}
-                                  {row.data.action === 'move_subject'
+                                  {row.data.action !== 'move_record'
                                     ? 'Transferência de tópico'
                                     : 'Mover registro'}
                                   <br />

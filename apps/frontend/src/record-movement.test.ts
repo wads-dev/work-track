@@ -7,12 +7,12 @@ import {
 } from './record-movement';
 const preview: MovePreview = {
   mode: 'preview',
-  operation: 'move_subject',
+  operation: 'move_topic',
   project_origin: 'source',
-  subject_origin: 'topic',
+  topic_origin: 'topic',
   project_target: 'target',
-  subject_target: 'resolved',
-  resolvedSubject: { id: 'resolved', title: 'Topic', willCreate: true },
+  topic_target: 'resolved',
+  resolvedTopic: { id: 'resolved', title: 'Topic', willCreate: true },
   recordCount: 1,
   recordIds: ['record'],
   warnings: [],
@@ -20,7 +20,7 @@ const preview: MovePreview = {
 };
 const intent = {
   project_origin: 'source',
-  subject_origin: 'topic',
+  topic_origin: 'topic',
   project_target: 'target',
   requestId: 'stable',
   reason: 'Move',
@@ -52,12 +52,12 @@ describe('audited record movement', () => {
     for (const changed of [
       { ...preview, project_target: 'other' },
       { ...preview, project_origin: 'other' },
-      { ...preview, subject_origin: 'other' },
+      { ...preview, topic_origin: 'other' },
       { ...preview, previewToken: '' },
       { ...preview, previewToken: 'malformed' },
       {
         ...preview,
-        resolvedSubject: { ...preview.resolvedSubject, id: 'other' },
+        resolvedTopic: { ...preview.resolvedTopic, id: 'other' },
       },
       { ...preview, recordCount: 2 },
       { ...preview, recordCount: 2, recordIds: ['record', 'record'] },
@@ -90,6 +90,67 @@ describe('audited record movement', () => {
         true,
       ),
     ).toThrow();
+  });
+  it('record confirmation preserves optional corporate record owner', () => {
+    const recordIntent = {
+      recordId: 'record',
+      recordOwnerUid: 'participant',
+      project_target: 'target',
+      topic_target: 'resolved',
+    };
+    expect(
+      moveConfirmation(
+        recordIntent,
+        {
+          ...preview,
+          operation: 'move_record',
+          records: [
+            {
+              recordId: 'record',
+              ownerUid: 'participant',
+              path: 'users/participant/records/record',
+            },
+          ],
+        },
+        true,
+      ),
+    ).toEqual({
+      ...recordIntent,
+      confirmed: true,
+      previewToken: preview.previewToken,
+    });
+    expect(() =>
+      moveConfirmation(
+        { ...recordIntent, topic_target: 'other' },
+        { ...preview, operation: 'move_record' },
+        true,
+      ),
+    ).toThrow();
+  });
+  it('dialog uses topic contracts and explains scope and preserved ownership', () => {
+    const source = readFileSync(
+      new URL('./MoveDialog.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).toContain("recordId ? 'moveRecord' : 'moveTopic'");
+    expect(source).toContain('topic_origin: topicId');
+    expect(source).toContain('topic_target: topic');
+    expect(source).toContain('preview.resolvedTopic.title');
+    expect(source).toContain('...(recordOwnerUid ? { recordOwnerUid } : {})');
+    expect(source).toContain("source?.type === 'personal'");
+    expect(source).toContain('move somente seus registros ativos');
+    expect(source).toContain(
+      'move os registros ativos de todos os participantes',
+    );
+    expect(source).toContain('propriedade dos registros serão preservados');
+    expect(source).not.toMatch(
+      /moveSubject|move_subject|subject_origin|subject_target|resolvedSubject/,
+    );
+    const topics = readFileSync(
+      new URL('./ProjectTopics.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(topics).toContain('topicId={String(movingTopic.id)}');
   });
   it('dialog stable retry, cancellation and changed destination discard old preview', () => {
     const source = readFileSync(
@@ -132,5 +193,43 @@ describe('audited record movement', () => {
     expect(source).toContain('isHidden(parent, revealed)');
     expect(source).toContain('movementSide(row.data.before)');
     expect(source).toContain('movementSide(row.data.after)');
+    expect(source).toContain("'move_topic',");
+    expect(source).toContain("'move_subject',");
+    expect(source).toContain("'move_record',");
+    expect(source).toContain("row.data.action !== 'move_record'");
+    expect(source).toContain('recordOwnerUid={');
+    expect(source).toContain('!record || record.uid !== uid');
+    expect(source).toContain("doc(db, 'users', uid, 'records', recordId)");
   });
+});
+it('accepts duplicate IDs only across distinct owner paths and rejects mismatched owner', () => {
+  const records = [
+    {
+      recordId: 'record',
+      ownerUid: 'alice',
+      path: 'users/alice/records/record',
+    },
+    { recordId: 'record', ownerUid: 'bob', path: 'users/bob/records/record' },
+  ];
+  const p = {
+    ...preview,
+    recordCount: 2,
+    recordIds: ['record', 'record'],
+    records,
+  };
+  expect(moveConfirmation(intent, p, true).confirmed).toBe(true);
+  expect(() =>
+    moveConfirmation(
+      intent,
+      { ...p, records: [records[0]!, records[0]!] },
+      true,
+    ),
+  ).toThrow();
+  expect(() =>
+    moveConfirmation(
+      { recordId: 'record', recordOwnerUid: 'alice', project_target: 'target' },
+      { ...preview, operation: 'move_record', records: [records[1]!] },
+      true,
+    ),
+  ).toThrow();
 });
