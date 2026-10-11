@@ -2,13 +2,17 @@ import { createWebCommand as createCallable } from '../../infrastructure/firebas
 import { Button } from '../../components/ui/button';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { TabsTrigger, Tabs, TabsList } from '../../components/ui/tabs';
-import { Label } from '../../components/ui/label';
-import { Input } from '../../components/ui/input';
-import { Checkbox } from '../../components/ui/checkbox';
-import { Textarea } from '../../components/ui/textarea';
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog';
 import { Sheet, SheetContent, SheetTitle } from '../../components/ui/sheet';
-import { MoveDialog } from './MoveDialog';
+import { RecordEditorForm } from './RecordEditorForm';
+import { RecordAuditEvent } from './RecordAuditEvent';
+import { RecordDetails } from './RecordDetails';
+import { Trash2 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '../../components/ui/tooltip';
 import { hardDeleteRecord } from '../../infrastructure/firebase/hard-delete-record';
 import { useProjects } from '../projects/hooks/useProjects';
 import { canFinishNow, createFinishNowCommand } from './finish-now';
@@ -89,7 +93,7 @@ export function RecordDrawer({
   const editOpen = activeTab === 'edit';
   const detailsOpen = activeTab === 'details';
   const close = () => {
-    if (mutationBusy.current || moveOpen) return;
+    if (mutationBusy.current) return;
     if (onClose) onClose();
     else navigate(closePath);
   };
@@ -110,9 +114,10 @@ export function RecordDrawer({
   const [finishSuccess, setFinishSuccess] = useState(false);
   const finishCommand = useRef(createFinishNowCommand());
   const editorDirty = useRef(false);
+  const editorVersion = useRef<string | null>(null);
   const mutationBusy = useRef(false);
-  const [moveOpen, setMoveOpen] = useState(false);
-  const [moving, setMoving] = useState(false);
+  const [editedProject, setEditedProject] = useState('');
+  const [sharingAck, setSharingAck] = useState(false);
   const currentScope = useRef(uid + '/' + recordId);
   currentScope.current = uid + '/' + recordId;
   const [end, setEnd] = useState('');
@@ -121,9 +126,7 @@ export function RecordDrawer({
   const [editedTopics, setEditedTopics] = useState<
     Array<{ topicId: string; percentage?: number; durationMinutes?: number }>
   >([]);
-  const [removeEnd, setRemoveEnd] = useState(false);
-  const [reason, setReason] = useState('');
-  const [confirmed, setConfirmed] = useState(false);
+  const reason = 'Edição de registro pela interface web.';
   const [success, setSuccess] = useState('');
   const intent = useRef<{
     key: string;
@@ -139,8 +142,8 @@ export function RecordDrawer({
     setRecord(null);
     editorDirty.current = false;
     mutationBusy.current = false;
-    setMoveOpen(false);
-    setMoving(false);
+    setEditedProject('');
+    setSharingAck(false);
     setRemoving(false);
     setRemoveError('');
     finishCommand.current = createFinishNowCommand();
@@ -163,6 +166,12 @@ export function RecordDrawer({
         setRecord(activeRecord);
         setLoading(false);
         if (activeRecord && !editorDirty.current) {
+          editorVersion.current =
+            typeof activeRecord.updatedAt === 'string'
+              ? activeRecord.updatedAt
+              : null;
+          setEditedProject(text(activeRecord.projectId, ''));
+          setSharingAck(false);
           setEnd(endToLocal(activeRecord.endedAt));
           setStart(endToLocal(activeRecord.startedAt));
           setDescription(text(activeRecord.interpretation));
@@ -177,7 +186,6 @@ export function RecordDrawer({
                 : {}),
             })),
           );
-          setConfirmed(false);
         }
       },
       () => {
@@ -192,8 +200,7 @@ export function RecordDrawer({
     };
   }, [db, uid, recordId]);
   async function removeRecord() {
-    if (mutationBusy.current || moveOpen || !record || record.uid !== uid)
-      return;
+    if (mutationBusy.current || !record || record.uid !== uid) return;
     if (
       !window.confirm(
         'Remover este registro definitivamente? Esta ação não pode ser desfeita.',
@@ -234,7 +241,7 @@ export function RecordDrawer({
   async function finishNow() {
     if (saving || finishing || finishSuccess || !canFinishNow(record, uid))
       return;
-    if (mutationBusy.current || moveOpen) return;
+    if (mutationBusy.current) return;
     mutationBusy.current = true;
     const scope = uid + '/' + recordId;
     setFinishing(true);
@@ -265,30 +272,53 @@ export function RecordDrawer({
       }
     }
   }
+  const originProject = projects.rows.find(
+    (p) => p.id === record?.projectId,
+  )?.data;
+  const destinationProject = projects.rows.find(
+    (p) => p.id === editedProject,
+  )?.data;
+  const requiresSharing =
+    originProject?.type === 'personal' &&
+    editedProject !== record?.projectId &&
+    destinationProject &&
+    destinationProject.type !== 'personal';
   async function save() {
-    if (
-      mutationBusy.current ||
-      !record ||
-      !confirmed ||
-      finishing ||
-      saving ||
-      moving ||
-      moveOpen
-    )
+    if (mutationBusy.current || !record || finishing || saving || removing)
       return;
     mutationBusy.current = true;
     setError('');
     setSuccess('');
     try {
-      const startedAt = localEndToIso(start.trim());
-      const endedAt = removeEnd
-        ? null
-        : end.trim()
-          ? validateEnd(localEndToIso(end.trim()), startedAt)
-          : null;
-      if (!reason.trim()) throw new Error('Informe o motivo da alteração.');
+      const startedAt =
+        start.trim() === endToLocal(record.startedAt)
+          ? String(record.startedAt)
+          : localEndToIso(start.trim());
+      const endedAt = end.trim()
+        ? validateEnd(
+            end.trim() === endToLocal(record.endedAt)
+              ? String(record.endedAt)
+              : localEndToIso(end.trim()),
+            startedAt,
+          )
+        : null;
+      if (!editedTopics.length)
+        throw new Error('Selecione pelo menos um tópico.');
+      if (
+        !editedProject ||
+        isHidden(
+          projects.rows.find((p) => p.id === editedProject)?.data,
+          revealed,
+        )
+      )
+        throw new Error('Selecione um projeto autorizado e visível.');
+      if (requiresSharing && !sharingAck)
+        throw new Error('Autorize o compartilhamento com a organização.');
+
       const key = JSON.stringify({
         recordId,
+        projectId: editedProject,
+        acknowledgeSharedDestination: !!requiresSharing && sharingAck,
         startedAt,
         interpretation: description,
         topics: editedTopics,
@@ -299,14 +329,15 @@ export function RecordDrawer({
         intent.current = {
           key,
           requestId: crypto.randomUUID(),
-          expectedUpdatedAt:
-            typeof record.updatedAt === 'string' ? record.updatedAt : null,
+          expectedUpdatedAt: editorVersion.current,
         };
       const currentIntent = intent.current;
       setSaving(true);
       const callable = createCallable<
         {
           recordId: string;
+          projectId: string;
+          acknowledgeSharedDestination: boolean;
           endedAt: string | null;
           startedAt: string;
           interpretation: string;
@@ -323,6 +354,8 @@ export function RecordDrawer({
       >(functions, 'updateRecord');
       const result = await callable({
         recordId,
+        projectId: editedProject,
+        acknowledgeSharedDestination: !!requiresSharing && sharingAck,
         endedAt,
         startedAt,
         interpretation: description,
@@ -334,10 +367,10 @@ export function RecordDrawer({
       setSuccess(
         'Alteração salva com auditoria em ' + date(result.data.updatedAt) + '.',
       );
-      setConfirmed(false);
-      setReason('');
+      editorDirty.current = false;
+      editorVersion.current = result.data.updatedAt;
       intent.current = null;
-      setRemoveEnd(false);
+      setSharingAck(false);
     } catch (failure) {
       if (
         failure &&
@@ -346,9 +379,10 @@ export function RecordDrawer({
         failure.code === 'functions/aborted'
       ) {
         intent.current = null;
-        setConfirmed(false);
+        editorVersion.current =
+          typeof record.updatedAt === 'string' ? record.updatedAt : null;
         setError(
-          'Registro alterado por outra operação. Confira os dados atualizados e confirme novamente antes de salvar.',
+          'Registro alterado por outra operação. Confira os dados atualizados e revise a edição antes de salvar novamente.',
         );
       } else
         setError(
@@ -359,19 +393,6 @@ export function RecordDrawer({
       setSaving(false);
     }
   }
-  const movementSide = (side: unknown) => {
-    const snapshot = object(side);
-    const parent = projects.rows.find((p) => p.id === snapshot.projectId)?.data;
-    if (!revealed && (!parent || isHidden(parent, revealed)))
-      return 'Projeto reservado · Tópicos reservados';
-    return (
-      text(object(snapshot.projectSnapshot).title, 'Projeto') +
-      ' · ' +
-      objects(snapshot.topicSnapshots)
-        .map((t) => text(t.title, 'Tópico'))
-        .join(', ')
-    );
-  };
   const content = (
     <div
       className={
@@ -386,7 +407,7 @@ export function RecordDrawer({
         </h2>
         <Button
           aria-label={'Fechar'}
-          disabled={finishing || saving || moving || moveOpen || removing}
+          disabled={finishing || saving || removing}
           onClick={close}
           variant="ghost"
           size="icon"
@@ -405,7 +426,7 @@ export function RecordDrawer({
             Carregando…
           </div>
         )}
-        {error && revealed && (
+        {error && (!record || !isHidden(originProject, revealed)) && (
           <Alert variant="destructive" className="my-2">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -417,7 +438,7 @@ export function RecordDrawer({
             </AlertDescription>
           </Alert>
         )}
-        {success && revealed && (
+        {success && !isHidden(originProject, revealed) && (
           <Alert role="status" className="my-2">
             <AlertDescription>{success}</AlertDescription>
           </Alert>
@@ -429,7 +450,7 @@ export function RecordDrawer({
           ) && (
             <Alert className="my-2">
               <AlertDescription>
-                Detalhes, edição e auditoria ocultos no apresentação com dados
+                Detalhes, edição e auditoria ocultos na apresentação com dados
                 ocultos. Revele dados no topo para continuar.
               </AlertDescription>
             </Alert>
@@ -470,134 +491,85 @@ export function RecordDrawer({
                   </AlertDescription>
                 </Alert>
               )}
-              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
-                {!finishSuccess && canFinishNow(record, uid) && (
-                  <Button
-                    disabled={
-                      finishing || saving || moving || moveOpen || removing
-                    }
-                    onClick={finishNow}
-                    variant="default"
-                    className="min-h-11"
-                  >
-                    {finishing
-                      ? 'Finalizando…'
-                      : finishError
-                        ? 'Tentar finalizar novamente'
-                        : 'Finalizar agora'}
-                  </Button>
-                )}
-                {record.uid === uid &&
-                  (record.deletedAt === null ||
-                    record.deletedAt === undefined) && (
-                    <Button
-                      disabled={
-                        saving || finishing || moving || moveOpen || removing
-                      }
-                      onClick={() => setMoveOpen(true)}
-                      variant="outline"
-                      className="min-h-11"
-                    >
-                      Mover registro
-                    </Button>
-                  )}
-                {record.uid === uid && !isDeletedRecord(record) && (
-                  <Button
-                    disabled={
-                      saving || finishing || moving || moveOpen || removing
-                    }
-                    onClick={removeRecord}
-                    variant="destructive"
-                    className="min-h-11"
-                  >
-                    {removing ? 'Removendo…' : 'Remover registro'}
-                  </Button>
-                )}
-              </div>
-              {moveOpen && (
-                <MoveDialog
-                  key={uid + '/' + recordId}
-                  functions={functions}
-                  uid={uid}
-                  projectId={String(record.projectId)}
-                  recordId={recordId}
-                  recordOwnerUid={
-                    record.uid !== uid ? String(record.uid) : undefined
-                  }
-                  originLabel={
-                    text(object(record.projectSnapshot).title) +
-                    ' · ' +
-                    date(record.startedAt)
-                  }
-                  mutationBusy={mutationBusy}
-                  onBusyChange={setMoving}
-                  onClose={() => setMoveOpen(false)}
-                />
-              )}
               <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
                 className="my-4"
               >
-                <TabsList
-                  className="grid w-full grid-cols-3"
-                  aria-label={'Seções do registro'}
+                <div
+                  className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-2"
+                  aria-label="Seções do registro e ações"
                 >
-                  <TabsTrigger
-                    id={'record-tab-details'}
-                    aria-controls={'record-panel-details'}
-                    value={'details'}
+                  <TabsList
+                    className="h-9 w-auto"
+                    aria-label={'Seções do registro'}
                   >
-                    {'Detalhes'}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    id={'record-tab-edit'}
-                    aria-controls={'record-panel-edit'}
-                    value={'edit'}
-                  >
-                    {'Editar'}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    id={'record-tab-history'}
-                    aria-controls={'record-panel-history'}
-                    value={'history'}
-                  >
-                    {'Histórico'}
-                  </TabsTrigger>
-                </TabsList>
+                    <TabsTrigger
+                      id={'record-tab-details'}
+                      aria-controls={'record-panel-details'}
+                      value={'details'}
+                    >
+                      {'Detalhes'}
+                    </TabsTrigger>
+                    <TabsTrigger
+                      id={'record-tab-edit'}
+                      aria-controls={'record-panel-edit'}
+                      value={'edit'}
+                    >
+                      {'Editar'}
+                    </TabsTrigger>
+                    <TabsTrigger
+                      id={'record-tab-history'}
+                      aria-controls={'record-panel-history'}
+                      value={'history'}
+                    >
+                      {'Histórico'}
+                    </TabsTrigger>
+                  </TabsList>
+                  <div className="ml-auto flex shrink-0 items-center gap-2">
+                    {!finishSuccess && canFinishNow(record, uid) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={finishing || saving || removing}
+                        onClick={finishNow}
+                      >
+                        {finishing ? 'Finalizando…' : 'Finalizar agora'}
+                      </Button>
+                    )}
+                    {record.uid === uid && !isDeletedRecord(record) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-9 text-muted-foreground hover:text-destructive"
+                            aria-label="Remover registro"
+                            disabled={finishing || saving || removing}
+                            onClick={removeRecord}
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Remover registro</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </div>
                 <div
                   role={'tabpanel'}
                   id={'record-panel-details'}
                   aria-labelledby={'record-tab-details'}
                   hidden={!detailsOpen}
                 >
-                  <dl className="[&_dt]:mt-4 [&_dt]:font-semibold [&_dd]:m-0 [&_dd]:whitespace-pre-wrap">
-                    <dt>ID</dt>
-                    <dd>{recordId}</dd>
-                    <dt>Projeto</dt>
-                    <dd>
-                      {text(
-                        object(record.projectSnapshot).title,
-                        text(record.projectId),
-                      )}
-                    </dd>
-                    <dt>Tópicos</dt>
-                    <dd>
-                      {objects(record.topicSnapshots)
-                        .map((topic) => text(topic.title))
-                        .join(', ') || 'Não informado'}
-                    </dd>
-                    <dt>Início original</dt>
-                    <dd>{date(record.startedAt, 'America/Sao_Paulo')}</dd>
-                    <dt>Fim atualmente registrado</dt>
-                    <dd>{date(record.endedAt, 'America/Sao_Paulo')}</dd>
-                    <dt>Texto original</dt>
-                    <dd>{text(record.originalText)}</dd>
-                    <dt>Contexto</dt>
-                    <dd>{text(record.interpretation)}</dd>
-                    <dt>Gravado em</dt>
-                    <dd>{date(record.recordedAt)}</dd>
-                  </dl>
+                  {detailsOpen && (
+                    <RecordDetails
+                      record={record}
+                      recordId={recordId}
+                      project={originProject}
+                      revealed={revealed}
+                    />
+                  )}
                 </div>
                 <div
                   role={'tabpanel'}
@@ -605,173 +577,46 @@ export function RecordDrawer({
                   aria-labelledby={'record-tab-edit'}
                   hidden={!editOpen}
                 >
-                  <form
-                    id={'record-edit-form'}
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void save();
-                    }}
-                    className="rounded-xl border bg-card p-4 text-card-foreground"
-                  >
-                    <h3 className="text-lg font-semibold">Editar registro</h3>
-                    <fieldset>
-                      <legend>Tópicos</legend>
-                      {objects(
-                        projects.rows.find((p) => p.id === record.projectId)
-                          ?.data.topics,
-                      )
-                        .filter((t) => !t.archived && !t.mergedIntoTopicId)
-                        .map((t) => (
-                          <label
-                            key={text(t.id)}
-                            className="flex items-center gap-2"
-                          >
-                            <Checkbox
-                              checked={editedTopics.some(
-                                (a) => a.topicId === t.id,
-                              )}
-                              disabled={saving || finishing || moveOpen}
-                              onCheckedChange={(checked) => {
-                                editorDirty.current = true;
-                                setEditedTopics((items) =>
-                                  checked === true
-                                    ? [...items, { topicId: text(t.id) }]
-                                    : items.filter((a) => a.topicId !== t.id),
-                                );
-                                setConfirmed(false);
-                              }}
-                            />
-                            {text(t.title)}
-                          </label>
-                        ))}
-                    </fieldset>
-                    <Label htmlFor="record-edit-start">Início efetivo</Label>
-                    <Input
-                      id="record-edit-start"
-                      type="datetime-local"
-                      value={start}
-                      disabled={saving || finishing || moveOpen}
-                      onChange={(e) => {
+                  {editOpen && (
+                    <RecordEditorForm
+                      key={uid + String(revealed)}
+                      catalog={projects.rows}
+                      revealed={revealed}
+                      projectId={editedProject}
+                      topics={editedTopics}
+                      start={start}
+                      end={end}
+                      description={description}
+                      busy={saving || finishing || removing}
+                      focusEnd={focusEnd}
+                      sharing={!!requiresSharing}
+                      ack={sharingAck}
+                      onProject={(id) => {
                         editorDirty.current = true;
-                        setStart(e.target.value);
-                        setConfirmed(false);
+                        setEditedProject(id);
+                        setEditedTopics([]);
+                        setSharingAck(false);
                       }}
-                    />
-                    <Label htmlFor="record-edit-description">
-                      Descrição / contexto
-                    </Label>
-                    <Textarea
-                      id="record-edit-description"
-                      value={description}
-                      disabled={saving || finishing || moveOpen}
-                      onChange={(e) => {
+                      onTopics={(value) => {
                         editorDirty.current = true;
-                        setDescription(e.target.value);
-                        setConfirmed(false);
+                        setEditedTopics(value);
                       }}
+                      onStart={(value) => {
+                        editorDirty.current = true;
+                        setStart(value);
+                      }}
+                      onEnd={(value) => {
+                        editorDirty.current = true;
+                        setEnd(value);
+                      }}
+                      onDescription={(value) => {
+                        editorDirty.current = true;
+                        setDescription(value);
+                      }}
+                      onAck={setSharingAck}
+                      onSave={() => void save()}
                     />
-                    <div className="flex flex-col gap-4">
-                      <div className="min-w-0 space-y-2">
-                        <Label htmlFor={'RecordDrawer-17410'}>
-                          {'Fim efetivo'}
-                        </Label>
-                        <Input
-                          autoFocus={focusEnd}
-                          type={'datetime-local'}
-                          value={end}
-                          disabled={
-                            finishing ||
-                            saving ||
-                            moving ||
-                            moveOpen ||
-                            removeEnd
-                          }
-                          onChange={(event) => {
-                            editorDirty.current = true;
-                            setEnd(event.target.value);
-                            setConfirmed(false);
-                          }}
-                          id={'RecordDrawer-17410'}
-                          aria-describedby={'RecordDrawer-17410-help'}
-                        ></Input>
-                        <p
-                          id="RecordDrawer-17410-help"
-                          className="text-xs text-muted-foreground"
-                        >
-                          {
-                            'Informe a data e hora efetivas. Nenhum horário é preenchido automaticamente.'
-                          }
-                        </p>
-                      </div>
-                      {!!record.endedAt && (
-                        <>
-                          <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
-                            <Checkbox
-                              checked={removeEnd}
-                              disabled={
-                                finishing ||
-                                saving ||
-                                moving ||
-                                moveOpen ||
-                                removing
-                              }
-                              onCheckedChange={(checked) => {
-                                editorDirty.current = true;
-                                setRemoveEnd(checked === true);
-                                setConfirmed(false);
-                              }}
-                            />
-                            <span>
-                              {'Remover fim e reabrir explicitamente'}
-                            </span>
-                          </Label>
-                        </>
-                      )}
-                      <div className="min-w-0 space-y-2">
-                        <Label htmlFor={'RecordDrawer-19047'}>
-                          {'Motivo da alteração'}
-                        </Label>
-                        <Textarea
-                          value={reason}
-                          disabled={
-                            finishing ||
-                            saving ||
-                            moving ||
-                            moveOpen ||
-                            removing
-                          }
-                          onChange={(event) => setReason(event.target.value)}
-                          required={true}
-                          id={'RecordDrawer-19047'}
-                          rows={2}
-                          maxLength={1000}
-                        ></Textarea>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {removeEnd
-                          ? 'Reabrir explicitamente'
-                          : 'Fim efetivo: ' + (end || 'não informado')}
-                      </p>
-                      <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
-                        <Checkbox
-                          checked={confirmed}
-                          disabled={
-                            finishing ||
-                            saving ||
-                            moving ||
-                            moveOpen ||
-                            removing
-                          }
-                          onCheckedChange={(checked) =>
-                            setConfirmed(checked === true)
-                          }
-                        />
-                        <span>
-                          {'Confirmo o horário e esta alteração explícita'}
-                        </span>
-                      </Label>
-                    </div>
-                  </form>
+                  )}
                 </div>
                 <div
                   role={'tabpanel'}
@@ -819,40 +664,11 @@ export function RecordDrawer({
                           Nenhuma alteração auditada disponível.
                         </p>
                       ) : (
-                        audit.rows.map((row) => (
-                          <div
-                            key={row.id}
-                            className="rounded-xl border bg-card p-4 text-card-foreground"
-                          >
-                            <p className="text-sm leading-relaxed">
-                              {date(row.data.updatedAt)}·{' '}
-                              {text(row.data.reason)}
-                            </p>
-                            <p className="text-sm">Autor: Pessoa</p>
-                            <p className="text-sm">
-                              {[
-                                'move_topic',
-                                'move_subject',
-                                'move_record',
-                              ].includes(String(row.data.action)) && (
-                                <>
-                                  Ação:{' '}
-                                  {row.data.action !== 'move_record'
-                                    ? 'Transferência de tópico'
-                                    : 'Mover registro'}
-                                  <br />
-                                  Origem: {movementSide(row.data.before)}
-                                  <br />
-                                  Destino: {movementSide(row.data.after)}
-                                  <br />
-                                </>
-                              )}
-                              Fim antes: {text(object(row.data.before).endedAt)}
-                              <br />
-                              Fim depois: {text(object(row.data.after).endedAt)}
-                            </p>
-                          </div>
-                        ))
+                        <div className="mt-4 space-y-3">
+                          {audit.rows.map((row) => (
+                            <RecordAuditEvent key={row.id} event={row.data} />
+                          ))}
+                        </div>
                       )}
                     </>
                   )}
@@ -867,22 +683,21 @@ export function RecordDrawer({
           projects.rows.find((item) => item.id === record.projectId)?.data,
           revealed,
         ) && (
-          <div className="shrink-0 border-t bg-background pt-3 pb-[var(--emulator-inset,0px)]">
+          <div className="flex shrink-0 justify-end border-t bg-background pt-3 pb-[var(--emulator-inset,0px)]">
             <Button
               type={'submit'}
               form={'record-edit-form'}
               disabled={
                 finishing ||
                 saving ||
-                moving ||
-                moveOpen ||
                 removing ||
-                !confirmed
+                !editedTopics.length ||
+                (requiresSharing && !sharingAck)
               }
               variant="default"
-              className="min-h-11 w-full"
+              className="min-h-11"
             >
-              {saving ? 'Salvando…' : 'Salvar alteração'}
+              {saving ? 'Salvando…' : 'Salvar'}
             </Button>
           </div>
         )}
