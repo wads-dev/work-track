@@ -40,6 +40,30 @@ it('persists default topics and isolates idempotent records by user', async () =
     'alice',
   );
   expect(project.topics[0]?.id).toBe('general');
+  const topicUpdate = {
+    projectId: project.id,
+    topicId: 'general',
+    githubUrl: 'https://github.com/wads-dev/work-track',
+    requestId: 'github-topic',
+    reason: 'associação solicitada',
+  };
+  expect(await repo.updateTopic(topicUpdate, 'alice')).toMatchObject({
+    id: 'general',
+    githubUrl: topicUpdate.githubUrl,
+  });
+  const size = data.size;
+  await repo.updateTopic(topicUpdate, 'alice');
+  expect(data.size).toBe(size);
+  await expect(
+    repo.updateTopic({ ...topicUpdate, githubUrl: null }, 'alice'),
+  ).rejects.toThrow('requestId');
+  expect(
+    [...data.entries()].find(([path]) => path.includes('/audit/topic_'))?.[1],
+  ).toMatchObject({
+    authorUid: 'alice',
+    before: { id: 'general' },
+    after: { githubUrl: topicUpdate.githubUrl },
+  });
   const input = {
     projectId: project.id,
     startedAt: '2026-10-08T21:00:00-03:00',

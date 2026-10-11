@@ -7,6 +7,11 @@ import type {
 
 /** Authoritative command implementation is server-side; clients use a command gateway. */
 export interface WorkRepository {
+  updateTopic?: (
+    input: import('../schemas/registration.js').UpdateTopicInput,
+    uid: string,
+  ) => Promise<Topic>;
+  listRecentRecords?: import('../registration/domain/recent-records.js').RecentRecordsRepository['listRecentRecords'];
   listProjects(uid: string): Promise<Project[]>;
   createProject(input: ProjectInput, uid: string): Promise<Project>;
   createTopic(input: TopicInput, uid: string): Promise<Topic>;

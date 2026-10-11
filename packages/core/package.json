@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./registration/domain/recent-records": {
+      "types": "./lib/registration/domain/recent-records.d.ts",
+      "development": "./src/registration/domain/recent-records.ts",
+      "default": "./lib/registration/domain/recent-records.js"
+    },
+    "./registration/domain/repository-search": {
+      "types": "./lib/registration/domain/repository-search.d.ts",
+      "development": "./src/registration/domain/repository-search.ts",
+      "default": "./lib/registration/domain/repository-search.js"
+    },
     "./daily-hours/domain/daily-hours": {
       "types": "./lib/daily-hours/domain/daily-hours.d.ts",
       "development": "./src/daily-hours/domain/daily-hours.ts",

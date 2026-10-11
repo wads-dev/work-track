@@ -27,4 +27,4 @@ case "$MODE" in
     ;;
   *) echo 'Use verify or export --confirm-synthetic-export' >&2; exit 1 ;;
 esac
-node "$ROOT/scripts/design-demo.mjs" --json | docker run --rm -i --entrypoint sh -e DESIGN_FIXTURE_PRIVATE=1 -e "FIXTURE_COMMAND=$COMMAND" -e "FIXTURE_IMPORT=$IMPORT" -v "$ROOT/scripts:/input/scripts:ro" -v "$MOUNT" pointcontextsaver-firebase:latest -c 'cat > /workspace/demo-seed.json; cp /input/scripts/demo-firebase.json /workspace/firebase.json; firebase emulators:exec --project demo-work-track --only auth,firestore ${FIXTURE_IMPORT:+"$FIXTURE_IMPORT"} "$FIXTURE_COMMAND"'
+node "$ROOT/scripts/design-demo.mjs" --json | docker run --rm -i --entrypoint sh -e DESIGN_FIXTURE_PRIVATE=1 -e "FIXTURE_COMMAND=$COMMAND" -e "FIXTURE_IMPORT=$IMPORT" -v "$ROOT/scripts:/input/scripts:ro" -v "$MOUNT" "${DEMO_FIREBASE_IMAGE:-pointcontextsaver-firebase:latest}" -c 'cat > /workspace/demo-seed.json; cp /input/scripts/demo-firebase.json /workspace/firebase.json; firebase emulators:exec --project demo-work-track --only auth,firestore ${FIXTURE_IMPORT:+"$FIXTURE_IMPORT"} "$FIXTURE_COMMAND"'

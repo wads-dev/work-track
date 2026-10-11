@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./repositories/project-discovery-repository": {
+      "types": "./lib/repositories/project-discovery-repository.d.ts",
+      "development": "./src/repositories/project-discovery-repository.ts",
+      "default": "./lib/repositories/project-discovery-repository.js"
+    },
+    "./repositories/record-edit-plan": {
+      "types": "./lib/repositories/record-edit-plan.d.ts",
+      "development": "./src/repositories/record-edit-plan.ts",
+      "default": "./lib/repositories/record-edit-plan.js"
+    },
     "./repositories/snapshots/personal-report-repository": {
       "types": "./lib/repositories/snapshots/personal-report-repository.d.ts",
       "development": "./src/repositories/snapshots/personal-report-repository.ts",

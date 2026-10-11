@@ -246,6 +246,8 @@ describe('remote MCP OAuth', () => {
         'whoami',
         'get_instructions',
         'search_projects',
+        'search_repository_context',
+        'list_recent_records',
         'create_project',
         'create_topic',
         'register',

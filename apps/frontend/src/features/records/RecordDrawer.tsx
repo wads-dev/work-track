@@ -116,6 +116,11 @@ export function RecordDrawer({
   const currentScope = useRef(uid + '/' + recordId);
   currentScope.current = uid + '/' + recordId;
   const [end, setEnd] = useState('');
+  const [start, setStart] = useState('');
+  const [description, setDescription] = useState('');
+  const [editedTopics, setEditedTopics] = useState<
+    Array<{ topicId: string; percentage?: number; durationMinutes?: number }>
+  >([]);
   const [removeEnd, setRemoveEnd] = useState(false);
   const [reason, setReason] = useState('');
   const [confirmed, setConfirmed] = useState(false);
@@ -159,6 +164,19 @@ export function RecordDrawer({
         setLoading(false);
         if (activeRecord && !editorDirty.current) {
           setEnd(endToLocal(activeRecord.endedAt));
+          setStart(endToLocal(activeRecord.startedAt));
+          setDescription(text(activeRecord.interpretation));
+          setEditedTopics(
+            objects(activeRecord.topics).map((t) => ({
+              topicId: text(t.topicId),
+              ...(typeof t.percentage === 'number'
+                ? { percentage: t.percentage }
+                : {}),
+              ...(typeof t.durationMinutes === 'number'
+                ? { durationMinutes: t.durationMinutes }
+                : {}),
+            })),
+          );
           setConfirmed(false);
         }
       },
@@ -262,11 +280,21 @@ export function RecordDrawer({
     setError('');
     setSuccess('');
     try {
+      const startedAt = localEndToIso(start.trim());
       const endedAt = removeEnd
         ? null
-        : validateEnd(localEndToIso(end.trim()), record.startedAt);
+        : end.trim()
+          ? validateEnd(localEndToIso(end.trim()), startedAt)
+          : null;
       if (!reason.trim()) throw new Error('Informe o motivo da alteração.');
-      const key = JSON.stringify({ recordId, endedAt, reason: reason.trim() });
+      const key = JSON.stringify({
+        recordId,
+        startedAt,
+        interpretation: description,
+        topics: editedTopics,
+        endedAt,
+        reason: reason.trim(),
+      });
       if (intent.current?.key !== key)
         intent.current = {
           key,
@@ -280,6 +308,13 @@ export function RecordDrawer({
         {
           recordId: string;
           endedAt: string | null;
+          startedAt: string;
+          interpretation: string;
+          topics: Array<{
+            topicId: string;
+            percentage?: number;
+            durationMinutes?: number;
+          }>;
           reason: string;
           expectedUpdatedAt: string | null;
           requestId: string;
@@ -289,6 +324,9 @@ export function RecordDrawer({
       const result = await callable({
         recordId,
         endedAt,
+        startedAt,
+        interpretation: description,
+        topics: editedTopics,
         reason: reason.trim(),
         expectedUpdatedAt: currentIntent.expectedUpdatedAt,
         requestId: currentIntent.requestId,
@@ -575,7 +613,63 @@ export function RecordDrawer({
                     }}
                     className="rounded-xl border bg-card p-4 text-card-foreground"
                   >
-                    <h3 className="text-lg font-semibold">Editar fim</h3>
+                    <h3 className="text-lg font-semibold">Editar registro</h3>
+                    <fieldset>
+                      <legend>Tópicos</legend>
+                      {objects(
+                        projects.rows.find((p) => p.id === record.projectId)
+                          ?.data.topics,
+                      )
+                        .filter((t) => !t.archived && !t.mergedIntoTopicId)
+                        .map((t) => (
+                          <label
+                            key={text(t.id)}
+                            className="flex items-center gap-2"
+                          >
+                            <Checkbox
+                              checked={editedTopics.some(
+                                (a) => a.topicId === t.id,
+                              )}
+                              disabled={saving || finishing || moveOpen}
+                              onCheckedChange={(checked) => {
+                                editorDirty.current = true;
+                                setEditedTopics((items) =>
+                                  checked === true
+                                    ? [...items, { topicId: text(t.id) }]
+                                    : items.filter((a) => a.topicId !== t.id),
+                                );
+                                setConfirmed(false);
+                              }}
+                            />
+                            {text(t.title)}
+                          </label>
+                        ))}
+                    </fieldset>
+                    <Label htmlFor="record-edit-start">Início efetivo</Label>
+                    <Input
+                      id="record-edit-start"
+                      type="datetime-local"
+                      value={start}
+                      disabled={saving || finishing || moveOpen}
+                      onChange={(e) => {
+                        editorDirty.current = true;
+                        setStart(e.target.value);
+                        setConfirmed(false);
+                      }}
+                    />
+                    <Label htmlFor="record-edit-description">
+                      Descrição / contexto
+                    </Label>
+                    <Textarea
+                      id="record-edit-description"
+                      value={description}
+                      disabled={saving || finishing || moveOpen}
+                      onChange={(e) => {
+                        editorDirty.current = true;
+                        setDescription(e.target.value);
+                        setConfirmed(false);
+                      }}
+                    />
                     <div className="flex flex-col gap-4">
                       <div className="min-w-0 space-y-2">
                         <Label htmlFor={'RecordDrawer-17410'}>

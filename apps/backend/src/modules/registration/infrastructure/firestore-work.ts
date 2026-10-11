@@ -1,8 +1,13 @@
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
+import { ProjectDiscoveryRepository } from '@work-track/data/repositories/project-discovery-repository';
+import {
+  compactRecentRecords,
+  recentRecordsInput,
+  type RecentRecordsInput,
+} from '@work-track/core/registration/domain/recent-records';
 import {
   assertProjectAccess,
-  canAccessProject,
   effectiveProjectType,
 } from '@work-track/core/registration/domain/project-access';
 import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
@@ -22,21 +27,47 @@ import type {
 import {
   projectInput,
   topicInput,
+  updateTopicInput,
   registerInput,
 } from '@work-track/core/registration/domain/work-model';
 import { normalize } from '@work-track/core/shared/text/normalize';
 export class FirestoreWorkRepository implements WorkRepository {
   constructor(private readonly db: Firestore) {}
-  async listProjects(uid: string): Promise<Project[]> {
-    const snapshot = await this.db.collection('projects').limit(1001).get();
-    if (snapshot.docs.length > 1000)
+  async listRecentRecords(raw: RecentRecordsInput, uid: string) {
+    const input = recentRecordsInput.parse(raw);
+    // Legacy open records may omit endedAt; bounded scan fails explicitly, never asserts absence from partial history.
+    const snapshot = await this.db
+      .collection('users')
+      .doc(uid)
+      .collection('records')
+      .limit(2001)
+      .get();
+    if (snapshot.docs.length > 2000)
       throw new ProjectManagementError(
         'resource-exhausted',
-        'Catálogo excede o limite seguro de consulta.',
+        'Histórico excede orçamento de leitura; não é possível afirmar ausência de tracking.',
       );
-    return snapshot.docs
-      .map((doc) => ({ ...doc.data(), id: doc.id }) as Project)
-      .filter((p) => canAccessProject(p, uid));
+    const projects = await this.listProjects(uid);
+    return compactRecentRecords(
+      snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
+      projects,
+      uid,
+      input,
+    );
+  }
+  async listProjects(uid: string): Promise<Project[]> {
+    const discovery = new ProjectDiscoveryRepository({
+      scanProjects: async (limit) => {
+        const snapshot = await this.db
+          .collection('projects')
+          .limit(limit)
+          .get();
+        return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+      },
+    });
+    return (await discovery.list(uid)).map(
+      (doc) => ({ ...doc.data, id: doc.id }) as Project,
+    );
   }
   async createProject(
     raw: Parameters<WorkRepository['createProject']>[0],
@@ -91,6 +122,68 @@ export class FirestoreWorkRepository implements WorkRepository {
       return project;
     });
   }
+  async updateTopic(
+    raw: Parameters<NonNullable<WorkRepository['updateTopic']>>[0],
+    uid: string,
+  ): Promise<Topic> {
+    const input = updateTopicInput.parse(raw);
+    const ref = this.db.collection('projects').doc(input.projectId);
+    const audit = ref.collection('audit').doc(
+      'topic_' +
+        createHash('sha256')
+          .update(uid + ':' + input.requestId)
+          .digest('hex'),
+    );
+    return this.db.runTransaction(async (tx) => {
+      const snapshot = await tx.get(ref);
+      assertProjectAccess(snapshot.data(), uid);
+      const project = snapshot.data() as Project;
+      assertProjectWritable(project);
+      const previous = await tx.get(audit);
+      if (previous.exists) {
+        const data = previous.data()!;
+        if (data.request !== JSON.stringify(input))
+          throw new Error('requestId já usado.');
+        return data.after as Topic;
+      }
+      const before = project.topics.find((t) => t.id === input.topicId);
+      if (!before || before.archived || before.mergedIntoTopicId)
+        throw new Error('Tópico ativo não encontrado.');
+      const after = {
+        ...before,
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.description !== undefined
+          ? { description: input.description }
+          : {}),
+        ...(input.githubUrl !== undefined
+          ? { githubUrl: input.githubUrl }
+          : {}),
+      };
+      if (
+        project.topics.some(
+          (t) =>
+            t.id !== after.id &&
+            !t.archived &&
+            normalize(t.title) === normalize(after.title),
+        )
+      )
+        throw new Error('Nome de tópico já utilizado.');
+      tx.update(ref, {
+        topics: project.topics.map((t) => (t.id === after.id ? after : t)),
+        updatedBy: uid,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      tx.create(audit, {
+        authorUid: uid,
+        request: JSON.stringify(input),
+        reason: input.reason,
+        before,
+        after,
+        recordedAt: FieldValue.serverTimestamp(),
+      });
+      return after;
+    });
+  }
   async createTopic(
     raw: { projectId: string; title: string; description: string },
     uid: string,
@@ -116,6 +209,9 @@ export class FirestoreWorkRepository implements WorkRepository {
           .slice(0, 32),
         title: input.title,
         description: input.description,
+        ...(input.githubUrl !== undefined
+          ? { githubUrl: input.githubUrl }
+          : {}),
       };
       tx.update(ref, {
         topics: [...project.topics, topic],

@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { metadata } from '../registration/domain/project-management.js';
+import {
+  metadata,
+  githubUrl,
+} from '../registration/domain/project-management.js';
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/);
 const instant = z.iso.datetime({ offset: true });
 export const projectInput = z.object({
@@ -13,10 +16,30 @@ export const projectInput = z.object({
   description: z.string().trim().min(20).max(6000),
 });
 export const topicInput = z.object({
+  githubUrl: githubUrl.nullable().optional(),
   projectId: id,
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().min(5).max(3000),
 });
+export const updateTopicInput = z
+  .object({
+    projectId: id,
+    topicId: id,
+    title: z.string().trim().min(2).max(160).optional(),
+    description: z.string().trim().min(5).max(3000).optional(),
+    githubUrl: githubUrl.nullable().optional(),
+    requestId: id,
+    reason: z.string().trim().min(1).max(1000),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.title !== undefined ||
+      v.description !== undefined ||
+      v.githubUrl !== undefined,
+    'Informe alteração.',
+  );
+export type UpdateTopicInput = z.infer<typeof updateTopicInput>;
 export const registerInput = z
   .object({
     projectId: id,

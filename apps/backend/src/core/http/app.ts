@@ -122,7 +122,7 @@ export function createApp(
         }),
       );
       const uid = req.auth?.extra?.uid;
-      if (repository && typeof uid === 'string')
+      if (repository && typeof uid === 'string' && uid)
         registerWorkTools(
           server,
           repository,
@@ -130,6 +130,7 @@ export function createApp(
           editingRepository,
           managementRepository,
           topicManagementRepository,
+          movementRepository,
         );
       if (dailyHoursRepository && typeof uid === 'string' && uid)
         registerDailyHoursTool(server, dailyHoursRepository, uid);

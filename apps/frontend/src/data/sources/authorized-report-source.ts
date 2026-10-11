@@ -63,6 +63,7 @@ export function subscribeAuthorizedReport(
   requiredProjectIds: readonly string[] = [],
   range?: CalendarQueryRange,
 ): Unsubscribe {
+  // Required IDs come from the shared authorized discovery, including legacy projects without type.
   const parentIds = [...new Set(requiredProjectIds)];
   let disposed = false;
   const catalog = new Map<number, Map<string, ClientReportProject>>(),
@@ -79,6 +80,7 @@ export function subscribeAuthorizedReport(
     >(),
     metadata = new Map<string, { cache: boolean; pending: boolean }>();
   let last: AuthorizedReportRepository | undefined;
+  let lastDataKey = '';
   const stop = () => {
     disposed = true;
     stops.forEach((s) => s());
@@ -157,13 +159,20 @@ export function subscribeAuthorizedReport(
       } else if (!range || !range.projectId || range.projectId === id)
         context.docs.forEach((d) => selected.add(d.ref.path));
     }
-    if (coherent)
+    const dataKey = JSON.stringify([
+      records,
+      [...projects],
+      range ? [...selected].sort() : null,
+    ]);
+    if (coherent && dataKey !== lastDataKey) {
+      lastDataKey = dataKey;
       last = new AuthorizedReportRepository(
         uid,
         records,
         new Map(projects),
         range ? selected : undefined,
       );
+    }
     if (!last) return;
     next({
       repository: last,
@@ -187,9 +196,11 @@ export function subscribeAuthorizedReport(
         )
           current.set(id, p);
     }
+    const catalogChanged =
+      JSON.stringify([...projects]) !== JSON.stringify([...current]);
     projects.clear();
     current.forEach((p, id) => projects.set(id, p)); // Immediately fence revoked projects, even before replacement record listeners converge.
-    if (last)
+    if (last && catalogChanged)
       last = new AuthorizedReportRepository(
         uid,
         last.records,

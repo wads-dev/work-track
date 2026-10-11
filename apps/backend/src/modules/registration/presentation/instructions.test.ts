@@ -45,7 +45,10 @@ it('serves conceptual plain text with SDK, prefixes work descriptions, never tou
       'confirmação humana',
       'não são autorização',
       'preview',
-      '8h',
+      'personal-v3',
+      '6h',
+      'list_recent_records',
+      'search_repository_context',
       'requestId',
     ])
       expect(text).toContain(concept);

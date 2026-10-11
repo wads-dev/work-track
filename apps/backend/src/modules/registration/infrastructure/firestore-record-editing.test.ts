@@ -81,8 +81,8 @@ it('atomically audits edits, preserves immutable fields, and replays the same re
     before: { startedAt: '2026-10-08T10:00:00Z' },
     after: { endedAt: input.endedAt },
   });
-  expect(audit?.before).not.toHaveProperty('originalText');
-  expect(audit?.after).not.toHaveProperty('originalText');
+  expect(audit?.before).toHaveProperty('originalText', 'original evidence');
+  expect(audit?.after).toHaveProperty('originalText', 'original evidence');
   await expect(repo.updateRecord(input, 'alice')).resolves.toEqual(result);
   expect(updates).toBe(1);
   expect(audits).toBe(1);
@@ -119,6 +119,50 @@ it('atomically audits edits, preserves immutable fields, and replays the same re
     originalText: 'original evidence',
     recordedAt: 'original-time',
   });
+  await repo.updateRecord(
+    {
+      recordId: 'record',
+      recordOwnerUid: 'alice',
+      interpretation: 'Correção colaborativa',
+      reason: 'correção',
+      requestId: 'corporate-edit',
+    },
+    'bob',
+  );
+  expect(values.get(recordPath)?.interpretation).toBe('Correção colaborativa');
+  await expect(
+    repo.updateRecord(
+      {
+        recordId: 'record',
+        recordOwnerUid: 'alice',
+        interpretation: 'Correção colaborativa',
+        reason: 'correção',
+        requestId: 'corporate-edit',
+      },
+      'alice',
+    ),
+  ).rejects.toThrow('requestId');
+  expect(values.get(recordPath + '/audit/corporate-edit')).toMatchObject({
+    authorUid: 'bob',
+    before: { uid: 'alice' },
+    after: { uid: 'alice' },
+  });
+  values.set('projects/project', {
+    ...values.get('projects/project'),
+    type: 'personal',
+    createdBy: 'alice',
+  });
+  await expect(
+    repo.updateRecord(
+      {
+        recordId: 'record',
+        recordOwnerUid: 'alice',
+        interpretation: 'não permitido',
+        reason: 'edit',
+      },
+      'bob',
+    ),
+  ).rejects.toThrow('não encontrado');
 });
 
 it('lists nullable and legacy open records but not closed or deleted records', async () => {

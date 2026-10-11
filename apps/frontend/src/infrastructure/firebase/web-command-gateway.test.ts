@@ -14,6 +14,7 @@ vi.mock('./web-work-repository', () => ({
   WebWorkRepository: class {
     archiveProject = mocks.web;
     updateProject = mocks.web;
+    updateTopic = mocks.web;
     updateRecord = mocks.web;
     listTopicMerges = mocks.web;
   },
@@ -50,6 +51,7 @@ it('dispatches exactly six Web names, preserves data envelope, never invokes the
       'moveRecord',
       'updateProject',
       'updateRecord',
+      'updateTopic',
     ].sort(),
   );
   for (const name of webCommandNames) {
@@ -68,7 +70,7 @@ it('dispatches exactly six Web names, preserves data envelope, never invokes the
       data: { ok: true },
     });
   }
-  expect(mocks.web).toHaveBeenCalledTimes(6);
+  expect(mocks.web).toHaveBeenCalledTimes(7);
   expect(mocks.callable).not.toHaveBeenCalled();
 });
 it('leaves moveTopic and remaining backend commands on callable transport', async () => {

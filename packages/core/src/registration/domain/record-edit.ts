@@ -6,6 +6,14 @@ const id = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 export const updateRecordInput = z
   .object({
     recordId: id,
+    recordOwnerUid: id.optional(),
+    acknowledgeSharedDestination: z.boolean().optional(),
+    startedAt: registerInput.shape.startedAt.optional(),
+    timeZone: registerInput.shape.timeZone.optional(),
+    originalText: registerInput.shape.originalText.optional(),
+    interpretation: registerInput.shape.interpretation.optional(),
+    interruptions: registerInput.shape.interruptions,
+    commandAt: registerInput.shape.commandAt,
     requestId: id.optional(),
     endedAt: z.iso.datetime({ offset: true }).nullable().optional(),
     projectId: id.optional(),
@@ -30,7 +38,13 @@ export const updateRecordInput = z
     (value) =>
       value.endedAt !== undefined ||
       value.projectId !== undefined ||
-      value.topics !== undefined,
+      value.topics !== undefined ||
+      value.startedAt !== undefined ||
+      value.timeZone !== undefined ||
+      value.originalText !== undefined ||
+      value.interpretation !== undefined ||
+      value.interruptions !== undefined ||
+      value.commandAt !== undefined,
     'Informe uma alteração.',
   );
 export type UpdateRecordInput = z.infer<typeof updateRecordInput>;
@@ -79,13 +93,14 @@ export function applyRecordPatch(
   project: {
     topics: { id: string; mergedIntoTopicId?: string; archived?: boolean }[];
   },
+  allowCorporateEdit = false,
 ): Record<string, unknown> {
   if (isDeletedRecord(existing))
     throw new RecordEditError(
       'not-found',
       'Registro removido; edição não permitida.',
     );
-  if (existing.uid !== uid)
+  if (existing.uid !== uid && !allowCorporateEdit)
     throw new RecordEditError(
       'permission-denied',
       'Somente o dono pode editar o registro.',
@@ -99,6 +114,16 @@ export function applyRecordPatch(
       'Registro alterado. Recarregue antes de salvar.',
     );
   const after = { ...existing };
+  for (const key of [
+    'startedAt',
+    'timeZone',
+    'originalText',
+    'interpretation',
+    'interruptions',
+    'commandAt',
+  ] as const) {
+    if (input[key] !== undefined) after[key] = input[key];
+  }
   // Firestore stores explicit null; the domain keeps an optional end instant.
   if (after.endedAt === null) delete after.endedAt;
   if (input.endedAt === null) delete after.endedAt;

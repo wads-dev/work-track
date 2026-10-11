@@ -85,9 +85,4 @@ export function registerMovementTools(
     { description, inputSchema: moveTopicInput, annotations },
     (input) => run(() => repository.moveTopic(input, uid)),
   );
-  server.registerTool(
-    'move_record',
-    { description, inputSchema: moveRecordInput, annotations },
-    (input) => run(() => repository.moveRecord(input, uid)),
-  );
 }

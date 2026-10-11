@@ -49,6 +49,33 @@ export function ProjectTopics({
     unknown
   > | null>(null);
   const { revealed } = usePrivacy();
+  const [githubTopic, setGithubTopic] = useState('');
+  const [githubValue, setGithubValue] = useState('');
+  async function saveGithub() {
+    if (!githubTopic || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await createCallable(
+        functions,
+        'updateTopic',
+      )({
+        projectId,
+        topicId: githubTopic,
+        githubUrl: githubValue.trim() || null,
+        reason: 'Atualização de repositório GitHub do tópico',
+        requestId: crypto.randomUUID(),
+      });
+      setGithubTopic('');
+      setMessage('GitHub do tópico atualizado com auditoria.');
+    } catch (failure) {
+      setError(
+        failure instanceof Error ? failure.message : 'Falha ao salvar GitHub.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   const catalog = objects(project.topics);
   const active = catalog.filter((t) => !t.archived && !t.mergedIntoTopicId);
   const [params] = useSearchParams(),
@@ -173,6 +200,34 @@ export function ProjectTopics({
             onClose={() => setMovingTopic(null)}
           />
         )}
+        {githubTopic && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveGithub();
+            }}
+            className="space-y-2"
+          >
+            <Label htmlFor="topic-github">Repositório GitHub do tópico</Label>
+            <Input
+              id="topic-github"
+              value={githubValue}
+              placeholder="https://github.com/owner/repo"
+              onChange={(event) => setGithubValue(event.target.value)}
+              disabled={busy}
+            />
+            <Button disabled={busy} type="submit">
+              Salvar GitHub
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setGithubTopic('')}
+            >
+              Cancelar
+            </Button>
+          </form>
+        )}
         <ul className="space-y-2">
           {catalog.map((t, i) => (
             <li
@@ -201,6 +256,21 @@ export function ProjectTopics({
                     ? ' · arquivado'
                     : ''}
               </div>
+              {!t.archived && !t.mergedIntoTopicId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    setGithubTopic(text(t.id));
+                    setGithubValue(
+                      typeof t.githubUrl === 'string' ? t.githubUrl : '',
+                    );
+                  }}
+                >
+                  GitHub
+                </Button>
+              )}
               {!t.archived && !t.mergedIntoTopicId && (
                 <Button
                   disabled={busy || !!movingTopic}
