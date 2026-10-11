@@ -724,11 +724,7 @@ export function PersonalPage({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={uid}>
-                    <PersonIdentity
-                      uid={uid}
-                      label="Meu calendário"
-                      respectPrivacy={false}
-                    />
+                    <PersonIdentity uid={uid} label="Meu calendário" />
                   </SelectItem>
                   {participants.length > 0 &&
                     (!directory.unavailable ||
@@ -739,21 +735,14 @@ export function PersonalPage({
                     .filter((p) => p.uid !== uid)
                     .map((p) => (
                       <SelectItem key={p.uid} value={p.uid}>
-                        <PersonIdentity
-                          uid={p.uid}
-                          fallback={p.label}
-                          respectPrivacy={false}
-                        />
+                        <PersonIdentity uid={p.uid} fallback={p.label} />
                       </SelectItem>
                     ))}
                   {person.selected !== uid &&
                     person.selected !== 'all' &&
                     !participants.some((p) => p.uid === person.selected) && (
                       <SelectItem value={person.selected}>
-                        <PersonIdentity
-                          uid={person.selected}
-                          respectPrivacy={false}
-                        />
+                        <PersonIdentity uid={person.selected} />
                       </SelectItem>
                     )}
                 </SelectContent>
@@ -1241,10 +1230,7 @@ export function PersonalPage({
                                         {person.selected === 'all' &&
                                           item.uid && (
                                             <>
-                                              <PersonIdentity
-                                                uid={item.uid}
-                                                respectPrivacy={false}
-                                              />
+                                              <PersonIdentity uid={item.uid} />
                                               {' · '}
                                             </>
                                           )}
@@ -1355,10 +1341,7 @@ export function PersonalPage({
                                         {person.selected === 'all' &&
                                           item.uid && (
                                             <>
-                                              <PersonIdentity
-                                                uid={item.uid}
-                                                respectPrivacy={false}
-                                              />
+                                              <PersonIdentity uid={item.uid} />
                                               {' · '}
                                             </>
                                           )}

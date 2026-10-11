@@ -1,5 +1,11 @@
 # Instruções para agentes — Work Track
 
+## Confidencialidade: somente projetos
+
+- **Projeto pode ser confidencial; pessoa não é confidencial.** O modo de ocultar dados confidenciais mascara o conteúdo dos projetos marcados como confidenciais e os dados de tópicos/registros vinculados a eles, nunca o diretório de pessoas ou a identidade das pessoas (nome, e-mail, ID e foto).
+- A tela Pessoas, sua busca, contagem e estados de carregamento/erro/vazio devem continuar disponíveis em ambos os modos. Não condicione identidade ou diretório a `PrivacyContext`/`revealed`.
+- Confidencialidade é apresentação, não autorização: mantenha autenticação corporativa, isolamento de contas e ACLs de projetos/registros. Mostrar uma pessoa não concede acesso às suas atividades.
+
 ## Isolamento obrigatório
 
 - Correções de bugs e features devem ser feitas em uma **Git worktree separada**, com branch própria baseada no estado relevante de origin/main. Nunca misture alterações pendentes do checkout principal.

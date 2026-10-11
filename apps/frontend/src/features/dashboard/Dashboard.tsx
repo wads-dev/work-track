@@ -1,3 +1,4 @@
+import { CompactListToolbar } from '../../shared/ui/CompactListToolbar';
 import { useOwnRecords } from '../records/hooks/useOwnRecords';
 import { filterRecords, recordPage } from '../records/record-filters';
 import {
@@ -498,26 +499,26 @@ export function Dashboard({
     >
       {mode === 'projects' && (
         <div>
-          <section
-            aria-label="Filtros de projetos"
-            className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center"
-          >
-            <Tabs
-              value={projectScope}
-              onValueChange={(value) => updateFilter('scope', value)}
-              className="min-w-0 shrink-0"
-            >
-              <TabsList
-                aria-label="Acesso aos projetos"
-                className="h-9 w-full sm:w-auto"
+          <CompactListToolbar
+            label="Filtros de projetos"
+            leading={
+              <Tabs
+                value={projectScope}
+                onValueChange={(value) => updateFilter('scope', value)}
+                className="min-w-0 shrink-0"
               >
-                <TabsTrigger value="work">Compartilhados</TabsTrigger>
-                <TabsTrigger value="personal">
-                  Meus projetos pessoais
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <div className="flex min-w-0 items-center gap-2 lg:flex-1">
+                <TabsList
+                  aria-label="Acesso aos projetos"
+                  className="h-9 w-full sm:w-auto"
+                >
+                  <TabsTrigger value="work">Compartilhados</TabsTrigger>
+                  <TabsTrigger value="personal">
+                    Meus projetos pessoais
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            }
+            filters={
               <Select
                 value={archiveFilter || 'all'}
                 onValueChange={(value) => updateFilter('status', value)}
@@ -534,32 +535,17 @@ export function Dashboard({
                   <SelectItem value="all">Todos</SelectItem>
                 </SelectContent>
               </Select>
-              <Input
-                aria-label="Pesquisar projetos"
-                placeholder="Pesquisar projetos…"
-                className="min-w-0 flex-1"
-                value={filter}
-                onChange={(event) => updateFilter('q', event.target.value)}
-              />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-9 shrink-0"
-                    aria-label="Limpar filtros"
-                    onClick={() => {
-                      setLocalFilter('');
-                      setParams(clearProjectFilters(params));
-                    }}
-                  >
-                    <UiIcon kind="refresh" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Limpar filtros</TooltipContent>
-              </Tooltip>
-            </div>
-          </section>
+            }
+            searchLabel="Pesquisar projetos"
+            searchPlaceholder="Pesquisar projetos…"
+            search={filter}
+            onSearchChange={(value) => updateFilter('q', value)}
+            actionLabel="Limpar filtros"
+            onAction={() => {
+              setLocalFilter('');
+              setParams(clearProjectFilters(params));
+            }}
+          />
           <ProjectCreate
             functions={functions}
             onCreated={(id, type) =>

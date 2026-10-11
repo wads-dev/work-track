@@ -29,7 +29,7 @@ describe('person identity', () => {
   it('keeps calendar people visible when project confidentiality is enabled', () => {
     const html = renderToStaticMarkup(
       <PrivacyContext.Provider value={{ revealed: false }}>
-        <PersonIdentity uid="user-id" respectPrivacy={false} />
+        <PersonIdentity uid="user-id" />
       </PrivacyContext.Provider>,
     );
     expect(html).toContain('Ana Silva');
@@ -57,9 +57,11 @@ describe('person identity', () => {
     expect(html).toContain('Meu calendário');
     expect(html).toContain('https://example.org/ana.jpg');
   });
-  it('does not expose name, photo or UID in privacy mode', () => {
+  it('keeps person identity unchanged when confidential projects are hidden', () => {
     const html = render('user-id', false);
-    expect(html).toBe('<span>Pessoa</span>');
+    expect(html).toBe(render('user-id', true));
+    expect(html).toContain('Ana Silva');
+    expect(html).toContain('https://example.org/ana.jpg');
   });
   it('never uses raw UID or Você as fallback', () => {
     expect(render('unknown-id')).not.toContain('unknown-id');

@@ -18,13 +18,13 @@ Cada chamada lê uma página Firebase Auth, filtrada depois da leitura. Uma pág
 
 ## Interface
 
-Provider autenticado em memória, isolado por uid; sem persistência em localStorage. Reutilizado pela aba Pessoas, cabeçalho do perfil e rótulos/seletor do Calendário. O diretório não concede acesso a registros de terceiros: as regras existentes continuam aplicáveis. A aba oferece busca por nome/e-mail/ID, atualização, estados de carregamento/erro/vazio e avatar substituto. O modo de privacidade oculta os dados. Fotos aceitam somente HTTPS, usam referrerPolicy no-referrer e fallback em caso de erro.
+Provider autenticado em memória, isolado por uid; sem persistência em localStorage. Reutilizado pela aba Pessoas, cabeçalho do perfil e rótulos/seletor do Calendário. O diretório não concede acesso a registros de terceiros: as regras existentes continuam aplicáveis. A aba reutiliza CompactListToolbar da tela Projetos: uma barra concisa com busca por nome/e-mail/ID e atualização por ícone com nome acessível e tooltip, sem cabeçalho/cartão introdutório duplicado. O título Pessoas aparece no cabeçalho global. Mantém estados de carregamento/erro/vazio, contagem e avatar substituto. A confidencialidade pertence somente ao projeto, nunca à pessoa. O modo de ocultar dados confidenciais não oculta nem filtra o diretório: nomes, e-mails, IDs, fotos, busca, contagem e estados de carregamento/erro/vazio continuam disponíveis. Apenas o conteúdo de projetos confidenciais e de seus tópicos/registros é mascarado; autenticação e autorização não mudam. Fotos aceitam somente HTTPS, usam referrerPolicy no-referrer e fallback em caso de erro.
 
 ## Identidade reutilizável e Calendário
 
 PersonIdentity recebe apenas uid e resolve nome/foto pelo provider global, carregado uma vez após login e mantido entre rotas. Não há consultas de perfil por linha. label opcional permite manter “Meu calendário” com a foto própria. Ausência de foto usa iniciais; ausência de conta usa rótulo neutro, nunca UID bruto ou “Você”. Nome ausente usa e-mail. Imagens são decorativas ao lado do nome, HTTPS e sem referrer.
 
-Dashboard/gráficos (eixo, tooltip e legenda), relatórios de projeto/tópico, perfil, tabela de participantes e eventos/filtro do Calendário usam essa identidade. Dados mascarados não enviam UID ao gráfico/componente e não revelam fotos.
+Dashboard/gráficos (eixo, tooltip e legenda), relatórios de projeto/tópico, perfil, tabela de participantes e eventos/filtro do Calendário usam essa identidade. PersonIdentity não depende do modo de confidencialidade e não precisa de exceções por tela. O mascaramento de conteúdo de projetos não deve ser aplicado à identidade das pessoas; isso não concede acesso a atividades não autorizadas.
 
 “Todas as pessoas” não tem teto de quantidade de participantes: foram removidos os limites de dez selecionados e de cem participantes do diretório do relatório. Mantêm-se limites de documentos/bytes e duração de leitura para segurança; excesso resulta em erro explícito, nunca truncamento silencioso. O diretório Firebase permanece paginado, sem limite total de pessoas.
 

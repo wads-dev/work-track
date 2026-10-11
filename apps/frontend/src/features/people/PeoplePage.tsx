@@ -1,49 +1,32 @@
-import { useContext, useState } from 'react';
-import { PageHeader } from '../../shared/ui/PageHeader';
+import { useState } from 'react';
+import { CompactListToolbar } from '../../shared/ui/CompactListToolbar';
 import { useCompanyPeople } from './CompanyPeopleContext';
 import { personName } from './company-people';
 import { PersonIdentity } from './PersonIdentity';
-import { PrivacyContext } from '../../shared/ui/privacy';
 import { matchesFilter } from '../../app/routes';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 
 export function PeoplePage() {
   const { people, loading, error, refresh } = useCompanyPeople();
-  const { revealed } = useContext(PrivacyContext);
   const [filter, setFilter] = useState('');
   const visible = people.filter((person) =>
     matchesFilter([personName(person), person.email, person.uid], filter),
   );
   return (
     <>
-      <PageHeader
-        title="Pessoas"
-        context="Diretório da empresa: contas Google verificadas @wads.dev, incluindo pessoas sem registros de trabalho."
-        actions={
-          <Button variant="outline" onClick={refresh} disabled={loading}>
-            Atualizar
-          </Button>
-        }
-      >
-        {revealed && (
-          <Input
-            className="mt-4"
-            aria-label="Buscar pessoas por nome, e-mail ou ID"
-            placeholder="Buscar por nome, e-mail ou ID"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-          />
-        )}
-      </PageHeader>
-      {!revealed ? (
-        <p role="status">
-          Dados das pessoas ocultos pelo modo de privacidade. Ative a exibição
-          de conteúdo para consultar o diretório.
-        </p>
-      ) : loading ? (
+      <CompactListToolbar
+        label="Filtros de pessoas"
+        searchLabel="Buscar pessoas por nome, e-mail ou ID"
+        searchPlaceholder="Pesquisar pessoas por nome, e-mail ou ID…"
+        search={filter}
+        onSearchChange={setFilter}
+        actionLabel="Atualizar pessoas"
+        onAction={refresh}
+        disabled={loading}
+      />
+      {loading ? (
         <p role="status">Carregando pessoas…</p>
       ) : error ? (
         <Alert variant="destructive">
