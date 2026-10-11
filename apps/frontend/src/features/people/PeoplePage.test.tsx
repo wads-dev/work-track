@@ -6,6 +6,7 @@ import {
   safeRecord,
 } from '../../shared/ui/privacy';
 import { PeoplePage } from './PeoplePage';
+import { TooltipProvider } from '../../components/ui/tooltip';
 
 const directory = vi.hoisted(() => ({
   people: [
@@ -36,7 +37,9 @@ vi.mock('./CompanyPeopleContext', () => ({
 const render = (revealed = false) =>
   renderToStaticMarkup(
     <PrivacyContext.Provider value={{ revealed }}>
-      <PeoplePage />
+      <TooltipProvider>
+        <PeoplePage />
+      </TooltipProvider>
     </PrivacyContext.Provider>,
   );
 beforeEach(() => {
@@ -57,11 +60,28 @@ it('keeps the full directory, identities, count and search visible in both confi
     'https://example.org/ana.jpg',
     '2 de 2 pessoas',
     'Buscar pessoas por nome, e-mail ou ID',
-    'Atualizar',
+    'Atualizar pessoas',
   ]) {
     expect(html).toContain(value);
   }
   expect(html).not.toContain('Dados das pessoas ocultos');
+});
+
+it('uses a compact search row and an accessible icon-only refresh button', () => {
+  const html = render();
+  expect(html).toContain('aria-label="Filtros de pessoas"');
+  expect(html).toContain(
+    'placeholder="Pesquisar pessoas por nome, e-mail ou ID…"',
+  );
+  expect(html).toContain('aria-label="Atualizar pessoas"');
+  expect(html).toContain('lucide-refresh-cw');
+  expect(html).not.toContain('Diretório da empresa:');
+  expect(html).not.toContain('<h1');
+  expect(html).not.toContain('>Atualizar</button>');
+  directory.loading = true;
+  expect(render()).toMatch(
+    /<button[^>]*aria-label="Atualizar pessoas"[^>]*disabled=""/,
+  );
 });
 
 it('still masks confidential project and record content without masking people', () => {

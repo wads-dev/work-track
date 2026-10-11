@@ -329,17 +329,19 @@ function App() {
                 </span>
                 {location.pathname.startsWith('/projects')
                   ? 'Projetos'
-                  : location.pathname.startsWith('/records')
-                    ? 'Meus registros'
-                    : location.pathname === '/calendar'
-                      ? 'Calendário'
-                      : location.pathname === '/pending'
-                        ? 'Pendências'
-                        : location.pathname === '/rules'
-                          ? 'Regras'
-                          : location.pathname === '/me'
-                            ? 'Meu relatório'
-                            : 'Dashboard'}
+                  : location.pathname.startsWith('/people')
+                    ? 'Pessoas'
+                    : location.pathname.startsWith('/records')
+                      ? 'Meus registros'
+                      : location.pathname === '/calendar'
+                        ? 'Calendário'
+                        : location.pathname === '/pending'
+                          ? 'Pendências'
+                          : location.pathname === '/rules'
+                            ? 'Regras'
+                            : location.pathname === '/me'
+                              ? 'Meu relatório'
+                              : 'Dashboard'}
               </h1>
               {toggleTheme}
               <PendingBell db={services.db} uid={user.uid} />
