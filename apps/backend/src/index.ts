@@ -4,8 +4,6 @@ import { listCompanyPeopleHandler } from './modules/people/presentation/list-com
 import { FirestoreMergeRepository } from './modules/merge/infrastructure/firestore-merge.js';
 import { FirestoreTopicReportRepository } from './modules/reports/infrastructure/firestore-topic-report.js';
 import { getTopicReportHandler } from './modules/reports/presentation/get-topic-report.js';
-import { FirestoreCalendarReportRepository } from './modules/reports/infrastructure/firestore-calendar-report.js';
-import { getCalendarReportHandler } from './modules/reports/presentation/get-calendar-report.js';
 import { FirestoreRecordMovementRepository } from './modules/registration/infrastructure/firestore-record-movement.js';
 import { movementHandler } from './modules/registration/presentation/record-movement.js';
 import { changeProjectScopeHandler } from './modules/registration/presentation/change-project-scope.js';
@@ -13,14 +11,9 @@ import { FirestoreProjectScopeRepository } from './modules/registration/infrastr
 import { FirestoreRemovalRepository } from './modules/removal/infrastructure/firestore-removal.js';
 import { FirestoreSplitRepository } from './modules/split/infrastructure/firestore-split.js';
 import { FirestoreDailyHoursRepository } from './modules/daily-hours/infrastructure/firestore-daily-hours.js';
-import { getCompanyReportHandler } from './modules/reports/presentation/get-company-report.js';
-import { FirestoreCompanyReportRepository } from './modules/reports/infrastructure/firestore-company-report.js';
-import { getPersonalReportHandler } from './modules/reports/presentation/get-personal-report.js';
-import { FirestorePersonalReportRepository } from './modules/reports/infrastructure/firestore-personal-report.js';
 import { manageProjectHandler } from './modules/registration/presentation/manage-projects.js';
 import { FirestoreTopicManagementRepository } from './modules/registration/infrastructure/firestore-topic-management.js';
 import { manageTopicsHandler } from './modules/registration/presentation/manage-topics.js';
-import { listProjectsHandler } from './modules/registration/presentation/list-projects.js';
 import { createProjectHandler } from './modules/registration/presentation/create-project.js';
 import { FirestoreProjectManagementRepository } from './modules/registration/infrastructure/firestore-project-management.js';
 import { updateRecordHandler } from './modules/registration/presentation/update-record.js';
@@ -28,9 +21,7 @@ import { FirestoreRecordEditingRepository } from './modules/registration/infrast
 import { getAuth } from 'firebase-admin/auth';
 import { FirestorePauseRepository } from './modules/pause/infrastructure/firestore-pause.js';
 import { getFirestore } from 'firebase-admin/firestore';
-import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
-import { getProjectReportHandler } from './modules/reports/presentation/get-project-report.js';
-import { FirestoreProjectReportRepository } from './modules/reports/infrastructure/firestore-project-report.js';
+import { onCall, onRequest } from 'firebase-functions/v2/https';
 import { getHealth } from './core/health/health.js';
 import { createApp } from './core/http/app.js';
 import { WorkTrackOAuth } from './core/auth/application/oauth-provider.js';
@@ -105,21 +96,6 @@ export const getTopicReport = onCall(
       request.auth,
     ),
 );
-export const getCalendarReport = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    getCalendarReportHandler(
-      new FirestoreCalendarReportRepository(getFirestore(), getAuth()),
-      request.data as unknown,
-      request.auth,
-    ),
-);
 export const moveTopic = onCall(
   {
     region: 'southamerica-east1',
@@ -170,21 +146,6 @@ export const changeProjectScope = onCall(
       request.auth,
     ),
 );
-export const getCompanyReport = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    getCompanyReportHandler(
-      new FirestoreCompanyReportRepository(getFirestore(), getAuth()),
-      request.data as unknown,
-      request.auth,
-    ),
-);
 export const archiveProject = onCall(
   {
     region: 'southamerica-east1',
@@ -197,21 +158,6 @@ export const archiveProject = onCall(
     manageProjectHandler(
       new FirestoreProjectManagementRepository(getFirestore()),
       'archive',
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const getPersonalReport = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    getPersonalReportHandler(
-      new FirestorePersonalReportRepository(getFirestore()),
       request.data as unknown,
       request.auth,
     ),
@@ -263,37 +209,12 @@ export const updateRecord = onCall(
       request.auth,
     ),
 );
-export const getProjectReport = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  async (request) => {
-    try {
-      return await getProjectReportHandler(
-        new FirestoreProjectReportRepository(getFirestore(), getAuth()),
-        request.data as unknown,
-        request.auth,
-      );
-    } catch (error) {
-      if (error instanceof HttpsError) throw error;
-      console.error('Project report failed');
-      throw new HttpsError(
-        'internal',
-        'Não foi possível consultar o relatório.',
-      );
-    }
-  },
-);
 const provider = new WorkTrackOAuth(
   new FirestoreOAuthStore(getFirestore()),
   new FirebaseIdentityService(getAuth()),
   'https://wadsworktrack.web.app',
 );
-export const api = onRequest(
+export const mcp = onRequest(
   {
     region: 'southamerica-east1',
     invoker: 'public',
@@ -315,6 +236,8 @@ export const api = onRequest(
     new FirestoreMergeRepository(getFirestore()),
   ),
 );
+// Transitional export: retire api only after Hosting has switched to mcp.
+export const api = mcp;
 export const createProject = onCall(
   {
     region: 'southamerica-east1',
@@ -325,21 +248,6 @@ export const createProject = onCall(
   },
   (request) =>
     createProjectHandler(
-      new FirestoreWorkRepository(getFirestore()),
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const listProjects = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    listProjectsHandler(
       new FirestoreWorkRepository(getFirestore()),
       request.data as unknown,
       request.auth,

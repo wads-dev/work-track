@@ -52,4 +52,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PUSH_BEFORE: ${{ github.event.before }}
         run: node scripts/wait-firestore-deploy.mjs
+      - name: Wait for the renamed MCP function before switching Hosting
+        timeout-minutes: 11
+        run: |
+          for attempt in $(seq 1 40); do
+            state=$(gcloud functions describe mcp --gen2 --region=southamerica-east1 --project=wadsworktrack --format='value(state)' 2>/dev/null || true)
+            if [ "$state" = "ACTIVE" ]; then exit 0; fi
+            sleep 15
+          done
+          echo "mcp is not ACTIVE; preserving current Hosting routes."
+          exit 1
       - run: npx -y firebase-tools@latest deploy --only hosting --project wadsworktrack --non-interactive

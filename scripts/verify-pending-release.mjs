@@ -79,10 +79,6 @@ try {
   await transport.close();
 }
 for (const name of [
-  'listProjects',
-  'getPersonalReport',
-  'getCompanyReport',
-  'getProjectReport',
   'createProject',
   'mergeProjects',
   'mergeTopics',

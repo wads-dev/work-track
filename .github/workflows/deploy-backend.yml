@@ -34,4 +34,7 @@ jobs:
         with:
           workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
           service_account: github-deploy@wadsworktrack.iam.gserviceaccount.com
+      # Explicit, reviewed retirement list. Never force a full deploy's implicit deletions.
+      - name: Retire the five unused frontend callables
+        run: node scripts/retire-unused-callables.mjs --execute
       - run: npx -y firebase-tools@latest deploy --only functions --project wadsworktrack --non-interactive
