@@ -155,13 +155,12 @@ export function PersonalPage({
     calendar &&
     person.mode === 'global' &&
     !!projectId &&
-    (!projects.rows.some((p) => p.id === projectId) ||
-      isHidden(projects.rows.find((p) => p.id === projectId)?.data, revealed));
+    !projects.rows.some((p) => p.id === projectId);
   let validated: ReturnType<typeof range> | null = null;
   let invalid = '';
   let view: View = 'day';
   try {
-    if (!['day', 'week', 'month'].includes(rawView))
+    if (!['day', 'three-days', 'week', 'month'].includes(rawView))
       throw new Error('Visualização inválida.');
     if (!['supercompact', 'compact', 'timeline'].includes(density))
       throw new Error('Densidade inválida.');
@@ -170,7 +169,15 @@ export function PersonalPage({
       throw new Error(
         'Selecione um projeto para consultar todas as semanas com atividade.',
       );
-    if (subject && (!projectId || !topics.some((t) => t.id === subject)))
+    if (
+      subject &&
+      (!projectId ||
+        !calendarTopics(
+          projects.rows.find((p) => p.id === projectId)?.data,
+          true,
+          includeArchived,
+        ).some((t) => t.id === subject))
+    )
       throw new Error('Selecione um tópico disponível no projeto escolhido.');
     validated =
       calendar && !allWeeks
@@ -217,19 +224,20 @@ export function PersonalPage({
           label: companyPeople.name(person.uid) || person.label,
         }))
       : [];
-  const participants = revealed
-    ? [
-        ...new Map(
-          [
-            ...scopedParticipants,
-            ...companyPeople.people.map((person) => ({
-              uid: person.uid,
-              label: companyPeople.name(person.uid) || person.email,
-            })),
-          ].map((person) => [person.uid, person]),
-        ).values(),
-      ]
-    : [];
+  const participants =
+    calendar || revealed
+      ? [
+          ...new Map(
+            [
+              ...scopedParticipants,
+              ...companyPeople.people.map((person) => ({
+                uid: person.uid,
+                label: companyPeople.name(person.uid) || person.email,
+              })),
+            ].map((person) => [person.uid, person]),
+          ).values(),
+        ]
+      : [];
   const [reportQuery, setReportQuery] = useState('');
   const queryIdentity = JSON.stringify([
     calendar,
@@ -674,9 +682,15 @@ export function PersonalPage({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {['day', 'week', 'month'].map((v) => (
+                  {['day', 'three-days', 'week', 'month'].map((v) => (
                     <SelectItem key={v} value={v}>
-                      {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Dia'}
+                      {v === 'month'
+                        ? 'Mês'
+                        : v === 'week'
+                          ? 'Semana'
+                          : v === 'three-days'
+                            ? 'Últimos três dias'
+                            : 'Dia'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -703,7 +717,11 @@ export function PersonalPage({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={uid}>
-                    <PersonIdentity uid={uid} label="Meu calendário" />
+                    <PersonIdentity
+                      uid={uid}
+                      label="Meu calendário"
+                      respectPrivacy={false}
+                    />
                   </SelectItem>
                   {participants.length > 0 &&
                     (!directory.unavailable ||
@@ -714,14 +732,21 @@ export function PersonalPage({
                     .filter((p) => p.uid !== uid)
                     .map((p) => (
                       <SelectItem key={p.uid} value={p.uid}>
-                        <PersonIdentity uid={p.uid} fallback={p.label} />
+                        <PersonIdentity
+                          uid={p.uid}
+                          fallback={p.label}
+                          respectPrivacy={false}
+                        />
                       </SelectItem>
                     ))}
                   {person.selected !== uid &&
                     person.selected !== 'all' &&
                     !participants.some((p) => p.uid === person.selected) && (
                       <SelectItem value={person.selected}>
-                        <PersonIdentity uid={person.selected} />
+                        <PersonIdentity
+                          uid={person.selected}
+                          respectPrivacy={false}
+                        />
                       </SelectItem>
                     )}
                 </SelectContent>
@@ -1024,12 +1049,7 @@ export function PersonalPage({
             )}
             {calendar && allWeeks && (
               <CalendarHistory
-                detailsAvailable={(id) =>
-                  !isHidden(
-                    projects.rows.find((row) => row.id === id)?.data,
-                    revealed,
-                  )
-                }
+                showPeople={person.selected === 'all'}
                 weeks={report.occupiedWeeks ?? []}
                 occurrences={report.weekOccurrences ?? []}
                 items={report.intervals}
@@ -1047,12 +1067,7 @@ export function PersonalPage({
             )}
             {calendar && !allWeeks && density === 'timeline' && (
               <CalendarTimeline
-                detailsAvailable={(id) =>
-                  !isHidden(
-                    projects.rows.find((row) => row.id === id)?.data,
-                    revealed,
-                  )
-                }
+                showPeople={person.selected === 'all'}
                 items={report.intervals}
                 day={selected}
                 view={view}
@@ -1073,7 +1088,11 @@ export function PersonalPage({
                 className={cn(
                   'grid gap-1 sm:gap-2 [&>*]:min-w-0 [&>*]:overflow-hidden',
                   view === 'month' ? 'grid-cols-7' : 'grid-cols-1',
-                  view === 'day' ? 'sm:grid-cols-1' : 'sm:grid-cols-7',
+                  view === 'day'
+                    ? 'sm:grid-cols-1'
+                    : view === 'three-days'
+                      ? 'sm:grid-cols-3'
+                      : 'sm:grid-cols-7',
                 )}
               >
                 {calendarDays(selected, view).map((day) => {
@@ -1193,16 +1212,13 @@ export function PersonalPage({
                                             ),
                                           ),
                                         )}{' '}
-                                        {item.uid &&
-                                          !isHidden(
-                                            projects.rows.find(
-                                              (row) =>
-                                                row.id === item.projectId,
-                                            )?.data,
-                                            revealed,
-                                          ) && (
+                                        {person.selected === 'all' &&
+                                          item.uid && (
                                             <>
-                                              <PersonIdentity uid={item.uid} />
+                                              <PersonIdentity
+                                                uid={item.uid}
+                                                respectPrivacy={false}
+                                              />
                                               {' · '}
                                             </>
                                           )}
@@ -1281,16 +1297,13 @@ export function PersonalPage({
                                             ),
                                           ),
                                         )}{' '}
-                                        {item.uid &&
-                                          !isHidden(
-                                            projects.rows.find(
-                                              (row) =>
-                                                row.id === item.projectId,
-                                            )?.data,
-                                            revealed,
-                                          ) && (
+                                        {person.selected === 'all' &&
+                                          item.uid && (
                                             <>
-                                              <PersonIdentity uid={item.uid} />
+                                              <PersonIdentity
+                                                uid={item.uid}
+                                                respectPrivacy={false}
+                                              />
                                               {' · '}
                                             </>
                                           )}

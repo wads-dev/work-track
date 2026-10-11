@@ -8,16 +8,18 @@ export function PersonIdentity({
   fallback,
   label,
   avatarOnly = false,
+  respectPrivacy = true,
 }: {
   uid?: string;
   fallback?: string;
   label?: string;
   avatarOnly?: boolean;
+  respectPrivacy?: boolean;
 }) {
   const directory = useCompanyPeople();
   const { revealed } = usePrivacy();
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
-  if (!revealed) return <span>Pessoa</span>;
+  if (respectPrivacy && !revealed) return <span>Pessoa</span>;
   const identity = resolvePersonIdentity(
     directory.person(uid || ''),
     fallback,

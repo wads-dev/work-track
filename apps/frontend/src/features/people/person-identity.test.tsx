@@ -26,6 +26,15 @@ const render = (uid = 'user-id', revealed = true, label?: string) =>
     </PrivacyContext.Provider>,
   );
 describe('person identity', () => {
+  it('keeps calendar people visible when project confidentiality is enabled', () => {
+    const html = renderToStaticMarkup(
+      <PrivacyContext.Provider value={{ revealed: false }}>
+        <PersonIdentity uid="user-id" respectPrivacy={false} />
+      </PrivacyContext.Provider>,
+    );
+    expect(html).toContain('Ana Silva');
+    expect(html).toContain('https://example.org/ana.jpg');
+  });
   it('avatar-only mode retains the accessible name without visible text', () => {
     const html = renderToStaticMarkup(
       <PrivacyContext.Provider value={{ revealed: true }}>

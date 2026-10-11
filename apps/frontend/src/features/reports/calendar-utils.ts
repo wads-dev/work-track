@@ -1,4 +1,4 @@
-export type View = 'day' | 'week' | 'month';
+export type View = 'day' | 'three-days' | 'week' | 'month';
 export function validZone(value: string) {
   try {
     new Intl.DateTimeFormat('en', { timeZone: value }).format();
@@ -65,6 +65,10 @@ export function range(day: string, view: View, zone: string) {
   const date = parseDay(day);
   let first = day,
     count = 1;
+  if (view === 'three-days') {
+    first = addDays(day, -2);
+    count = 3;
+  }
   if (view === 'week') {
     first = addDays(day, -((date.getUTCDay() + 6) % 7));
     count = 7;
@@ -112,7 +116,10 @@ export function customRange(first: string, last: string, zone: string) {
 }
 export function moveReference(day: string, view: View, direction: number) {
   if (view !== 'month')
-    return addDays(day, direction * (view === 'week' ? 7 : 1));
+    return addDays(
+      day,
+      direction * (view === 'week' ? 7 : view === 'three-days' ? 3 : 1),
+    );
   const d = parseDay(day);
   return new Date(
     Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + direction, 1, 12),
