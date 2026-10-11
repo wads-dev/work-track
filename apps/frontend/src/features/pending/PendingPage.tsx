@@ -123,6 +123,7 @@ export function PendingPage({
   const recordId = params.get('record');
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fromCache, setFromCache] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const projects = useProjects(functions, uid);
@@ -130,6 +131,7 @@ export function PendingPage({
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setFromCache(true);
     setError('');
     setRows([]);
     const stop = subscribeAuthorizedOwnRecords(
@@ -138,6 +140,7 @@ export function PendingPage({
       (page) => {
         if (!active) return;
         setRows(page.rows.filter((r) => !isDeletedRecord(r.data)));
+        setFromCache(page.fromCache);
         setLoading(false);
       },
       () => {
@@ -193,6 +196,14 @@ export function PendingPage({
         </Alert>
       ) : (
         <>
+          {fromCache && (
+            <Alert>
+              <AlertDescription>
+                Dados locais provisórios. Aguarde a sincronização para confirmar
+                todas as pendências.
+              </AlertDescription>
+            </Alert>
+          )}
           <p className={cn('text-base')}>
             {open.length}{' '}
             {open.length === 1
@@ -202,7 +213,9 @@ export function PendingPage({
           {open.length === 0 ? (
             <Alert>
               <AlertDescription>
-                Tudo em dia. Você não tem registros sem finalização.
+                {fromCache
+                  ? 'Ainda não há pendências no cache local; o resultado não está confirmado.'
+                  : 'Tudo em dia. Você não tem registros sem finalização.'}
               </AlertDescription>
             </Alert>
           ) : (

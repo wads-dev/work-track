@@ -12,6 +12,7 @@ export default tseslint.config(
       '.npm-cache/**',
       '.firebase/**',
       '.release/**',
+      '.release-check/**',
       '.firebase-cli/**',
       '.agents/**',
     ],
@@ -75,7 +76,10 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    languageOptions: { globals: globals.node },
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: { tsconfigRootDir: import.meta.dirname },
+    },
     rules: { eqeqeq: ['error', 'always'] },
   },
   {

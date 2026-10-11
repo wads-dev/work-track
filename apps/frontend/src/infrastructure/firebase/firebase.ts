@@ -5,7 +5,12 @@ import {
   getAuth,
   setPersistence,
 } from 'firebase/auth';
-import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import {
+  connectFirestoreEmulator,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 
 export function emulatorMode(projectId: string, hostname: string): boolean {
@@ -40,7 +45,13 @@ export async function initializeServices() {
   );
   const app = initializeApp(config as FirebaseOptions, 'work-track-dashboard');
   const auth = getAuth(app);
-  const db = getFirestore(app);
+  // Keep queried documents in IndexedDB across reloads; coordinate the cache across tabs.
+  // SDK handles unsupported/unavailable persistence; auth and snapshot freshness stay separate.
+  const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
   const functions = getFunctions(app, 'southamerica-east1');
   if (emulator) {
     const ports =

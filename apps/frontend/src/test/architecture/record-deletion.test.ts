@@ -1,5 +1,11 @@
 import { it, expect, vi } from 'vitest';
-import type { Firestore } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  type Firestore,
+} from 'firebase/firestore';
 const recordListeners = vi.hoisted(
   () =>
     [] as {
@@ -36,6 +42,7 @@ import {
 } from '../../data/sources/authorized-own-record-source';
 import { deletionAccount } from '../../data/cache/record-deletion';
 import { projectRepository } from '../../data/cache/project-repository';
+import * as projectSource from '../../data/sources/authorized-project-source';
 import { readFileSync } from 'node:fs';
 import {
   isDeletedRecord,
@@ -137,7 +144,42 @@ it('record editor hides deleted parent, audit is not filtered; reports guard rev
 });
 it('caps merged raw pages and advances past tombstones without skipping live rows or repeating cursors', async () => {
   // Typed projects are delivered by the live catalogs; no legacy parent reads.
-  const loadCatalog = vi.spyOn(projectRepository, 'load').mockResolvedValue([]);
+  const loadCatalog = vi
+    .spyOn(projectSource, 'subscribeAuthorizedProjects')
+    .mockImplementation((db, uid, next, error) => {
+      const rows = new Map<number, Row[]>();
+      const stops = [
+        query(collection(db, 'projects'), where('type', '==', 'work')),
+        query(
+          collection(db, 'projects'),
+          where('type', '==', 'personal'),
+          where('createdBy', '==', uid),
+        ),
+      ].map((target, index) =>
+        onSnapshot(
+          target,
+          { includeMetadataChanges: true },
+          (snapshot) => {
+            rows.set(
+              index,
+              snapshot.docs.map((document) => ({
+                id: document.id,
+                data: document.data(),
+              })),
+            );
+            if (rows.size === 2)
+              next({
+                rows: [...rows.values()].flat(),
+                fromCache: false,
+                hasPendingWrites: false,
+                complete: true,
+              });
+          },
+          error,
+        ),
+      );
+      return () => stops.forEach((stop) => stop());
+    });
   const facts = Array.from({ length: 103 }, (_, i) => ({
     id: String(i).padStart(3, '0'),
     data: {
@@ -222,7 +264,42 @@ it('caps merged raw pages and advances past tombstones without skipping live row
   loadCatalog.mockRestore();
 });
 it('pending queries null in Firestore without limits and stays live beyond 100 opens', async () => {
-  const catalog = vi.spyOn(projectRepository, 'load').mockResolvedValue([]);
+  const catalog = vi
+    .spyOn(projectSource, 'subscribeAuthorizedProjects')
+    .mockImplementation((db, uid, next, error) => {
+      const rows = new Map<number, Row[]>();
+      const stops = [
+        query(collection(db, 'projects'), where('type', '==', 'work')),
+        query(
+          collection(db, 'projects'),
+          where('type', '==', 'personal'),
+          where('createdBy', '==', uid),
+        ),
+      ].map((target, index) =>
+        onSnapshot(
+          target,
+          { includeMetadataChanges: true },
+          (snapshot) => {
+            rows.set(
+              index,
+              snapshot.docs.map((document) => ({
+                id: document.id,
+                data: document.data(),
+              })),
+            );
+            if (rows.size === 2)
+              next({
+                rows: [...rows.values()].flat(),
+                fromCache: false,
+                hasPendingWrites: false,
+                complete: true,
+              });
+          },
+          error,
+        ),
+      );
+      return () => stops.forEach((stop) => stop());
+    });
   recordListeners.splice(0);
   const next = vi.fn();
   const stop = subscribeAuthorizedOwnRecords(

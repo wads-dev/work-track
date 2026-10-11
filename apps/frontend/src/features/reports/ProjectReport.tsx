@@ -75,6 +75,7 @@ export function ProjectReport({
   const [cachedReport, setReport] = useState<Report | null>(null);
   const report =
     !projects.loading &&
+    projects.complete &&
     !projects.error &&
     reportRevision === revision &&
     reportOwner === uid &&
@@ -90,12 +91,12 @@ export function ProjectReport({
     setLoading(true);
     setError('');
     setReport(null);
-    if (projects.loading) return;
     if (projects.error) {
       setError(projects.error);
       setLoading(false);
       return;
     }
+    if (projects.loading || !projects.complete) return;
     let generation = 0;
     const stop = subscribeAuthorizedReport(
       db,
@@ -155,6 +156,7 @@ export function ProjectReport({
     db,
     personal,
     projects.loading,
+    projects.complete,
     projects.error,
     authorizedProjectIdsKey,
     functions,
@@ -192,7 +194,10 @@ export function ProjectReport({
           )}
           <div className="mt-2">
             <Button
-              onClick={() => setAttempt((value) => value + 1)}
+              onClick={() => {
+                if (projects.error) projects.retry();
+                setAttempt((value) => value + 1);
+              }}
               variant="ghost"
             >
               Tentar novamente
@@ -451,7 +456,10 @@ export function ProjectReport({
       )}
       <div className={cn('flex flex-row mt-4 gap-4')}>
         <Button
-          onClick={() => setAttempt((value) => value + 1)}
+          onClick={() => {
+            if (projects.error) projects.retry();
+            setAttempt((value) => value + 1);
+          }}
           variant="ghost"
         >
           Atualizar relatório

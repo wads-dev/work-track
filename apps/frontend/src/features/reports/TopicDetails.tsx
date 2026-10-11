@@ -75,7 +75,14 @@ export function TopicDetails({
   }>({ identity: '' });
   useEffect(() => {
     let active = true;
-    if (!project || hidden || !canonical || projects.loading || projects.error)
+    if (
+      !project ||
+      hidden ||
+      !canonical ||
+      projects.loading ||
+      !projects.complete ||
+      projects.error
+    )
       return;
     setState({ identity });
     void createCallable(
@@ -117,12 +124,14 @@ export function TopicDetails({
     project,
     hidden,
     projects.loading,
+    projects.complete,
     projects.error,
     identity,
     access,
     deletion,
   ]);
-  const current = state.identity === identity ? state : undefined;
+  const current =
+    state.identity === identity && projects.complete ? state : undefined;
   if (projects.loading)
     return (
       <Skeleton

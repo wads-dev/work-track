@@ -273,11 +273,11 @@ export function PersonalPage({
     setLocalSnapshot(null);
     setLocalError('');
     if (privacyBlocked || invalid) return;
-    if (projects.loading) return;
     if (projects.error) {
       setLocalError(projects.error);
       return;
     }
+    if (projects.loading || !projects.complete) return;
     return subscribeAuthorizedReport(
       db,
       uid,
@@ -313,6 +313,7 @@ export function PersonalPage({
     Boolean(invalid),
     person.mode,
     projects.loading,
+    projects.complete,
     projects.error,
     authorizedProjectIdsKey,
     from,
@@ -322,6 +323,7 @@ export function PersonalPage({
   ]);
   const local =
     !projects.loading &&
+    projects.complete &&
     !projects.error &&
     localSnapshot?.owner === uid &&
     localSnapshot.revision === accessRevision &&
@@ -529,7 +531,10 @@ export function PersonalPage({
               text(p.data.title, '') + ' ' + text(p.data.description, ''),
           }))}
           onFilter={update}
-          onRefresh={() => setAttempt((v) => v + 1)}
+          onRefresh={() => {
+            if (projects.error) projects.retry();
+            setAttempt((v) => v + 1);
+          }}
           onInfo={() => setInfoOpen((v) => !v)}
         />
       ) : (
@@ -552,7 +557,10 @@ export function PersonalPage({
                 <TooltipTrigger asChild>
                   <Button
                     aria-label="Atualizar calendário"
-                    onClick={() => setAttempt((v) => v + 1)}
+                    onClick={() => {
+                      if (projects.error) projects.retry();
+                      setAttempt((v) => v + 1);
+                    }}
                     variant="ghost"
                     size="icon"
                     className={cn('shrink-0', 'size-9')}
@@ -863,7 +871,13 @@ export function PersonalPage({
               person.mode === 'global' &&
               ' Se o volume de registros exceder o orçamento de leitura, reduza o período ou escolha um projeto; não exibimos totais parciais.'}
             <div className="mt-2">
-              <Button onClick={() => setAttempt((v) => v + 1)} variant="ghost">
+              <Button
+                onClick={() => {
+                  if (projects.error) projects.retry();
+                  setAttempt((v) => v + 1);
+                }}
+                variant="ghost"
+              >
                 Tentar novamente
               </Button>
             </div>

@@ -1,105 +1,105 @@
-import { createCallable } from '../../../infrastructure/firebase/callable-command-gateway';
-import { useEffect, useState } from 'react';
-import {
-  projectRepository,
-  StaleProjectResponse,
-} from '../../../data/cache/project-repository';
+import { useEffect, useMemo, useState } from 'react';
 import type { Functions } from 'firebase/functions';
-import { type Row, text } from '../../../shared/data';
+import { getFirestore } from 'firebase/firestore';
 import {
-  loadAllProjects,
-  type ProjectPage,
-  type ProjectScope,
-} from '../project-list';
+  subscribeAuthorizedProjects,
+  type ProjectSnapshot,
+} from '../../../data/sources/authorized-project-source';
+import { projectRepository } from '../../../data/cache/project-repository';
+import type { ProjectScope } from '../project-list';
+
+/** Query results are projected from the SDK cache/live listeners, never cached Callable payloads. */
 export function useProjects(
   functions: Functions,
   uid: string,
   scope: ProjectScope = 'all',
 ) {
+  const db = useMemo(() => getFirestore(functions.app), [functions]);
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<{
-    uid: string;
-    scope: ProjectScope;
-    functions: Functions;
-    rows: Row[];
-    loading: boolean;
-    error: string;
-  }>({ uid, scope, functions, rows: [], loading: true, error: '' });
-  useEffect(
-    () => projectRepository.subscribe(() => setAttempt((value) => value + 1)),
-    [],
-  );
+  const [state, setState] = useState<
+    ProjectSnapshot & {
+      uid: string;
+      db: typeof db;
+      loading: boolean;
+      error: string;
+    }
+  >({
+    uid,
+    db,
+    rows: [],
+    fromCache: true,
+    hasPendingWrites: false,
+    complete: false,
+    loading: true,
+    error: '',
+  });
   useEffect(() => {
     let active = true;
-    setState({ uid, scope, functions, rows: [], loading: true, error: '' });
-    void projectRepository
-      .load(functions, uid, scope, () =>
-        loadAllProjects(
-          async (cursor) =>
-            (
-              await createCallable<
-                {
-                  scope: ProjectScope;
-                  limit: number;
-                  includeArchived: boolean;
-                  cursor?: string;
-                },
-                ProjectPage
-              >(
-                functions,
-                'listProjects',
-              )({
-                scope: 'all',
-                limit: 100,
-                includeArchived: true,
-                ...(cursor ? { cursor } : {}),
-              })
-            ).data,
-        ),
-      )
-      .then((projects) => {
+    let ready = false;
+    setState({
+      uid,
+      db,
+      rows: [],
+      fromCache: true,
+      hasPendingWrites: false,
+      complete: false,
+      loading: true,
+      error: '',
+    });
+    if (!uid)
+      return () => {
+        active = false;
+      };
+    const stop = subscribeAuthorizedProjects(
+      db,
+      uid,
+      (snapshot) => {
+        if (active) {
+          ready ||= snapshot.complete;
+          setState({ ...snapshot, uid, db, loading: !ready, error: '' });
+        }
+      },
+      () => {
         if (active)
           setState({
             uid,
-            scope,
-            functions,
-            rows: projects
-              .filter(
-                (project) =>
-                  scope === 'all' ||
-                  (project.type === 'personal' ? 'personal' : 'work') === scope,
-              )
-              .map((project) => ({
-                id: text(project.id, ''),
-                data: project,
-              })),
-            loading: false,
-            error: '',
-          });
-      })
-      .catch((error: unknown) => {
-        if (error instanceof StaleProjectResponse) return;
-        if (active)
-          setState({
-            uid,
-            scope,
-            functions,
+            db,
             rows: [],
+            fromCache: true,
+            hasPendingWrites: false,
+            complete: false,
             loading: false,
             error:
               'Não foi possível carregar os projetos autorizados. Nenhuma consulta alternativa foi feita.',
           });
-      });
+      },
+    );
     return () => {
       active = false;
+      stop();
     };
-  }, [functions, uid, scope, attempt]);
-  return {
-    ...(state.uid === uid &&
-    state.scope === scope &&
-    state.functions === functions
+  }, [db, uid, attempt]);
+  const current =
+    state.uid === uid && state.db === db
       ? state
-      : { rows: [], loading: true, error: '' }),
-    retry: () => projectRepository.invalidate(),
+      : {
+          rows: [],
+          loading: true,
+          error: '',
+          fromCache: true,
+          hasPendingWrites: false,
+          complete: false,
+        };
+  return {
+    ...current,
+    rows: current.rows.filter(
+      (row) =>
+        scope === 'all' ||
+        (row.data.type === 'personal' ? 'personal' : 'work') === scope,
+    ),
+    retry: () => {
+      projectRepository.invalidate();
+      setAttempt((value) => value + 1);
+    },
   };
 }

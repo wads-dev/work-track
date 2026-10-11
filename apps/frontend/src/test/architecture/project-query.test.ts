@@ -55,3 +55,30 @@ describe('privacy query lifetime regressions', () => {
     expect(blur).not.toContain('onChange(');
   });
 });
+it('project catalog uses Firestore subscriptions without Callable payload caching', () => {
+  const hook = readFileSync(
+    new URL('../../features/projects/hooks/useProjects.ts', import.meta.url),
+    'utf8',
+  );
+  const source = readFileSync(
+    new URL('../../data/sources/authorized-project-source.ts', import.meta.url),
+    'utf8',
+  );
+  expect(hook).toContain('subscribeAuthorizedProjects(');
+  expect(hook).not.toContain('loadAllProjects');
+  expect(hook).not.toContain('listProjects');
+  expect(source).toContain("['cache', 'default']");
+  expect(source).toContain('authorized.size === 2');
+});
+it('report errors remain visible and retries reopen project subscriptions', () => {
+  for (const file of ['PersonalPage', 'ProjectReport']) {
+    const source = readFileSync(
+      new URL('../../features/reports/' + file + '.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source.indexOf('if (projects.error) {')).toBeLessThan(
+      source.indexOf('if (projects.loading || !projects.complete) return;'),
+    );
+    expect(source).toContain('if (projects.error) projects.retry();');
+  }
+});

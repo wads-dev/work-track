@@ -29,7 +29,7 @@ Diretório administrativo de usuários, OAuth e escrita de auditoria permanecem 
 - `apps/frontend/src/shared/ui` e `components/ui`: apresentação e componentes comuns.
 - `apps/frontend/src/app`: navegação e PWA; main compõe autenticação, providers e rotas.
 
-O navegador calcula relatórios com os mesmos casos de uso do core e repositórios do data sobre fatos autorizados. Coerência de listeners, origem de cache e escritas pendentes são estados distintos. A autorização atual dos parents é revalidada sem consultas alternativas inseguras.
+O navegador calcula relatórios com os mesmos casos de uso do core e repositórios do data sobre fatos autorizados. Coerência de listeners, origem de cache e escritas pendentes são estados distintos. A autorização atual dos parents é revalidada sem consultas alternativas inseguras. Firestore Web usa IndexedDB persistente multiaba. O catálogo de projetos tipados é lido por subscriptions cache/default do Firestore, sem cache de documentos/Promises Callable; a primeira confirmação remota por assinatura protege a troca de conta. Diretório de pessoas continua no backend com provider em memória. Consulte a nota de [cache e isolamento](design/frontend-cache-isolation-review.md) para as limitações de logout/offline.
 
 ## Compatibilidade e segurança
 

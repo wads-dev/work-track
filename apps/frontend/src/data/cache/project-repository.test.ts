@@ -1,74 +1,33 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  createProjectRepository,
-  StaleProjectResponse,
-} from './project-repository';
+import { createProjectRepository } from './project-repository';
 import { matchesProject } from '../../features/projects/project-search';
-describe('authorized memory repository', () => {
-  it('deduplicates concurrent scopes and caches until refresh', async () => {
-    const r = createProjectRepository<string[]>(),
-      o = {};
-    const f = vi.fn(async () => ['private', 'work']);
-    await Promise.all([r.load(o, 'a', 'all', f), r.load(o, 'a', 'work', f)]);
-    await r.load(o, 'a', 'personal', f);
-    expect(f).toHaveBeenCalledTimes(1);
-    r.invalidate();
-    await r.load(o, 'a', 'all', f);
-    expect(f).toHaveBeenCalledTimes(2);
-  });
-  it('isolates account and Functions instance', async () => {
-    const r = createProjectRepository<string[]>(),
-      o = {};
-    const f = vi.fn(async () => ['ok']);
-    await r.load(o, 'a', 'all', f);
-    await r.load(o, 'b', 'all', f);
-    await r.load({}, 'a', 'all', f);
-    expect(f).toHaveBeenCalledTimes(3);
-    r.account('a');
-    r.account('');
-    await r.load(o, 'a', 'all', f);
-    expect(f).toHaveBeenCalledTimes(4);
-  });
-  it('rejects stale mutation and account responses', async () => {
-    for (const invalidate of ['mutation', 'account']) {
-      const r = createProjectRepository<string[]>();
-      let resolve!: (v: string[]) => void;
-      const pending = r.load(
-        {},
-        'a',
-        'all',
-        () =>
-          new Promise((done) => {
-            resolve = done;
-          }),
-      );
-      if (invalidate === 'mutation') r.invalidate();
-      else r.account('b');
-      resolve(['stale']);
-      await expect(pending).rejects.toBeInstanceOf(StaleProjectResponse);
-    }
-  });
-  it('does not cache errors or partial results', async () => {
-    const r = createProjectRepository<string[]>(),
-      o = {};
-    await expect(
-      r.load(o, 'a', 'all', async () => {
-        throw Error('denied');
-      }),
-    ).rejects.toThrow('denied');
-    expect(await r.load(o, 'a', 'all', async () => ['fresh'])).toEqual([
-      'fresh',
+describe('project lifecycle events without a document cache', () => {
+  it('does not expose document loading, value caching or promise deduplication', () => {
+    const repo = createProjectRepository();
+    expect(Object.keys(repo).sort()).toEqual([
+      'account',
+      'invalidate',
+      'subscribe',
     ]);
   });
-  it('notifies active consumers on invalidation', () => {
-    const r = createProjectRepository(),
-      fn = vi.fn();
-    const stop = r.subscribe(fn);
-    r.invalidate();
-    expect(fn).toHaveBeenCalledTimes(1);
+  it('notifies account changes, but not repeated identities', () => {
+    const repo = createProjectRepository(),
+      notify = vi.fn();
+    repo.subscribe(notify);
+    repo.account('alice');
+    repo.account('alice');
+    repo.account('');
+    expect(notify).toHaveBeenCalledTimes(2);
+  });
+  it('notifies current consumers on invalidation and detaches stopped consumers', () => {
+    const repo = createProjectRepository(),
+      notify = vi.fn();
+    const stop = repo.subscribe(notify);
+    repo.invalidate();
+    expect(notify).toHaveBeenCalledOnce();
     stop();
-    r.invalidate();
-    expect(fn).toHaveBeenCalledTimes(1);
+    repo.invalidate();
+    expect(notify).toHaveBeenCalledOnce();
   });
   it('matches authorized raw data while keeping rendered labels neutral', () => {
     const option = {

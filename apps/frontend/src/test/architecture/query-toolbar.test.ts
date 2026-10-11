@@ -23,9 +23,7 @@ describe('shared query toolbar', () => {
       '../../data/sources/authorized-own-record-source.ts',
     );
     expect(recordSource).toContain('includeMetadataChanges: true');
-    expect(recordSource).toContain(
-      's.metadata.fromCache || s.metadata.hasPendingWrites',
-    );
+    expect(recordSource).toContain('recordSnapshot.metadata.fromCache ||');
     // Owner history supplies no pagination options; only paginated callers get limits.
     expect(recordSource).toContain('options.size ? [limit(options.size)] : []');
     expect(hook).not.toContain('size:');
