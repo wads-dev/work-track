@@ -26,33 +26,29 @@ describe('privacy query lifetime regressions', () => {
       'key={String(revealed)}',
     );
   });
-  it('shows all projects until the user types a search, not just the selected label', () => {
-    const selector = source('../../features/projects/ProjectSelector.tsx');
-    expect(selector.replace(/\s+/g, ' ')).toContain(
-      "input?.id === projectId && input.label === selected.label ? input.query : ''",
-    );
-    expect(selector).toContain('matchesProject(option, searchQuery)');
-    expect(selector).not.toContain('matchesProject(option, inputValue)');
-    expect(selector).toContain('event.currentTarget.select()');
-  });
-  it('never clears selection due to programmatic reset', () => {
+  it('uses the design-system selector with an independent search query', () => {
     const selector = source('../../features/projects/ProjectSelector.tsx');
     expect(selector).toContain(
-      'input?.id === projectId && input.label === selected.label',
+      "const [searchQuery, setSearchQuery] = useState('');",
     );
+    expect(selector).toContain('matchesProject(option, searchQuery)');
+    expect(selector).toContain('<SelectTrigger');
+    expect(selector).toContain('<SelectContent');
+    expect(selector).not.toContain('matchesProject(option, selected.label)');
+  });
+  it('never clears selection due to typing or resetting the search', () => {
+    const selector = source('../../features/projects/ProjectSelector.tsx');
     expect(selector).toContain(
       'options.find((option) => option.id === projectId)',
     );
-    expect(selector).toContain('onChange(option.id)');
-    expect(selector).toContain("onChange('')");
-    const typing = selector
-      .split('onChange={(event) => {')[1]
-      .split('onKeyDown=')[0];
-    expect(typing).toContain('setInput');
-    expect(typing).not.toContain('onChange(');
-    const blur = selector.split('onBlur={(event) => {')[1].split('<Label')[0];
-    expect(blur).toContain('setInput(null)');
-    expect(blur).not.toContain('onChange(');
+    expect(selector).toContain(
+      "onChange(value === allValue ? '' : value.slice('project:'.length))",
+    );
+    expect(selector).toContain(
+      'onChange={(event) => setSearchQuery(event.target.value)}',
+    );
+    expect(selector).toContain("setSearchQuery('')");
+    expect(selector).not.toContain('onChange(searchQuery)');
   });
 });
 it('project catalog uses Firestore subscriptions without Callable payload caching', () => {

@@ -9,14 +9,6 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '../../components/ui/tooltip';
-import { Input } from '../../components/ui/input';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '../../components/ui/select';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Card } from '../../components/ui/card';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -26,7 +18,7 @@ import {
   useProjectAccessRevision,
   projectAccessRevision,
 } from '../../data/cache/project-access-revision';
-import { QueryToolbar, QueryToolbarField } from '../../shared/ui/QueryToolbar';
+import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarHistory } from './CalendarHistory';
 import {
   calendarTopics,
@@ -73,7 +65,6 @@ import { RecordDrawer } from '../records/RecordDrawer';
 import { contextualRecordPath } from '../../app/routes';
 import { CalendarTimeline } from './CalendarTimeline';
 import { calendarEventDetails } from './calendar-event-details';
-import { CalendarProjectFilter } from './CalendarProjectFilter';
 import { updatePersonalFilters } from './calendar-project-filter';
 import { date, text } from '../../shared/data';
 import { isHidden, safeProject, usePrivacy } from '../../shared/ui/privacy';
@@ -556,277 +547,90 @@ export function PersonalPage({
           onInfo={() => setInfoOpen((v) => !v)}
         />
       ) : (
-        <QueryToolbar
-          label="Filtros do calendário"
-          compact
-          actions={
-            <>
-              {' '}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Incluir arquivados"
-                    aria-pressed={includeArchived}
-                    onClick={() =>
-                      update('includeArchived', String(!includeArchived))
-                    }
-                  >
-                    <UiIcon kind={includeArchived ? 'archive' : 'archiveoff'} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {includeArchived
-                    ? 'Ocultar arquivados'
-                    : 'Incluir arquivados'}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="Atualizar calendário"
-                    onClick={() => {
-                      if (projects.error) projects.retry();
-                      setAttempt((v) => v + 1);
-                    }}
-                    variant="ghost"
-                    size="icon"
-                    className={cn('shrink-0', 'size-9')}
-                  >
-                    <UiIcon kind="refresh" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{'Atualizar calendário'}</TooltipContent>
-              </Tooltip>
-            </>
+        <CalendarToolbar
+          key={String(revealed)}
+          date={selected}
+          view={view}
+          density={density}
+          allWeeks={allWeeks}
+          projectId={projectId}
+          projects={projects.rows
+            .filter(
+              (p) =>
+                person.mode !== 'global' ||
+                (!isHidden(p.data, revealed) &&
+                  (!p.data.type || p.data.type === 'work')),
+            )
+            .map((p) => ({
+              id: p.id,
+              label: label(p.id),
+              searchText:
+                text(p.data.title, '') + ' ' + text(p.data.description, ''),
+            }))}
+          projectsLoading={projects.loading}
+          projectsError={projects.error}
+          personId={person.selected}
+          personDisabled={profile}
+          personAvatar={
+            person.selected === 'all' ? (
+              <UiIcon kind="people" />
+            ) : (
+              <PersonIdentity uid={person.selected} avatarOnly />
+            )
           }
-        >
-          <div
-            className={cn(
-              'flex items-center gap-1 shrink-0 [&_[data-query-field]]:w-36',
-            )}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  disabled={allWeeks}
-                  aria-label="Período anterior"
-                  onClick={() =>
-                    update('date', moveReference(selected, view, -1))
-                  }
-                  variant="ghost"
-                  size="icon"
-                  className={cn('shrink-0', 'size-9')}
-                >
-                  <UiIcon kind="previous" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{'Período anterior'}</TooltipContent>
-            </Tooltip>
-            <QueryToolbarField kind="date">
-              <div className="min-w-0">
-                <span className="sr-only">{'Referência'}</span>
-                <Input
-                  aria-label={'Referência'}
-                  type="date"
-                  value={selected}
-                  disabled={allWeeks}
-                  onChange={(e) => update('date', e.target.value)}
-                />
-              </div>
-            </QueryToolbarField>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  disabled={allWeeks}
-                  aria-label="Próximo período"
-                  onClick={() =>
-                    update('date', moveReference(selected, view, 1))
-                  }
-                  variant="ghost"
-                  size="icon"
-                  className={cn('shrink-0', 'size-9')}
-                >
-                  <UiIcon kind="next" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{'Próximo período'}</TooltipContent>
-            </Tooltip>
-          </div>
-          <QueryToolbarField>
-            <div className="min-w-0">
-              <span className="sr-only">{'Visualização'}</span>
-              <Select
-                value={allWeeks ? 'all' : view}
-                onValueChange={(value) =>
-                  setParams(updateCalendarView(params, value))
-                }
-              >
-                <SelectTrigger aria-label={'Visualização'}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" disabled={!projectId}>
-                    Semanas com atividade
-                  </SelectItem>
-                  {['day', 'three-days', 'week', 'month'].map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {v === 'month'
-                        ? 'Mês'
-                        : v === 'week'
-                          ? 'Semana'
-                          : v === 'three-days'
-                            ? 'Últimos três dias'
-                            : 'Dia'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </QueryToolbarField>
-          <div
-            data-calendar-person
-            className="order-first shrink-0 sm:order-none"
-          >
-            <div className="min-w-0">
-              <span className="sr-only">{'Pessoa'}</span>
-              <Select
-                disabled={loading || profile}
-                value={person.selected || '__all__'}
-                onValueChange={(value) =>
-                  setParams(
-                    updateCalendarPerson(
-                      params,
-                      value === '__all__' ? '' : value,
-                    ),
-                  )
-                }
-              >
-                <SelectTrigger
-                  aria-label={
-                    'Pessoa: ' +
-                    (person.selected === 'all'
-                      ? 'Todas as pessoas'
-                      : person.selected === uid
-                        ? 'Meu calendário'
-                        : participants.find((p) => p.uid === person.selected)
-                            ?.label || 'Pessoa selecionada')
-                  }
-                  className="w-auto gap-1 px-2"
-                >
-                  {person.selected === 'all' ? (
-                    <UiIcon kind="people" />
-                  ) : (
-                    <PersonIdentity
-                      uid={person.selected}
-                      avatarOnly
-                      respectPrivacy={false}
-                    />
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={uid}>
-                    <PersonIdentity uid={uid} label="Meu calendário" />
-                  </SelectItem>
-                  {participants.length > 0 &&
-                    (!directory.unavailable ||
-                      companyPeople.people.length > 0) && (
-                      <SelectItem value="all">Todas as pessoas</SelectItem>
-                    )}
-                  {participants
-                    .filter((p) => p.uid !== uid)
-                    .map((p) => (
-                      <SelectItem key={p.uid} value={p.uid}>
-                        <PersonIdentity uid={p.uid} fallback={p.label} />
-                      </SelectItem>
-                    ))}
-                  {person.selected !== uid &&
-                    person.selected !== 'all' &&
-                    !participants.some((p) => p.uid === person.selected) && (
-                      <SelectItem value={person.selected}>
-                        <PersonIdentity uid={person.selected} />
-                      </SelectItem>
-                    )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <QueryToolbarField kind="project">
-            <CalendarProjectFilter
-              key={String(revealed)}
-              projectId={projectId}
-              projects={projects.rows
-                .filter(
-                  (p) =>
-                    person.mode !== 'global' ||
-                    (!isHidden(p.data, revealed) &&
-                      (!p.data.type || p.data.type === 'work')),
-                )
-                .map((p) => ({
-                  id: p.id,
-                  label: label(p.id),
-                  searchText:
-                    text(p.data.title, '') + ' ' + text(p.data.description, ''),
-                }))}
-              loading={projects.loading}
-              error={projects.error}
-              onChange={(id) => update('projectId', id)}
-            />
-          </QueryToolbarField>
-          {projectId && (
-            <QueryToolbarField>
-              <div className="min-w-0">
-                <span className="sr-only">{'Tópico'}</span>
-                <Select
-                  value={subject || '__all__'}
-                  onValueChange={(value) =>
-                    update('subject', value === '__all__' ? '' : value)
-                  }
-                >
-                  <SelectTrigger aria-label={'Tópico'}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos os tópicos</SelectItem>
-                    {topics.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </QueryToolbarField>
-          )}
-          <QueryToolbarField>
-            <div className="min-w-0">
-              <span className="sr-only">{'Densidade'}</span>
-              <Select
-                disabled={allWeeks}
-                value={density || '__all__'}
-                onValueChange={(value) =>
-                  update('density', value === '__all__' ? '' : value)
-                }
-              >
-                <SelectTrigger aria-label={'Densidade'}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {['supercompact', 'compact', 'timeline'].map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d === 'timeline'
-                        ? 'Régua'
-                        : d === 'compact'
-                          ? 'Compacto'
-                          : 'Supercompacto'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </QueryToolbarField>
-        </QueryToolbar>
+          personOptions={[
+            {
+              value: uid,
+              text: 'Meu calendário',
+              label: <PersonIdentity uid={uid} label="Meu calendário" />,
+            },
+            ...(participants.length > 0 &&
+            (!directory.unavailable || companyPeople.people.length > 0)
+              ? [
+                  {
+                    value: 'all',
+                    text: 'Todas as pessoas',
+                    label: 'Todas as pessoas',
+                  },
+                ]
+              : []),
+            ...participants
+              .filter((p) => p.uid !== uid)
+              .map((p) => ({
+                value: p.uid,
+                text: p.label,
+                label: <PersonIdentity uid={p.uid} fallback={p.label} />,
+              })),
+            ...(person.selected !== uid &&
+            person.selected !== 'all' &&
+            !participants.some((p) => p.uid === person.selected)
+              ? [
+                  {
+                    value: person.selected,
+                    text: 'Pessoa selecionada',
+                    label: <PersonIdentity uid={person.selected} />,
+                  },
+                ]
+              : []),
+          ]}
+          subject={subject}
+          topics={topics}
+          includeArchived={includeArchived}
+          onDate={(value) => update('date', value)}
+          onMove={(direction) =>
+            update('date', moveReference(selected, view, direction))
+          }
+          onView={(value) => setParams(updateCalendarView(params, value))}
+          onDensity={(value) => update('density', value)}
+          onPerson={(value) => setParams(updateCalendarPerson(params, value))}
+          onProject={(value) => update('projectId', value)}
+          onSubject={(value) => update('subject', value)}
+          onArchived={() => update('includeArchived', String(!includeArchived))}
+          onRefresh={() => {
+            if (projects.error) projects.retry();
+            setAttempt((v) => v + 1);
+          }}
+        />
       )}
       {calendar &&
         directory.unavailable &&

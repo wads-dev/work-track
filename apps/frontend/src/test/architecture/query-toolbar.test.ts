@@ -40,7 +40,7 @@ describe('shared query toolbar', () => {
   });
   it('shares the responsive labeled surface across calendar, reports and records', () => {
     for (const name of [
-      '../../features/reports/PersonalPage.tsx',
+      '../../features/reports/CalendarToolbar.tsx',
       '../../features/reports/ReportToolbar.tsx',
       '../../features/dashboard/Dashboard.tsx',
     ])
@@ -81,7 +81,10 @@ describe('shared filter structure', () => {
     ])
       expect(source(page)).toContain('<QueryPeriodControls');
     expect(source('../../features/reports/PersonalPage.tsx')).toContain(
-      '<QueryToolbarField',
+      '<CalendarToolbar',
+    );
+    expect(source('../../features/reports/CalendarToolbar.tsx')).toContain(
+      '<QueryToolbar',
     );
   });
   it('constructs identical date controls for records and reports with small size and same labels', () => {
@@ -150,10 +153,11 @@ describe('compact toolbar contract', () => {
     expect(compact).toContain(layoutTokens.wrapRow);
     for (const slot of [
       'data-query-slot="controls"',
-      'data-query-slot="actions"',
       'data-query-row="secondary"',
     ])
       expect(compact).toContain(slot + ' class="contents"');
+    expect(compact).toContain('data-query-slot="actions"');
+    expect(compact).toContain('ml-auto shrink-0 justify-end');
     expect(compact).not.toContain('order-2');
     expect(compact).not.toContain('order-3');
     expect(compact).not.toContain('border-t');

@@ -1,9 +1,21 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Button } from '../../components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
 import { cn } from '../../lib/utils';
 import { matchesProject, type ProjectOption } from './project-search';
+
+// Radix reserves the empty string for its placeholder. Prefix real IDs so the
+// "all" option cannot collide with any project ID, while keeping the public API.
+const allValue = 'all';
+const selectValue = (id: string) => (id ? 'project:' + id : allValue);
+
 export function ProjectSelector({
   projects,
   projectId,
@@ -26,6 +38,14 @@ export function ProjectSelector({
   disabled?: boolean;
 }) {
   const id = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const focusSearchOnOpen = useRef(false);
+  const retainSearchFocus = useRef(false);
+  const tabDirection = useRef<1 | -1 | null>(null);
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const options = useMemo(
     () =>
       allowAll
@@ -37,164 +57,165 @@ export function ProjectSelector({
     id: projectId,
     label: projectId ? 'Projeto não disponível' : 'Escolha o projeto',
   };
-  const [input, setInput] = useState<{
-    id: string;
-    label: string;
-    query: string;
-  } | null>(null);
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
-  const inputValue =
-    input?.id === projectId && input.label === selected.label
-      ? input.query
-      : selected.label;
-  // The selected label is display text, not a user-entered search query.
-  const searchQuery =
-    input?.id === projectId && input.label === selected.label
-      ? input.query
-      : '';
   const filtered = options.filter((option) =>
     matchesProject(option, searchQuery),
   );
-  function choose(option: ProjectOption) {
-    setInput(null);
-    setOpen(false);
-    setActive(-1);
-    onChange(option.id);
+  function changeOpen(next: boolean) {
+    focusSearchOnOpen.current = next;
+    retainSearchFocus.current = next;
+    setSearchQuery('');
+    setOpen(next);
+  }
+  function choose(value: string) {
+    onChange(value === allValue ? '' : value.slice('project:'.length));
+    changeOpen(false);
   }
   return (
-    <div
-      className={cn('relative w-full min-w-0 space-y-1.5 sm:w-60', className)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setOpen(false);
-          setInput(null);
-          setActive(-1);
-        }
-      }}
-    >
+    <div className={cn('w-full min-w-0 space-y-1.5 sm:w-60', className)}>
       <Label htmlFor={id}>{label}</Label>
-      <div className="flex items-center gap-1">
-        <Input
+      <Select
+        value={projectId || allowAll ? selectValue(projectId) : ''}
+        onValueChange={choose}
+        open={open && !disabled}
+        onOpenChange={changeOpen}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          ref={triggerRef}
           id={id}
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded={open}
-          aria-controls={id + '-list'}
-          aria-activedescendant={
-            open && active >= 0 && filtered[active]
-              ? id + '-option-' + active
-              : undefined
-          }
+          className="w-full min-w-0"
           aria-invalid={!!error}
           aria-describedby={error ? id + '-error' : undefined}
-          placeholder="Pesquisar projeto"
-          disabled={disabled}
-          value={inputValue}
-          onFocus={(event) => {
-            setOpen(true);
-            event.currentTarget.select();
-          }}
-          onChange={(event) => {
-            setInput({
-              id: projectId,
-              label: selected.label,
-              query: event.target.value,
-            });
-            setOpen(true);
-            setActive(-1);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-              event.preventDefault();
-              setOpen(true);
-              setActive((previous) =>
-                filtered.length
-                  ? event.key === 'ArrowDown'
-                    ? (previous + 1) % filtered.length
-                    : previous <= 0
-                      ? filtered.length - 1
-                      : previous - 1
-                  : -1,
-              );
-            } else if (
-              event.key === 'Enter' &&
-              open &&
-              active >= 0 &&
-              filtered[active]
-            ) {
-              event.preventDefault();
-              choose(filtered[active]);
-            } else if (event.key === 'Escape') {
-              event.preventDefault();
-              setOpen(false);
-              setInput(null);
-              setActive(-1);
+          aria-busy={loading}
+        >
+          <SelectValue
+            className="min-w-0 flex-1 text-left"
+            placeholder="Escolha o projeto"
+          >
+            {selected.label}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent
+          ref={contentRef}
+          className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]"
+          aria-label={label}
+          aria-busy={loading}
+          onFocusCapture={(event) => {
+            // Radix focuses after positioning and again if a live catalog
+            // removes its selected item. Preserve input focus until the user
+            // deliberately navigates to an option, not on every re-render.
+            if (event.target === searchRef.current) {
+              retainSearchFocus.current = true;
+            } else if (focusSearchOnOpen.current || retainSearchFocus.current) {
+              focusSearchOnOpen.current = false;
+              searchRef.current?.focus({ preventScroll: true });
             }
           }}
-        />
-        {projectId && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Limpar projeto"
-            disabled={disabled}
-            onClick={() => {
-              setInput(null);
-              onChange('');
-            }}
-          >
-            ×
-          </Button>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={open ? 'Fechar projetos' : 'Pesquisar projetos'}
-          disabled={disabled}
-          onClick={() => {
-            setOpen(!open);
-            setActive(-1);
+          onPointerMoveCapture={(event) => {
+            if ((event.target as HTMLElement).closest('[role="option"]')) {
+              retainSearchFocus.current = false;
+            }
+          }}
+          onPointerDownCapture={(event) => {
+            if ((event.target as HTMLElement).closest('[role="option"]')) {
+              retainSearchFocus.current = false;
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Tab') {
+              // Radix traps Tab in a Select; a searchable menu must let the user
+              // leave it. Complete traversal after its focus scope unmounts.
+              event.preventDefault();
+              tabDirection.current = event.shiftKey ? -1 : 1;
+              changeOpen(false);
+            } else if (
+              event.target !== searchRef.current &&
+              event.key === 'ArrowUp' &&
+              event.target ===
+                contentRef.current?.querySelector(
+                  '[role="option"]:not([data-disabled])',
+                )
+            ) {
+              event.preventDefault();
+              searchRef.current?.focus();
+            }
+          }}
+          onCloseAutoFocus={(event) => {
+            if (tabDirection.current === null) return;
+            event.preventDefault();
+            const direction = tabDirection.current;
+            tabDirection.current = null;
+            const trigger = triggerRef.current;
+            const focusable = Array.from(
+              document.querySelectorAll<HTMLElement>(
+                'button, a[href], input, select, textarea, [tabindex]',
+              ),
+            ).filter(
+              (element) =>
+                element.tabIndex >= 0 &&
+                !element.matches(':disabled') &&
+                !element.closest('[inert], [aria-hidden="true"]') &&
+                !contentRef.current?.contains(element) &&
+                element.getClientRects().length > 0,
+            );
+            const index = trigger ? focusable.indexOf(trigger) : -1;
+            (focusable[index + direction] ?? trigger)?.focus();
           }}
         >
-          ⌄
-        </Button>
-      </div>
-      {open && !disabled && (
-        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
-          <ul
-            id={id + '-list'}
-            role="listbox"
-            aria-label={label}
-            aria-busy={loading}
-          >
-            {filtered.map((option, index) => (
-              <li
-                key={option.id}
-                id={id + '-option-' + index}
-                role="option"
-                aria-selected={option.id === projectId}
+          <div className="sticky top-0 z-10 bg-popover p-1 pb-2">
+            <Input
+              ref={searchRef}
+              aria-label={'Pesquisar ' + label.toLocaleLowerCase()}
+              placeholder="Pesquisar projeto"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' || event.key === 'Tab') return;
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                  if (filtered.length) retainSearchFocus.current = false;
+                  return;
+                }
+                // Preserve text editing (including spaces, Home/End, shortcuts
+                // and IME) without feeding Radix's typeahead or stealing focus.
+                event.stopPropagation();
+                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  if (filtered[0]) choose(selectValue(filtered[0].id));
+                }
+              }}
+            />
+          </div>
+          {/* Keep item refs stable: removing the selected item while filtering
+              makes Radix's positioning effect move focus out of the input. */}
+          {options.map((option) => {
+            const matches = matchesProject(option, searchQuery);
+            return (
+              <SelectItem
+                key={selectValue(option.id)}
+                value={selectValue(option.id)}
+                disabled={!matches}
+                hidden={!matches}
                 className={cn(
-                  'cursor-pointer rounded-sm px-3 py-2 text-sm [overflow-wrap:anywhere]',
-                  active === index && 'bg-accent text-accent-foreground',
+                  'whitespace-normal [overflow-wrap:anywhere]',
+                  !matches && 'hidden',
                 )}
-                onMouseDown={(event) => event.preventDefault()}
-                onMouseMove={() => setActive(index)}
-                onClick={() => choose(option)}
               >
                 {option.label}
-              </li>
-            ))}
-          </ul>
-          {!filtered.length && (
+              </SelectItem>
+            );
+          })}
+          {loading && (
             <p role="status" className="p-3 text-sm text-muted-foreground">
-              {loading ? 'Carregando projetos…' : 'Nenhum projeto encontrado'}
+              Carregando projetos…
             </p>
           )}
-        </div>
-      )}
+          {!loading && !filtered.length && (
+            <p role="status" className="p-3 text-sm text-muted-foreground">
+              Nenhum projeto encontrado
+            </p>
+          )}
+        </SelectContent>
+      </Select>
       {error && (
         <p id={id + '-error'} role="alert" className="text-sm text-destructive">
           {error}

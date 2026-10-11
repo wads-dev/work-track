@@ -88,9 +88,10 @@ export function QueryToolbar({
             <div
               data-query-slot="actions"
               className={cn(
-                compact ? 'contents' : layoutTokens.wrapRow,
-                !compact &&
-                  'order-3 w-full justify-end sm:order-0 sm:ml-auto sm:w-auto',
+                layoutTokens.wrapRow,
+                compact
+                  ? 'ml-auto shrink-0 justify-end'
+                  : 'order-3 w-full justify-end sm:order-0 sm:ml-auto sm:w-auto',
               )}
             >
               {actions}
