@@ -4,6 +4,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { cn } from '../../lib/utils';
 import { layoutTokens } from './layout-tokens';
+import { FilterBar } from './FilterBar';
 
 const QueryToolbarCompactContext = createContext(false);
 
@@ -53,15 +54,10 @@ export function QueryToolbar({
 }) {
   return (
     <QueryToolbarCompactContext.Provider value={compact}>
-      <section
-        aria-label={label}
+      <FilterBar
+        label={label}
         data-query-compact={compact}
-        className={cn(
-          layoutTokens.surface,
-          layoutTokens.wrapRow,
-          layoutTokens.controls,
-          className,
-        )}
+        className={cn(layoutTokens.controls, className)}
       >
         <div data-query-row="primary" className="contents">
           {summary && (
@@ -109,7 +105,7 @@ export function QueryToolbar({
             {secondary}
           </div>
         )}
-      </section>
+      </FilterBar>
     </QueryToolbarCompactContext.Provider>
   );
 }

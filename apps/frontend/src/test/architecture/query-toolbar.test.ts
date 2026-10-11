@@ -46,7 +46,8 @@ describe('shared query toolbar', () => {
     ])
       expect(source(name)).toContain('<QueryToolbar');
     const toolbar = source('../../shared/ui/QueryToolbar.tsx');
-    expect(toolbar).toContain('aria-label={label}');
+    expect(toolbar).toContain('<FilterBar');
+    expect(toolbar).not.toContain('layoutTokens.surface');
     expect(layoutTokens.wrapRow).toContain('flex-wrap');
     expect(toolbar).toContain('{actions}');
   });
