@@ -64,13 +64,14 @@ const project = {
 };
 const record = {
   uid: 'alice',
+  requestId: 'original',
   projectId: 'p',
   startedAt: '2026-10-10T09:00:00-03:00',
   endedAt: null,
   topics: [{ topicId: 'general' }],
   originalText: 'comecei',
   interpretation: 'Atividade geral',
-  timezone: 'America/Sao_Paulo',
+  timeZone: 'America/Sao_Paulo',
 };
 beforeEach(() => {
   state.data.clear();
@@ -210,4 +211,47 @@ it('rejects cursor outside project and paginates without partial silent history'
   expect(
     await repo.listTopicMerges({ projectId: 'p', limit: 1 }, 'alice'),
   ).toMatchObject({ items: [{ id: 'a' }], nextCursor: 'a' });
+});
+it('requires explicit personal publication acknowledgement and atomically audits project topics context and reopening', async () => {
+  state.data.set('projects/p', { ...project, type: 'personal' });
+  state.data.set('projects/q', {
+    ...project,
+    title: 'Destino',
+    type: 'work',
+    topics: [
+      { id: 'target', title: 'Destino', description: 'Tópico de destino' },
+    ],
+  });
+  const input = {
+    recordId: 'r',
+    projectId: 'q',
+    topics: [{ topicId: 'target' }],
+    endedAt: null,
+    interpretation: 'Novo contexto',
+    requestId: 'edit-project',
+    expectedUpdatedAt: null,
+    reason: 'Edição de registro pela interface web.',
+  };
+  await expect(repo.updateRecord(input, 'alice')).rejects.toThrow(
+    'Autorize compartilhar',
+  );
+  expect(state.writes).toHaveLength(0);
+  const command = { ...input, acknowledgeSharedDestination: true };
+  const result = await repo.updateRecord(command, 'alice');
+  const after = state.data.get('users/alice/records/r')!;
+  expect(after.projectId).toBe('q');
+  expect(after.topics).toEqual([{ topicId: 'target' }]);
+  expect(after.endedAt).toBeNull();
+  expect(after.originalText).toBe('comecei');
+  const audit = state.data.get('users/alice/records/r/audit/edit-project')!;
+  expect(audit.authorUid).toBe('alice');
+  expect(audit.before).toEqual(record);
+  expect(audit.after).toMatchObject({
+    projectId: 'q',
+    interpretation: 'Novo contexto',
+    endedAt: null,
+  });
+  expect(audit.updatedAt).toBe(result.updatedAt);
+  expect(await repo.updateRecord(command, 'alice')).toEqual(result);
+  expect(state.writes).toHaveLength(2);
 });

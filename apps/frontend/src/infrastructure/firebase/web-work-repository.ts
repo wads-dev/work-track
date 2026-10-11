@@ -191,6 +191,15 @@ export class WebWorkRepository {
         ? await tx.get(doc(this.db, 'projects', input.projectId))
         : origin;
       assertProjectAccess(target.data(), uid);
+      if (
+        effectiveProjectType(origin.data()!) === 'personal' &&
+        effectiveProjectType(target.data()!) === 'work' &&
+        !input.acknowledgeSharedDestination
+      )
+        throw new ProjectManagementError(
+          'invalid-argument',
+          'Autorize compartilhar o texto original e contexto com a organização.',
+        );
       if (prior.exists()) {
         const p = prior.data();
         if (p.authorUid !== uid || p.request !== JSON.stringify(input))

@@ -127,79 +127,27 @@ describe('audited record movement', () => {
       ),
     ).toThrow();
   });
-  it('dialog uses topic contracts and explains scope and preserved ownership', () => {
+  it('project topics expose no separate movement frontend', () => {
     const source = readFileSync(
-      new URL('../../features/records/MoveDialog.tsx', import.meta.url),
-      'utf8',
-    );
-    expect(source).toContain("recordId ? 'moveRecord' : 'moveTopic'");
-    expect(source).toContain('topic_origin: topicId');
-    expect(source).toContain('topic_target: topic');
-    expect(source).toContain('preview.resolvedTopic.title');
-    expect(source).toContain('...(recordOwnerUid ? { recordOwnerUid } : {})');
-    expect(source).toContain("source?.type === 'personal'");
-    expect(source).toContain('move somente seus registros ativos');
-    expect(source).toContain(
-      'move os registros ativos de todos os participantes',
-    );
-    expect(source).toContain('propriedade dos registros serão preservados');
-    expect(source).not.toMatch(
-      /moveSubject|move_subject|subject_origin|subject_target|resolvedSubject/,
-    );
-    const topics = readFileSync(
       new URL('../../features/projects/ProjectTopics.tsx', import.meta.url),
       'utf8',
     );
-    expect(topics).not.toContain('MoveDialog');
-    expect(topics).not.toContain('moveTopic');
+    expect(source).not.toContain('MoveDialog');
+    expect(source).not.toContain('moveTopic');
   });
-  it('dialog stable retry, cancellation and changed destination discard old preview', () => {
-    const source = readFileSync(
-      new URL('../../features/records/MoveDialog.tsx', import.meta.url),
-      'utf8',
-    );
-    expect(source).toContain('requestId: crypto.randomUUID()');
-    expect(source).toContain('intent.current = null');
-    expect(source).toContain('setPreview(null)');
-    expect(source).toContain('moveConfirmation');
-    expect(source).toContain('functions/failed-precondition');
-    expect(source).toContain('ownRecordsRepository.invalidate()');
-    expect(source).toContain('projectRepository.invalidate()');
-    expect(source).not.toContain('setDoc(');
-  });
-  it('source hidden and destination privacy protected; explicit same-name behavior', () => {
-    const source = readFileSync(
-      new URL('../../features/records/MoveDialog.tsx', import.meta.url),
-      'utf8',
-    );
-    expect(source).toContain('!isHidden(p.data, revealed)');
-    expect(source).toContain('isHidden(source, revealed)');
-    expect(source).toContain('mergedIntoTopicId');
-    expect(source).toContain('Mesmo nome no destino');
-    expect(source).toContain('willCreate');
-  });
-  it('drawer shares synchronous lock and audit source/destination labels', () => {
+  it('drawer edits project directly without a separate movement flow and preserves locks and audit', () => {
     const source = readFileSync(
       new URL('../../features/records/RecordDrawer.tsx', import.meta.url),
       'utf8',
     );
-    expect(source).toContain('mutationBusy={mutationBusy}');
-    expect(source).toContain('mutationBusy.current || moveOpen');
-    expect(source).toContain('Mover registro');
-    expect(source).toContain('Transferência de tópico');
-    expect(source).toContain('Origem:');
-    expect(source).toContain('Destino:');
+    expect(source).not.toContain('<MoveDialog');
+    expect(source).not.toContain('Mover registro');
+    expect(source).toContain('mutationBusy.current');
+    expect(source).toContain('projectId: editedProject');
+    expect(source).toContain('setEditedTopics([])');
+    expect(source).toContain('acknowledgeSharedDestination');
+    expect(source).toContain('<RecordAuditEvent');
     expect(source).toContain('record.uid === uid');
-    expect(source).toContain('Projeto reservado · Tópicos reservados');
-    expect(source).toContain('isHidden(parent, revealed)');
-    expect(source).toContain('movementSide(row.data.before)');
-    expect(source).toContain('movementSide(row.data.after)');
-    expect(source).toContain("'move_topic',");
-    expect(source).toContain("'move_subject',");
-    expect(source).toContain("'move_record',");
-    expect(source).toContain("row.data.action !== 'move_record'");
-    expect(source).toContain('recordOwnerUid={');
-    expect(source).toContain('!record || record.uid !== uid');
     expect(source).toContain("doc(db, 'users', uid, 'records', recordId)");
   });
 });
