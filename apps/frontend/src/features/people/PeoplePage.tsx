@@ -1,9 +1,8 @@
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { PageHeader } from '../../shared/ui/PageHeader';
 import { useCompanyPeople } from './CompanyPeopleContext';
 import { personName } from './company-people';
 import { PersonIdentity } from './PersonIdentity';
-import { PrivacyContext } from '../../shared/ui/privacy';
 import { matchesFilter } from '../../app/routes';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -12,7 +11,6 @@ import { Alert, AlertDescription } from '../../components/ui/alert';
 
 export function PeoplePage() {
   const { people, loading, error, refresh } = useCompanyPeople();
-  const { revealed } = useContext(PrivacyContext);
   const [filter, setFilter] = useState('');
   const visible = people.filter((person) =>
     matchesFilter([personName(person), person.email, person.uid], filter),
@@ -28,22 +26,15 @@ export function PeoplePage() {
           </Button>
         }
       >
-        {revealed && (
-          <Input
-            className="mt-4"
-            aria-label="Buscar pessoas por nome, e-mail ou ID"
-            placeholder="Buscar por nome, e-mail ou ID"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-          />
-        )}
+        <Input
+          className="mt-4"
+          aria-label="Buscar pessoas por nome, e-mail ou ID"
+          placeholder="Buscar por nome, e-mail ou ID"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+        />
       </PageHeader>
-      {!revealed ? (
-        <p role="status">
-          Dados das pessoas ocultos pelo modo de privacidade. Ative a exibição
-          de conteúdo para consultar o diretório.
-        </p>
-      ) : loading ? (
+      {loading ? (
         <p role="status">Carregando pessoas…</p>
       ) : error ? (
         <Alert variant="destructive">

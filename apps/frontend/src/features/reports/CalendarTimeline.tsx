@@ -76,11 +76,7 @@ export function CalendarTimeline({
   const renderIdentity = (personUid: string, fallback: string) =>
     showPeople && (
       <>
-        <PersonIdentity
-          uid={personUid}
-          fallback={fallback}
-          respectPrivacy={false}
-        />
+        <PersonIdentity uid={personUid} fallback={fallback} />
         {' · '}
       </>
     );

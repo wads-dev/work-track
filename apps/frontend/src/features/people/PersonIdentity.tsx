@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useCompanyPeople } from './CompanyPeopleContext';
-import { usePrivacy } from '../../shared/ui/privacy';
 import { resolvePersonIdentity } from './person-identity';
 
 export function PersonIdentity({
@@ -8,18 +7,14 @@ export function PersonIdentity({
   fallback,
   label,
   avatarOnly = false,
-  respectPrivacy = true,
 }: {
   uid?: string;
   fallback?: string;
   label?: string;
   avatarOnly?: boolean;
-  respectPrivacy?: boolean;
 }) {
   const directory = useCompanyPeople();
-  const { revealed } = usePrivacy();
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
-  if (respectPrivacy && !revealed) return <span>Pessoa</span>;
   const identity = resolvePersonIdentity(
     directory.person(uid || ''),
     fallback,
