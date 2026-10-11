@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./registration/domain/project-color": {
+      "types": "./lib/registration/domain/project-color.d.ts",
+      "development": "./src/registration/domain/project-color.ts",
+      "default": "./lib/registration/domain/project-color.js"
+    },
     "./registration/domain/recent-records": {
       "types": "./lib/registration/domain/recent-records.d.ts",
       "development": "./src/registration/domain/recent-records.ts",

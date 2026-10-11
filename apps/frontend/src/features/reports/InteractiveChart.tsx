@@ -17,6 +17,7 @@ import { useCompanyPeople } from '../people/CompanyPeopleContext';
 import { usePrivacy } from '../../shared/ui/privacy';
 export type ChartDatum = {
   key: string;
+  color?: string;
   uid?: string;
   label: string;
   minutes: number;
@@ -112,7 +113,7 @@ export function InteractiveChart({
                 {values.map((item, index) => (
                   <Cell
                     key={item.key}
-                    fill={colors[index % colors.length]}
+                    fill={item.color ?? colors[index % colors.length]}
                     cursor={item.href || item.onSelect ? 'pointer' : 'default'}
                   />
                 ))}
@@ -180,7 +181,7 @@ export function InteractiveChart({
                 {values.map((item, index) => (
                   <Cell
                     key={item.key}
-                    fill={colors[index % colors.length]}
+                    fill={item.color ?? colors[index % colors.length]}
                     cursor={item.href || item.onSelect ? 'pointer' : 'default'}
                   />
                 ))}

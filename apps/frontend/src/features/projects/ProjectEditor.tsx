@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Label } from '../../components/ui/label';
 import { Input } from '../../components/ui/input';
+import { ProjectAppearance } from '@work-track/core/registration/domain/project-color';
 import { Textarea } from '../../components/ui/textarea';
 import {
   SelectItem,
@@ -108,6 +109,7 @@ function ProjectForm({
   const [description, setDescription] = useState(text(project.description, ''));
   const type = project.type === 'personal' ? 'personal' : 'work';
   const [githubUrl, setGithubUrl] = useState(text(project.githubUrl, ''));
+  const [color, setColor] = useState(text(project.color, ''));
   const confidential = project.confidential === true;
   const [alias, setAlias] = useState(
     text(project.publicAlias, 'Projeto reservado'),
@@ -158,6 +160,7 @@ function ProjectForm({
         description,
         type,
         githubUrl,
+        color,
         alias,
         reason,
       });
@@ -171,6 +174,7 @@ function ProjectForm({
         title,
         description,
         githubUrl: githubUrl || null,
+        color: color || null,
         publicAlias: alias,
         reason,
         requestId: saveIntent.current.requestId,
@@ -272,6 +276,30 @@ function ProjectForm({
           </p>
         </div>
         <div className="min-w-0 space-y-2">
+          <Label htmlFor="ProjectEditor-color">Cor do projeto</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="ProjectEditor-color"
+              type="color"
+              value={new ProjectAppearance({ id: projectId, color }).getColor(
+                catalog.rows.map((p) => ({ id: p.id, color: p.data.color })),
+              )}
+              onChange={(e) => setColor(e.target.value)}
+              disabled={busy}
+              className="w-16"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => setColor('')}
+            >
+              Usar cor automática
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {color || 'Automática'} · aplicada ao salvar.
+          </p>
           <Label htmlFor={'ProjectEditor-7387'}>{'GitHub HTTPS'}</Label>
           <Input
             value={githubUrl}

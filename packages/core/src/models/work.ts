@@ -9,6 +9,7 @@ export interface Topic {
   description: string;
 }
 export interface Project {
+  color?: string | null;
   type?: 'personal' | 'work';
   githubUrl?: string | null;
   confidential?: boolean;

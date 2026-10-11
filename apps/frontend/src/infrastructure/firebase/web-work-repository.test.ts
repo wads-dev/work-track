@@ -96,6 +96,20 @@ it('allows authenticated noncreator work/legacy writes and atomic actor audit, r
     repo.updateProject({ ...input, title: 'Outra intenção' }, 'bob'),
   ).rejects.toThrow('requestId');
 });
+it('persists optional project color and clears it with an audited update', async () => {
+  await repo.updateProject(
+    { projectId: 'p', requestId: 'color1', reason: 'Cor', color: '#dc2626' },
+    'bob',
+  );
+  expect(state.data.get('projects/p')?.color).toBe('#dc2626');
+  await repo.updateProject(
+    { projectId: 'p', requestId: 'color2', reason: 'Automática', color: null },
+    'bob',
+  );
+  expect(state.data.get('projects/p')?.color).toBeNull();
+  expect(state.data.get('projects/p/audit/color2')?.authorUid).toBe('bob');
+});
+
 it('denies foreign personal project access without writes', async () => {
   state.data.set('projects/p', { ...project, type: 'personal' });
   await expect(

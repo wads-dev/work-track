@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils';
+import { ProjectAppearance } from '@work-track/core/registration/domain/project-color';
 import { useCompanyPeople } from '../people/CompanyPeopleContext';
 import { PersonIdentity } from '../people/PersonIdentity';
 import { Button } from '../../components/ui/button';
@@ -484,10 +485,14 @@ export function PersonalPage({
       revealed={revealed}
     />
   );
+  const colorCatalog = projects.rows.map((p) => ({
+    id: p.id,
+    color: p.data.color,
+  }));
   const color = (id: string) =>
-    ['#2457a7', '#a84417', '#35704a', '#8d4388', '#796214', '#166c77'][
-      Array.from(id).reduce((n, c) => n + c.charCodeAt(0), 0) % 6
-    ];
+    new ProjectAppearance(
+      colorCatalog.find((p) => p.id === id) ?? { id },
+    ).getColor(colorCatalog);
   function update(key: string, value: string) {
     const next = calendar
       ? updateCalendarFilters(params, key, value)
@@ -975,6 +980,7 @@ export function PersonalPage({
                         );
                         return {
                           key: project.projectId,
+                          color: color(project.projectId),
                           label: navigation.label,
                           minutes: project.minutes,
                           href: navigation.path
