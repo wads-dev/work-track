@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirestoreDailyHoursRepository } from './modules/daily-hours/infrastructure/firestore-daily-hours.js';
 import { getCompanyReportHandler } from './modules/reports/presentation/get-company-report.js';
 import { FirestoreCompanyReportRepository } from './modules/reports/infrastructure/firestore-company-report.js';
 import { getPersonalReportHandler } from './modules/reports/presentation/get-personal-report.js';
@@ -156,6 +157,7 @@ export const api = onRequest(
     new FirestoreWorkRepository(getFirestore()),
     new FirestoreRecordEditingRepository(getFirestore()),
     new FirestoreProjectManagementRepository(getFirestore()),
+    new FirestoreDailyHoursRepository(getFirestore()),
   ),
 );
 // Public diagnostic endpoint; never returns user data.

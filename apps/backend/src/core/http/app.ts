@@ -1,4 +1,6 @@
 import express from 'express';
+import type { DailyHoursRepository } from '../../modules/daily-hours/domain/daily-hours.js';
+import { registerDailyHoursTool } from '../../modules/daily-hours/presentation/daily-hours-tool.js';
 import type { ProjectManagementRepository } from '../../modules/registration/domain/project-management.js';
 import type { RecordEditingRepository } from '../../modules/registration/domain/record-edit.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -15,6 +17,7 @@ export function createApp(
   repository?: WorkRepository,
   editingRepository?: RecordEditingRepository,
   managementRepository?: ProjectManagementRepository,
+  dailyHoursRepository?: DailyHoursRepository,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -110,6 +113,8 @@ export function createApp(
           editingRepository,
           managementRepository,
         );
+      if (dailyHoursRepository && typeof uid === 'string' && uid)
+        registerDailyHoursTool(server, dailyHoursRepository, uid);
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });
