@@ -225,7 +225,7 @@ describe('timeline stays mathematically faithful while surfaces change', () => {
       expect(html.match(/<a /g)).toHaveLength(count);
       expect(
         html.match(
-          /aria-label="Pessoa · 10:00 · Projeto · Estimado · sem duração"/g,
+          /aria-label="Autor · 10:00 · Projeto · Estimado · sem duração"/g,
         ),
       ).toHaveLength(count);
       expect(html).not.toContain('Nenhum intervalo');
