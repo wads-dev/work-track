@@ -32,7 +32,38 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
   const app = createApp(
     provider,
     {
-      listProjects: vi.fn().mockResolvedValue([]),
+      listProjects: vi.fn().mockResolvedValue([
+        {
+          id: 'p',
+          title: 'SH',
+          description: 'Projeto',
+          createdBy: 'alice',
+          createdAt: '2026-10-11',
+          type: 'work',
+          topics: [
+            {
+              id: 't',
+              title: 'Work Track',
+              description: 'Contexto',
+              githubUrl: 'https://github.com/wads-dev/work-track',
+            },
+          ],
+        },
+      ]),
+      listRecentRecords: vi.fn().mockResolvedValue({
+        records: [
+          {
+            id: 'r',
+            project: { id: 'p', title: 'SH' },
+            topics: [{ id: 't', title: 'Work Track' }],
+            title: 'Resumo',
+            startedAt: '2026-10-11T00:00:00Z',
+            endedAt: null,
+          },
+        ],
+        hasMore: false,
+        nextCursor: null,
+      }),
       createProject: vi.fn(),
       createTopic: vi.fn(),
       register: vi.fn(),
@@ -61,6 +92,27 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
   };
   expect(listed.result.tools.map((t) => t.name)).toContain('update_record');
   expect(listed.result.tools.map((t) => t.name)).toContain('move_topic');
+  const instructions = (
+    await mcp('tools/call', { name: 'get_instructions', arguments: {} })
+  ).body as { result: { content: Array<{ text: string }> } };
+  expect(JSON.parse(instructions.result.content[1]!.text)).toMatchObject({
+    recentRecords: { records: [{ id: 'r', endedAt: null }] },
+  });
+  const recent = (
+    await mcp('tools/call', { name: 'list_recent_records', arguments: {} })
+  ).body as { result: { content: Array<{ text: string }> } };
+  expect(JSON.parse(recent.result.content[0]!.text)).toMatchObject({
+    hasMore: false,
+  });
+  const context = (
+    await mcp('tools/call', {
+      name: 'search_repository_context',
+      arguments: { repository: 'git@github.com:wads-dev/work-track.git' },
+    })
+  ).body as { result: { content: Array<{ text: string }> } };
+  expect(JSON.parse(context.result.content[0]!.text)).toMatchObject({
+    matches: [{ projectId: 'p', topicId: 't', matchType: 'exact_repository' }],
+  });
   expect(listed.result.tools.map((t) => t.name)).not.toContain('move_subject');
   expect(listed.result.tools.map((t) => t.name)).toContain('get_daily_hours');
   expect(
