@@ -59,7 +59,14 @@ it('exposes merge over authenticated MCP HTTP, preserves daily wiring, rejects U
   expect(listed.result.tools.map((t) => t.name)).toContain('get_daily_hours');
   expect(
     listed.result.tools.find((t) => t.name === 'merge_records')!.description,
-  ).toContain('confirmação humana');
+  ).toContain('sem pedir nova confirmação');
+  const mergeInstructions = workInstructions
+    .split('\n')
+    .find((line) => line.startsWith('- merge_records'))!;
+  expect(mergeInstructions).toContain('sem pedir nova confirmação humana');
+  expect(mergeInstructions).not.toContain('peça confirmação humana');
+  expect(mergeInstructions).toContain('apenas de prévia');
+  expect(mergeInstructions).toContain('ambíguos');
   const args = {
     sourceRecordId: 's',
     targetRecordId: 't',
