@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { projectColor } from './project-color.js';
 import { normalize } from '../../shared/text/normalize.js';
 import type { Project, Topic } from './work-model.js';
 export const safeId = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
@@ -34,6 +35,7 @@ export const publicAlias = z
     'Alias deve ser neutro: Projeto reservado, opcionalmente seguido de número.',
   );
 export const metadata = {
+  color: projectColor.nullable().optional(),
   type: z.enum(['personal', 'work']).optional(),
   githubUrl: githubUrl.nullable().optional(),
   confidential: z.boolean().optional(),
