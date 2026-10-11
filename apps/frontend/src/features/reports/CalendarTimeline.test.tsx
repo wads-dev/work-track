@@ -5,7 +5,7 @@ import { PrivacyContext } from '../../shared/ui/privacy';
 import { CalendarTimeline } from './CalendarTimeline';
 import { TooltipProvider } from '../../components/ui/tooltip';
 
-const render = (showPeople: boolean, revealed: boolean) =>
+const render = (showPeople: boolean, revealed: boolean, minutes = 60) =>
   renderToStaticMarkup(
     <MemoryRouter>
       <TooltipProvider>
@@ -17,7 +17,9 @@ const render = (showPeople: boolean, revealed: boolean) =>
                 uid: 'other',
                 projectId: 'project',
                 effectiveStartedAt: '2026-10-09T12:00:00Z',
-                effectiveEndedAt: '2026-10-09T13:00:00Z',
+                effectiveEndedAt: new Date(
+                  Date.parse('2026-10-09T12:00:00Z') + minutes * 60000,
+                ).toISOString(),
                 estimated: false,
               },
             ]}
@@ -55,6 +57,16 @@ it('omits repeated identity for a single selected person', () => {
   expect(html).toContain('min-height:108px');
   expect(html).toContain('height:108px');
   expect(html).not.toContain('text-[11px]');
+});
+
+it('keeps short activities only in the timeline with hover expansion', () => {
+  const html = render(false, true, 10);
+  expect(html).not.toContain('Atividades curtas');
+  expect(html).not.toContain('Detalhes das atividades curtas');
+  expect(html).toContain('09:10');
+  expect(html).toContain('hover:!h-auto');
+  expect(html).toContain('focus-visible:!h-auto');
+  expect(html).toContain('min-height:18px');
 });
 
 it('keeps events and people in confidentiality mode for multiple people', () => {
