@@ -375,44 +375,6 @@ export function CalendarTimeline({
                     })}
                 </div>
               </div>
-              {d.events.some(
-                (e) =>
-                  !e.point &&
-                  projectMinute(e.wallEnd, segments) -
-                    projectMinute(e.wallStart, segments) <
-                    100,
-              ) && (
-                <section
-                  aria-label={'Detalhes das atividades curtas de ' + d.key}
-                  className="mt-3 space-y-2"
-                >
-                  <h4 className="text-sm font-medium">Atividades curtas</h4>
-                  {d.events
-                    .filter(
-                      (e) =>
-                        !e.point &&
-                        projectMinute(e.wallEnd, segments) -
-                          projectMinute(e.wallStart, segments) <
-                          100,
-                    )
-                    .map((e) => (
-                      <div
-                        key={JSON.stringify([
-                          e.item.uid || viewerUid,
-                          e.item.id,
-                        ])}
-                        className="rounded border border-l-4"
-                        style={{ borderColor: color(e.item.projectId) }}
-                      >
-                        {renderIdentity(
-                          e.item.uid || viewerUid,
-                          authorLabel(e.item.uid || viewerUid),
-                        )}
-                        {content(e.item, e.start, e.end)}
-                      </div>
-                    ))}
-                </section>
-              )}
               {/* Normal flow keeps simultaneous points reachable even inside
                   collapsed gaps or outside the interval axis span. */}
               {d.events.some((e) => e.point) && (
