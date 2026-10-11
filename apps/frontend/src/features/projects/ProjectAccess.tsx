@@ -14,7 +14,6 @@ import {
   Dialog,
   DialogContent,
 } from '../../components/ui/dialog';
-import { Textarea } from '../../components/ui/textarea';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Button } from '../../components/ui/button';
 import { useRef, useState } from 'react';
@@ -71,7 +70,7 @@ function AccessForm({
   const [target, setTarget] = useState<ProjectScope | null>(null);
   const [preview, setPreview] = useState<ScopePreview | null>(null);
   const [ack, setAck] = useState(false);
-  const [reason, setReason] = useState('');
+  const reason = 'Alteração de acesso pela interface web.';
   const [confidentialTarget, setConfidentialTarget] = useState<boolean | null>(
     null,
   );
@@ -114,8 +113,22 @@ function AccessForm({
       )
         scopeIntent.current = { ...next, requestId: crypto.randomUUID() };
       const intent = scopeIntent.current;
+      let checkedPreview = preview;
+      if (execute && !checkedPreview) {
+        const check = await createCallable(
+          functions,
+          'changeProjectScope',
+        )({ ...intent, confirmed: false });
+        checkedPreview = check.data as ScopePreview;
+        if (
+          checkedPreview.mode !== 'preview' ||
+          checkedPreview.projectId !== projectId ||
+          checkedPreview.toType !== target
+        )
+          throw Error('Não foi possível conferir a mudança de acesso.');
+      }
       const payload = execute
-        ? scopeConfirmation(intent, preview!, ack)
+        ? scopeConfirmation(intent, checkedPreview!, ack)
         : { ...intent, confirmed: false };
       const result = await createCallable(
         functions,
@@ -223,7 +236,7 @@ function AccessForm({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2">
         <div className="min-w-0 space-y-2">
           <Label htmlFor={'ProjectAccess-6251'}>{'Escopo'}</Label>
           <Select
@@ -231,7 +244,6 @@ function AccessForm({
             disabled={busy || !!disabledReason}
             onValueChange={(value) => {
               setTarget(value as ProjectScope);
-              setReason('');
               setPreview(null);
               setAck(false);
               setError('');
@@ -316,44 +328,18 @@ function AccessForm({
                     : 'Pessoal limita o acesso ao criador. A operação será bloqueada se houver registros de outras pessoas, inclusive históricos removidos.'}
                 </AlertDescription>
               </Alert>
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor={'ProjectAccess-8976'}>
-                  {'Motivo da alteração'}
+              {target === 'work' && (
+                <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
+                  <Checkbox
+                    checked={ack}
+                    disabled={busy}
+                    onCheckedChange={(checked) => setAck(checked === true)}
+                  />
+                  <span>
+                    Entendo e autorizo compartilhar todos esses dados com a
+                    organização.
+                  </span>
                 </Label>
-                <Textarea
-                  value={reason}
-                  disabled={busy || !!preview}
-                  onChange={(e) => setReason(e.target.value)}
-                  id={'ProjectAccess-8976'}
-                  rows={2}
-                ></Textarea>
-              </div>
-              {preview && (
-                <>
-                  <p className="text-sm leading-relaxed">
-                    Prévia: mudança de acesso do projeto. Nenhum horário, texto
-                    ou autoria será reescrito.
-                  </p>
-                  {preview.warnings.map((warning, index) => (
-                    <Alert key={index} className="my-2">
-                      <AlertDescription>{warning}</AlertDescription>
-                    </Alert>
-                  ))}
-                  {preview.requiresSharingAcknowledgement && (
-                    <Label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed">
-                      <Checkbox
-                        checked={ack}
-                        disabled={busy}
-                        onCheckedChange={(checked) => setAck(checked === true)}
-                      />
-                      <span>
-                        {
-                          'Entendo e autorizo compartilhar todos esses dados com a organização.'
-                        }
-                      </span>
-                    </Label>
-                  )}
-                </>
               )}
               {error && (
                 <Alert variant="destructive" className="my-2">
@@ -371,31 +357,16 @@ function AccessForm({
             >
               Cancelar
             </Button>
-            {preview ? (
-              <Button
-                disabled={
-                  busy || (preview.requiresSharingAcknowledgement && !ack)
-                }
-                onClick={() => void changeScope(true)}
-                variant="default"
-                className="min-h-11"
-              >
-                {busy
-                  ? 'Atualizando…'
-                  : target === 'work'
-                    ? 'Confirmar mudança para Global'
-                    : 'Confirmar mudança para Pessoal'}
-              </Button>
-            ) : (
-              <Button
-                disabled={busy || !reason.trim()}
-                onClick={() => void changeScope(false)}
-                variant="default"
-                className="min-h-11"
-              >
-                {busy ? 'Consultando…' : 'Conferir prévia'}
-              </Button>
-            )}
+            <Button
+              disabled={busy || (target === 'work' && !ack)}
+              onClick={() => void changeScope(true)}
+            >
+              {busy
+                ? 'Salvando…'
+                : target === 'work'
+                  ? 'Confirmar mudança para Global'
+                  : 'Confirmar mudança para Pessoal'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

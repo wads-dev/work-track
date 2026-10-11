@@ -35,10 +35,12 @@ export function TopicReport({
   buckets,
   personal = false,
   unassignedMinutes = 0,
+  compact = false,
 }: {
   buckets: TopicReportBucket[];
   personal?: boolean;
   unassignedMinutes?: number;
+  compact?: boolean;
 }) {
   const [params] = useSearchParams();
   const location = useLocation();
@@ -63,15 +65,20 @@ export function TopicReport({
       >
         <div className={cn('flex flex-col gap-4')}>
           <h3 className={cn('text-lg font-semibold')}>Tempo por tópico</h3>
-          <p className={cn('text-sm text-muted-foreground')}>
-            Distribuição informada pelo relatório. Tópicos de projetos
-            diferentes permanecem separados; tempo sem divisão não é repartido
-            automaticamente.
-          </p>
-          <p className={cn('text-base')}>
-            Não distribuído: {hours(unassignedMinutes)}. Tempo sem atribuição
-            válida; não é distribuído por projeto ou pessoa.
-          </p>
+          {!compact && (
+            <p className="text-sm text-muted-foreground">
+              Distribuição informada pelo relatório. Tópicos de projetos
+              diferentes permanecem separados; tempo sem divisão não é repartido
+              automaticamente.
+            </p>
+          )}
+          {(!compact || unassignedMinutes > 0) && (
+            <p className="text-sm text-muted-foreground">
+              Não distribuído: {hours(unassignedMinutes)}
+              {!compact &&
+                '. Tempo sem atribuição válida; não é distribuído por projeto ou pessoa.'}
+            </p>
+          )}
           {buckets.length === 0 ? (
             <p className={cn('text-base text-muted-foreground')}>
               Nenhum tópico com tempo neste escopo.
