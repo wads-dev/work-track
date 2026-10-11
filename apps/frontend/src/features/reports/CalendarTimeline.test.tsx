@@ -47,7 +47,7 @@ it('omits repeated identity for a single selected person', () => {
   expect(html).toContain('09:00');
   expect(html).toContain('10:00');
   expect(html).toContain('Entrega');
-  expect(html).toContain('Corrigir navegação');
+  expect(html).not.toContain('Corrigir navegação');
   expect(html).not.toContain('min-height:22px');
   expect(html).toContain('hover:!h-auto');
   expect(html).toContain('focus-visible:!h-auto');

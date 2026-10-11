@@ -31,8 +31,13 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
   const moveRecord = vi.fn().mockResolvedValue({ recordId: 's' });
   const app = createApp(
     provider,
-    undefined,
-    undefined,
+    {
+      listProjects: vi.fn().mockResolvedValue([]),
+      createProject: vi.fn(),
+      createTopic: vi.fn(),
+      register: vi.fn(),
+    },
+    { updateRecord: vi.fn(), listOpenRecords: vi.fn() },
     undefined,
     undefined,
     {
@@ -54,13 +59,14 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
   const listed = (await mcp('tools/list')).body as {
     result: { tools: { name: string; description: string }[] };
   };
-  expect(listed.result.tools.map((t) => t.name)).toContain('move_record');
+  expect(listed.result.tools.map((t) => t.name)).toContain('update_record');
   expect(listed.result.tools.map((t) => t.name)).toContain('move_topic');
   expect(listed.result.tools.map((t) => t.name)).not.toContain('move_subject');
   expect(listed.result.tools.map((t) => t.name)).toContain('get_daily_hours');
   expect(
-    listed.result.tools.find((t) => t.name === 'move_record')!.description,
-  ).toContain('confirmação humana');
+    listed.result.tools.find((t) => t.name === 'update_record')!.description,
+  ).toContain('auditoria');
+  expect(listed.result.tools.map((t) => t.name)).not.toContain('move_record');
   const args = {
     recordId: 's',
     project_target: 'target',
@@ -68,23 +74,23 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
     reason: 'Remover registro incorreto',
   };
   await mcp('tools/call', {
-    name: 'move_record',
+    name: 'update_record',
     arguments: { ...args, uid: 'bob' },
   });
   expect(moveRecord).not.toHaveBeenCalled();
-  await mcp('tools/call', { name: 'move_record', arguments: args });
+  await mcp('tools/call', { name: 'update_record', arguments: args });
   expect(moveRecord).toHaveBeenCalledWith(
     { ...args, confirmed: false },
     'alice',
   );
   moveRecord.mockClear();
   await mcp('tools/call', {
-    name: 'move_record',
+    name: 'update_record',
     arguments: { ...args, confirmed: true },
   });
   expect(moveRecord).not.toHaveBeenCalled();
   await mcp('tools/call', {
-    name: 'move_record',
+    name: 'update_record',
     arguments: { ...args, confirmed: true, previewToken: '0'.repeat(64) },
   });
   expect(moveRecord).toHaveBeenCalledWith(
@@ -102,7 +108,7 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
   const missing = (await mcp('tools/list')).body as {
     result: { tools: { name: string }[] };
   };
-  expect(missing.result.tools.some((t) => t.name === 'move_record')).toBe(
+  expect(missing.result.tools.some((t) => t.name === 'update_record')).toBe(
     false,
   );
   expect(workInstructions).toContain('Frase futura');

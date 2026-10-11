@@ -107,7 +107,6 @@ export function CalendarTimeline({
       {details && (
         <>
           <span className="block text-xs">{details(item).topics}</span>
-          <span className="block text-sm">{details(item).summary}</span>
         </>
       )}
     </span>

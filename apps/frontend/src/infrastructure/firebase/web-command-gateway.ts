@@ -11,6 +11,7 @@ import { moveRecordInput } from '@work-track/core/registration/domain/record-mov
 export const webCommandNames = new Set([
   'archiveProject',
   'updateProject',
+  'updateTopic',
   'changeProjectScope',
   'updateRecord',
   'moveRecord',
@@ -37,6 +38,8 @@ export class WebCommandGateway implements CommandGateway {
           return (await repository.archiveProject(input, uid)) as Response;
         case 'updateProject':
           return (await repository.updateProject(input, uid)) as Response;
+        case 'updateTopic':
+          return (await repository.updateTopic(input, uid)) as Response;
         case 'updateRecord':
           return (await repository.updateRecord(input, uid)) as Response;
         case 'listTopicMerges':

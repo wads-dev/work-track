@@ -1,8 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
+  moveRecordInput,
+  type MovementRepository,
+} from '@work-track/core/registration/domain/record-movement';
+import { recentRecordsInput } from '@work-track/core/registration/domain/recent-records';
+import { searchRepositoryContext } from '@work-track/core/registration/domain/repository-search';
+import {
   mergeTopicsInput,
-  listTopicMergesInput,
   type TopicManagementRepository,
 } from '@work-track/core/registration/domain/topic-management';
 import { instructionPrefix, workInstructions } from './instructions.js';
@@ -20,6 +25,7 @@ import type { WorkRepository } from '@work-track/core/registration/domain/work-m
 import {
   projectInput,
   topicInput,
+  updateTopicInput,
   registerInput,
 } from '@work-track/core/registration/domain/work-model';
 import { RegistrationService } from '@work-track/core/registration/application/registration-service';
@@ -30,6 +36,7 @@ export function registerWorkTools(
   editing?: RecordEditingRepository,
   management?: ProjectManagementRepository,
   topicManagement?: TopicManagementRepository,
+  movement?: MovementRepository,
 ) {
   server.registerTool(
     'get_instructions',
@@ -43,9 +50,84 @@ export function registerWorkTools(
         idempotentHint: true,
       },
     },
-    () => ({ content: [{ type: 'text' as const, text: workInstructions }] }),
+    async () => {
+      let recentRecords: unknown;
+      try {
+        recentRecords = repository.listRecentRecords
+          ? await repository.listRecentRecords(
+              recentRecordsInput.parse({}),
+              uid,
+            )
+          : { unavailable: true };
+      } catch (error) {
+        recentRecords = {
+          unavailable: true,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Consulta indisponível; não presuma ausência de tracking.',
+        };
+      }
+      return {
+        content: [
+          { type: 'text' as const, text: workInstructions },
+          { type: 'text' as const, text: JSON.stringify({ recentRecords }) },
+        ],
+      };
+    },
   );
   const service = new RegistrationService(repository);
+  if (repository.updateTopic)
+    server.registerTool(
+      'update_topic',
+      {
+        description:
+          instructionPrefix +
+          'Edite título, descrição ou GitHub de tópico existente com IDs explícitos, motivo e requestId estável; auditoria preservada.',
+        inputSchema: updateTopicInput,
+      },
+      (input) => run(() => repository.updateTopic!(input, uid)),
+    );
+  server.registerTool(
+    'list_recent_records',
+    {
+      description:
+        instructionPrefix +
+        'Atualize contexto compacto dos próprios registros: últimas 24h por padrão e abertos antigos; título até 70 caracteres, projeto, tópicos, início e fim. Siga nextCursor quando hasMore; falha não significa ausência de tracking.',
+      inputSchema: recentRecordsInput,
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    },
+    (input) =>
+      run(async () => {
+        if (!repository.listRecentRecords)
+          throw new Error('Consulta de registros recentes indisponível.');
+        return repository.listRecentRecords(input, uid);
+      }),
+  );
+  server.registerTool(
+    'search_repository_context',
+    {
+      description:
+        instructionPrefix +
+        'Localize projetos e tópicos pelo remote GitHub, owner/repo ou nome aproximado. Somente associações cadastradas; confirme ambiguidades antes de registrar.',
+      inputSchema: z
+        .object({
+          repository: z.string().trim().min(1).max(500),
+          limit: z.number().int().min(1).max(100).default(20),
+        })
+        .strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    },
+    ({ repository: term, limit }) =>
+      run(async () =>
+        searchRepositoryContext(
+          await repository.listProjects(uid),
+          term,
+          uid,
+          limit,
+        ),
+      ),
+  );
   const output = (data: unknown) => ({
     content: [{ type: 'text' as const, text: JSON.stringify(data) }],
   });
@@ -104,17 +186,6 @@ export function registerWorkTools(
       },
       (input) => run(() => topicManagement.mergeTopics(input, uid)),
     );
-    server.registerTool(
-      'list_topic_merges',
-      {
-        description:
-          instructionPrefix +
-          'Histórico paginado de unificações de tópicos do projeto, com estados anteriores e posteriores. Somente leitura.',
-        inputSchema: listTopicMergesInput,
-        annotations: { readOnlyHint: true },
-      },
-      (input) => run(() => topicManagement.listTopicMerges(input, uid)),
-    );
   }
   if (editing) {
     server.registerTool(
@@ -122,10 +193,20 @@ export function registerWorkTools(
       {
         description:
           instructionPrefix +
-          'Edite registro próprio com ID explícito e motivo. endedAt null reabre explicitamente; não infira horário.',
-        inputSchema: updateRecordInput,
+          'Edite projeto, tópicos, início, fim, fuso, textos e interrupções com auditoria completa. recordOwnerUid explícito permite editar participante de projeto corporativo; pessoal permanece restrito. Correção solicitada não exige prévia adicional. Publicação pessoal para corporativo exige acknowledgeSharedDestination. endedAt null reabre; não invente horários. Use requestId estável e expectedUpdatedAt.',
+        inputSchema: movement
+          ? z.union([updateRecordInput, moveRecordInput])
+          : updateRecordInput,
       },
-      (input) => run(() => editing.updateRecord(input, uid)),
+      (
+        input:
+          z.infer<typeof updateRecordInput> | z.infer<typeof moveRecordInput>,
+      ) =>
+        run(() =>
+          'project_target' in input && movement
+            ? movement.moveRecord(moveRecordInput.parse(input), uid)
+            : editing.updateRecord(updateRecordInput.parse(input), uid),
+        ),
     );
   }
   server.registerTool(

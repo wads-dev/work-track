@@ -1,4 +1,5 @@
 export interface Topic {
+  githubUrl?: string | null;
   mergedIntoTopicId?: string;
   mergedAt?: string;
   mergedBy?: string;

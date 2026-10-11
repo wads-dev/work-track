@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./repositories/record-edit-plan": {
+      "types": "./lib/repositories/record-edit-plan.d.ts",
+      "development": "./src/repositories/record-edit-plan.ts",
+      "default": "./lib/repositories/record-edit-plan.js"
+    },
     "./repositories/snapshots/personal-report-repository": {
       "types": "./lib/repositories/snapshots/personal-report-repository.d.ts",
       "development": "./src/repositories/snapshots/personal-report-repository.ts",

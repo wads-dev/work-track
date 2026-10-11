@@ -75,6 +75,30 @@ const parent = (data: Record<string, unknown>, pending = false) => ({
   metadata: { fromCache: false, hasPendingWrites: pending },
 });
 beforeEach(() => (mock.listeners.length = 0));
+it('preserves repository identity on metadata-only record snapshots', () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  const stop = subscribeAuthorizedReport(db, 'alice', next, fail);
+  mock.listeners[0]!.next(
+    catalog([['a', { type: 'work', title: 'A', topics: [] }]]),
+  );
+  mock.listeners[1]!.next(catalog([]));
+  const listener = mock.listeners.find(
+    (l) =>
+      (l.q as MockQuery).base &&
+      ((l.q as MockQuery).base as { group?: string }).group === 'records',
+  )!;
+  listener.next(batch([record()], true));
+  const first = next.mock.calls.at(-1)![0].repository;
+  listener.next(batch([record()], false));
+  expect(next.mock.calls.at(-1)![0].repository).toBe(first);
+  listener.next(
+    batch([record({ ...fact, endedAt: '2026-10-08T14:00:00Z' })], false),
+  );
+  expect(next.mock.calls.at(-1)![0].repository).not.toBe(first);
+  expect(fail).not.toHaveBeenCalled();
+  stop();
+});
 it('Web snapshot adapter decodes synchronously without creating listeners or changing SDK metadata', () => {
   const raw = {
     type: 'work',

@@ -1,3 +1,4 @@
+import { buildRecordEditPlan } from '@work-track/data/repositories/record-edit-plan';
 import {
   collection,
   deleteField,
@@ -25,15 +26,49 @@ import {
   assertProjectAccess,
   effectiveProjectType,
 } from '@work-track/core/registration/domain/project-access';
-import {
-  applyRecordPatch,
-  recordSummary,
-  updateRecordInput,
-} from '@work-track/core/registration/domain/record-edit';
+import { updateRecordInput } from '@work-track/core/registration/domain/record-edit';
 import { listTopicMergesInput } from '@work-track/core/registration/domain/topic-management';
 
+import { updateTopicInput } from '@work-track/core/registration/domain/work-model';
+import { normalize } from '@work-track/core/shared/text/normalize';
 export class WebWorkRepository {
   constructor(private readonly db: Firestore) {}
+  async updateTopic(raw: unknown, uid: string) {
+    const input = updateTopicInput.parse(raw);
+    return this.projectWrite(
+      input,
+      uid,
+      'topic_' + uid + '_' + input.requestId,
+      (before) => {
+        assertProjectWritable(before);
+        const topics = before.topics as Array<Record<string, unknown>>;
+        const topic = topics.find((t) => t.id === input.topicId);
+        if (!topic || topic.archived || topic.mergedIntoTopicId)
+          throw new Error('Tópico ativo não encontrado.');
+        const after: Record<string, unknown> = {
+          ...topic,
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.description !== undefined
+            ? { description: input.description }
+            : {}),
+          ...(input.githubUrl !== undefined
+            ? { githubUrl: input.githubUrl }
+            : {}),
+        };
+        if (
+          topics.some(
+            (t) =>
+              t.id !== after.id &&
+              !t.archived &&
+              normalize(String(t.title)) === normalize(String(after.title)),
+          )
+        )
+          throw new Error('Nome de tópico já utilizado.');
+        return { topics: topics.map((t) => (t.id === after.id ? after : t)) };
+      },
+      'update-topic',
+    );
+  }
   async archiveProject(raw: unknown, uid: string) {
     const input = archiveProjectInput.parse(raw);
     return this.projectWrite(
@@ -167,7 +202,7 @@ export class WebWorkRepository {
           recordId: input.recordId,
           auditId: audit.id,
           updatedAt: p.updatedAt,
-          record: p.after,
+          record: p.result ?? p.after,
         };
       }
       const project = target.data()! as {
@@ -178,35 +213,14 @@ export class WebWorkRepository {
       assertProjectWritable(target.data()!);
       if (input.projectId && input.projectId !== before.projectId)
         assertProjectWritable(origin.data()!);
-      const after = applyRecordPatch(before, input, uid, project),
-        summary = recordSummary(after, input.recordId),
-        updatedAt = new Date().toISOString();
-      const patch: Record<string, unknown> = { updatedAt, updatedBy: uid };
-      if (input.endedAt !== undefined) patch.endedAt = input.endedAt;
-      else if (before.endedAt === undefined) patch.endedAt = null;
-      if (input.projectId !== undefined) {
-        patch.projectId = input.projectId;
-        patch.projectSnapshot = {
-          title: project.title,
-          description: project.description,
-        };
-      }
-      if (input.topics !== undefined || input.projectId !== undefined) {
-        patch.topics = summary.topics;
-        patch.topicSnapshots = summary.topics.map((t) =>
-          project.topics.find((k) => k.id === t.topicId),
-        );
-      }
+      const updatedAt = new Date().toISOString();
+      const {
+        patch,
+        summary,
+        audit: auditData,
+      } = buildRecordEditPlan(before, input, uid, project, updatedAt);
       tx.update(ref, patch);
-      tx.set(audit, {
-        request: JSON.stringify(input),
-        authorUid: uid,
-        updatedAt,
-        recordedAt: serverTimestamp(),
-        reason: input.reason,
-        before: recordSummary(before, input.recordId),
-        after: summary,
-      });
+      tx.set(audit, { ...auditData, recordedAt: serverTimestamp() });
       return {
         recordId: input.recordId,
         auditId: audit.id,

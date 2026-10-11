@@ -3,6 +3,7 @@ export type { Project, Topic } from '../../models/work.js';
 export {
   projectInput,
   topicInput,
+  updateTopicInput,
   registerInput,
 } from '../../schemas/registration.js';
 export type {

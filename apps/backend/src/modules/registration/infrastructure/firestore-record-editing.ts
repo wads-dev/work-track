@@ -1,9 +1,12 @@
+import { buildRecordEditPlan } from '@work-track/data/repositories/record-edit-plan';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { assertProjectWritable } from '@work-track/core/registration/domain/project-management';
-import { assertProjectAccess } from '@work-track/core/registration/domain/project-access';
 import {
-  applyRecordPatch,
+  assertProjectAccess,
+  effectiveProjectType,
+} from '@work-track/core/registration/domain/project-access';
+import {
   recordSummary,
   RecordEditError,
   type RecordEditingRepository,
@@ -14,13 +17,12 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
   async updateRecord(input: UpdateRecordInput, uid: string) {
     const ref = this.db
       .collection('users')
-      .doc(uid)
+      .doc(input.recordOwnerUid ?? uid)
       .collection('records')
       .doc(input.recordId);
     const audit = input.requestId
       ? ref.collection('audit').doc(input.requestId)
       : ref.collection('audit').doc();
-    const updatedAt = new Date().toISOString();
     return this.db.runTransaction(async (tx) => {
       const snapshot = await tx.get(ref);
       if (!snapshot.exists)
@@ -31,29 +33,48 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
           'not-found',
           'Registro removido; edição não permitida.',
         );
-      if (before.uid !== uid)
-        throw new RecordEditError(
-          'permission-denied',
-          'Somente o dono pode editar o registro.',
-        );
+      if (before.uid !== (input.recordOwnerUid ?? uid))
+        throw new RecordEditError('not-found', 'Registro não encontrado.');
       const origin = await tx.get(
         this.db.collection('projects').doc(before.projectId as string),
       );
       assertProjectAccess(origin.data(), uid);
+      const corporateEdit = before.uid !== uid;
+      if (corporateEdit && effectiveProjectType(origin.data()!) !== 'work')
+        throw new RecordEditError('not-found', 'Registro não encontrado.');
       if (input.projectId !== undefined) {
         const destination = await tx.get(
           this.db.collection('projects').doc(input.projectId),
         );
         assertProjectAccess(destination.data(), uid);
+        if (
+          corporateEdit &&
+          effectiveProjectType(destination.data()!) !== 'work'
+        )
+          throw new RecordEditError(
+            'permission-denied',
+            'Registro de outro participante deve permanecer em projeto corporativo.',
+          );
+        if (
+          effectiveProjectType(origin.data()!) === 'personal' &&
+          effectiveProjectType(destination.data()!) === 'work' &&
+          !input.acknowledgeSharedDestination
+        )
+          throw new RecordEditError(
+            'invalid-argument',
+            'A transferência publica o texto na organização; confirme acknowledgeSharedDestination explicitamente.',
+          );
       }
       const priorAudit = await tx.get(audit);
       if (priorAudit.exists) {
         const prior = priorAudit.data() as {
           request: string;
+          authorUid: string;
           updatedAt: string;
           after: ReturnType<typeof recordSummary>;
+          result?: ReturnType<typeof recordSummary>;
         };
-        if (prior.request !== JSON.stringify(input))
+        if (prior.authorUid !== uid || prior.request !== JSON.stringify(input))
           throw new RecordEditError(
             'invalid-argument',
             'requestId já usado para outra alteração.',
@@ -62,7 +83,7 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
           recordId: input.recordId,
           updatedAt: prior.updatedAt,
           auditId: audit.id,
-          record: prior.after,
+          record: prior.result ?? prior.after,
         };
       }
       const projectId = input.projectId ?? (before.projectId as string);
@@ -91,33 +112,23 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
           original.data() as { mergeLock?: string; archived?: boolean },
         );
       }
-      const after = applyRecordPatch(before, input, uid, project);
-      const summary = recordSummary(after, input.recordId);
-      const patch: Record<string, unknown> = { updatedAt, updatedBy: uid };
-      if (input.endedAt !== undefined) patch.endedAt = input.endedAt;
-      else if (before.endedAt === undefined) patch.endedAt = null;
-      if (input.projectId !== undefined) {
-        patch.projectId = input.projectId;
-        patch.projectSnapshot = {
-          title: project.title,
-          description: project.description,
-        };
-      }
-      if (input.topics !== undefined || input.projectId !== undefined) {
-        patch.topics = summary.topics;
-        patch.topicSnapshots = summary.topics.map((topic) =>
-          project.topics.find((known) => known.id === topic.topicId),
-        );
-      }
+      const updatedAt = new Date().toISOString();
+      const {
+        patch,
+        summary,
+        audit: auditData,
+      } = buildRecordEditPlan(
+        before,
+        input,
+        uid,
+        project,
+        updatedAt,
+        corporateEdit,
+      );
       tx.update(ref, patch);
       tx.create(audit, {
-        request: JSON.stringify(input),
-        authorUid: uid,
-        updatedAt,
+        ...auditData,
         recordedAt: FieldValue.serverTimestamp(),
-        reason: input.reason,
-        before: recordSummary(before, input.recordId),
-        after: summary,
       });
       return {
         recordId: input.recordId,

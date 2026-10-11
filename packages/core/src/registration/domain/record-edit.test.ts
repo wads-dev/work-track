@@ -14,6 +14,37 @@ const before = {
   topics: [{ topicId: 'general' }],
 };
 const project = { topics: [{ id: 'general' }] };
+it('edits business fields while preserving identity and original registration intent', () => {
+  const input = updateRecordInput.parse({
+    recordId: 'record',
+    reason: 'correção',
+    startedAt: '2026-10-08T09:00:00Z',
+    timeZone: 'America/Sao_Paulo',
+    originalText: 'texto corrigido',
+    interpretation: 'descrição corrigida',
+    interruptions: [{ description: 'pausa', durationMinutes: 5 }],
+  });
+  const after = applyRecordPatch(before, input, 'alice', project);
+  expect(after).toMatchObject({
+    startedAt: input.startedAt,
+    timeZone: input.timeZone,
+    originalText: input.originalText,
+    interpretation: input.interpretation,
+    interruptions: input.interruptions,
+    uid: 'alice',
+    fingerprint: 'immutable',
+    requestId: 'intent',
+  });
+  expect(before.originalText).toBe('original');
+  expect(() =>
+    applyRecordPatch(
+      { ...before, endedAt: '2026-10-08T11:00:00Z' },
+      { recordId: 'record', reason: 'edit', startedAt: '2026-10-08T12:00:00Z' },
+      'alice',
+      project,
+    ),
+  ).toThrow('Fim');
+});
 it('edits only the allowed facts, preserving original evidence', () => {
   const input = updateRecordInput.parse({
     recordId: 'record',
