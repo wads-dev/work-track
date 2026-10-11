@@ -147,14 +147,35 @@ test(
         [
           '--input-type=module',
           '-e',
-          "const f = await import('./index.js'); console.log(JSON.stringify(Object.keys(f).sort()))",
+          "const f = await import('./index.js'); if (typeof f.mcp !== 'function' || 'api' in f || 'moveSubject' in f) throw new Error('Only canonical MCP/topic exports must remain'); console.log(JSON.stringify(Object.keys(f).sort()))",
         ],
         { cwd: isolated, env, encoding: 'utf8', timeout: 15_000 },
       );
       assert.equal(imported.status, 0, imported.stdout + imported.stderr);
       const exportedNames = JSON.parse(imported.stdout.trim());
-      assert(exportedNames.includes('api'));
-      assert(exportedNames.includes('health'));
+      assert(exportedNames.includes('mcp'));
+      assert(!exportedNames.includes('api'));
+      assert(!exportedNames.includes('health'));
+      const retiredCallables = [
+        'getCalendarReport',
+        'getCompanyReport',
+        'getPersonalReport',
+        'getProjectReport',
+        'listProjects',
+        'archiveProject',
+        'updateProject',
+        'changeProjectScope',
+        'updateRecord',
+        'moveRecord',
+        'listTopicMerges',
+        'moveSubject',
+      ];
+      for (const name of retiredCallables) {
+        assert(
+          !exportedNames.includes(name),
+          'Retired callable exported: ' + name,
+        );
+      }
       const discovered = spawnSync(
         process.execPath,
         ['node_modules/firebase-functions/lib/bin/firebase-functions.js'],
@@ -174,8 +195,14 @@ test(
       assert.equal(discovered.status, 0, discovered.stdout + discovered.stderr);
       const runtime = await json(join(isolated, 'functions-manifest.json'));
       assert.deepEqual(Object.keys(runtime.endpoints).sort(), exportedNames);
-      assert(runtime.endpoints.api.httpsTrigger);
-      assert(runtime.endpoints.getPersonalReport.callableTrigger);
+      assert(runtime.endpoints.mcp.httpsTrigger);
+
+      for (const name of retiredCallables) {
+        assert(
+          !Object.hasOwn(runtime.endpoints, name),
+          'Retired endpoint: ' + name,
+        );
+      }
     } finally {
       // This canonical path is the fresh mkdtemp fixture owned by this test only.
       assert(

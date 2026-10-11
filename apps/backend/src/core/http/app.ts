@@ -174,9 +174,6 @@ export function createApp(
       await transport.handleRequest(req, res, req.body);
     },
   );
-  app.get('/health', (_req, res) =>
-    res.json({ status: 'ok', service: 'work-track' }),
-  );
   app.use(
     (
       err: unknown,

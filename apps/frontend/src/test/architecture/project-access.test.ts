@@ -24,18 +24,21 @@ const preview: ScopePreview = {
   previewToken: 'token',
 };
 describe('project access', () => {
-  it('only exact creator of active explicit scope allowed; legacy denied', () => {
-    expect(
-      scopeDisabledReason({ createdBy: 'owner', type: 'personal' }, 'owner'),
-    ).toBe('');
+  it('personal requires owner; public and missing-type work allow any authenticated editor', () => {
     for (const project of [
+      { createdBy: 'owner', type: 'personal' },
       { type: 'work' },
       { createdBy: 'other', type: 'work' },
+      { createdBy: 'other' },
+    ])
+      expect(scopeDisabledReason(project, 'owner')).toBe('');
+    expect(scopeDisabledReason({ type: 'work' }, '')).not.toBe('');
+    for (const project of [
+      { createdBy: 'other', type: 'personal' },
       { createdBy: 'owner', type: 'work', archived: true },
       { createdBy: 'owner', type: 'work', mergedInto: 'target' },
       { createdBy: 'owner', type: 'work', mergeLock: {} },
       { createdBy: 'owner', type: 'unknown' },
-      { createdBy: 'owner' },
     ])
       expect(scopeDisabledReason(project, 'owner')).not.toBe('');
   });

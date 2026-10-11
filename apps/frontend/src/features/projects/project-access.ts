@@ -1,10 +1,11 @@
+import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 export type ProjectScope = 'personal' | 'work';
 export type ScopePreview = {
   mode: 'preview';
   projectId: string;
   fromType: ProjectScope;
   toType: ProjectScope;
-  recordCount: number;
+  recordCount?: number;
   requiresSharingAcknowledgement: boolean;
   warnings: string[];
   previewToken: string;
@@ -13,15 +14,15 @@ export function scopeDisabledReason(
   project: Record<string, unknown>,
   uid: string,
 ) {
-  if (!uid || project.createdBy !== uid)
-    return typeof project.createdBy === 'string'
-      ? 'Somente o criador pode mudar o escopo.'
-      : 'Criador não identificado: alteração de escopo indisponível.';
+  if (!canAccessProject(project, uid))
+    return 'Projeto indisponível: Pessoal exige o criador; Global exige autenticação.';
   if (project.archived === true || project.mergedInto || project.mergeLock)
     return 'Projeto arquivado, mesclado ou bloqueado: alteração indisponível.';
-  if (project.type === undefined)
-    return 'Escopo legado: alteração indisponível até conferir o tipo explícito do projeto.';
-  if (project.type !== 'personal' && project.type !== 'work')
+  if (
+    project.type !== undefined &&
+    project.type !== 'personal' &&
+    project.type !== 'work'
+  )
     return 'Escopo não identificado: alteração indisponível.';
   return '';
 }

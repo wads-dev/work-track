@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 
-it('retains the deployed callable alias without reintroducing the legacy MCP tool', () => {
+it('exports only canonical topic callable after legacy retirement', () => {
   const entry = readFileSync(
     new URL('../../index.ts', import.meta.url),
     'utf8',
@@ -13,7 +13,9 @@ it('retains the deployed callable alias without reintroducing the legacy MCP too
     ),
     'utf8',
   );
-  expect(entry).toContain('export const moveSubject = moveTopic;');
+  expect(entry).not.toContain('export const moveSubject');
+  expect(entry).not.toContain('export const api');
+  expect(entry).toContain('export const mcp');
   expect(tools).toContain("'move_topic'");
   expect(tools).not.toContain("'move_subject'");
 });

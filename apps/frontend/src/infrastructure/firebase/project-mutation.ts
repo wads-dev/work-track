@@ -1,11 +1,11 @@
 import type { Functions } from 'firebase/functions';
-import { CallableCommandGateway } from './callable-command-gateway';
+import { WebCommandGateway } from './web-command-gateway';
 import { projectRepository } from '../../data/cache/project-repository';
 export function projectMutation<Request = unknown, Response = unknown>(
   functions: Functions,
   name: string,
 ) {
-  const gateway = new CallableCommandGateway(functions);
+  const gateway = new WebCommandGateway(functions);
   return async (input: Request) => {
     try {
       return { data: await gateway.execute<Request, Response>(name, input) };

@@ -78,16 +78,7 @@ try {
   await client.close();
   await transport.close();
 }
-for (const name of [
-  'listProjects',
-  'getPersonalReport',
-  'getCompanyReport',
-  'getProjectReport',
-  'createProject',
-  'mergeProjects',
-  'mergeTopics',
-  'listTopicMerges',
-]) {
+for (const name of ['createProject', 'mergeProjects', 'mergeTopics']) {
   const response = await fetch(
     'https://southamerica-east1-wadsworktrack.cloudfunctions.net/' + name,
     {
@@ -106,11 +97,6 @@ for (const name of [
   assert.equal(data.error?.status, 'UNAUTHENTICATED');
 }
 console.log('UNAUTHENTICATED_CALLABLES_DENIED_PASS');
-const health = await fetch(base + '/health', {
-  signal: AbortSignal.timeout(30000),
-});
-assert(health.ok, 'Health failed');
-console.log('HEALTH_PASS');
 if (stage === 'all') {
   const index = await fetch(base + '/?release=9e64b8d', {
     signal: AbortSignal.timeout(30000),
