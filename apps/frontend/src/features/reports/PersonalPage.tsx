@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils';
+import { Clock3 } from 'lucide-react';
 import { ProjectAppearance } from '@work-track/core/registration/domain/project-color';
 import { useCompanyPeople } from '../people/CompanyPeopleContext';
 import { PersonIdentity } from '../people/PersonIdentity';
@@ -8,7 +9,6 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '../../components/ui/tooltip';
-import { Label } from '../../components/ui/label';
 import { Input } from '../../components/ui/input';
 import {
   Select,
@@ -17,7 +17,6 @@ import {
   SelectContent,
   SelectItem,
 } from '../../components/ui/select';
-import { Checkbox } from '../../components/ui/checkbox';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Card } from '../../components/ui/card';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -29,7 +28,11 @@ import {
 } from '../../data/cache/project-access-revision';
 import { QueryToolbar, QueryToolbarField } from '../../shared/ui/QueryToolbar';
 import { CalendarHistory } from './CalendarHistory';
-import { calendarTopics, updateCalendarFilters } from './calendar-history';
+import {
+  calendarTopics,
+  updateCalendarFilters,
+  updateCalendarView,
+} from './calendar-history';
 import {
   calendarPerson,
   calendarRequest,
@@ -555,19 +558,30 @@ export function PersonalPage({
       ) : (
         <QueryToolbar
           label="Filtros do calendário"
+          compact
           actions={
             <>
               {' '}
-              <Label className={cn('m-0 text-xs flex items-center gap-2')}>
-                <Checkbox
-                  aria-label="Incluir arquivados"
-                  checked={includeArchived}
-                  onCheckedChange={(checked) =>
-                    update('includeArchived', String(checked === true))
-                  }
-                />
-                {'Arquivados'}
-              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Incluir arquivados"
+                    aria-pressed={includeArchived}
+                    onClick={() =>
+                      update('includeArchived', String(!includeArchived))
+                    }
+                  >
+                    <UiIcon kind={includeArchived ? 'archive' : 'archiveoff'} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {includeArchived
+                    ? 'Ocultar arquivados'
+                    : 'Incluir arquivados'}
+                </TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -587,41 +601,10 @@ export function PersonalPage({
               </Tooltip>
             </>
           }
-          secondary={
-            <QueryToolbarField>
-              <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
-                <span className="text-xs text-muted-foreground">
-                  {'Densidade'}
-                </span>
-                <Select
-                  disabled={allWeeks}
-                  value={density || '__all__'}
-                  onValueChange={(value) =>
-                    update('density', value === '__all__' ? '' : value)
-                  }
-                >
-                  <SelectTrigger aria-label={'Densidade'}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {['supercompact', 'compact', 'timeline'].map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d === 'timeline'
-                          ? 'Régua'
-                          : d === 'compact'
-                            ? 'Compacto'
-                            : 'Supercompacto'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Label>
-            </QueryToolbarField>
-          }
         >
           <div
             className={cn(
-              'flex items-center gap-2 w-full sm:w-auto [&_[data-query-field]]:w-40',
+              'flex items-center gap-1 shrink-0 [&_[data-query-field]]:w-36',
             )}
           >
             <Tooltip>
@@ -642,10 +625,8 @@ export function PersonalPage({
               <TooltipContent>{'Período anterior'}</TooltipContent>
             </Tooltip>
             <QueryToolbarField kind="date">
-              <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
-                <span className="text-xs text-muted-foreground">
-                  {'Referência'}
-                </span>
+              <div className="min-w-0">
+                <span className="sr-only">{'Referência'}</span>
                 <Input
                   aria-label={'Referência'}
                   type="date"
@@ -653,7 +634,7 @@ export function PersonalPage({
                   disabled={allWeeks}
                   onChange={(e) => update('date', e.target.value)}
                 />
-              </Label>
+              </div>
             </QueryToolbarField>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -674,21 +655,21 @@ export function PersonalPage({
             </Tooltip>
           </div>
           <QueryToolbarField>
-            <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
-              <span className="text-xs text-muted-foreground">
-                {'Visualização'}
-              </span>
+            <div className="min-w-0">
+              <span className="sr-only">{'Visualização'}</span>
               <Select
-                disabled={allWeeks}
-                value={view || '__all__'}
+                value={allWeeks ? 'all' : view}
                 onValueChange={(value) =>
-                  update('view', value === '__all__' ? '' : value)
+                  setParams(updateCalendarView(params, value))
                 }
               >
                 <SelectTrigger aria-label={'Visualização'}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all" disabled={!projectId}>
+                    Semanas com atividade
+                  </SelectItem>
                   {['day', 'three-days', 'week', 'month'].map((v) => (
                     <SelectItem key={v} value={v}>
                       {v === 'month'
@@ -702,11 +683,14 @@ export function PersonalPage({
                   ))}
                 </SelectContent>
               </Select>
-            </Label>
+            </div>
           </QueryToolbarField>
-          <QueryToolbarField>
-            <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
-              <span className="text-xs text-muted-foreground">{'Pessoa'}</span>
+          <div
+            data-calendar-person
+            className="order-first shrink-0 sm:order-none"
+          >
+            <div className="min-w-0">
+              <span className="sr-only">{'Pessoa'}</span>
               <Select
                 disabled={loading || profile}
                 value={person.selected || '__all__'}
@@ -719,8 +703,27 @@ export function PersonalPage({
                   )
                 }
               >
-                <SelectTrigger aria-label={'Pessoa'} className={cn('min-h-11')}>
-                  <SelectValue />
+                <SelectTrigger
+                  aria-label={
+                    'Pessoa: ' +
+                    (person.selected === 'all'
+                      ? 'Todas as pessoas'
+                      : person.selected === uid
+                        ? 'Meu calendário'
+                        : participants.find((p) => p.uid === person.selected)
+                            ?.label || 'Pessoa selecionada')
+                  }
+                  className="w-auto gap-1 px-2"
+                >
+                  {person.selected === 'all' ? (
+                    <UiIcon kind="people" />
+                  ) : (
+                    <PersonIdentity
+                      uid={person.selected}
+                      avatarOnly
+                      respectPrivacy={false}
+                    />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={uid}>
@@ -747,32 +750,8 @@ export function PersonalPage({
                     )}
                 </SelectContent>
               </Select>
-            </Label>
-          </QueryToolbarField>
-          <QueryToolbarField>
-            <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
-              <span className="text-xs text-muted-foreground">{'Período'}</span>
-              <Select
-                value={allWeeks ? 'all' : 'dated'}
-                onValueChange={(value) =>
-                  update(
-                    'allWeeks',
-                    value === '__all__' ? '' : value === 'all' ? 'true' : '',
-                  )
-                }
-              >
-                <SelectTrigger aria-label={'Período'}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dated">Período com data</SelectItem>
-                  <SelectItem value="all" disabled={!projectId}>
-                    Todas as semanas com atividade
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </Label>
-          </QueryToolbarField>
+            </div>
+          </div>
           <QueryToolbarField kind="project">
             <CalendarProjectFilter
               key={String(revealed)}
@@ -797,10 +776,8 @@ export function PersonalPage({
           </QueryToolbarField>
           {projectId && (
             <QueryToolbarField>
-              <Label className="flex min-w-0 flex-col items-stretch gap-1.5">
-                <span className="text-xs text-muted-foreground">
-                  {'Tópico'}
-                </span>
+              <div className="min-w-0">
+                <span className="sr-only">{'Tópico'}</span>
                 <Select
                   value={subject || '__all__'}
                   onValueChange={(value) =>
@@ -819,9 +796,36 @@ export function PersonalPage({
                     ))}
                   </SelectContent>
                 </Select>
-              </Label>
+              </div>
             </QueryToolbarField>
           )}
+          <QueryToolbarField>
+            <div className="min-w-0">
+              <span className="sr-only">{'Densidade'}</span>
+              <Select
+                disabled={allWeeks}
+                value={density || '__all__'}
+                onValueChange={(value) =>
+                  update('density', value === '__all__' ? '' : value)
+                }
+              >
+                <SelectTrigger aria-label={'Densidade'}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['supercompact', 'compact', 'timeline'].map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {d === 'timeline'
+                        ? 'Régua'
+                        : d === 'compact'
+                          ? 'Compacto'
+                          : 'Supercompacto'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </QueryToolbarField>
         </QueryToolbar>
       )}
       {calendar &&
@@ -853,21 +857,6 @@ export function PersonalPage({
             tópicos.
           </AlertDescription>
         </Alert>
-      )}
-      {calendar && (
-        <p className={cn('text-sm')}>
-          {person.mode === 'own'
-            ? 'Meu calendário'
-            : person.selected === 'all'
-              ? 'Todas as pessoas · organização'
-              : 'Calendário de ' +
-                (participants.find((p) => p.uid === person.selected)?.label ||
-                  'pessoa selecionada')}{' '}
-          ·{' '}
-          {person.mode === 'own'
-            ? 'Meus registros pessoais e globais'
-            : 'Somente projetos globais autorizados, nunca registros pessoais de outras pessoas'}
-        </p>
       )}
       {local &&
         (!local.coherent || local.fromCache || local.hasPendingWrites) && (
@@ -914,122 +903,126 @@ export function PersonalPage({
                 </AlertDescription>
               </Alert>
             )}
-            <div hidden={!infoOpen}>
-              <div className={cn('flex flex-col gap-2')}>
-                <p className={cn('text-base')}>
-                  Referência {date(report.asOf, zone)} · {report.policy};{' '}
-                  {report.page.scannedCount} registros examinados.{' '}
-                  {report.estimatedCount} estimados. Tempos podem somar
-                  atividades simultâneas.
-                </p>
-                <Button asChild variant="ghost">
-                  <RouterLink to={'/rules'}>Regras de cálculo</RouterLink>
-                </Button>
-                {revealed ? (
-                  report.warnings.map((warning, i) => (
-                    <Alert key={i} className={cn('border-amber-500/50')}>
-                      <AlertDescription>{warning}</AlertDescription>
-                    </Alert>
-                  ))
-                ) : (
+            {infoOpen && (
+              <div>
+                <div className={cn('flex flex-col gap-2')}>
                   <p className={cn('text-base')}>
-                    Avisos detalhados ocultos na apresentação atual.
+                    Referência {date(report.asOf, zone)} · {report.policy};{' '}
+                    {report.page.scannedCount} registros examinados.{' '}
+                    {report.estimatedCount} estimados. Tempos podem somar
+                    atividades simultâneas.
                   </p>
-                )}
+                  <Button asChild variant="ghost">
+                    <RouterLink to={'/rules'}>Regras de cálculo</RouterLink>
+                  </Button>
+                  {revealed ? (
+                    report.warnings.map((warning, i) => (
+                      <Alert key={i} className={cn('border-amber-500/50')}>
+                        <AlertDescription>{warning}</AlertDescription>
+                      </Alert>
+                    ))
+                  ) : (
+                    <p className={cn('text-base')}>
+                      Avisos detalhados ocultos na apresentação atual.
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             {report.intervals.length === 0 && (
               <EmptyState
                 title="Nenhum registro neste escopo"
                 detail="Ajuste o período ou os filtros para consultar outras atividades."
               />
             )}
-            <div
-              className={cn(
-                'grid grid-cols-1 gap-4',
-                company && 'md:grid-cols-2',
-              )}
-            >
-              {(!calendar || profile) &&
-                report.byProject.some((project) => project.minutes > 0) && (
-                  <Card className={cn('gap-0 p-4 sm:p-5 min-w-0')}>
-                    <h3 className={cn('text-lg font-semibold')}>
-                      Tempo por projeto
-                    </h3>
-                    <InteractiveChart
-                      title="Tempo por projeto"
-                      variant="pie"
-                      data={report.byProject.map((project) => {
-                        const navigation = metadataNavigation(
-                          project.projectId,
-                          projects.rows.find(
-                            (row) => row.id === project.projectId,
-                          )?.data,
-                          revealed,
-                        );
-                        return {
-                          key: project.projectId,
-                          color: color(project.projectId),
-                          label: navigation.label,
-                          minutes: project.minutes,
-                          href: navigation.path
-                            ? navigation.path +
-                              '?returnTo=' +
-                              encodeURIComponent(
-                                location.pathname + location.search,
-                              )
-                            : undefined,
-                        };
-                      })}
-                    />
-                    <ul
-                      className={cn(
-                        'list-none p-0 m-0 [&_li]:py-2 [&_li]:border-b [&_li]:text-sm',
-                      )}
-                    >
-                      {report.byProject.map((p) => (
-                        <li key={p.projectId}>
-                          {projectLink(p.projectId)}: {hours(p.minutes)} ·{' '}
-                          {report.totalMinutes > 0
-                            ? new Intl.NumberFormat('pt-BR', {
-                                style: 'percent',
-                                maximumFractionDigits: 1,
-                              }).format(p.minutes / report.totalMinutes)
-                            : '0%'}{' '}
-                          do agregado selecionado
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
+            {(!calendar || profile || company) && (
+              <div
+                className={cn(
+                  'grid grid-cols-1 gap-4',
+                  company && 'md:grid-cols-2',
                 )}
-              {company &&
-                report.byUser?.some((person) => person.minutes > 0) && (
-                  <Card className={cn('gap-0 p-4 sm:p-5 min-w-0')}>
-                    <h2 className={cn('text-lg font-semibold')}>
-                      Tempo por pessoa
-                    </h2>
-                    <InteractiveChart
-                      title="Tempo por pessoa"
-                      variant="bar"
-                      data={report.byUser.map((person, index) => ({
-                        key: person.uid,
-                        uid: revealed ? person.uid : undefined,
-                        label: revealed
-                          ? companyPeople.name(person.uid) ||
-                            'Pessoa da empresa'
-                          : 'Pessoa ' + (index + 1),
-                        minutes: person.minutes,
-                        href:
-                          revealed && person.uid
-                            ? '/people/' +
-                              encodeURIComponent(person.uid) +
-                              location.search
-                            : undefined,
-                      }))}
-                    />
-                  </Card>
-                )}
-            </div>
+              >
+                {(!calendar || profile) &&
+                  report.byProject.some((project) => project.minutes > 0) && (
+                    <Card className={cn('gap-0 p-4 sm:p-5 min-w-0')}>
+                      <h3 className={cn('text-lg font-semibold')}>
+                        Tempo por projeto
+                      </h3>
+                      <InteractiveChart
+                        title="Tempo por projeto"
+                        variant="pie"
+                        data={report.byProject.map((project) => {
+                          const navigation = metadataNavigation(
+                            project.projectId,
+                            projects.rows.find(
+                              (row) => row.id === project.projectId,
+                            )?.data,
+                            revealed,
+                          );
+                          return {
+                            key: project.projectId,
+                            color: color(project.projectId),
+                            label: navigation.label,
+                            minutes: project.minutes,
+                            href: navigation.path
+                              ? navigation.path +
+                                '?returnTo=' +
+                                encodeURIComponent(
+                                  location.pathname + location.search,
+                                )
+                              : undefined,
+                          };
+                        })}
+                      />
+                      <ul
+                        className={cn(
+                          'list-none p-0 m-0 [&_li]:py-2 [&_li]:border-b [&_li]:text-sm',
+                        )}
+                      >
+                        {report.byProject.map((p) => (
+                          <li key={p.projectId}>
+                            {projectLink(p.projectId)}: {hours(p.minutes)} ·{' '}
+                            {report.totalMinutes > 0
+                              ? new Intl.NumberFormat('pt-BR', {
+                                  style: 'percent',
+                                  maximumFractionDigits: 1,
+                                }).format(p.minutes / report.totalMinutes)
+                              : '0%'}{' '}
+                            do agregado selecionado
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
+                  )}
+                {company &&
+                  report.byUser?.some((person) => person.minutes > 0) && (
+                    <Card className={cn('gap-0 p-4 sm:p-5 min-w-0')}>
+                      <h2 className={cn('text-lg font-semibold')}>
+                        Tempo por pessoa
+                      </h2>
+                      <InteractiveChart
+                        title="Tempo por pessoa"
+                        variant="bar"
+                        data={report.byUser.map((person, index) => ({
+                          key: person.uid,
+                          uid: revealed ? person.uid : undefined,
+                          label: revealed
+                            ? companyPeople.name(person.uid) ||
+                              'Pessoa da empresa'
+                            : 'Pessoa ' + (index + 1),
+                          minutes: person.minutes,
+                          href:
+                            revealed && person.uid
+                              ? '/people/' +
+                                encodeURIComponent(person.uid) +
+                                location.search
+                              : undefined,
+                        }))}
+                      />
+                    </Card>
+                  )}
+              </div>
+            )}
             {!calendar && (
               <div className={cn('mt-4')}>
                 <TopicReport
@@ -1226,6 +1219,19 @@ export function PersonalPage({
                                               ),
                                             ),
                                           ),
+                                        )}
+                                        {item.estimated && (
+                                          <span
+                                            className="ml-1 inline-flex align-middle"
+                                            role="img"
+                                            aria-label="Duração estimada"
+                                            title="Duração estimada"
+                                          >
+                                            <Clock3
+                                              className="size-3 shrink-0"
+                                              aria-hidden="true"
+                                            />
+                                          </span>
                                         )}{' '}
                                         {person.selected === 'all' &&
                                           item.uid && (
@@ -1281,9 +1287,7 @@ export function PersonalPage({
                                                 ),
                                               ),
                                             )}
-                                            {item.estimated
-                                              ? ' · Estimado'
-                                              : ''}
+
                                             {report.intervals.some(
                                               (other) =>
                                                 other.id !== item.id &&
@@ -1337,6 +1341,19 @@ export function PersonalPage({
                                               ),
                                             ),
                                           ),
+                                        )}
+                                        {item.estimated && (
+                                          <span
+                                            className="ml-1 inline-flex align-middle"
+                                            role="img"
+                                            aria-label="Duração estimada"
+                                            title="Duração estimada"
+                                          >
+                                            <Clock3
+                                              className="size-3 shrink-0"
+                                              aria-hidden="true"
+                                            />
+                                          </span>
                                         )}{' '}
                                         {person.selected === 'all' &&
                                           item.uid && (
@@ -1392,9 +1409,7 @@ export function PersonalPage({
                                                 ),
                                               ),
                                             )}
-                                            {item.estimated
-                                              ? ' · Estimado'
-                                              : ''}
+
                                             {report.intervals.some(
                                               (other) =>
                                                 other.id !== item.id &&
@@ -1431,7 +1446,8 @@ export function PersonalPage({
                                       Date.parse(item.effectiveStartedAt)) /
                                       60000,
                                   ) +
-                                  ' min'}
+                                  ' min' +
+                                  (item.estimated ? ' · Duração estimada' : '')}
                               </TooltipContent>
                             </Tooltip>
                             <span className={cn('text-xs block px-2')}>
@@ -1439,7 +1455,7 @@ export function PersonalPage({
                               {item.estimated &&
                                 item.effectiveStartedAt ===
                                   item.effectiveEndedAt && (
-                                  <span className="block text-muted-foreground">
+                                  <span className="sr-only">
                                     Registro aberto · sem duração estimada
                                   </span>
                                 )}

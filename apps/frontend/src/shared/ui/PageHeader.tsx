@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react';
+import { cn } from '../../lib/utils';
+import { layoutTokens } from './layout-tokens';
+
 export function PageHeader({
   title,
   context,
@@ -13,14 +16,18 @@ export function PageHeader({
   return (
     <section
       aria-label={title + ' e filtros'}
-      className="mb-4 rounded-xl border bg-card p-5 sm:p-6"
+      className={cn('mb-3', layoutTokens.surface, layoutTokens.stack)}
     >
-      <div className="grid min-w-0 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <div>
-          <h1 className="text-[22px] font-semibold">{title}</h1>
+      <div className={layoutTokens.wrapRow}>
+        <div className="min-w-0 flex-1 basis-[200px]">
+          <h1 className="text-xl font-semibold leading-tight">{title}</h1>
           <p className="text-sm text-muted-foreground">{context}</p>
         </div>
-        {actions}
+        {actions && (
+          <div className={cn(layoutTokens.wrapRow, layoutTokens.controls)}>
+            {actions}
+          </div>
+        )}
       </div>
       {children}
     </section>

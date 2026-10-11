@@ -46,6 +46,17 @@ export function updateCalendarFilters(
     next.delete(name);
   return next;
 }
+/** A single view control replaces the separate dated/history period selector. */
+export function updateCalendarView(params: URLSearchParams, view: string) {
+  if (view === 'all') return updateCalendarFilters(params, 'allWeeks', 'true');
+  const next = updateCalendarFilters(params, 'allWeeks', '');
+  next.set('view', view);
+  next.set('density', view === 'month' ? 'supercompact' : 'timeline');
+  // Keep the explicit reference date when switching between dated views.
+  const date = params.get('date');
+  if (date) next.set('date', date);
+  return next;
+}
 export function validateOccupiedWeeks(weeks: unknown) {
   if (!Array.isArray(weeks) || weeks.length > 10000)
     throw new Error('Semanas históricas inválidas.');

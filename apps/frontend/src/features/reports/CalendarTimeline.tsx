@@ -10,6 +10,7 @@ import {
 import { Card } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { useState } from 'react';
+import { Clock3 } from 'lucide-react';
 
 import { contextualRecordPath } from '../../app/routes';
 import { Link as RouterLink } from 'react-router-dom';
@@ -96,8 +97,14 @@ export function CalendarTimeline({
   const content = (item: Event, start: number, end: number) => (
     <span className="block whitespace-normal [overflow-wrap:anywhere] px-2 py-1 text-sm leading-snug">
       <span className="block font-semibold tabular-nums">
-        {time(start)} – {time(end)}
-        {item.estimated ? ' · Estimado' : ''}
+        <span className="inline-flex items-center gap-1">
+          <span>
+            {time(start)} – {time(end)}
+          </span>
+          {item.estimated && (
+            <Clock3 aria-hidden="true" className="size-3.5 shrink-0" />
+          )}
+        </span>
       </span>
       <span className="block font-medium">{label(item.projectId)}</span>
       {details && (
@@ -328,7 +335,6 @@ export function CalendarTimeline({
                                   >
                                     {renderIdentity(personUid, fallback)}
                                     {content(e.item, e.start, e.end)}
-                                    {e.item.estimated ? ' ◷' : ''}
                                     {e.overlap ? ' ⇆' : ''}
                                   </span>
                                 </span>
@@ -355,7 +361,6 @@ export function CalendarTimeline({
                                   >
                                     {renderIdentity(personUid, fallback)}
                                     {content(e.item, e.start, e.end)}
-                                    {e.item.estimated ? ' ◷' : ''}
                                     {e.overlap ? ' ⇆' : ''}
                                   </span>
                                 </RouterLink>
@@ -365,6 +370,12 @@ export function CalendarTimeline({
                           <TooltipContent>
                             {renderIdentity(personUid, fallback)}
                             {caption}
+                            {details && (
+                              <span className="block">
+                                {details(e.item).topics} ·{' '}
+                                {details(e.item).summary}
+                              </span>
+                            )}
                           </TooltipContent>
                         </Tooltip>
                       );
@@ -378,9 +389,7 @@ export function CalendarTimeline({
                   aria-label={'Marcadores estimados de ' + d.key}
                   className="mt-2 min-w-0"
                 >
-                  <h4 className="text-xs font-medium mb-1">
-                    Estimados · sem duração
-                  </h4>
+                  <h4 className="text-xs font-medium mb-1">Sem duração</h4>
                   <ul className="flex flex-col gap-1">
                     {d.events
                       .filter((e) => e.point)
@@ -407,16 +416,34 @@ export function CalendarTimeline({
                               <span
                                 tabIndex={0}
                                 aria-label={caption}
+                                title={
+                                  caption +
+                                  (details
+                                    ? ' · ' +
+                                      details(e.item).topics +
+                                      ' · ' +
+                                      details(e.item).summary
+                                    : '')
+                                }
                                 className={className}
                                 style={{ borderColor: color(e.item.projectId) }}
                               >
                                 {renderIdentity(personUid, fallback)}
-                                {content(e.item, e.start, e.end)} · Estimado ·
+                                {content(e.item, e.start, e.end)}
                                 sem duração
                               </span>
                             ) : (
                               <RouterLink
                                 aria-label={caption}
+                                title={
+                                  caption +
+                                  (details
+                                    ? ' · ' +
+                                      details(e.item).topics +
+                                      ' · ' +
+                                      details(e.item).summary
+                                    : '')
+                                }
                                 className={className}
                                 style={{ borderColor: color(e.item.projectId) }}
                                 to={
@@ -431,7 +458,7 @@ export function CalendarTimeline({
                                 }
                               >
                                 {renderIdentity(personUid, fallback)}
-                                {content(e.item, e.start, e.end)} · Estimado ·
+                                {content(e.item, e.start, e.end)}
                                 sem duração
                               </RouterLink>
                             )}
