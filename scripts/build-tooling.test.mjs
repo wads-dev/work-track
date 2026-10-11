@@ -17,6 +17,17 @@ import demoVite from '../docker/firebase/vite.config.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = (file) => readFile(join(root, file), 'utf8');
+test('Docker uses Alpine and removes installation cache in the same image layer', async () => {
+  const dockerfile = await source('docker/firebase/Dockerfile');
+  assert.match(dockerfile, /^FROM node:22-alpine$/m);
+  assert.match(dockerfile, /apk add --no-cache openjdk21-jre/);
+  assert.match(
+    dockerfile,
+    /RUN npm install[^\n]*firebase-tools@15\.33\.0 \\\s*&& npm cache clean --force/,
+  );
+  assert.match(await source('docker-compose.yml'), /image: node:22-alpine/);
+});
+
 const core = '@work-track/core/registration/domain/project-access';
 const data =
   '@work-track/data/repositories/snapshots/personal-report-repository';

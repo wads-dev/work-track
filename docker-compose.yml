@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: node:22
+    image: node:22-alpine
     working_dir: /workspace
     init: true
     command: >-
