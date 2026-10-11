@@ -46,6 +46,8 @@ export interface TopicMergePreview {
 export interface TopicMergeExecution {
   mode: 'execution';
   status: 'completed';
+  migratedRecordCount?: number;
+  removedTopicIds?: string[];
   projectId: string;
   auditId: string;
   updatedAt: string;
@@ -151,7 +153,13 @@ export function previewTopicMerge(
         'not-found',
         'Tópico origem não existe neste projeto.',
       );
-    if (topic.id === 'general' || topic.archived || topic.mergedIntoTopicId)
+    const legacyAlias =
+      topic.mergedIntoTopicId &&
+      resolveTopicId(project.topics, topic.id) === target.id;
+    if (
+      topic.id === 'general' ||
+      (!legacyAlias && (topic.archived || topic.mergedIntoTopicId))
+    )
       throw new ProjectManagementError(
         'failed-precondition',
         'Origem Geral, arquivada ou já mesclada não permitida.',
@@ -174,7 +182,7 @@ export function previewTopicMerge(
     preservesRecords: true,
     recordImpact: { scope: 'not-scanned', count: null },
     warnings: [
-      'Registros e snapshots históricos permanecem inalterados. Relatórios resolvem aliases no projeto.',
+      'Na execução, referências e snapshots dos registros são migrados para o destino e os tópicos de origem são removidos do projeto; fatos e auditoria são preservados. Limites: 2000 registros físicos no contexto e 100 registros migrados atomicamente.',
       'Impacto em registros não foi contado; esta prévia não é uma contagem completa.',
       'Não há desfazer nesta versão; auditoria preserva estados anteriores e posteriores.',
     ],

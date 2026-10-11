@@ -181,7 +181,7 @@ export function registerWorkTools(
       {
         description:
           instructionPrefix +
-          'Prévia somente leitura por padrão; unir tópicos do MESMO projeto preserva registros/snapshots e auditoria. Exige origens/destino explícitos, confirmed true, motivo e requestId estável; nunca confirme sem pedido humano. Sem desfazer nesta versão.',
+          'Prévia somente leitura por padrão; unir tópicos do MESMO projeto migra referências e snapshots dos registros para o destino e remove os tópicos de origem do projeto, preservando fatos e auditoria. Execução atômica até 100 registros; contexto completo até 2000 registros físicos. Exige origens/destino explícitos, confirmed true, motivo e requestId estável; nunca confirme sem pedido humano. Sem desfazer nesta versão.',
         inputSchema: mergeTopicsInput,
       },
       (input) => run(() => topicManagement.mergeTopics(input, uid)),

@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
-import { assertProjectAccess } from '@work-track/core/registration/domain/project-access';
+import {
+  assertProjectAccess,
+  effectiveProjectType,
+} from '@work-track/core/registration/domain/project-access';
 import type { Firestore } from 'firebase-admin/firestore';
 import type {
   Project,
@@ -65,17 +68,147 @@ export class FirestoreTopicManagementRepository implements TopicManagementReposi
       previewTopicMerge(project, input);
       const recordedAt = new Date().toISOString();
       const before = project.topics.map((t) => ({ ...t }));
-      const after: Topic[] = before.map((t) =>
-        input.sourceTopicIds.includes(t.id)
-          ? {
-              ...t,
-              archived: true,
-              mergedIntoTopicId: input.targetTopicId,
-              mergedAt: recordedAt,
-              mergedBy: uid,
-            }
-          : t,
+      const removed = new Set(input.sourceTopicIds);
+      // Include inbound aliases so no live record or catalog entry retains a dangling ID.
+      let expanded = true;
+      while (expanded) {
+        expanded = false;
+        for (const topic of before) {
+          if (
+            !removed.has(topic.id) &&
+            topic.mergedIntoTopicId &&
+            removed.has(topic.mergedIntoTopicId)
+          ) {
+            removed.add(topic.id);
+            expanded = true;
+          }
+        }
+      }
+      const after: Topic[] = before.filter((t) => !removed.has(t.id));
+      const target = after.find((t) => t.id === input.targetTopicId)!;
+      const scan = await tx.get(
+        this.db
+          .collectionGroup('records')
+          .where('projectId', '==', input.projectId)
+          .limit(2001),
       );
+      if (scan.docs.length > 2000)
+        throw new ProjectManagementError(
+          'resource-exhausted',
+          'Contexto excede 2000 registros físicos; nenhum tópico foi removido.',
+        );
+      const migrations = scan.docs.flatMap((doc) => {
+        const data = doc.data() as Record<string, unknown>;
+        const owner = data.uid;
+        if (
+          typeof owner !== 'string' ||
+          doc.ref.path !== 'users/' + owner + '/records/' + doc.id ||
+          (effectiveProjectType(project) === 'personal' &&
+            owner !== project.createdBy)
+        )
+          throw new ProjectManagementError(
+            'failed-precondition',
+            'Propriedade inválida; nenhum tópico foi removido.',
+          );
+        if (!Array.isArray(data.topics))
+          throw new ProjectManagementError(
+            'failed-precondition',
+            'Distribuição de tópicos inválida; nenhum tópico foi removido.',
+          );
+        const allocations = data.topics as Record<string, unknown>[];
+        if (
+          allocations.some(
+            (a) =>
+              !a ||
+              typeof a.topicId !== 'string' ||
+              ['percentage', 'durationMinutes'].some(
+                (key) =>
+                  a[key] !== undefined &&
+                  (typeof a[key] !== 'number' ||
+                    !Number.isFinite(a[key]) ||
+                    a[key] <= 0),
+              ),
+          )
+        )
+          throw new ProjectManagementError(
+            'failed-precondition',
+            'Distribuição de tópicos inválida; nenhum tópico foi removido.',
+          );
+        const snapshots = Array.isArray(data.topicSnapshots)
+          ? (data.topicSnapshots as Record<string, unknown>[])
+          : [];
+        if (snapshots.some((s) => !s || typeof s.id !== 'string'))
+          throw new ProjectManagementError(
+            'failed-precondition',
+            'Snapshots de tópicos inválidos; nenhum tópico foi removido.',
+          );
+        if (
+          !allocations.some((a) => removed.has(a.topicId as string)) &&
+          !snapshots.some((s) => removed.has(s.id as string))
+        )
+          return [];
+        const mapped: Record<string, unknown>[] = allocations.map((a) =>
+          removed.has(a.topicId as string)
+            ? { ...a, topicId: target.id }
+            : { ...a },
+        );
+        const topics: Record<string, unknown>[] = [];
+        for (const allocation of mapped) {
+          const existing = topics.find((a) => a.topicId === allocation.topicId);
+          if (!existing) {
+            topics.push(allocation);
+            continue;
+          }
+          const keys = ['percentage', 'durationMinutes'] as const;
+          const key = keys.find(
+            (k) =>
+              typeof existing[k] === 'number' &&
+              typeof allocation[k] === 'number',
+          );
+          if (
+            !key ||
+            keys.some(
+              (k) =>
+                k !== key &&
+                (existing[k] !== undefined || allocation[k] !== undefined),
+            )
+          )
+            throw new ProjectManagementError(
+              'failed-precondition',
+              'Alocações convergentes ambíguas; informe repartição explícita antes de mesclar.',
+            );
+          existing[key] =
+            (existing[key] as number) + (allocation[key] as number);
+          if (
+            !Number.isFinite(existing[key]) ||
+            (key === 'percentage' && (existing[key] as number) > 100)
+          )
+            throw new ProjectManagementError(
+              'failed-precondition',
+              'Alocação consolidada inválida; nenhum tópico foi removido.',
+            );
+        }
+        const topicSnapshots = snapshots.filter(
+          (s) => !removed.has(s.id as string),
+        );
+        if (
+          topics.some((a) => a.topicId === target.id) &&
+          !topicSnapshots.some((s) => s.id === target.id)
+        )
+          topicSnapshots.push({ ...target });
+        const patch = {
+          topics,
+          topicSnapshots,
+          updatedAt: recordedAt,
+          updatedBy: uid,
+        };
+        return [{ doc, before: data, after: { ...data, ...patch }, patch }];
+      });
+      if (migrations.length > 100)
+        throw new ProjectManagementError(
+          'resource-exhausted',
+          'Mesclagem atômica limitada a 100 registros; nenhum tópico foi removido.',
+        );
       const result: TopicMergeExecution = {
         mode: 'execution',
         status: 'completed',
@@ -85,6 +218,8 @@ export class FirestoreTopicManagementRepository implements TopicManagementReposi
         sourceTopicIds: [...input.sourceTopicIds],
         targetTopicId: input.targetTopicId,
         preservesRecords: true,
+        migratedRecordCount: migrations.length,
+        removedTopicIds: [...removed],
       };
       const audit: TopicMergeAudit = {
         id,
@@ -107,7 +242,44 @@ export class FirestoreTopicManagementRepository implements TopicManagementReposi
           'failed-precondition',
           'Catálogo grande demais para auditoria atômica; nenhum tópico foi alterado.',
         );
-      tx.update(ref, { topics: after, updatedAt: recordedAt });
+      const recordAudits = migrations.map((m) => ({
+        action: 'merge-topics',
+        authorUid: uid,
+        recordOwnerUid: m.before.uid,
+        recordPath: m.doc.ref.path,
+        reason: input.reason,
+        requestId: input.requestId,
+        operationId: id,
+        updatedAt: recordedAt,
+        before: m.before,
+        after: m.after,
+      }));
+      if (
+        recordAudits.some(
+          (a) => Buffer.byteLength(JSON.stringify(a)) > 700000,
+        ) ||
+        recordAudits.reduce(
+          (n, a) => n + Buffer.byteLength(JSON.stringify(a)),
+          0,
+        ) +
+          migrations.reduce(
+            (n, m) => n + Buffer.byteLength(JSON.stringify(m.after)),
+            0,
+          ) >
+          7000000
+      )
+        throw new ProjectManagementError(
+          'resource-exhausted',
+          'Auditoria excede limite atômico seguro; nenhum tópico foi removido.',
+        );
+      for (const [index, migration] of migrations.entries()) {
+        tx.update(migration.doc.ref, migration.patch);
+        tx.create(
+          migration.doc.ref.collection('edits').doc(id),
+          recordAudits[index]!,
+        );
+      }
+      tx.update(ref, { topics: after, updatedAt: recordedAt, updatedBy: uid });
       tx.create(auditRef, { ...audit, fingerprint, result });
       return result;
     });

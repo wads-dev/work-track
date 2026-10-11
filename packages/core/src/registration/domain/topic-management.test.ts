@@ -76,7 +76,8 @@ it('resolves bounded alias chains, rejects cycles/missing/archived endpoints and
   expect(() =>
     resolveTopicId([{ id: 'a', mergedIntoTopicId: 'missing' }], 'a'),
   ).toThrow();
-  expect(() =>
-    previewTopicMerge({ ...project, topics: merged }, input),
-  ).toThrow('já mesclada');
+  expect(
+    previewTopicMerge({ ...project, topics: merged }, input).sourceTopics[0]!
+      .id,
+  ).toBe('a');
 });
