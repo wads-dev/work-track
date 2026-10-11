@@ -53,7 +53,7 @@ export function registerMovementTools(
     openWorldHint: false,
   };
   const description =
-    'Consulte get_instructions. Move registros entre projetos de mesmo escopo com auditoria do ator e proprietário em cada registro. Em projetos corporativos, move_topic inclui todos os participantes e move_record aceita recordOwnerUid explícito; em pessoais somente o proprietário pode mover seus registros. Prévia sem escrita por padrão; apresente destino, contagem e avisos e peça confirmação humana. Só depois confirmed true com mesmo previewToken/requestId/motivo. topic_target opcional reutiliza nome exato normalizado único ativo ou cria tópico com nome original. Múltiplos tópicos/aliases/mais de100 bloqueados; origem preservada para outros participantes. Nunca confirme automaticamente.';
+    'Move registros entre projetos de mesmo escopo com auditoria do ator e proprietário em cada registro. Em projetos corporativos, move_topic inclui todos os participantes e move_record aceita recordOwnerUid explícito; em pessoais somente o proprietário pode mover seus registros. Prévia sem escrita por padrão; apresente destino, contagem e avisos e peça confirmação humana. Só depois confirmed true com mesmo previewToken/requestId/motivo. topic_target opcional reutiliza nome exato normalizado único ativo ou cria tópico com nome original. Múltiplos tópicos/aliases/mais de100 bloqueados; origem preservada para outros participantes. Nunca confirme automaticamente.';
   const run = async (fn: () => Promise<Record<string, unknown>>) => {
     try {
       return {

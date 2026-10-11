@@ -14,7 +14,7 @@ export function registerPauseTool(
     'register_pause',
     {
       description:
-        'Antes de usar consulte get_instructions. Somente pausa PASSADA de minutos explícitos: resumedAt é o momento ISO da fala/retomada, nunca o recebimento. Fecha registro próprio aberto (<24h) no início da pausa e cria retomada atômica no mesmo contexto. Se múltiplos, pergunte recordId. requestId estável, motivo e fala original obrigatórios. Vou pausar (futuro): NÃO use esta ferramenta; update_record só encerra agora sem criar retomada.',
+        'Somente pausa PASSADA de minutos explícitos: resumedAt é o momento ISO da fala/retomada, nunca o recebimento. Fecha registro próprio aberto (<24h) no início da pausa e cria retomada atômica no mesmo contexto. Se múltiplos, pergunte recordId. requestId estável, motivo e fala original obrigatórios. Vou pausar (futuro): NÃO use esta ferramenta; update_record só encerra agora sem criar retomada.',
       inputSchema: pauseInput,
       annotations: {
         readOnlyHint: false,

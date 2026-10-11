@@ -4,8 +4,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { registerWorkTools } from './work-tools.js';
 import type { WorkRepository } from '@work-track/core/registration/domain/work-model';
-import { instructionPrefix } from './instructions.js';
-it('serves conceptual plain text with SDK, prefixes work descriptions, never touches repositories', async () => {
+it('serves conceptual plain text with SDK, reads instructions once per context without repeating guidance in other descriptions, never touches repositories', async () => {
   const listProjects = vi.fn<WorkRepository['listProjects']>(),
     createProject = vi.fn<WorkRepository['createProject']>(),
     createTopic = vi.fn<WorkRepository['createTopic']>(),
@@ -26,7 +25,14 @@ it('serves conceptual plain text with SDK, prefixes work descriptions, never tou
       tools.tools.find((t) => t.name === 'get_instructions')?.annotations,
     ).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     for (const tool of tools.tools.filter((t) => t.name !== 'get_instructions'))
-      expect(tool.description?.startsWith(instructionPrefix)).toBe(true);
+      expect(tool.description).not.toContain('get_instructions');
+    const description = tools.tools.find(
+      (t) => t.name === 'get_instructions',
+    )!.description!;
+    expect(description).toContain('somente se ainda não leu');
+    expect(description).toContain('contexto atual');
+    expect(description).toContain('não repita antes de cada ferramenta');
+    expect(description).toContain('list_recent_records');
     const response = await client.callTool({
       name: 'get_instructions',
       arguments: {},

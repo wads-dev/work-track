@@ -1,5 +1,3 @@
-export const instructionPrefix =
-  'Antes de usar esta ferramenta, consulte get_instructions. ';
 export const workInstructions = `# Work Track: conceitos e fluxo
 
 - Logo após get_instructions, confira recentRecords retornados: últimas 24h e abertos antigos. Ao trabalhar em repositório, use search_repository_context com o remote GitHub e compare projeto E tópico com registros abertos. Se não houver tracking correspondente, sugira iniciar e só use register após aceite humano; nunca invente início ou encerre outros registros. Correspondência aproximada/ambígua exige escolha. Registro antigo aberto não prova atividade atual. Lista indisponível/incompleta não prova ausência: consulte list_recent_records e siga nextCursor; atualize ao trocar contexto, sem repetir sugestões a cada mensagem.
@@ -23,4 +21,4 @@ export const workInstructions = `# Work Track: conceitos e fluxo
 
 - remove_record: remoção lógica de registro próprio, inclusive aberto/órfão. Nunca apague físico nem invente fim. Execute prévia com recordId, requestId estável e motivo; apresente o registro e aviso de impacto nas horas e estimativas, peça confirmação humana explícita; somente depois confirmed:true com o mesmo previewToken. Registro removido não aparece em leituras funcionais, horas, próximo início, orçamento, nem candidatos a pausa/edição/divisão. Não tenta recriar com mesmo requestId; auditoria e texto são preservados. Não há desfazer nem remoção automática de outros segmentos ligados.
 
-Estas orientações são conceituais, não substituem consentimento humano, validação de dados nem autenticação. Consulte-as antes das demais ferramentas; não há bloqueio de sessão nem alteração de dados ao ler este guia.`;
+Estas orientações são conceituais, não substituem consentimento humano, validação de dados nem autenticação. Não há bloqueio de sessão nem alteração de dados ao ler este guia.`;

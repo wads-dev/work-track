@@ -14,7 +14,7 @@ export function registerMergeTool(
     'merge_records',
     {
       description:
-        'Consulte get_instructions. Mescle dois registros próprios encerrados do mesmo projeto/fuso e distribuição de tópicos em um intervalo contínuo do menor início ao maior fim, mesmo com lacunas ou sobreposição. Lacunas passam a integrar o intervalo; outros projetos não são alterados. Interrupções e minutos absolutos bloqueiam. Pedido explícito de mesclagem já autoriza executar, sem pedir nova confirmação. Obtenha a prévia técnica somente leitura e execute confirmed true com mesmo previewToken/requestId/motivo, sem outra pergunta. Se pediu apenas prévia, não execute. Pergunte somente se origem/destino forem ambíguos. Origem é removida logicamente, destino conserva ID; evidências completas ficam na auditoria. Não há desfazer.',
+        'Mescle dois registros próprios encerrados do mesmo projeto/fuso e distribuição de tópicos em um intervalo contínuo do menor início ao maior fim, mesmo com lacunas ou sobreposição. Lacunas passam a integrar o intervalo; outros projetos não são alterados. Interrupções e minutos absolutos bloqueiam. Pedido explícito de mesclagem já autoriza executar, sem pedir nova confirmação. Obtenha a prévia técnica somente leitura e execute confirmed true com mesmo previewToken/requestId/motivo, sem outra pergunta. Se pediu apenas prévia, não execute. Pergunte somente se origem/destino forem ambíguos. Origem é removida logicamente, destino conserva ID; evidências completas ficam na auditoria. Não há desfazer.',
       inputSchema: mergeInput,
       annotations: {
         readOnlyHint: false,

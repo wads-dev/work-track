@@ -13,7 +13,7 @@ export function registerRemovalTool(
     'remove_record',
     {
       description:
-        'Consulte get_instructions. Remove logicamente registro próprio, mantendo fatos e auditoria. Prévia read-only por padrão: apresente registro e impacto nas horas/estimativas; peça confirmação humana. Somente depois confirmed true com mesmo previewToken/requestId/motivo. Pode remover aberto sem inventar fim e registro órfão próprio. Não apaga físico, não remove ligados nem desfaz.',
+        'Remove logicamente registro próprio, mantendo fatos e auditoria. Prévia read-only por padrão: apresente registro e impacto nas horas/estimativas; peça confirmação humana. Somente depois confirmed true com mesmo previewToken/requestId/motivo. Pode remover aberto sem inventar fim e registro órfão próprio. Não apaga físico, não remove ligados nem desfaz.',
       inputSchema: removalInput,
       annotations: {
         readOnlyHint: false,

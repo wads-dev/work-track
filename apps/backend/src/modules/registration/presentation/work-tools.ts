@@ -10,7 +10,7 @@ import {
   mergeTopicsInput,
   type TopicManagementRepository,
 } from '@work-track/core/registration/domain/topic-management';
-import { instructionPrefix, workInstructions } from './instructions.js';
+import { workInstructions } from './instructions.js';
 import {
   updateProjectInput,
   archiveProjectInput,
@@ -42,7 +42,7 @@ export function registerWorkTools(
     'get_instructions',
     {
       description:
-        'Leia primeiro: conceitos e fluxo seguro antes das demais ferramentas Work Track. Somente leitura, não registra atividade.',
+        'Chame somente se ainda não leu as instruções do Work Track no contexto atual. Leia uma vez e reutilize essas orientações nas próximas operações; não repita antes de cada ferramenta ou mensagem. Em um novo contexto, ou se as instruções anteriores não estiverem mais disponíveis, leia novamente. Retorna conceitos, fluxo seguro e registros recentes. Somente leitura, não registra atividade. Para atualizar apenas os registros recentes, use list_recent_records.',
       inputSchema: z.object({}).strict(),
       annotations: {
         readOnlyHint: true,
@@ -82,7 +82,6 @@ export function registerWorkTools(
       'update_topic',
       {
         description:
-          instructionPrefix +
           'Edite título, descrição ou GitHub de tópico existente com IDs explícitos, motivo e requestId estável; auditoria preservada.',
         inputSchema: updateTopicInput,
       },
@@ -92,7 +91,6 @@ export function registerWorkTools(
     'list_recent_records',
     {
       description:
-        instructionPrefix +
         'Atualize contexto compacto dos próprios registros: últimas 24h por padrão e abertos antigos; título até 70 caracteres, projeto, tópicos, início e fim. Siga nextCursor quando hasMore; falha não significa ausência de tracking.',
       inputSchema: recentRecordsInput,
       annotations: { readOnlyHint: true, destructiveHint: false },
@@ -108,7 +106,6 @@ export function registerWorkTools(
     'search_repository_context',
     {
       description:
-        instructionPrefix +
         'Localize projetos e tópicos pelo remote GitHub, owner/repo ou nome aproximado. Somente associações cadastradas; confirme ambiguidades antes de registrar.',
       inputSchema: z
         .object({
@@ -148,7 +145,6 @@ export function registerWorkTools(
       'archive_project',
       {
         description:
-          instructionPrefix +
           'Arquive/desarquive projeto com ID explícito, archived boolean, motivo e requestId estável. Origem mesclada não pode ser reaberta. Nunca apagar histórico.',
         inputSchema: archiveProjectInput,
       },
@@ -158,7 +154,6 @@ export function registerWorkTools(
       'update_project',
       {
         description:
-          instructionPrefix +
           'Edite metadados de projeto com ID explícito, motivo e requestId estável. Confidencialidade é apenas apresentação, não autorização.',
         inputSchema: updateProjectInput,
       },
@@ -168,7 +163,6 @@ export function registerWorkTools(
       'merge_projects',
       {
         description:
-          instructionPrefix +
           'Preview sem mutation por padrão. Exige origem/destino explícitos. confirmed true, requestId e motivo executam um lote até100. Repetir retoma. Nunca escolher ou confirmar sem pedido humano.',
         inputSchema: mergeProjectsInput,
       },
@@ -180,7 +174,6 @@ export function registerWorkTools(
       'merge_topics',
       {
         description:
-          instructionPrefix +
           'Prévia somente leitura por padrão; unir tópicos do MESMO projeto migra referências e snapshots dos registros para o destino e remove os tópicos de origem do projeto, preservando fatos e auditoria. Execução atômica até 100 registros; contexto completo até 2000 registros físicos. Exige origens/destino explícitos, confirmed true, motivo e requestId estável; nunca confirme sem pedido humano. Sem desfazer nesta versão.',
         inputSchema: mergeTopicsInput,
       },
@@ -192,7 +185,6 @@ export function registerWorkTools(
       'update_record',
       {
         description:
-          instructionPrefix +
           'Edite projeto, tópicos, início, fim, fuso, textos e interrupções com auditoria completa. recordOwnerUid explícito permite editar participante de projeto corporativo; pessoal permanece restrito. Correção solicitada não exige prévia adicional. Publicação pessoal para corporativo exige acknowledgeSharedDestination. endedAt null reabre; não invente horários. Use requestId estável e expectedUpdatedAt.',
         inputSchema: movement
           ? z.union([updateRecordInput, moveRecordInput])
@@ -213,7 +205,6 @@ export function registerWorkTools(
     'search_projects',
     {
       description:
-        instructionPrefix +
         'Pesquise antes de registrar/criar. Busca aproximada por título, descrição e tópicos, com acentos e erros de escrita; não usa embeddings. Sem query lista projetos. Retorna IDs, tópicos e scores. Pergunte em caso de ambiguidade.',
       inputSchema: z.object({
         query: z.string().max(500).default(''),
@@ -229,7 +220,6 @@ export function registerWorkTools(
     'create_project',
     {
       description:
-        instructionPrefix +
         'Crie projeto com tipo personal (somente proprietário) ou work (corporativo compartilhado) escolhido EXPLICITAMENTE pela pessoa; se ausente pergunte, nunca infira nem use padrão. Após pesquisar e não encontrar. Exige título e descrição generosa do escopo. Retorna ID e tópico Geral padrão. Reutiliza títulos normalizados iguais.',
       inputSchema: projectInput,
     },
@@ -239,7 +229,6 @@ export function registerWorkTools(
     'create_topic',
     {
       description:
-        instructionPrefix +
         'Crie tópico em projeto existente; reutilize tópicos retornados pela pesquisa. Geral já existe para atividades sem contexto específico.',
       inputSchema: topicInput,
     },
@@ -249,7 +238,6 @@ export function registerWorkTools(
     'register',
     {
       description:
-        instructionPrefix +
         'Registre atividade do usuário autenticado: projeto e início obrigatórios; fim opcional, nunca invente. Resolva tempos relativos ao momento da fala, não ao recebimento de transcrição. Preserve texto e interpretação. Aceita vários tópicos existentes e percentuais/durações somente informados; não reparte automaticamente. Sem tópicos usa Geral. Preserve interrupções e sobreposições; não encerra registros anteriores. Vários projetos: uma chamada por projeto. closePrevious padrão false; pergunte e obtenha confirmação humana explícita antes de true, exige motivo; múltiplos abertos exigem closedPreviousRecordId explícito, nunca adivinhe. Reutilize requestId nos retries.',
       inputSchema: registerInput,
     },
