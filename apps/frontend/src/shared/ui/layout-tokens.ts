@@ -1,6 +1,5 @@
 /** Literal Tailwind classes shared by page headers and query surfaces. */
 export const layoutTokens = {
-  surface: 'min-w-0 rounded-xl border bg-card p-3',
   wrapRow: 'flex min-w-0 flex-wrap items-center gap-2',
   stack: 'flex min-w-0 flex-col gap-2',
   controlHeight: 'h-11 sm:h-9',
