@@ -1,9 +1,9 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import {
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   connectAuthEmulator,
-  getAuth,
-  setPersistence,
+  initializeAuth,
 } from 'firebase/auth';
 import {
   connectFirestoreEmulator,
@@ -44,7 +44,13 @@ export async function initializeServices() {
     emulator ? '50px' : '0px',
   );
   const app = initializeApp(config as FirebaseOptions, 'work-track-dashboard');
-  const auth = getAuth(app);
+  // Choose one persistence before restoring the user. getAuth() followed by
+  // setPersistence() migrates localStorage → IndexedDB → localStorage in a new
+  // tab, removing the shared auth key and making existing tabs observe a logout.
+  const auth = initializeAuth(app, {
+    persistence: browserLocalPersistence,
+    popupRedirectResolver: browserPopupRedirectResolver,
+  });
   // Keep queried documents in IndexedDB across reloads; coordinate the cache across tabs.
   // SDK handles unsupported/unavailable persistence; auth and snapshot freshness stay separate.
   const db = initializeFirestore(app, {
@@ -80,7 +86,9 @@ export async function initializeServices() {
       port('functions', 5001),
     );
   }
-  await setPersistence(auth, browserLocalPersistence);
+  // Connect demo emulators synchronously above, before restoration makes requests.
+  // Never expose services to protected pages before the persisted session settles.
+  await auth.authStateReady();
   return { auth, db, functions };
 }
 export type Services = Awaited<ReturnType<typeof initializeServices>>;
