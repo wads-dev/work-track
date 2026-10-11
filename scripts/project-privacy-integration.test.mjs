@@ -58,7 +58,63 @@ if (!run) {
     await import('../apps/backend/lib/modules/registration/infrastructure/firestore-topic-management.js');
   const { registerWorkTools } =
     await import('../apps/backend/lib/modules/registration/presentation/work-tools.js');
+  const { listProjectsHandler } =
+    await import('../apps/backend/lib/modules/registration/presentation/list-projects.js');
+  const { getProjectReportHandler } =
+    await import('../apps/backend/lib/modules/reports/presentation/get-project-report.js');
+  const { getPersonalReportHandler } =
+    await import('../apps/backend/lib/modules/reports/presentation/get-personal-report.js');
+  const { getCompanyReportHandler } =
+    await import('../apps/backend/lib/modules/reports/presentation/get-company-report.js');
+  const { FirestoreProjectReportRepository } =
+    await import('../apps/backend/lib/modules/reports/infrastructure/firestore-project-report.js');
+  const { FirestorePersonalReportRepository } =
+    await import('../apps/backend/lib/modules/reports/infrastructure/firestore-personal-report.js');
+  const { FirestoreCompanyReportRepository } =
+    await import('../apps/backend/lib/modules/reports/infrastructure/firestore-company-report.js');
   const repo = new FirestoreWorkRepository(db);
+  // Keep the same handlers/core/repositories without deploying retired read callables.
+  const readHandlers = {
+    listProjects: [listProjectsHandler, repo],
+    getProjectReport: [
+      getProjectReportHandler,
+      new FirestoreProjectReportRepository(db, auth),
+    ],
+    getPersonalReport: [
+      getPersonalReportHandler,
+      new FirestorePersonalReportRepository(db),
+    ],
+    getCompanyReport: [
+      getCompanyReportHandler,
+      new FirestoreCompanyReportRepository(db, auth),
+    ],
+  };
+  const reportAsOf = Date.now();
+  async function readHandler(name, data, token) {
+    const claims = token ? await auth.verifyIdToken(token) : undefined;
+    const [handler, repository] = readHandlers[name];
+    return handler(
+      repository,
+      data,
+      claims ? { uid: claims.uid, token: claims } : undefined,
+      reportAsOf,
+    );
+  }
+  async function goodRead(name, data, token) {
+    const result = await readHandler(name, data, token);
+    checks++;
+    return result;
+  }
+  async function badRead(name, data, token, status) {
+    let rejected;
+    await assert.rejects(readHandler(name, data, token), (error) => {
+      assert.equal(error.code, status.toLowerCase().replaceAll('_', '-'));
+      rejected = error;
+      return true;
+    });
+    checks++;
+    return rejected;
+  }
   const owned = new Set(),
     users = new Set();
   const sha = (text) => createHash('sha256').update(text).digest('hex');
@@ -243,7 +299,7 @@ if (!run) {
         collected = [],
         pages = 0;
       do {
-        const page = await good(
+        const page = await goodRead(
           'listProjects',
           { limit: 100, includeArchived: true, ...(cursor ? { cursor } : {}) },
           person.token,
@@ -265,21 +321,26 @@ if (!run) {
     });
     assert(!JSON.stringify(search).includes(pa.id));
     assert(JSON.stringify(search).includes(pb.id));
-    await bad('listProjects', { cursor: pa.id }, b.token, 'INVALID_ARGUMENT');
-    const hidden = await bad(
+    await badRead(
+      'listProjects',
+      { cursor: pa.id },
+      b.token,
+      'INVALID_ARGUMENT',
+    );
+    const hidden = await badRead(
       'getProjectReport',
       { projectId: pa.id },
       b.token,
       'NOT_FOUND',
     );
-    const missing = await bad(
+    const missing = await badRead(
       'getProjectReport',
       { projectId: marker + '-missing' },
       b.token,
       'NOT_FOUND',
     );
     assert.equal(hidden.message, missing.message);
-    await good('getProjectReport', { projectId: pa.id }, a.token);
+    await goodRead('getProjectReport', { projectId: pa.id }, a.token);
     const denied = 'Projeto não encontrado.';
     await toolsB(
       'create_topic',
@@ -374,7 +435,7 @@ if (!run) {
     });
     const globalInput = { ...reportInput, projectId: work.id };
     const globalBefore = stable(
-      await good('getCompanyReport', globalInput, b.token),
+      await goodRead('getCompanyReport', globalInput, b.token),
     );
     // Private-only closed and open facts must not alter company facts/counts/estimates/warnings.
     for (const [person, projectId, tool, endedAt] of [
@@ -406,19 +467,23 @@ if (!run) {
       marker,
     });
     const globalAfter = stable(
-      await good('getCompanyReport', globalInput, b.token),
+      await goodRead('getCompanyReport', globalInput, b.token),
     );
     assert.deepEqual(
       globalAfter,
       globalBefore,
       'Company totals/counts/context changed after personal facts',
     );
-    const personalB = await good('getPersonalReport', reportInput, b.token);
+    const personalB = await goodRead('getPersonalReport', reportInput, b.token);
     assert(!JSON.stringify(personalB).includes(pa.id));
     assert(!JSON.stringify(personalB).includes(a.uid));
     assert(!JSON.stringify(globalAfter).includes(pa.id));
     assert(!JSON.stringify(globalAfter).includes(pb.id));
-    const broadCompany = await good('getCompanyReport', reportInput, b.token);
+    const broadCompany = await goodRead(
+      'getCompanyReport',
+      reportInput,
+      b.token,
+    );
     assert(!JSON.stringify(broadCompany).includes(pa.id));
     assert(!JSON.stringify(broadCompany).includes(pb.id));
     assert.equal(owned.size, 12, 'Unexpected document ledger');
@@ -429,6 +494,7 @@ if (!run) {
         checks,
         documentsOwned: owned.size,
         limitations: [
+          'Read privacy uses handlers/core/repositories with verified emulator claims, not retired callable HTTP endpoints',
           'MCP adapter tested with trusted UID, not OAuth HTTP token transport',
           'Emulator Google claims are synthetic, not production Google signature proof',
           'No browser/production/deployment evidence',

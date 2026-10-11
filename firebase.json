@@ -48,63 +48,56 @@
       {
         "source": "/mcp",
         "function": {
-          "functionId": "api",
+          "functionId": "mcp",
           "region": "southamerica-east1"
         }
       },
       {
         "source": "/.well-known/**",
         "function": {
-          "functionId": "api",
+          "functionId": "mcp",
           "region": "southamerica-east1"
         }
       },
       {
         "source": "/register",
         "function": {
-          "functionId": "api",
+          "functionId": "mcp",
           "region": "southamerica-east1"
         }
       },
       {
         "source": "/authorize",
         "function": {
-          "functionId": "api",
+          "functionId": "mcp",
           "region": "southamerica-east1"
         }
       },
       {
         "source": "/token",
         "function": {
-          "functionId": "api",
+          "functionId": "mcp",
           "region": "southamerica-east1"
         }
       },
       {
         "source": "/revoke",
         "function": {
-          "functionId": "api",
+          "functionId": "mcp",
           "region": "southamerica-east1"
         }
       },
       {
         "source": "/flow",
         "function": {
-          "functionId": "api",
+          "functionId": "mcp",
           "region": "southamerica-east1"
         }
       },
       {
         "source": "/complete",
         "function": {
-          "functionId": "api",
-          "region": "southamerica-east1"
-        }
-      },
-      {
-        "source": "/health",
-        "function": {
-          "functionId": "api",
+          "functionId": "mcp",
           "region": "southamerica-east1"
         }
       },

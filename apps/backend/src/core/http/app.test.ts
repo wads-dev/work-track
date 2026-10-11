@@ -57,10 +57,9 @@ function setup(repository?: WorkRepository) {
 }
 
 describe('remote MCP OAuth', () => {
-  it('serves public health with security headers and no user data', async () => {
+  it('returns not found for retired health route with security headers', async () => {
     const response = await request(setup()).get('/health');
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ status: 'ok', service: 'work-track' });
+    expect(response.status).toBe(404);
     expect(response.headers['cache-control']).toBe('no-store');
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.headers['referrer-policy']).toBe('no-referrer');
