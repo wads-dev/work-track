@@ -28,7 +28,12 @@ import {
   projectMinute,
   type Timed,
 } from './timeline-layout';
-type Event = Timed & { uid?: string; projectId: string; estimated: boolean };
+type Event = Timed & {
+  uid?: string;
+  projectId: string;
+  estimated: boolean;
+  topics?: { label: string }[];
+};
 export function CalendarTimeline({
   items,
   day,
@@ -41,6 +46,7 @@ export function CalendarTimeline({
   authorLabel,
   renderProject,
   showPeople = true,
+  details,
 }: {
   items: Event[];
   day: string;
@@ -52,6 +58,7 @@ export function CalendarTimeline({
   viewerUid: string;
   authorLabel: (uid: string) => string;
   showPeople?: boolean;
+  details?: (item: Event) => { topics: string; summary: string };
   renderProject?: (id: string) => import('react').ReactNode;
 }) {
   const directory = useCompanyPeople();
@@ -90,6 +97,21 @@ export function CalendarTimeline({
       hour: '2-digit',
       minute: '2-digit',
     }).format(new Date(instant));
+  const content = (item: Event, start: number, end: number) => (
+    <span className="block whitespace-normal [overflow-wrap:anywhere] px-2 py-1 text-sm leading-snug">
+      <span className="block font-semibold tabular-nums">
+        {time(start)} – {time(end)}
+        {item.estimated ? ' · Estimado' : ''}
+      </span>
+      <span className="block font-medium">{label(item.projectId)}</span>
+      {details && (
+        <>
+          <span className="block text-xs">{details(item).topics}</span>
+          <span className="block text-sm">{details(item).summary}</span>
+        </>
+      )}
+    </span>
+  );
   const minute = (instant: number) => {
     const p = new Intl.DateTimeFormat('en', {
       timeZone: zone,
@@ -137,7 +159,7 @@ export function CalendarTimeline({
         </AlertDescription>
       </Alert>
     );
-  const px = 1.1;
+  const px = 1.8;
   const gaps = commonGaps(
     data.flatMap((d) =>
       d.events.map((e) => ({ start: e.wallStart, end: e.wallEnd })),
@@ -241,12 +263,13 @@ export function CalendarTimeline({
                       }}
                       variant="ghost"
                       className={cn(
-                        'absolute left-12 right-0 min-h-0 p-0 text-[10px] z-[2] bg-muted',
+                        'absolute left-12 right-0 min-h-0 p-0 text-xs bg-muted overflow-hidden',
                       )}
                       style={{ top: 15 + s.top, height: s.collapsed ? 32 : 24 }}
                     >
                       … {clock(s.start)}–{clock(s.end)} ·{' '}
-                      {(s.end - s.start) / 60}h sem atividades
+                      {Math.floor((s.end - s.start) / 60)}h{' '}
+                      {Math.round((s.end - s.start) % 60)}min sem atividades
                     </Button>
                   ))}
                 <div
@@ -286,15 +309,13 @@ export function CalendarTimeline({
                               asChild
                               variant="ghost"
                               className={cn(
-                                'absolute min-h-[22px] hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-[11px] leading-[1.15]',
+                                'absolute min-h-0 hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-sm leading-snug',
                               )}
                               style={{
                                 top: projectMinute(e.wallStart, segments),
-                                minHeight: Math.max(
-                                  22,
+                                minHeight:
                                   projectMinute(e.wallEnd, segments) -
-                                    projectMinute(e.wallStart, segments),
-                                ),
+                                  projectMinute(e.wallStart, segments),
                                 height:
                                   projectMinute(e.wallEnd, segments) -
                                   projectMinute(e.wallStart, segments),
@@ -307,11 +328,11 @@ export function CalendarTimeline({
                                 <span tabIndex={0}>
                                   <span
                                     className={cn(
-                                      'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
+                                      'block whitespace-normal [overflow-wrap:anywhere]',
                                     )}
                                   >
                                     {renderIdentity(personUid, fallback)}
-                                    {time(e.start)} · {label(e.item.projectId)}
+                                    {content(e.item, e.start, e.end)}
                                     {e.item.estimated ? ' ◷' : ''}
                                     {e.overlap ? ' ⇆' : ''}
                                   </span>
@@ -334,11 +355,11 @@ export function CalendarTimeline({
                                 >
                                   <span
                                     className={cn(
-                                      'text-base block whitespace-nowrap overflow-hidden text-ellipsis group-hover:whitespace-normal group-focus-visible:whitespace-normal [overflow-wrap:anywhere] text-[11px] px-1',
+                                      'block whitespace-normal [overflow-wrap:anywhere]',
                                     )}
                                   >
                                     {renderIdentity(personUid, fallback)}
-                                    {time(e.start)} · {label(e.item.projectId)}
+                                    {content(e.item, e.start, e.end)}
                                     {e.item.estimated ? ' ◷' : ''}
                                     {e.overlap ? ' ⇆' : ''}
                                   </span>
@@ -355,6 +376,44 @@ export function CalendarTimeline({
                     })}
                 </div>
               </div>
+              {d.events.some(
+                (e) =>
+                  !e.point &&
+                  projectMinute(e.wallEnd, segments) -
+                    projectMinute(e.wallStart, segments) <
+                    100,
+              ) && (
+                <section
+                  aria-label={'Detalhes das atividades curtas de ' + d.key}
+                  className="mt-3 space-y-2"
+                >
+                  <h4 className="text-sm font-medium">Atividades curtas</h4>
+                  {d.events
+                    .filter(
+                      (e) =>
+                        !e.point &&
+                        projectMinute(e.wallEnd, segments) -
+                          projectMinute(e.wallStart, segments) <
+                          100,
+                    )
+                    .map((e) => (
+                      <div
+                        key={JSON.stringify([
+                          e.item.uid || viewerUid,
+                          e.item.id,
+                        ])}
+                        className="rounded border border-l-4"
+                        style={{ borderColor: color(e.item.projectId) }}
+                      >
+                        {renderIdentity(
+                          e.item.uid || viewerUid,
+                          authorLabel(e.item.uid || viewerUid),
+                        )}
+                        {content(e.item, e.start, e.end)}
+                      </div>
+                    ))}
+                </section>
+              )}
               {/* Normal flow keeps simultaneous points reachable even inside
                   collapsed gaps or outside the interval axis span. */}
               {d.events.some((e) => e.point) && (
@@ -395,8 +454,8 @@ export function CalendarTimeline({
                                 style={{ borderColor: color(e.item.projectId) }}
                               >
                                 {renderIdentity(personUid, fallback)}
-                                {time(e.start)} · {label(e.item.projectId)} ·
-                                Estimado · sem duração
+                                {content(e.item, e.start, e.end)} · Estimado ·
+                                sem duração
                               </span>
                             ) : (
                               <RouterLink
@@ -415,8 +474,8 @@ export function CalendarTimeline({
                                 }
                               >
                                 {renderIdentity(personUid, fallback)}
-                                {time(e.start)} · {label(e.item.projectId)} ·
-                                Estimado · sem duração
+                                {content(e.item, e.start, e.end)} · Estimado ·
+                                sem duração
                               </RouterLink>
                             )}
                           </li>

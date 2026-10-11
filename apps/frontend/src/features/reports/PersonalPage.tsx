@@ -68,6 +68,7 @@ import { EmptyState } from '../../shared/ui/Surface';
 import { RecordDrawer } from '../records/RecordDrawer';
 import { contextualRecordPath } from '../../app/routes';
 import { CalendarTimeline } from './CalendarTimeline';
+import { calendarEventDetails } from './calendar-event-details';
 import { CalendarProjectFilter } from './CalendarProjectFilter';
 import { updatePersonalFilters } from './calendar-project-filter';
 import { date, text } from '../../shared/data';
@@ -98,6 +99,7 @@ type PersonalReport = Omit<
   intervals: (import('@work-track/core/reports/domain/personal-report').PersonalReport['intervals'][number] & {
     uid?: string;
     readOnly?: boolean;
+    topics?: { label: string }[];
   })[];
   allWeeks?: boolean;
   occupiedWeeks?: string[];
@@ -1050,6 +1052,15 @@ export function PersonalPage({
             {calendar && allWeeks && (
               <CalendarHistory
                 showPeople={person.selected === 'all'}
+                details={(item) =>
+                  calendarEventDetails(
+                    item,
+                    localRepository?.records ?? [],
+                    projects.rows.find((p) => p.id === item.projectId)?.data,
+                    revealed,
+                    uid,
+                  )
+                }
                 weeks={report.occupiedWeeks ?? []}
                 occurrences={report.weekOccurrences ?? []}
                 items={report.intervals}
@@ -1068,6 +1079,15 @@ export function PersonalPage({
             {calendar && !allWeeks && density === 'timeline' && (
               <CalendarTimeline
                 showPeople={person.selected === 'all'}
+                details={(item) =>
+                  calendarEventDetails(
+                    item,
+                    localRepository?.records ?? [],
+                    projects.rows.find((p) => p.id === item.projectId)?.data,
+                    revealed,
+                    uid,
+                  )
+                }
                 items={report.intervals}
                 day={selected}
                 view={view}
@@ -1223,6 +1243,35 @@ export function PersonalPage({
                                             </>
                                           )}
                                         {label(item.projectId)}
+                                        <span className="block whitespace-normal text-xs">
+                                          {
+                                            calendarEventDetails(
+                                              item,
+                                              localRepository?.records ?? [],
+                                              projects.rows.find(
+                                                (p) => p.id === item.projectId,
+                                              )?.data,
+                                              revealed,
+                                              uid,
+                                            ).topics
+                                          }
+                                        </span>
+                                        {density !== 'supercompact' && (
+                                          <span className="block whitespace-normal text-sm">
+                                            {
+                                              calendarEventDetails(
+                                                item,
+                                                localRepository?.records ?? [],
+                                                projects.rows.find(
+                                                  (p) =>
+                                                    p.id === item.projectId,
+                                                )?.data,
+                                                revealed,
+                                                uid,
+                                              ).summary
+                                            }
+                                          </span>
+                                        )}
                                         {density !== 'supercompact' && (
                                           <>
                                             <br />
@@ -1308,6 +1357,35 @@ export function PersonalPage({
                                             </>
                                           )}
                                         {label(item.projectId)}
+                                        <span className="block whitespace-normal text-xs">
+                                          {
+                                            calendarEventDetails(
+                                              item,
+                                              localRepository?.records ?? [],
+                                              projects.rows.find(
+                                                (p) => p.id === item.projectId,
+                                              )?.data,
+                                              revealed,
+                                              uid,
+                                            ).topics
+                                          }
+                                        </span>
+                                        {density !== 'supercompact' && (
+                                          <span className="block whitespace-normal text-sm">
+                                            {
+                                              calendarEventDetails(
+                                                item,
+                                                localRepository?.records ?? [],
+                                                projects.rows.find(
+                                                  (p) =>
+                                                    p.id === item.projectId,
+                                                )?.data,
+                                                revealed,
+                                                uid,
+                                              ).summary
+                                            }
+                                          </span>
+                                        )}
                                         {density !== 'supercompact' && (
                                           <>
                                             <br />

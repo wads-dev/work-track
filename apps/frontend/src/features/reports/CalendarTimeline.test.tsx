@@ -30,6 +30,10 @@ const render = (showPeople: boolean, revealed: boolean) =>
             viewerUid="me"
             authorLabel={() => 'Ana Silva'}
             showPeople={showPeople}
+            details={() => ({
+              topics: 'Entrega',
+              summary: 'Corrigir navegação',
+            })}
           />
         </PrivacyContext.Provider>
       </TooltipProvider>
@@ -41,6 +45,16 @@ it('omits repeated identity for a single selected person', () => {
   expect(html).not.toContain('Ana Silva');
   expect(html).toContain('Projeto reservado');
   expect(html).toContain('09:00');
+  expect(html).toContain('10:00');
+  expect(html).toContain('Entrega');
+  expect(html).toContain('Corrigir navegação');
+  expect(html).not.toContain('min-height:22px');
+  expect(html).toContain('hover:!h-auto');
+  expect(html).toContain('focus-visible:!h-auto');
+  expect(html).toContain('hover:z-40');
+  expect(html).toContain('min-height:108px');
+  expect(html).toContain('height:108px');
+  expect(html).not.toContain('text-[11px]');
 });
 
 it('keeps events and people in confidentiality mode for multiple people', () => {
