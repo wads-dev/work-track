@@ -6,16 +6,16 @@ import {
   QueryPeriodControls,
 } from '../../shared/ui/QueryToolbar';
 import { useProjects } from '../projects/hooks/useProjects';
-import { topicDetailsPath } from '../../app/routes';
 import { MetadataLink } from '../../shared/ui/MetadataLink';
 import { ProjectCreate } from '../projects/ProjectCreate';
+import { ProjectList } from '../projects/ProjectList';
+import { clearProjectFilters } from '../projects/project-list';
 import { ProjectSelector } from '../projects/ProjectSelector';
 import { writeUrlTab } from '../../app/url-tabs';
 import { useEffect, useState, type ReactNode } from 'react';
 import { isOpen } from '../pending/pending-utils';
 import { Alert } from '../../components/ui/alert';
 import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
 import { Card } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -498,75 +498,79 @@ export function Dashboard({
     >
       {mode === 'projects' && (
         <div>
-          <div className="mb-4 grid grid-cols-1 items-center gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <section
+            aria-label="Filtros de projetos"
+            className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center"
+          >
             <Tabs
               value={projectScope}
               onValueChange={(value) => updateFilter('scope', value)}
+              className="min-w-0 shrink-0"
             >
-              <TabsList aria-label="Acesso aos projetos">
+              <TabsList
+                aria-label="Acesso aos projetos"
+                className="h-9 w-full sm:w-auto"
+              >
                 <TabsTrigger value="work">Compartilhados</TabsTrigger>
                 <TabsTrigger value="personal">
                   Meus projetos pessoais
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <ProjectCreate
-              functions={functions}
-              onCreated={(id, type) => {
-                navigate(
-                  '/projects/' +
-                    encodeURIComponent(id) +
-                    '?tab=details&scope=' +
-                    type,
-                );
-              }}
-            />
-          </div>
-          <section
-            aria-label="Filtros de projetos"
-            className="mb-4 grid grid-cols-1 items-start gap-4 md:grid-cols-3 rounded-xl border bg-card p-4 sm:p-6"
-          >
-            {mode === 'projects' && (
-              <div className="min-w-0 space-y-1.5">
-                <Label>Estado dos projetos</Label>
-                <Select
-                  value={archiveFilter || '__all__'}
-                  onValueChange={(value) =>
-                    updateFilter('status', value === '__all__' ? '' : value)
-                  }
+            <div className="flex min-w-0 items-center gap-2 lg:flex-1">
+              <Select
+                value={archiveFilter || 'all'}
+                onValueChange={(value) => updateFilter('status', value)}
+              >
+                <SelectTrigger
+                  aria-label="Estado dos projetos"
+                  className="w-28 shrink-0"
                 >
-                  <SelectTrigger aria-label="Estado dos projetos">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Ativos</SelectItem>
-                    <SelectItem value="archived">Arquivados</SelectItem>
-                    <SelectItem value="all">Todos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <Label className="grid min-w-0 gap-1.5">
-              Pesquisar projetos
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativos</SelectItem>
+                  <SelectItem value="archived">Arquivados</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
+                </SelectContent>
+              </Select>
               <Input
+                aria-label="Pesquisar projetos"
+                placeholder="Pesquisar projetos…"
+                className="min-w-0 flex-1"
                 value={filter}
                 onChange={(event) => updateFilter('q', event.target.value)}
               />
-            </Label>
-            <Button
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                setLocalFilter('');
-                next.delete('q');
-                next.delete('project');
-                next.delete('status');
-                setParams(next);
-              }}
-              className="whitespace-nowrap"
-            >
-              Limpar filtros
-            </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 shrink-0"
+                    aria-label="Limpar filtros"
+                    onClick={() => {
+                      setLocalFilter('');
+                      setParams(clearProjectFilters(params));
+                    }}
+                  >
+                    <UiIcon kind="refresh" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Limpar filtros</TooltipContent>
+              </Tooltip>
+            </div>
           </section>
+          <ProjectCreate
+            functions={functions}
+            onCreated={(id, type) =>
+              navigate(
+                '/projects/' +
+                  encodeURIComponent(id) +
+                  '?tab=details&scope=' +
+                  type,
+              )
+            }
+          />
         </div>
       )}
       {recordId && (
@@ -764,55 +768,11 @@ export function Dashboard({
         </p>
       )}
       {mode !== 'records' && (
-        <DataTable
+        <ProjectList
           hideHeading={mode === 'projects'}
-          title="Projetos"
-          headers={['Projeto', 'Descrição', 'Tópicos', 'Criado em']}
           state={filteredProjects}
-          render={(data, id) => [
-            <MetadataLink
-              projectId={id}
-              project={rawProjects.rows.find((p) => p.id === id)?.data}
-              revealed={revealed}
-            />,
-            text(data.description),
-            <div className="flex flex-col gap-2">
-              {objects(data.topics).length === 0 && 'Não informado'}
-              {objects(data.topics).map((topic, index) => (
-                <Badge
-                  key={text(topic.id, String(index))}
-                  variant="secondary"
-                  className="max-w-full self-start whitespace-normal"
-                  asChild={
-                    !!text(topic.id, '') &&
-                    !isHidden(
-                      rawProjects.rows.find((p) => p.id === id)?.data,
-                      revealed,
-                    )
-                  }
-                >
-                  {text(topic.id, '') &&
-                  !isHidden(
-                    rawProjects.rows.find((p) => p.id === id)?.data,
-                    revealed,
-                  ) ? (
-                    <RouterLink
-                      to={
-                        topicDetailsPath(id, text(topic.id)) +
-                        '?returnTo=' +
-                        encodeURIComponent(location.pathname + location.search)
-                      }
-                    >
-                      {text(topic.title)}
-                    </RouterLink>
-                  ) : (
-                    <span>{text(topic.title)}</span>
-                  )}
-                </Badge>
-              ))}
-            </div>,
-            date(data.createdAt),
-          ]}
+          catalog={rawProjects.rows}
+          revealed={revealed}
         />
       )}
       {mode !== 'projects' && (
