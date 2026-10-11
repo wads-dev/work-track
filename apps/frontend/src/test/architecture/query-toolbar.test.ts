@@ -42,9 +42,11 @@ describe('shared query toolbar', () => {
     for (const name of [
       '../../features/reports/CalendarToolbar.tsx',
       '../../features/reports/ReportToolbar.tsx',
-      '../../features/dashboard/Dashboard.tsx',
     ])
       expect(source(name)).toContain('<QueryToolbar');
+    expect(source('../../features/records/RecordsToolbar.tsx')).toContain(
+      '<CompactListToolbar',
+    );
     const toolbar = source('../../shared/ui/QueryToolbar.tsx');
     expect(toolbar).toContain('<FilterBar');
     expect(toolbar).not.toContain('layoutTokens.surface');
@@ -70,17 +72,13 @@ describe('shared filter structure', () => {
       expect(toolbar).toContain(slot);
     expect(layoutTokens.fieldWidths.date).toBe('w-[calc(50%-4px)] sm:w-40');
     expect(layoutTokens.controls).toContain('[&_input]:h-11 sm:[&_input]:h-9');
-    const records = source('../../features/dashboard/Dashboard.tsx')
-      .split('<QueryToolbar')[1]
-      .split('</QueryToolbar>')[0];
-    expect(records).not.toContain('gridTemplateColumns');
-    expect(records).not.toContain('fullWidth');
-    expect(records).toContain('secondary=');
-    for (const page of [
-      '../../features/dashboard/Dashboard.tsx',
-      '../../features/reports/ReportToolbar.tsx',
-    ])
-      expect(source(page)).toContain('<QueryPeriodControls');
+    const records = source('../../features/records/RecordsToolbar.tsx');
+    expect(records).toContain('<CompactListToolbar');
+    expect(records).not.toContain('secondary=');
+    expect(records).not.toContain('Fuso do período');
+    expect(source('../../features/reports/ReportToolbar.tsx')).toContain(
+      '<QueryPeriodControls',
+    );
     expect(source('../../features/reports/PersonalPage.tsx')).toContain(
       '<CalendarToolbar',
     );
