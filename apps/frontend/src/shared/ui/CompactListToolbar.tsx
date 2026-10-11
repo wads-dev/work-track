@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from '../../components/ui/tooltip';
 import { UiIcon } from './UiIcons';
+import { FilterBar } from './FilterBar';
 
 /** Compact list controls shared by the Projects and People directories. */
 export function CompactListToolbar({
@@ -33,8 +34,8 @@ export function CompactListToolbar({
   disabled?: boolean;
 }) {
   return (
-    <section
-      aria-label={label}
+    <FilterBar
+      label={label}
       className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center"
     >
       {leading}
@@ -63,6 +64,6 @@ export function CompactListToolbar({
           <TooltipContent>{actionLabel}</TooltipContent>
         </Tooltip>
       </div>
-    </section>
+    </FilterBar>
   );
 }

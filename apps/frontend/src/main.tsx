@@ -20,12 +20,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from './components/ui/dropdown-menu';
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-  SheetDescription,
-} from './components/ui/sheet';
+import { NavigationShell, useNavigationMenu } from './app/NavigationShell';
 import { cn } from './lib/utils';
 import { useMediaQuery } from './shared/ui/theme';
 
@@ -144,7 +139,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useNavigationMenu();
 
   useEffect(() => {
     let active = true;
@@ -232,7 +227,7 @@ function App() {
   }
   if (!loading && authorized && location.pathname === '/')
     return <Navigate replace to={returnTo} />;
-  const navigation = (
+  const navigation = (onNavigate: () => void) => (
     <nav
       id="menu-principal"
       aria-label="Menu principal"
@@ -271,7 +266,7 @@ function App() {
               key={to}
               to={to}
               aria-current={active ? 'page' : undefined}
-              onClick={() => setMenuOpen(false)}
+              onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground',
                 active && 'bg-accent text-accent-foreground',
@@ -298,213 +293,193 @@ function App() {
           Ir para o conteúdo
         </a>
         {authorized && services ? (
-          <>
-            <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r bg-sidebar text-sidebar-foreground lg:block">
-              {navigation}
-            </aside>
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-              <SheetContent side="left" className="w-64 p-0">
-                <SheetTitle className="sr-only">Navegação</SheetTitle>
-                <SheetDescription className="sr-only">
-                  Menu principal do Work Track
-                </SheetDescription>
-                {navigation}
-              </SheetContent>
-            </Sheet>
-            <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b bg-background/95 px-6 backdrop-blur lg:ml-64">
-              <Button
-                className="lg:hidden"
-                variant="ghost"
-                size="icon"
-                aria-label="Abrir menu de navegação"
-                aria-expanded={menuOpen}
-                aria-controls="menu-principal"
-                onClick={() => setMenuOpen(true)}
-              >
-                <UiIcon kind="menu" />
-              </Button>
-              <h1 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
-                <span className="mr-3 font-normal text-muted-foreground">
-                  Work Track <span className="ml-2">›</span>
-                </span>
-                {location.pathname.startsWith('/projects')
-                  ? 'Projetos'
-                  : location.pathname.startsWith('/people')
-                    ? 'Pessoas'
-                    : location.pathname.startsWith('/records')
-                      ? 'Meus registros'
-                      : location.pathname === '/calendar'
-                        ? 'Calendário'
-                        : location.pathname === '/pending'
-                          ? 'Pendências'
-                          : location.pathname === '/rules'
-                            ? 'Regras'
-                            : location.pathname === '/me'
-                              ? 'Meu relatório'
-                              : 'Dashboard'}
-              </h1>
-              {toggleTheme}
-              <PendingBell db={services.db} uid={user.uid} />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={
-                      revealed
-                        ? 'Ocultar dados confidenciais'
-                        : 'Revelar dados confidenciais'
-                    }
-                    aria-pressed={revealed}
-                    onClick={() => {
-                      const next = !revealed;
-                      savePrivacyPreference(user.uid, next);
-                      setRevealed(next);
-                    }}
-                  >
-                    <UiIcon kind={revealed ? 'eye' : 'eyeoff'} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {revealed
-                    ? 'Ocultar dados confidenciais'
-                    : 'Revelar dados confidenciais'}
-                </TooltipContent>
-              </Tooltip>
-            </header>
-            <main id="conteudo" tabIndex={-1} className="min-w-0 p-6 lg:ml-64">
-              {error && (
-                <Alert variant="destructive" className="mb-4">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              <CompanyPeopleProvider
-                key={user.uid}
-                functions={services.functions}
-                uid={user.uid}
-              >
-                <Routes>
-                  <Route path="/people" element={<PeoplePage />} />
-                  <Route
-                    path="/people/:personId"
-                    element={
-                      <PersonPage
-                        key={user.uid}
-                        db={services.db}
-                        functions={services.functions}
-                        uid={user.uid}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/me"
-                    element={
-                      <PersonalPage
-                        key={user.uid}
-                        db={services.db}
-                        functions={services.functions}
-                        uid={user.uid}
-                      />
-                    }
-                  />
-                  <Route path="/rules" element={<RulesPage />} />
-                  <Route
-                    path="/pending"
-                    element={
-                      <PendingPage
-                        functions={services.functions}
-                        key={user.uid}
-                        db={services.db}
-                        uid={user.uid}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/app"
-                    element={
-                      <PersonalPage
-                        company
-                        key={user.uid}
-                        db={services.db}
-                        functions={services.functions}
-                        uid={user.uid}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/calendar"
-                    element={
-                      <PersonalPage
-                        key={user.uid}
-                        db={services.db}
-                        functions={services.functions}
-                        uid={user.uid}
-                        calendar
-                      />
-                    }
-                  />
-                  <Route
-                    path="/projects"
-                    element={
-                      <Dashboard
-                        key={user.uid}
-                        db={services.db}
-                        functions={services.functions}
-                        uid={user.uid}
-                        mode="projects"
-                      />
-                    }
-                  />
-                  <Route
-                    path="/projects/:projectId/topics/:topicId"
-                    element={
-                      <TopicDetails
-                        key={user.uid}
-                        functions={services.functions}
-                        uid={user.uid}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/projects/:projectId"
-                    element={
-                      <Dashboard
-                        key={user.uid}
-                        db={services.db}
-                        functions={services.functions}
-                        uid={user.uid}
-                        mode="projects"
-                      />
-                    }
-                  />
-                  <Route
-                    path="/records"
-                    element={
-                      <Dashboard
-                        key={user.uid}
-                        db={services.db}
-                        functions={services.functions}
-                        uid={user.uid}
-                        mode="records"
-                      />
-                    }
-                  />
-                  <Route
-                    path="/records/:recordId"
-                    element={<RecordPage services={services} uid={user.uid} />}
-                  />
-                  <Route
-                    path="*"
-                    element={
-                      <Alert>
-                        Página não encontrada. Use a navegação para voltar.
-                      </Alert>
-                    }
-                  />
-                </Routes>
-              </CompanyPeopleProvider>
-            </main>
-          </>
+          <NavigationShell
+            {...menu}
+            navigation={navigation}
+            header={
+              <>
+                <h1 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
+                  <span className="mr-3 font-normal text-muted-foreground">
+                    Work Track <span className="ml-2">›</span>
+                  </span>
+                  {location.pathname.startsWith('/projects')
+                    ? 'Projetos'
+                    : location.pathname.startsWith('/people')
+                      ? 'Pessoas'
+                      : location.pathname.startsWith('/records')
+                        ? 'Meus registros'
+                        : location.pathname === '/calendar'
+                          ? 'Calendário'
+                          : location.pathname === '/pending'
+                            ? 'Pendências'
+                            : location.pathname === '/rules'
+                              ? 'Regras'
+                              : location.pathname === '/me'
+                                ? 'Meu relatório'
+                                : 'Dashboard'}
+                </h1>
+                {toggleTheme}
+                <PendingBell db={services.db} uid={user.uid} />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={
+                        revealed
+                          ? 'Ocultar dados confidenciais'
+                          : 'Revelar dados confidenciais'
+                      }
+                      aria-pressed={revealed}
+                      onClick={() => {
+                        const next = !revealed;
+                        savePrivacyPreference(user.uid, next);
+                        setRevealed(next);
+                      }}
+                    >
+                      <UiIcon kind={revealed ? 'eye' : 'eyeoff'} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {revealed
+                      ? 'Ocultar dados confidenciais'
+                      : 'Revelar dados confidenciais'}
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            }
+          >
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <CompanyPeopleProvider
+              key={user.uid}
+              functions={services.functions}
+              uid={user.uid}
+            >
+              <Routes>
+                <Route path="/people" element={<PeoplePage />} />
+                <Route
+                  path="/people/:personId"
+                  element={
+                    <PersonPage
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                    />
+                  }
+                />
+                <Route
+                  path="/me"
+                  element={
+                    <PersonalPage
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                    />
+                  }
+                />
+                <Route path="/rules" element={<RulesPage />} />
+                <Route
+                  path="/pending"
+                  element={
+                    <PendingPage
+                      functions={services.functions}
+                      key={user.uid}
+                      db={services.db}
+                      uid={user.uid}
+                    />
+                  }
+                />
+                <Route
+                  path="/app"
+                  element={
+                    <PersonalPage
+                      company
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                    />
+                  }
+                />
+                <Route
+                  path="/calendar"
+                  element={
+                    <PersonalPage
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      calendar
+                    />
+                  }
+                />
+                <Route
+                  path="/projects"
+                  element={
+                    <Dashboard
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      mode="projects"
+                    />
+                  }
+                />
+                <Route
+                  path="/projects/:projectId/topics/:topicId"
+                  element={
+                    <TopicDetails
+                      key={user.uid}
+                      functions={services.functions}
+                      uid={user.uid}
+                    />
+                  }
+                />
+                <Route
+                  path="/projects/:projectId"
+                  element={
+                    <Dashboard
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      mode="projects"
+                    />
+                  }
+                />
+                <Route
+                  path="/records"
+                  element={
+                    <Dashboard
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                      mode="records"
+                    />
+                  }
+                />
+                <Route
+                  path="/records/:recordId"
+                  element={<RecordPage services={services} uid={user.uid} />}
+                />
+                <Route
+                  path="*"
+                  element={
+                    <Alert>
+                      Página não encontrada. Use a navegação para voltar.
+                    </Alert>
+                  }
+                />
+              </Routes>
+            </CompanyPeopleProvider>
+          </NavigationShell>
         ) : (
           <main
             id="conteudo"

@@ -55,7 +55,7 @@ describe('interactive charts', () => {
     expect(profile).toContain('uid={uid}');
     expect(profile).toContain('calendar');
     expect(source('../../features/reports/PersonalPage.tsx')).toContain(
-      'loading || profile',
+      'personDisabled={profile}',
     );
   });
   it('allows only safe local profile returns', () => {

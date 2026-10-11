@@ -3,9 +3,43 @@ import { calendarRequest, updateCalendarPerson } from './calendar-people';
 import {
   calendarTopics,
   updateCalendarFilters,
+  updateCalendarView,
   validateOccupiedWeeks,
 } from './calendar-history';
 describe('calendar actual historical weeks and subjects', () => {
+  it('single view control enters history without stale dates and preserves scope', () => {
+    const params = new URLSearchParams(
+      'date=2026-10-08&fromDate=old&toDate=old&projectId=p&subject=t&uid=other&includeArchived=true&record=r&cursor=c&historyPage=3',
+    );
+    const history = updateCalendarView(params, 'all');
+    expect(history.get('allWeeks')).toBe('true');
+    expect(history.get('view')).toBe('week');
+    for (const key of [
+      'date',
+      'fromDate',
+      'toDate',
+      'record',
+      'cursor',
+      'historyPage',
+    ])
+      expect(history.has(key)).toBe(false);
+    for (const key of ['projectId', 'subject', 'uid', 'includeArchived'])
+      expect(history.get(key)).toBe(params.get(key));
+    const month = updateCalendarView(history, 'month');
+    expect(month.has('allWeeks')).toBe(false);
+    expect(month.get('view')).toBe('month');
+    expect(month.get('density')).toBe('supercompact');
+    expect(month.get('projectId')).toBe('p');
+  });
+  it('keeps reference date when switching dated views and does not mutate caller', () => {
+    const params = new URLSearchParams('date=2026-10-08&view=day&record=r');
+    const next = updateCalendarView(params, 'three-days');
+    expect(next.get('date')).toBe('2026-10-08');
+    expect(next.get('view')).toBe('three-days');
+    expect(next.get('density')).toBe('timeline');
+    expect(next.has('record')).toBe(false);
+    expect(params.get('view')).toBe('day');
+  });
   it('changing person resets historical viewport while preserving project subject archive', () => {
     const n = updateCalendarPerson(
       new URLSearchParams(
