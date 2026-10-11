@@ -150,7 +150,8 @@ describe('audited record movement', () => {
       new URL('../../features/projects/ProjectTopics.tsx', import.meta.url),
       'utf8',
     );
-    expect(topics).toContain('topicId={String(movingTopic.id)}');
+    expect(topics).not.toContain('MoveDialog');
+    expect(topics).not.toContain('moveTopic');
   });
   it('dialog stable retry, cancellation and changed destination discard old preview', () => {
     const source = readFileSync(

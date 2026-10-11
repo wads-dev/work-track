@@ -63,7 +63,6 @@ import {
   detailPath,
   matchesFilter,
   contextualRecordPath,
-  safeReturnTo,
 } from '../../app/routes';
 import { UiIcon } from '../../shared/ui/UiIcons';
 import {
@@ -74,6 +73,8 @@ import {
 } from '../../shared/ui/privacy';
 import { ProjectEditor } from '../projects/ProjectEditor';
 import { ProjectAccess } from '../projects/ProjectAccess';
+import { ProjectHeader } from '../projects/ProjectHeader';
+import { ProjectArchive } from '../projects/ProjectArchive';
 import { matchesArchive } from '../projects/project-archive';
 
 function DataTable({
@@ -216,6 +217,9 @@ export function Dashboard({
   mode: 'overview' | 'projects' | 'records';
 }) {
   const { revealed } = usePrivacy();
+  const [reportRefresh, setReportRefresh] = useState(0);
+  const [reportSummaryTarget, setReportSummaryTarget] =
+    useState<HTMLDivElement | null>(null);
   const rawProjects = useProjects(functions, uid);
   const rawRecords = useOwnRecords(db, uid, mode !== 'projects');
   const rawProjectsById = new Map(rawProjects.rows.map((row) => [row.id, row]));
@@ -313,63 +317,69 @@ export function Dashboard({
   if (projectId)
     return (
       <section aria-label="Projeto">
-        {params.has('returnTo') && (
-          <Button asChild className="mb-4">
-            <RouterLink to={safeReturnTo(params.get('returnTo'))}>
-              Voltar ao contexto
-            </RouterLink>
-          </Button>
-        )}
-        <Button asChild className="mb-4">
-          <RouterLink to={'/projects' + location.search}>
-            Voltar aos projetos
-          </RouterLink>
-        </Button>
-        <h2 className="text-2xl font-semibold">
-          {text(
-            projects.rows.find((item) => item.id === projectId)?.data.title,
-            'Projeto indisponível',
-          )}
-        </h2>
-        <p className="text-muted-foreground">
-          {text(
-            projects.rows.find((item) => item.id === projectId)?.data
-              .description,
-            'O relatório consulta o projeto diretamente, independente do limite da lista.',
-          )}
-        </p>
-        {!rawProjects.loading &&
-          rawProjects.rows.some((row) => row.id === projectId) && (
-            <p className="text-sm mt-2">
-              {rawProjectsById.get(projectId)?.data.type === 'personal'
-                ? 'Pessoal · acesso somente ao dono'
-                : 'Compartilhado · usuários autorizados da empresa'}
-            </p>
-          )}
-        <ProjectAccess
-          functions={functions}
-          uid={uid}
-          projectId={projectId}
-          project={rawProjectsById.get(projectId)?.data}
-          hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
-        />
-        <Tabs value={projectTab} onValueChange={setProjectTab} className="mt-4">
-          <TabsList aria-label="Seções do projeto">
-            <TabsTrigger
-              id="project-tab-overview"
-              aria-controls="project-panel-overview"
-              value="overview"
-            >
-              Visão geral
-            </TabsTrigger>
-            <TabsTrigger
-              id="project-tab-details"
-              aria-controls="project-panel-details"
-              value="details"
-            >
-              Detalhes / Editar
-            </TabsTrigger>
-          </TabsList>
+        <Tabs value={projectTab} onValueChange={setProjectTab}>
+          <ProjectHeader
+            projectId={projectId}
+            project={rawProjectsById.get(projectId)?.data}
+            catalog={rawProjects.rows}
+            revealed={revealed}
+            loading={rawProjects.loading}
+            search={location.search}
+            summary={
+              projectTab === 'overview' ? (
+                <div ref={setReportSummaryTarget} className="shrink-0" />
+              ) : undefined
+            }
+            actions={
+              <>
+                {rawProjectsById.get(projectId)?.data &&
+                  !isHidden(rawProjectsById.get(projectId)?.data, revealed) && (
+                    <ProjectArchive
+                      key={projectId + String(revealed)}
+                      functions={functions}
+                      projectId={projectId}
+                      project={rawProjectsById.get(projectId)!.data}
+                    />
+                  )}
+                {projectTab === 'overview' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 shrink-0"
+                        aria-label="Atualizar relatório"
+                        onClick={() => {
+                          if (rawProjects.error) rawProjects.retry();
+                          setReportRefresh((value) => value + 1);
+                        }}
+                      >
+                        <UiIcon kind="refresh" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Atualizar relatório</TooltipContent>
+                  </Tooltip>
+                )}
+              </>
+            }
+          >
+            <TabsList aria-label="Seções do projeto">
+              <TabsTrigger
+                id="project-tab-overview"
+                aria-controls="project-panel-overview"
+                value="overview"
+              >
+                Visão geral
+              </TabsTrigger>
+              <TabsTrigger
+                id="project-tab-details"
+                aria-controls="project-panel-details"
+                value="details"
+              >
+                Detalhes / Editar
+              </TabsTrigger>
+            </TabsList>
+          </ProjectHeader>
           <TabsContent
             forceMount
             value="details"
@@ -377,14 +387,31 @@ export function Dashboard({
             aria-labelledby="project-tab-details"
             hidden={projectTab !== 'details'}
           >
-            <ProjectEditor
-              uid={uid}
-              onDeleted={() => navigate('/projects', { replace: true })}
-              functions={functions}
-              projectId={projectId}
-              project={rawProjectsById.get(projectId)?.data}
-              hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
-            />
+            <div className="space-y-4">
+              <ProjectEditor
+                access={
+                  <ProjectAccess
+                    functions={functions}
+                    uid={uid}
+                    projectId={projectId}
+                    project={rawProjectsById.get(projectId)?.data}
+                    hidden={isHidden(
+                      rawProjectsById.get(projectId)?.data,
+                      revealed,
+                    )}
+                  />
+                }
+                uid={uid}
+                onDeleted={() => navigate('/projects', { replace: true })}
+                functions={functions}
+                projectId={projectId}
+                project={rawProjectsById.get(projectId)?.data}
+                hidden={isHidden(
+                  rawProjectsById.get(projectId)?.data,
+                  revealed,
+                )}
+              />
+            </div>
           </TabsContent>
           <TabsContent
             forceMount
@@ -393,27 +420,34 @@ export function Dashboard({
             aria-labelledby="project-tab-overview"
             hidden={projectTab !== 'overview'}
           >
-            <ProjectReport
-              projectLabel={text(
-                projects.rows.find((row) => row.id === projectId)?.data.title,
-                'Projeto reservado',
-              )}
-              key={
-                projectId +
-                String(rawProjectsById.get(projectId)?.data.type) +
-                String(rawProjectsById.get(projectId)?.data.updatedAt) +
-                String(rawProjectsById.has(projectId))
-              }
-              projectId={projectId}
-              functions={functions}
-              db={db}
-              personal={
-                rawProjectsById.get(projectId)?.data.type === 'personal'
-              }
-              hidden={isHidden(rawProjectsById.get(projectId)?.data, revealed)}
-              search={location.search}
-              uid={uid}
-            />
+            {projectTab === 'overview' && (
+              <ProjectReport
+                refreshKey={reportRefresh}
+                summaryTarget={reportSummaryTarget}
+                projectLabel={text(
+                  projects.rows.find((row) => row.id === projectId)?.data.title,
+                  'Projeto reservado',
+                )}
+                key={
+                  projectId +
+                  String(rawProjectsById.get(projectId)?.data.type) +
+                  String(rawProjectsById.get(projectId)?.data.updatedAt) +
+                  String(rawProjectsById.has(projectId))
+                }
+                projectId={projectId}
+                functions={functions}
+                db={db}
+                personal={
+                  rawProjectsById.get(projectId)?.data.type === 'personal'
+                }
+                hidden={isHidden(
+                  rawProjectsById.get(projectId)?.data,
+                  revealed,
+                )}
+                search={location.search}
+                uid={uid}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </section>

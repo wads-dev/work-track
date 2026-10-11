@@ -88,7 +88,7 @@ export function ProjectDeletion({
       aria-label={'Exclusão permanente'}
       className="mt-6 rounded-xl border border-destructive bg-card p-4 text-card-foreground"
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col items-start gap-3">
         <h3 className="text-lg font-semibold text-destructive">
           Zona de perigo · exclusão permanente
         </h3>
@@ -156,7 +156,11 @@ export function ProjectDeletion({
                     checked={state.saved}
                     disabled={!!state.busy}
                     onCheckedChange={(checked) =>
-                      flow.confirm(checked === true, state.typed, state.reason)
+                      flow.confirm(
+                        checked === true,
+                        state.typed,
+                        'Exclusão permanente confirmada pela interface web.',
+                      )
                     }
                   />
                   <span>
@@ -174,7 +178,7 @@ export function ProjectDeletion({
                       flow.confirm(
                         state.saved,
                         event.target.value,
-                        state.reason,
+                        'Exclusão permanente confirmada pela interface web.',
                       )
                     }
                     id={'ProjectDeletion-5229'}
@@ -187,19 +191,7 @@ export function ProjectDeletion({
                     {'Nome: ' + title + ' · ID: ' + projectId}
                   </p>
                 </div>
-                <div className="min-w-0 space-y-2">
-                  <Label htmlFor={'ProjectDeletion-5633'}>
-                    {'Motivo da exclusão'}
-                  </Label>
-                  <Input
-                    value={state.reason}
-                    disabled={!!state.busy}
-                    onChange={(event) =>
-                      flow.confirm(state.saved, state.typed, event.target.value)
-                    }
-                    id={'ProjectDeletion-5633'}
-                  ></Input>
-                </div>
+
                 <Button
                   disabled={!flow.canDelete()}
                   onClick={() => {

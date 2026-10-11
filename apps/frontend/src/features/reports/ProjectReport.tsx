@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { PersonIdentity } from '../people/PersonIdentity';
 import { cn } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
@@ -51,6 +52,8 @@ export function ProjectReport({
   projectId,
   search,
   uid,
+  refreshKey = 0,
+  summaryTarget,
 }: {
   functions: Functions;
   db: Firestore;
@@ -60,6 +63,8 @@ export function ProjectReport({
   projectId: string;
   search: string;
   uid: string;
+  refreshKey?: number;
+  summaryTarget?: HTMLElement | null;
 }) {
   const [params, setParams] = useSearchParams();
   const includeArchived = params.get('includeArchived') === 'true';
@@ -162,6 +167,7 @@ export function ProjectReport({
     functions,
     projectId,
     attempt,
+    refreshKey,
     includeArchived,
     revision,
     uid,
@@ -218,7 +224,7 @@ export function ProjectReport({
       </Alert>
     );
   return (
-    <section aria-label="Relatório do projeto" className={cn('mt-6')}>
+    <section aria-label="Relatório do projeto" className="space-y-4">
       {provisional && (
         <Alert role="status">
           <AlertDescription>
@@ -227,46 +233,37 @@ export function ProjectReport({
           </AlertDescription>
         </Alert>
       )}
-      <Button
-        onClick={() => {
-          const next = new URLSearchParams(params);
-          next.set('includeArchived', String(!includeArchived));
-
-          setParams(next);
-        }}
-        variant="ghost"
-      >
-        {includeArchived
-          ? 'Voltar à seleção ativa'
-          : 'Permitir histórico arquivado nesta consulta'}
-      </Button>
-      <Card className={cn('gap-0 p-4 my-4')}>
-        <span className={cn('text-xs text-muted-foreground')}>
-          Tempo registrado · seleção atual
-        </span>
-        <h2
-          className={cn('text-3xl font-semibold tracking-tight tabular-nums')}
-        >
-          {hours(report.totalMinutes)}
-        </h2>
-      </Card>
-      <p className={cn('text-base mb-4 text-muted-foreground')}>
-        Pode somar atividades simultâneas; não representa tempo líquido único.
-        Referência: {date(report.asOf)}. Política: {report.policy}.
-      </p>
-      <p className={cn('text-base mb-4')}>
-        Estimativas não alteram fatos: até agora, limitadas a 6 horas por
-        registro aberto, sem teto diário, com os cortes por meia-noite e próximo
-        início no mesmo projeto. Fatos fechados não são truncados; o total
-        exibido considera todos os registros selecionados.{' '}
-        <RouterLink
-          to="/rules"
-          className={cn('text-primary underline-offset-4 hover:underline')}
-        >
-          Consultar regras e limites do relatório
-        </RouterLink>
-        .
-      </p>
+      {summaryTarget
+        ? createPortal(
+            <div className="flex flex-wrap items-center gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  Tempo registrado
+                </p>
+                <h2 className="text-3xl font-semibold tracking-tight tabular-nums">
+                  {hours(report.totalMinutes)}
+                </h2>
+              </div>
+              <Button
+                onClick={() => {
+                  const next = new URLSearchParams(params);
+                  next.set('includeArchived', String(!includeArchived));
+                  setParams(next);
+                }}
+                variant="outline"
+                size="sm"
+                aria-pressed={includeArchived}
+                className="self-start sm:self-auto"
+              >
+                <UiIcon kind="archive" />
+                {includeArchived
+                  ? 'Histórico arquivado incluído'
+                  : 'Incluir histórico arquivado'}
+              </Button>
+            </div>,
+            summaryTarget,
+          )
+        : null}
       {report.page.partial && (
         <Alert className={cn('mb-4 border-amber-500/50')}>
           <AlertDescription>
@@ -278,18 +275,6 @@ export function ProjectReport({
             {report.page.limit}registros, não todo o projeto.
           </AlertDescription>
         </Alert>
-      )}
-      {report.warnings.length > 0 && (
-        <details className={cn('mb-4 text-muted-foreground text-sm')}>
-          <summary className={cn('cursor-pointer py-2')}>
-            Notas do cálculo ({report.warnings.length})
-          </summary>
-          <ul className={cn('pl-6')}>
-            {report.warnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
-            ))}
-          </ul>
-        </details>
       )}
       {report.records.length === 0 ? (
         <Alert>
@@ -321,6 +306,7 @@ export function ProjectReport({
               />
             </Card>
             <TopicReport
+              compact
               unassignedMinutes={report.unassignedMinutes ?? 0}
               buckets={(report.byTopic ?? []).map((topic) => ({
                 projectId: topic.projectId,
@@ -340,6 +326,41 @@ export function ProjectReport({
               }))}
             />
           </div>
+          <details className="my-3 text-sm text-muted-foreground">
+            <summary className="cursor-pointer py-2">
+              Sobre o cálculo
+              {report.warnings.length > 0
+                ? ' · ' + report.warnings.length + ' notas'
+                : ''}
+            </summary>
+            <div className="space-y-2 pt-2 leading-relaxed">
+              <p>
+                Pode somar atividades simultâneas; não representa tempo líquido
+                único. Referência: {date(report.asOf)}. Política:{' '}
+                {report.policy}.
+              </p>
+              <p>
+                Estimativas não alteram fatos: até agora, limitadas a 6 horas
+                por registro aberto, sem teto diário, com os cortes por
+                meia-noite e próximo início no mesmo projeto. Fatos fechados não
+                são truncados; o total exibido considera todos os registros
+                selecionados.
+              </p>
+              <RouterLink
+                to="/rules"
+                className="inline-block text-primary underline-offset-4 hover:underline"
+              >
+                Consultar regras e limites do relatório
+              </RouterLink>
+              {report.warnings.length > 0 && (
+                <ul className="list-disc space-y-1 pl-5">
+                  {report.warnings.map((warning, index) => (
+                    <li key={index}>{warning}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </details>
           <div className={cn('flex flex-col flex sm:hidden gap-2')}>
             {report.records.map((record) => (
               <Card key={record.id + record.uid} className={cn('gap-0 p-4')}>
@@ -378,9 +399,7 @@ export function ProjectReport({
             className={cn('hidden sm:block overflow-x-auto rounded-xl border')}
           >
             <Table className={cn('min-w-[650px]')}>
-              <caption>
-                Registros selecionados — sem texto privado ou contexto
-              </caption>
+              <caption className="sr-only">Registros do projeto</caption>
               <TableHeader>
                 <TableRow>
                   {['Pessoa', 'Tópicos', 'Início', 'Fim', 'Tempo'].map(
@@ -454,17 +473,6 @@ export function ProjectReport({
           </div>
         </>
       )}
-      <div className={cn('flex flex-row mt-4 gap-4')}>
-        <Button
-          onClick={() => {
-            if (projects.error) projects.retry();
-            setAttempt((value) => value + 1);
-          }}
-          variant="ghost"
-        >
-          Atualizar relatório
-        </Button>
-      </div>
     </section>
   );
 }
