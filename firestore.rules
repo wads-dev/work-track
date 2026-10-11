@@ -1,85 +1,210 @@
 rules_version = '2';
-// Web authorization only. MCP/Admin SDK operations bypass these rules normally.
+
+// Autorização do Firebase Web. O MCP usa Admin SDK e valida acesso no backend.
+// Refatoração de organização: mantém a política existente, inclusive o legado.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
+
+    // -------------------------------------------------------------------------
+    // 1. Identidade e invariantes mínimas
+    // -------------------------------------------------------------------------
+    function isAuthenticated() {
       return request.auth != null
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
-    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
-    function validUid(uid) { return uid is string && uid.size() > 0 && uid.size() <= 128; }
-    function validId(id) { return id is string && id.matches('^[A-Za-z0-9_-]{1,128}$'); }
-    function isWorkProject(data) { return !('type' in data) || data.type == 'work'; }
-    function projectAccess(data) {
-      return signedIn() && (isWorkProject(data)
-        || (data.get('type', '') == 'personal'
-          && validUid(data.get('createdBy', '')) && isOwner(data.createdBy)));
+
+    function isCurrentUser(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
     }
-    function validProject(data, projectId) {
-      return validId(projectId) && data.id == projectId
-        && (isWorkProject(data)
-          || (data.type == 'personal' && validUid(data.get('createdBy', ''))));
+
+    function isValidUid(uid) {
+      return uid is string && uid.size() > 0 && uid.size() <= 128;
     }
-    function recordProjectAccess(data) {
-      return validId(data.get('projectId', ''))
-        && exists(/databases/$(database)/documents/projects/$(data.projectId))
-        && projectAccess(get(/databases/$(database)/documents/projects/$(data.projectId)).data);
+
+    function isValidDocumentId(id) {
+      return id is string && id.matches('^[A-Za-z0-9_-]{1,128}$');
     }
-    function validRecord(data, uid, recordId) {
-      return validId(recordId) && data.uid == uid
-        && (!('id' in data) || data.id == recordId)
-        && recordProjectAccess(data);
+
+    function preservesFields(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
     }
-    match /projects/{projectId} {
-      allow get: if projectAccess(resource.data);
-      // Legacy missing-type projects are accessible by get; discovery uses explicit type.
-      allow list: if signedIn() && (resource.data.get('type', '') == 'work'
-        || (resource.data.get('type', '') == 'personal'
-          && resource.data.get('createdBy', '') == request.auth.uid));
-      allow create: if signedIn() && validProject(request.resource.data, projectId)
+
+    function isAuditAuthor() {
+      return isAuthenticated()
+        && request.resource.data.authorUid == request.auth.uid;
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Projetos: acesso atual, descoberta e escritas
+    // -------------------------------------------------------------------------
+    function projectPath(projectId) {
+      return /databases/$(database)/documents/projects/$(projectId);
+    }
+
+    // Projetos antigos sem type continuam compartilhados na leitura individual.
+    function isSharedProject(project) {
+      return !('type' in project) || project.type == 'work';
+    }
+
+    function isOwnPersonalProject(project) {
+      return project.get('type', '') == 'personal'
+        && isValidUid(project.get('createdBy', ''))
+        && isCurrentUser(project.createdBy);
+    }
+
+    function canAccessProject(project) {
+      return isAuthenticated()
+        && (isSharedProject(project) || isOwnPersonalProject(project));
+    }
+
+    function canAccessProjectById(projectId) {
+      return canAccessProject(get(projectPath(projectId)).data);
+    }
+
+    // Listagens usam os filtros explícitos das consultas Web. Rules não filtram
+    // resultados: a consulta deve restringir type e, para personal, createdBy.
+    // Não incluir aqui o legado sem type: preserva o contrato atual de descoberta.
+    function canDiscoverProject(project) {
+      return isAuthenticated()
+        && (project.get('type', '') == 'work'
+          || (project.get('type', '') == 'personal'
+            && project.get('createdBy', '') == request.auth.uid));
+    }
+
+    function isValidProject(project, projectId) {
+      return isValidDocumentId(projectId)
+        && project.id == projectId
+        && (isSharedProject(project)
+          || (project.type == 'personal'
+            && isValidUid(project.get('createdBy', ''))));
+    }
+
+    function canCreateProject(projectId) {
+      return isAuthenticated()
+        && isValidProject(request.resource.data, projectId)
         && request.resource.data.get('createdBy', '') == request.auth.uid;
-      // Authorize the CURRENT resource, not the destination: a public editor may
-      // make it personal to its unchanged creator, then immediately lose access.
-      allow update: if projectAccess(resource.data)
-        && validProject(request.resource.data, projectId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'createdBy']);
-      allow delete: if projectAccess(resource.data);
+    }
+
+    // A autorização usa o estado ANTERIOR. Tornar compartilhado -> pessoal pode
+    // fazer o editor perder acesso após o commit; não muda a autoria do projeto.
+    function canUpdateProject(projectId) {
+      return canAccessProject(resource.data)
+        && isValidProject(request.resource.data, projectId)
+        && preservesFields(['id', 'createdBy']);
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Auditoria de projeto: somente acréscimos, inclusive em transações
+    // -------------------------------------------------------------------------
+    function isValidProjectAfterWrite(projectId) {
+      return isValidProject(getAfter(projectPath(projectId)).data, projectId);
+    }
+
+    function isCreatingOwnProject(projectId) {
+      return !exists(projectPath(projectId))
+        && getAfter(projectPath(projectId)).data.createdBy == request.auth.uid;
+    }
+
+    function canAuditExistingProject(projectId) {
+      let before = get(projectPath(projectId)).data;
+      let after = getAfter(projectPath(projectId)).data;
+      return canAccessProject(before)
+        && after.get('createdBy', '') == before.get('createdBy', '');
+    }
+
+    // getAfter vê o projeto no fim do batch. Acesso ao estado anterior permite
+    // gravar auditoria mesmo quando o autor perde acesso ao mudar o escopo.
+    function canCreateProjectAudit(projectId) {
+      return isAuditAuthor()
+        && isValidProjectAfterWrite(projectId)
+        && (isCreatingOwnProject(projectId) || canAuditExistingProject(projectId));
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Registros: leitura pelo projeto atual, escrita somente pelo dono
+    // -------------------------------------------------------------------------
+    // Snapshots históricos não concedem acesso. Projetos ausentes são negados.
+    function canAccessRecordProject(record) {
+      return isValidDocumentId(record.get('projectId', ''))
+        && exists(projectPath(record.projectId))
+        && canAccessProjectById(record.projectId);
+    }
+
+    function isValidRecord(record, ownerUid, recordId) {
+      return isValidDocumentId(recordId)
+        && record.uid == ownerUid
+        && (!('id' in record) || record.id == recordId)
+        && canAccessRecordProject(record);
+    }
+
+    function canCreateRecord(ownerUid, recordId) {
+      return isCurrentUser(ownerUid)
+        && isValidRecord(request.resource.data, ownerUid, recordId);
+    }
+
+    // Movimentos precisam autorizar origem e destino, sem trocar id ou dono.
+    function canUpdateRecord(ownerUid, recordId) {
+      return isCurrentUser(ownerUid)
+        && resource.data.uid == ownerUid
+        && canAccessRecordProject(resource.data)
+        && isValidRecord(request.resource.data, ownerUid, recordId)
+        && preservesFields(['id', 'uid']);
+    }
+
+    function canDeleteRecord(ownerUid) {
+      return isCurrentUser(ownerUid)
+        && resource.data.uid == ownerUid
+        && canAccessRecordProject(resource.data);
+    }
+
+    function canCreateRecordAudit(ownerUid) {
+      return isCurrentUser(ownerUid) && isAuditAuthor();
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Coleções: regras curtas que expressam intenção
+    // -------------------------------------------------------------------------
+    match /projects/{projectId} {
+      allow get: if canAccessProject(resource.data);
+      allow list: if canDiscoverProject(resource.data);
+      allow create: if canCreateProject(projectId);
+      allow update: if canUpdateProject(projectId);
+      allow delete: if canAccessProject(resource.data);
+
       match /audit/{auditId} {
-        allow read: if projectAccess(get(/databases/$(database)/documents/projects/$(projectId)).data);
-        // getAfter permits a batch changing scope even when the actor loses access.
-        // Identity stays fixed and authorization is against the pre-write project.
-        allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid
-          && validProject(getAfter(/databases/$(database)/documents/projects/$(projectId)).data, projectId)
-          && ((!exists(/databases/$(database)/documents/projects/$(projectId))
-              && getAfter(/databases/$(database)/documents/projects/$(projectId)).data.createdBy == request.auth.uid)
-            || (projectAccess(get(/databases/$(database)/documents/projects/$(projectId)).data)
-              && getAfter(/databases/$(database)/documents/projects/$(projectId)).data.get('createdBy', '')
-                == get(/databases/$(database)/documents/projects/$(projectId)).data.get('createdBy', '')));
+        allow read: if canAccessProjectById(projectId);
+        allow create: if canCreateProjectAudit(projectId);
         allow update, delete: if false;
       }
+
+      // União de tópicos é uma operação de backend; Web só consulta o histórico.
       match /topicMerges/{mergeId} {
-        allow read: if projectAccess(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        allow read: if canAccessProjectById(projectId);
         allow write: if false;
       }
     }
-    match /users/{uid}/records/{recordId} {
-      allow create: if isOwner(uid) && validRecord(request.resource.data, uid, recordId);
-      allow update: if isOwner(uid) && resource.data.uid == uid
-        && recordProjectAccess(resource.data) && validRecord(request.resource.data, uid, recordId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'uid']);
-      allow delete: if isOwner(uid) && resource.data.uid == uid && recordProjectAccess(resource.data);
+
+    match /users/{ownerUid}/records/{recordId} {
+      allow create: if canCreateRecord(ownerUid, recordId);
+      allow update: if canUpdateRecord(ownerUid, recordId);
+      allow delete: if canDeleteRecord(ownerUid);
+
       match /audit/{auditId} {
-        allow read: if isOwner(uid);
-        allow create: if isOwner(uid) && request.resource.data.authorUid == request.auth.uid;
+        allow read: if isCurrentUser(ownerUid);
+        allow create: if canCreateRecordAudit(ownerUid);
         allow update, delete: if false;
       }
     }
-    // Collection-group reads use CURRENT project authorization, including records
-    // owned by other users; snapshots never grant access to personal or orphan data.
+
+    // Necessário para collectionGroup('records'). Só concede leitura, nunca
+    // escrita em registros alheios ou acesso recursivo às suas subcoleções.
     match /{path=**}/records/{recordId} {
-      allow get, list: if recordProjectAccess(resource.data);
+      allow get, list: if canAccessRecordProject(resource.data);
     }
-    // Never recursively inherit grants into profiles, OAuth or projections.
-    match /{document=**} { allow read, write: if false; }
+
+    // Perfis, OAuth, projeções e coleções não declaradas permanecem privados.
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }
