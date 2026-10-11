@@ -63,6 +63,7 @@ export function subscribeAuthorizedReport(
   requiredProjectIds: readonly string[] = [],
   range?: CalendarQueryRange,
 ): Unsubscribe {
+  // Required IDs come from the shared authorized discovery, including legacy projects without type.
   const parentIds = [...new Set(requiredProjectIds)];
   let disposed = false;
   const catalog = new Map<number, Map<string, ClientReportProject>>(),
@@ -195,9 +196,11 @@ export function subscribeAuthorizedReport(
         )
           current.set(id, p);
     }
+    const catalogChanged =
+      JSON.stringify([...projects]) !== JSON.stringify([...current]);
     projects.clear();
     current.forEach((p, id) => projects.set(id, p)); // Immediately fence revoked projects, even before replacement record listeners converge.
-    if (last)
+    if (last && catalogChanged)
       last = new AuthorizedReportRepository(
         uid,
         last.records,

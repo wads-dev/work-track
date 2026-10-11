@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
 const mocks = vi.hoisted(() => ({
   access: vi.fn(),
+  legacyIds: [] as string[],
   listeners: [] as {
     target: { path: string; constraints: unknown[] };
     options: { source: 'cache' | 'default'; includeMetadataChanges: boolean };
@@ -12,6 +13,15 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../cache/project-access-revision', () => ({
   invalidateProjectAccess: mocks.access,
+}));
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(),
+  httpsCallable: () => () => ({
+    then: (callback: (result: { data: { ids: string[] } }) => void) => {
+      callback({ data: { ids: mocks.legacyIds } });
+      return { catch: vi.fn() };
+    },
+  }),
 }));
 vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, path: string) => path,
@@ -45,6 +55,31 @@ const batch = (
 beforeEach(() => {
   mocks.listeners.splice(0);
   mocks.access.mockReset();
+  mocks.legacyIds = [];
+});
+it('includes authorized legacy documents without broad collection reads', () => {
+  mocks.legacyIds = ['legacy'];
+  const next = vi.fn();
+  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
+  const legacy = mocks.listeners.find(
+    (l) => l.target.path === 'projects/legacy',
+  )!;
+  legacy.next({
+    data: () => ({ title: 'Legacy' }),
+    metadata: { fromCache: false, hasPendingWrites: false },
+  });
+  const live = mocks.listeners.filter((l) => l.options.source === 'default');
+  live[0]!.next(batch([], false));
+  live[1]!.next(batch([], false));
+  expect(next.mock.lastCall?.[0]).toMatchObject({
+    rows: [{ id: 'legacy', data: { title: 'Legacy' } }],
+    complete: true,
+  });
+  legacy.next({
+    data: () => ({ type: 'personal', createdBy: 'bob' }),
+    metadata: { fromCache: false, hasPendingWrites: false },
+  });
+  expect(next.mock.lastCall?.[0].rows).toEqual([]);
 });
 it('reads scoped cache first and keeps a default listener for remote synchronization', () => {
   const next = vi.fn();

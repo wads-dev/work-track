@@ -1,5 +1,6 @@
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
+import { ProjectDiscoveryRepository } from '@work-track/data/repositories/project-discovery-repository';
 import {
   compactRecentRecords,
   recentRecordsInput,
@@ -7,7 +8,6 @@ import {
 } from '@work-track/core/registration/domain/recent-records';
 import {
   assertProjectAccess,
-  canAccessProject,
   effectiveProjectType,
 } from '@work-track/core/registration/domain/project-access';
 import { ProjectManagementError } from '@work-track/core/registration/domain/project-management';
@@ -56,15 +56,18 @@ export class FirestoreWorkRepository implements WorkRepository {
     );
   }
   async listProjects(uid: string): Promise<Project[]> {
-    const snapshot = await this.db.collection('projects').limit(1001).get();
-    if (snapshot.docs.length > 1000)
-      throw new ProjectManagementError(
-        'resource-exhausted',
-        'Catálogo excede o limite seguro de consulta.',
-      );
-    return snapshot.docs
-      .map((doc) => ({ ...doc.data(), id: doc.id }) as Project)
-      .filter((p) => canAccessProject(p, uid));
+    const discovery = new ProjectDiscoveryRepository({
+      scanProjects: async (limit) => {
+        const snapshot = await this.db
+          .collection('projects')
+          .limit(limit)
+          .get();
+        return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+      },
+    });
+    return (await discovery.list(uid)).map(
+      (doc) => ({ ...doc.data, id: doc.id }) as Project,
+    );
   }
   async createProject(
     raw: Parameters<WorkRepository['createProject']>[0],

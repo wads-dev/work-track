@@ -19,6 +19,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { FirestorePauseRepository } from './modules/pause/infrastructure/firestore-pause.js';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall, onRequest } from 'firebase-functions/v2/https';
+import { authorizeReport } from './modules/reports/presentation/get-project-report.js';
 import { createApp } from './core/http/app.js';
 import { WorkTrackOAuth } from './core/auth/application/oauth-provider.js';
 import { FirebaseIdentityService } from './core/auth/infrastructure/firebase-identity.js';
@@ -150,6 +151,20 @@ export const mcp = onRequest(
     new FirestoreRecordMovementRepository(getFirestore()),
     new FirestoreMergeRepository(getFirestore()),
   ),
+);
+export const discoverLegacyProjectIds = onCall(
+  { region: 'southamerica-east1', invoker: 'public', maxInstances: 3 },
+  async (request) => {
+    authorizeReport(request.auth);
+    const projects = await new FirestoreWorkRepository(
+      getFirestore(),
+    ).listProjects(request.auth!.uid);
+    return {
+      ids: projects
+        .filter((project) => project.type === undefined)
+        .map((project) => project.id),
+    };
+  },
 );
 export const createProject = onCall(
   {

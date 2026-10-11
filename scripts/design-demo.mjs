@@ -77,6 +77,7 @@ const projects = specs.map(([slug, title, description], i) => ({
     confidential: i === 4,
     publicAlias: i === 4 ? 'Projeto reservado 27' : 'Projeto reservado',
   }),
+  ...(i === 0 || i === 1 ? { type: undefined } : {}),
   archived: i === 6,
   createdBy: uid,
   createdAt: '2026-10-01T08:00:00-03:00',

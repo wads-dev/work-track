@@ -92,6 +92,10 @@ it('preserves repository identity on metadata-only record snapshots', () => {
   const first = next.mock.calls.at(-1)![0].repository;
   listener.next(batch([record()], false));
   expect(next.mock.calls.at(-1)![0].repository).toBe(first);
+  mock.listeners[0]!.next(
+    catalog([['a', { type: 'work', title: 'A', topics: [] }]]),
+  );
+  expect(next.mock.calls.at(-1)![0].repository).toBe(first);
   listener.next(
     batch([record({ ...fact, endedAt: '2026-10-08T14:00:00Z' })], false),
   );
