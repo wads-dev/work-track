@@ -1,7 +1,13 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type { Functions } from 'firebase/functions';
 const mocks = vi.hoisted(() => ({ call: vi.fn(), invalidate: vi.fn() }));
-vi.mock('firebase/functions', () => ({ httpsCallable: () => mocks.call }));
+vi.mock('./web-command-gateway', () => ({
+  WebCommandGateway: class {
+    async execute(_name: string, input: unknown) {
+      return (await mocks.call(input)).data;
+    }
+  },
+}));
 vi.mock('../../data/cache/project-repository', () => ({
   projectRepository: { invalidate: mocks.invalidate },
 }));

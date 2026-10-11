@@ -89,6 +89,17 @@ if (!run) {
       new FirestoreCompanyReportRepository(db, auth),
     ],
   };
+  const { manageProjectHandler } =
+    await import('../apps/backend/lib/modules/registration/presentation/manage-projects.js');
+  const { manageTopicsHandler } =
+    await import('../apps/backend/lib/modules/registration/presentation/manage-topics.js');
+  const projectManagement = new FirestoreProjectManagementRepository(db);
+  const topicManagement = new FirestoreTopicManagementRepository(db);
+  const localCommands = {
+    updateProject: [manageProjectHandler, projectManagement, 'update'],
+    archiveProject: [manageProjectHandler, projectManagement, 'archive'],
+    listTopicMerges: [manageTopicsHandler, topicManagement, 'history'],
+  };
   const reportAsOf = Date.now();
   async function readHandler(name, data, token) {
     const claims = token ? await auth.verifyIdToken(token) : undefined;
@@ -138,14 +149,33 @@ if (!run) {
     });
     return { status: response.status, body: await response.json() };
   }
-  const callable = async (name, data, token) =>
-    (
+  const callable = async (name, data, token) => {
+    if (localCommands[name]) {
+      const [handler, repository, kind] = localCommands[name];
+      try {
+        const claims = token ? await auth.verifyIdToken(token) : undefined;
+        return {
+          result: await handler(
+            repository,
+            kind,
+            data,
+            claims ? { uid: claims.uid, token: claims } : undefined,
+          ),
+        };
+      } catch (error) {
+        return {
+          error: { status: error.code.toUpperCase().replaceAll('-', '_') },
+        };
+      }
+    }
+    return (
       await http(
         'http://127.0.0.1:5001/' + project + '/southamerica-east1/' + name,
         { data },
         token,
       )
     ).body;
+  };
   async function good(name, data, token) {
     const result = await callable(name, data, token);
     assert(!result.error, name + ': ' + JSON.stringify(result.error));

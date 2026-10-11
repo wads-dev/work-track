@@ -1,4 +1,4 @@
-import { createCallable } from '../../infrastructure/firebase/callable-command-gateway';
+import { createWebCommand as createCallable } from '../../infrastructure/firebase/web-command-gateway';
 import { Button } from '../../components/ui/button';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { TabsTrigger, Tabs, TabsList } from '../../components/ui/tabs';

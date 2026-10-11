@@ -1,4 +1,4 @@
-import { createCallable } from '../../infrastructure/firebase/callable-command-gateway';
+import { createWebCommand as createCallable } from '../../infrastructure/firebase/web-command-gateway';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import {
   SelectItem,
@@ -143,7 +143,10 @@ function AccessForm({
         failure && typeof failure === 'object' && 'code' in failure
           ? failure.code
           : '';
-      if (code === 'functions/failed-precondition') {
+      if (
+        code === 'functions/failed-precondition' ||
+        code === 'failed-precondition'
+      ) {
         setPreview(null);
         setAck(false);
       }
@@ -328,8 +331,8 @@ function AccessForm({
               {preview && (
                 <>
                   <p className="text-sm leading-relaxed">
-                    Prévia: {preview.recordCount}registros associados. Nenhum
-                    horário, texto ou autoria será reescrito.
+                    Prévia: mudança de acesso do projeto. Nenhum horário, texto
+                    ou autoria será reescrito.
                   </p>
                   {preview.warnings.map((warning, index) => (
                     <Alert key={index} className="my-2">

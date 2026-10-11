@@ -6,8 +6,6 @@ import { FirestoreTopicReportRepository } from './modules/reports/infrastructure
 import { getTopicReportHandler } from './modules/reports/presentation/get-topic-report.js';
 import { FirestoreRecordMovementRepository } from './modules/registration/infrastructure/firestore-record-movement.js';
 import { movementHandler } from './modules/registration/presentation/record-movement.js';
-import { changeProjectScopeHandler } from './modules/registration/presentation/change-project-scope.js';
-import { FirestoreProjectScopeRepository } from './modules/registration/infrastructure/firestore-project-scope.js';
 import { FirestoreRemovalRepository } from './modules/removal/infrastructure/firestore-removal.js';
 import { FirestoreSplitRepository } from './modules/split/infrastructure/firestore-split.js';
 import { FirestoreDailyHoursRepository } from './modules/daily-hours/infrastructure/firestore-daily-hours.js';
@@ -16,7 +14,6 @@ import { FirestoreTopicManagementRepository } from './modules/registration/infra
 import { manageTopicsHandler } from './modules/registration/presentation/manage-topics.js';
 import { createProjectHandler } from './modules/registration/presentation/create-project.js';
 import { FirestoreProjectManagementRepository } from './modules/registration/infrastructure/firestore-project-management.js';
-import { updateRecordHandler } from './modules/registration/presentation/update-record.js';
 import { FirestoreRecordEditingRepository } from './modules/registration/infrastructure/firestore-record-editing.js';
 import { getAuth } from 'firebase-admin/auth';
 import { FirestorePauseRepository } from './modules/pause/infrastructure/firestore-pause.js';
@@ -111,72 +108,6 @@ export const moveTopic = onCall(
       request.auth,
     ),
 );
-// Keep the deployed callable during the rename rollout. MCP exposes only move_topic.
-// Remove this alias only through an explicitly planned Firebase function retirement.
-export const moveSubject = moveTopic;
-export const moveRecord = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    movementHandler(
-      new FirestoreRecordMovementRepository(getFirestore()),
-      'move_record',
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const changeProjectScope = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    changeProjectScopeHandler(
-      new FirestoreProjectScopeRepository(getFirestore()),
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const archiveProject = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    manageProjectHandler(
-      new FirestoreProjectManagementRepository(getFirestore()),
-      'archive',
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const updateProject = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    manageProjectHandler(
-      new FirestoreProjectManagementRepository(getFirestore()),
-      'update',
-      request.data as unknown,
-      request.auth,
-    ),
-);
 export const mergeProjects = onCall(
   {
     region: 'southamerica-east1',
@@ -189,21 +120,6 @@ export const mergeProjects = onCall(
     manageProjectHandler(
       new FirestoreProjectManagementRepository(getFirestore()),
       'merge',
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const updateRecord = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    updateRecordHandler(
-      new FirestoreRecordEditingRepository(getFirestore()),
       request.data as unknown,
       request.auth,
     ),
@@ -235,8 +151,6 @@ export const mcp = onRequest(
     new FirestoreMergeRepository(getFirestore()),
   ),
 );
-// Transitional export: retire api only after Hosting has switched to mcp.
-export const api = mcp;
 export const createProject = onCall(
   {
     region: 'southamerica-east1',
@@ -264,22 +178,6 @@ export const mergeTopics = onCall(
     manageTopicsHandler(
       new FirestoreTopicManagementRepository(getFirestore()),
       'merge',
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const listTopicMerges = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    manageTopicsHandler(
-      new FirestoreTopicManagementRepository(getFirestore()),
-      'history',
       request.data as unknown,
       request.auth,
     ),

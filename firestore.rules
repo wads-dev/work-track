@@ -1,8 +1,5 @@
 rules_version = '2';
-// work and legacy missing-type projects are public to authenticated users.
-// personal projects are private to createdBy. Full canonical record content is
-// intentionally shared by CURRENT parent authorization, regardless of record uid.
-// Prototype: review and verify with the emulator before broad deployment.
+// Web authorization only. MCP/Admin SDK operations bypass these rules normally.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -10,84 +7,79 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
-    function isWorkProject(data) { return !('type' in data) || data.type == 'work'; }
-    function isPersonalProjectOwner(data) {
-      return 'type' in data && data.type == 'personal'
-        && data.createdBy is string && data.createdBy.size() > 0
-        && data.createdBy.size() <= 128 && isOwner(data.createdBy);
-    }
-    function projectAccess(data) {
-      return signedIn() && (isWorkProject(data) || isPersonalProjectOwner(data));
-    }
+    function validUid(uid) { return uid is string && uid.size() > 0 && uid.size() <= 128; }
     function validId(id) { return id is string && id.matches('^[A-Za-z0-9_-]{1,128}$'); }
+    function isWorkProject(data) { return !('type' in data) || data.type == 'work'; }
+    function projectAccess(data) {
+      return signedIn() && (isWorkProject(data)
+        || (data.get('type', '') == 'personal'
+          && validUid(data.get('createdBy', '')) && isOwner(data.createdBy)));
+    }
+    function validProject(data, projectId) {
+      return validId(projectId) && data.id == projectId
+        && (isWorkProject(data)
+          || (data.type == 'personal' && validUid(data.get('createdBy', ''))));
+    }
     function recordProjectAccess(data) {
-      return 'projectId' in data && validId(data.projectId)
+      return validId(data.get('projectId', ''))
         && exists(/databases/$(database)/documents/projects/$(data.projectId))
         && projectAccess(get(/databases/$(database)/documents/projects/$(data.projectId)).data);
     }
-    function validProject(data, projectId) {
-      return data.keys().hasAll(['id', 'title', 'description', 'createdBy', 'createdAt', 'topics'])
-        && data.id == projectId && validId(projectId)
-        && data.createdBy is string && data.createdBy.size() > 0 && data.createdBy.size() <= 128
-        && (!('type' in data) || data.type in ['work', 'personal'])
-        && data.title is string && data.title.size() >= 2 && data.title.size() <= 160
-        && data.description is string && data.description.size() >= 20 && data.description.size() <= 6000
-        && data.createdAt is string && data.topics is list
-        && (!('archived' in data) || data.archived is bool)
-        && (!('confidential' in data) || data.confidential is bool);
-    }
     function validRecord(data, uid, recordId) {
-      return data.keys().hasAll(['uid', 'projectId', 'startedAt', 'timeZone', 'originalText', 'interpretation', 'requestId', 'fingerprint', 'topics'])
+      return validId(recordId) && data.uid == uid
         && (!('id' in data) || data.id == recordId)
-        && data.uid == uid && uid is string && uid.size() > 0 && uid.size() <= 128
-        && validId(data.projectId) && validId(data.requestId)
-        && data.fingerprint is string && data.fingerprint.size() > 0
-        && data.startedAt is string && data.startedAt.size() >= 20 && data.startedAt.size() <= 40
-        && (!('endedAt' in data) || data.endedAt == null || (data.endedAt is string && data.endedAt.size() >= 20 && data.endedAt.size() <= 40))
-        && data.timeZone is string && data.timeZone.size() > 0 && data.timeZone.size() <= 100
-        && data.originalText is string && data.originalText.size() > 0 && data.originalText.size() <= 12000
-        && data.interpretation is string && data.interpretation.size() > 0 && data.interpretation.size() <= 6000
-        && data.topics is list && data.topics.size() <= 30
-        && (!('interruptions' in data) || (data.interruptions is list && data.interruptions.size() <= 30));
+        && recordProjectAccess(data);
     }
     match /projects/{projectId} {
-      // Query selectors: type == work; type == personal AND createdBy == uid.
-      // Legacy missing-type projects are readable but cannot be selected with
-      // type==work. Do not perform an unbounded unfiltered discovery query.
       allow get: if projectAccess(resource.data);
-      // Absence of type cannot constrain a query's potential result set. Legacy
-      // documents remain accessible by get, but discovery requires explicit type.
+      // Legacy missing-type projects are accessible by get; discovery uses explicit type.
       allow list: if signedIn() && (resource.data.get('type', '') == 'work'
         || (resource.data.get('type', '') == 'personal'
           && resource.data.get('createdBy', '') == request.auth.uid));
-      allow create: if signedIn() && 'type' in request.resource.data
+      allow create: if signedIn() && validProject(request.resource.data, projectId)
+        && request.resource.data.get('createdBy', '') == request.auth.uid;
+      // Authorize the CURRENT resource, not the destination: a public editor may
+      // make it personal to its unchanged creator, then immediately lose access.
+      allow update: if projectAccess(resource.data)
         && validProject(request.resource.data, projectId)
-        && request.resource.data.createdBy == request.auth.uid;
-      allow update: if projectAccess(resource.data) && projectAccess(request.resource.data)
-        && validProject(request.resource.data, projectId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'type', 'createdBy', 'createdAt']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'createdBy']);
       allow delete: if projectAccess(resource.data);
-    }
-    match /users/{uid}/records/{recordId} {
-      allow create: if signedIn() && validId(recordId)
-        && validRecord(request.resource.data, uid, recordId) && recordProjectAccess(request.resource.data);
-      allow update: if recordProjectAccess(resource.data) && recordProjectAccess(request.resource.data)
-        && resource.data.uid == uid && validRecord(request.resource.data, uid, recordId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'uid', 'requestId', 'fingerprint', 'receivedAt']);
-      allow delete: if recordProjectAccess(resource.data) && resource.data.uid == uid;
       match /audit/{auditId} {
-        allow read: if isOwner(uid);
+        allow read: if projectAccess(get(/databases/$(database)/documents/projects/$(projectId)).data);
+        // getAfter permits a batch changing scope even when the actor loses access.
+        // Identity stays fixed and authorization is against the pre-write project.
+        allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid
+          && validProject(getAfter(/databases/$(database)/documents/projects/$(projectId)).data, projectId)
+          && ((!exists(/databases/$(database)/documents/projects/$(projectId))
+              && getAfter(/databases/$(database)/documents/projects/$(projectId)).data.createdBy == request.auth.uid)
+            || (projectAccess(get(/databases/$(database)/documents/projects/$(projectId)).data)
+              && getAfter(/databases/$(database)/documents/projects/$(projectId)).data.get('createdBy', '')
+                == get(/databases/$(database)/documents/projects/$(projectId)).data.get('createdBy', '')));
+        allow update, delete: if false;
+      }
+      match /topicMerges/{mergeId} {
+        allow read: if projectAccess(get(/databases/$(database)/documents/projects/$(projectId)).data);
         allow write: if false;
       }
     }
-    // Required for collectionGroup('records'). Only record documents whose
-    // current parent is authorized are granted; no grant extends to their children.
-    // Orphans and unauthorized current parents are denied, including record owners.
+    match /users/{uid}/records/{recordId} {
+      allow create: if isOwner(uid) && validRecord(request.resource.data, uid, recordId);
+      allow update: if isOwner(uid) && resource.data.uid == uid
+        && recordProjectAccess(resource.data) && validRecord(request.resource.data, uid, recordId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'uid']);
+      allow delete: if isOwner(uid) && resource.data.uid == uid && recordProjectAccess(resource.data);
+      match /audit/{auditId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && request.resource.data.authorUid == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+    // Collection-group reads use CURRENT project authorization, including records
+    // owned by other users; snapshots never grant access to personal or orphan data.
     match /{path=**}/records/{recordId} {
       allow get, list: if recordProjectAccess(resource.data);
     }
-    // Profiles, OAuth, audits outside the explicit owner branch, projections and
-    // all other paths remain denied. Never recursively inherit a project grant.
+    // Never recursively inherit grants into profiles, OAuth or projections.
     match /{document=**} { allow read, write: if false; }
   }
 }

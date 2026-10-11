@@ -147,14 +147,14 @@ test(
         [
           '--input-type=module',
           '-e',
-          "const f = await import('./index.js'); if (typeof f.mcp !== 'function' || f.api !== f.mcp) throw new Error('api must be the temporary mcp alias'); console.log(JSON.stringify(Object.keys(f).sort()))",
+          "const f = await import('./index.js'); if (typeof f.mcp !== 'function' || 'api' in f || 'moveSubject' in f) throw new Error('Only canonical MCP/topic exports must remain'); console.log(JSON.stringify(Object.keys(f).sort()))",
         ],
         { cwd: isolated, env, encoding: 'utf8', timeout: 15_000 },
       );
       assert.equal(imported.status, 0, imported.stdout + imported.stderr);
       const exportedNames = JSON.parse(imported.stdout.trim());
       assert(exportedNames.includes('mcp'));
-      assert(exportedNames.includes('api'));
+      assert(!exportedNames.includes('api'));
       assert(!exportedNames.includes('health'));
       const retiredCallables = [
         'getCalendarReport',
@@ -162,6 +162,13 @@ test(
         'getPersonalReport',
         'getProjectReport',
         'listProjects',
+        'archiveProject',
+        'updateProject',
+        'changeProjectScope',
+        'updateRecord',
+        'moveRecord',
+        'listTopicMerges',
+        'moveSubject',
       ];
       for (const name of retiredCallables) {
         assert(
@@ -189,11 +196,7 @@ test(
       const runtime = await json(join(isolated, 'functions-manifest.json'));
       assert.deepEqual(Object.keys(runtime.endpoints).sort(), exportedNames);
       assert(runtime.endpoints.mcp.httpsTrigger);
-      assert(runtime.endpoints.api.httpsTrigger);
-      assert.deepEqual(
-        { ...runtime.endpoints.api, entryPoint: 'mcp' },
-        runtime.endpoints.mcp,
-      );
+
       for (const name of retiredCallables) {
         assert(
           !Object.hasOwn(runtime.endpoints, name),

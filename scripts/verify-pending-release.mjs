@@ -78,12 +78,7 @@ try {
   await client.close();
   await transport.close();
 }
-for (const name of [
-  'createProject',
-  'mergeProjects',
-  'mergeTopics',
-  'listTopicMerges',
-]) {
+for (const name of ['createProject', 'mergeProjects', 'mergeTopics']) {
   const response = await fetch(
     'https://southamerica-east1-wadsworktrack.cloudfunctions.net/' + name,
     {

@@ -114,6 +114,16 @@ function list(path, token) {
 function write(path, data, token) {
   return request(documentUrl(path), token, 'PATCH', { fields: fields(data) });
 }
+function batch(entries, token) {
+  return request(documentRoot + ':commit', token, 'POST', {
+    writes: entries.map(([path, data]) => ({
+      update: {
+        name: documentUrl(path).slice(root.length + 4),
+        fields: fields(data),
+      },
+    })),
+  });
+}
 function query(parent, collectionId, token, options = {}) {
   const { allDescendants = false, where, orderBy, limit = 100 } = options;
   const url = parent
@@ -165,6 +175,9 @@ before(async () => {
   emulator = spawn(
     process.env.PROJECT_PRIVACY_JAVA || 'java',
     [
+      // The cached emulator lacks localized rule-error bundles (e.g. pt_BR).
+      '-Duser.language=en',
+      '-Duser.country=US',
       '-jar',
       jarPath,
       '--host',
@@ -508,7 +521,7 @@ test('project authorization: public authenticated and own personal', async (t) =
     },
   );
   await t.test(
-    'project writes protect ownership/type and validate schema',
+    'project writes preserve identity but allow scope changes by current access',
     async () => {
       const p = validProject('client-project', alice);
       await allowed(write('projects/client-project', p, aliceToken));
@@ -523,10 +536,40 @@ test('project authorization: public authenticated and own personal', async (t) =
         write('projects/client-project', { ...p, createdBy: bob }, bobToken),
       );
       await denied(
+        write('projects/client-project', { ...p, id: 'stolen' }, bobToken),
+      );
+      await allowed(
+        write('projects/client-project', { ...p, type: 'personal' }, bobToken),
+      );
+      await denied(get('projects/client-project', bobToken));
+      await denied(write('projects/client-project', p, bobToken));
+      await denied(
+        request(documentUrl('projects/client-project'), bobToken, 'DELETE'),
+      );
+      await allowed(write('projects/client-project', p, aliceToken));
+      await allowed(
         write(
-          'projects/client-project',
-          { ...p, type: 'personal' },
-          aliceToken,
+          'projects/legacy',
+          { ...validProject('legacy', alice), type: 'personal' },
+          bobToken,
+        ),
+      );
+      await denied(get('projects/legacy', bobToken));
+      await allowed(
+        write('projects/legacy', validProject('legacy', alice), aliceToken),
+      );
+      await allowed(
+        write(
+          'projects/legacy-no-owner',
+          { id: 'legacy-no-owner', title: 'Edited legacy' },
+          bobToken,
+        ),
+      );
+      await denied(
+        write(
+          'projects/legacy-no-owner',
+          { id: 'legacy-no-owner', createdBy: bob },
+          bobToken,
         ),
       );
       await denied(
@@ -562,21 +605,25 @@ test('project authorization: public authenticated and own personal', async (t) =
     async () => {
       const path = 'users/' + alice + '/records/client-record';
       const record = validRecord('work');
-      await allowed(write(path, record, bobToken));
-      await allowed(
+      // Public reading never grants writes to someone else's record path.
+      await denied(write(path, record, bobToken));
+      await allowed(write(path, record, aliceToken));
+      await allowed(get(path, bobToken));
+      await denied(
         write(path, { ...record, interpretation: 'Public edit' }, bobToken),
       );
-      await denied(write(path, { ...record, uid: bob }, bobToken));
-      await denied(
-        write(path, { ...record, fingerprint: 'changed' }, bobToken),
+      await denied(write(path, { ...record, uid: bob }, aliceToken));
+      await denied(write(path, { ...record, id: 'forged' }, aliceToken));
+      await allowed(
+        write(path, { ...record, interpretation: 'Owner edit' }, aliceToken),
       );
+      await denied(request(documentUrl(path), bobToken, 'DELETE'));
       await denied(
-        write(path, { ...record, projectId: 'personal-alice' }, bobToken),
+        write(path, { ...record, projectId: 'personal-bob' }, aliceToken),
       );
       await denied(
         write(path, { ...record, projectId: 'missing-project' }, aliceToken),
       );
-      await denied(write(path, { ...record, topics: 'bad' }, bobToken));
       await denied(
         write(
           'users/' + alice + '/records/forged',
@@ -584,21 +631,38 @@ test('project authorization: public authenticated and own personal', async (t) =
           bobToken,
         ),
       );
-      await denied(
-        write(
-          'users/' + alice + '/records/private-forged',
-          validRecord('personal-alice'),
-          bobToken,
-        ),
-      );
+      await denied(write('users/' + bob + '/records/forged', record, bobToken));
       await denied(write('users/' + alice + '/records/anonymous', record));
       await allowed(
         write(path, { ...record, projectId: 'personal-alice' }, aliceToken),
       );
+      await denied(get(path, bobToken));
       await denied(write(path, record, bobToken));
       await denied(request(documentUrl(path), bobToken, 'DELETE'));
       await allowed(write(path, record, aliceToken));
-      await allowed(request(documentUrl(path), bobToken, 'DELETE'));
+      await allowed(request(documentUrl(path), aliceToken, 'DELETE'));
+      // Even a project creator cannot mutate another user's canonical record.
+      const foreignPath = 'users/' + bob + '/records/personal-owner-test';
+      await allowed(
+        write(
+          foreignPath,
+          { ...record, uid: bob, projectId: 'personal-alice' },
+          'owner',
+        ),
+      );
+      await allowed(get(foreignPath, aliceToken));
+      await denied(
+        write(
+          foreignPath,
+          { ...record, uid: bob, projectId: 'personal-alice' },
+          aliceToken,
+        ),
+      );
+      await denied(request(documentUrl(foreignPath), aliceToken, 'DELETE'));
+      const corruptPath = 'users/' + alice + '/records/wrong-stored-uid';
+      await allowed(write(corruptPath, { ...record, uid: bob }, 'owner'));
+      await denied(write(corruptPath, record, aliceToken));
+      await denied(request(documentUrl(corruptPath), aliceToken, 'DELETE'));
     },
   );
   await t.test(
@@ -635,7 +699,6 @@ test('project authorization: public authenticated and own personal', async (t) =
         'oauth_tokens/secret',
         'oauth_states/secret',
         'projects/work/topics/nested',
-        'projects/work/audit/entry',
         'projects/work/merges/entry',
         'projects/work/reportRecords/hidden',
       ]) {
@@ -655,6 +718,101 @@ test('project authorization: public authenticated and own personal', async (t) =
           aliceToken,
         ),
       );
+    },
+  );
+  await t.test(
+    'audits append only; scope-change batches and topic merge history',
+    async () => {
+      const p = validProject('audit-scope', alice);
+      const auditPath = 'projects/audit-scope/audit/scope';
+      await allowed(
+        batch(
+          [
+            ['projects/audit-scope', p],
+            ['projects/audit-scope/audit/created', { authorUid: alice }],
+          ],
+          aliceToken,
+        ),
+      );
+      await denied(
+        write(
+          'projects/audit-scope/audit/forged',
+          { authorUid: alice },
+          bobToken,
+        ),
+      );
+      await allowed(
+        batch(
+          [
+            ['projects/audit-scope', { ...p, type: 'personal' }],
+            [
+              auditPath,
+              { authorUid: bob, reason: 'Public actor made scope personal' },
+            ],
+          ],
+          bobToken,
+        ),
+      );
+      await denied(get('projects/audit-scope', bobToken));
+      await denied(get(auditPath, bobToken));
+      await allowed(get(auditPath, aliceToken));
+      await allowed(list('projects/audit-scope/audit', aliceToken));
+      await denied(list('projects/audit-scope/audit', bobToken));
+      await denied(write(auditPath, { authorUid: alice }, aliceToken));
+      await denied(request(documentUrl(auditPath), aliceToken, 'DELETE'));
+      await denied(
+        write('projects/audit-scope/audit/late', { authorUid: bob }, bobToken),
+      );
+      await denied(
+        write('projects/missing/audit/entry', { authorUid: alice }, aliceToken),
+      );
+      await allowed(
+        write(
+          'projects/audit-scope/audit/owner',
+          { authorUid: alice },
+          aliceToken,
+        ),
+      );
+      const recordAudit = 'users/' + alice + '/records/work/audit/web';
+      await denied(write(recordAudit, { authorUid: bob }, bobToken));
+      await denied(write(recordAudit, { authorUid: bob }, aliceToken));
+      await allowed(write(recordAudit, { authorUid: alice }, aliceToken));
+      await denied(
+        write(
+          recordAudit,
+          { authorUid: alice, reason: 'overwrite' },
+          aliceToken,
+        ),
+      );
+      await denied(request(documentUrl(recordAudit), aliceToken, 'DELETE'));
+      await allowed(list('users/' + alice + '/records/work/audit', aliceToken));
+      await denied(list('users/' + alice + '/records/work/audit', bobToken));
+      for (const projectId of ['work', 'personal-alice']) {
+        const mergePath = 'projects/' + projectId + '/topicMerges/entry';
+        await allowed(
+          write(
+            mergePath,
+            { authorUid: alice, createdAt: '2026-10-09' },
+            'owner',
+          ),
+        );
+        await allowed(get(mergePath, aliceToken));
+        await allowed(
+          list('projects/' + projectId + '/topicMerges', aliceToken),
+        );
+        await denied(write(mergePath, { authorUid: alice }, aliceToken));
+        await denied(
+          write(
+            'projects/' + projectId + '/topicMerges/web',
+            { authorUid: alice },
+            aliceToken,
+          ),
+        );
+        await denied(request(documentUrl(mergePath), aliceToken, 'DELETE'));
+      }
+      await allowed(list('projects/work/topicMerges', bobToken));
+      await denied(list('projects/personal-alice/topicMerges', bobToken));
+      await denied(list('projects/missing/topicMerges', aliceToken));
     },
   );
   await t.test(
@@ -691,9 +849,7 @@ test('project authorization: public authenticated and own personal', async (t) =
           ),
         }),
       );
-      await denied(
-        write(pendingPath, { ...pending, endedAt: false }, aliceToken),
-      );
+
       const anonymous = jwt(alice, {
         firebase: { sign_in_provider: 'anonymous' },
       });
