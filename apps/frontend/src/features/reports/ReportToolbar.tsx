@@ -4,14 +4,11 @@ import {
   QueryPeriodControls,
 } from '../../shared/ui/QueryToolbar';
 import { Button } from '../../components/ui/button';
-import { Checkbox } from '../../components/ui/checkbox';
-import { Label } from '../../components/ui/label';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '../../components/ui/tooltip';
-import { useId } from 'react';
 import { UiIcon } from '../../shared/ui/UiIcons';
 import { ProjectSelector } from '../projects/ProjectSelector';
 import { usePrivacy } from '../../shared/ui/privacy';
@@ -38,7 +35,6 @@ export function ReportToolbar({
   includeArchived?: boolean;
 }) {
   const { revealed } = usePrivacy();
-  const archivedId = useId();
   return (
     <QueryToolbar
       label="Filtros do relatório"
@@ -68,16 +64,24 @@ export function ReportToolbar({
             </Tooltip>
           )}
           {includeArchived !== undefined && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id={archivedId}
-                checked={includeArchived}
-                onCheckedChange={(checked) =>
-                  onFilter('includeArchived', String(checked === true))
-                }
-              />
-              <Label htmlFor={archivedId}>Arquivados</Label>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Incluir arquivados"
+                  aria-pressed={includeArchived}
+                  onClick={() =>
+                    onFilter('includeArchived', String(!includeArchived))
+                  }
+                >
+                  <UiIcon kind={includeArchived ? 'archive' : 'archiveoff'} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {includeArchived ? 'Ocultar arquivados' : 'Incluir arquivados'}
+              </TooltipContent>
+            </Tooltip>
           )}
           <Tooltip>
             <TooltipTrigger asChild>
