@@ -1,19 +1,12 @@
 import { cn } from '../../lib/utils';
-import { Button } from '../../components/ui/button';
-import { TableCell } from '../../components/ui/table';
-import { TableHead } from '../../components/ui/table';
-import { TableRow } from '../../components/ui/table';
-import { TableHeader } from '../../components/ui/table';
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from '../../components/ui/tooltip';
-import { TableBody } from '../../components/ui/table';
-import { Table } from '../../components/ui/table';
-import { Card } from '../../components/ui/card';
-import { Alert, AlertDescription } from '../../components/ui/alert';
-import { Skeleton } from '../../components/ui/skeleton';
+import { UiIcon } from '../../shared/ui/UiIcons';
+import { Button } from '../../components/ui/button';
+import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { useProjects } from '../projects/hooks/useProjects';
 import {
@@ -27,12 +20,12 @@ import { useClock } from '../../hooks/use-clock';
 import { type Firestore } from 'firebase/firestore';
 import { subscribeAuthorizedOwnRecords } from '../../data/sources/authorized-own-record-source';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
-import { date, text, type Row } from '../../shared/data';
-import { isHidden, safeProject, usePrivacy } from '../../shared/ui/privacy';
+import { type Row } from '../../shared/data';
+import { usePrivacy } from '../../shared/ui/privacy';
 import { RecordDrawer } from '../records/RecordDrawer';
-import { contextualRecordPath } from '../../app/routes';
+import { RecordsList } from '../records/RecordsList';
+import { sortRecords } from '../records/record-filters';
 import type { Functions } from 'firebase/functions';
-import { UiIcon } from '../../shared/ui/UiIcons';
 export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
   // Fetch only indexed open records, never a sample of the history.
   const [bellError, setBellError] = useState(false);
@@ -159,7 +152,23 @@ export function PendingPage({
   }, [db, uid, attempt, revision]);
   const open = rows.filter((row) => isOpen(row.data));
   return (
-    <div className={cn('flex flex-col gap-4')}>
+    <div className="flex min-w-0 flex-col gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Registros sem finalização</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Revise o fim de cada registro. Nada será encerrado automaticamente.
+          </p>
+        </div>
+        {!loading && !error && (
+          <Badge variant="secondary">
+            {fromCache
+              ? 'Dados provisórios'
+              : open.length +
+                (open.length === 1 ? ' pendência' : ' pendências')}
+          </Badge>
+        )}
+      </header>
       {recordId && (
         <RecordDrawer
           key={recordId}
@@ -177,157 +186,29 @@ export function PendingPage({
           }}
         />
       )}
-      {loading ? (
-        <Skeleton
-          role="status"
-          aria-label="Carregando pendências"
-          className={cn('size-6 rounded-full')}
-        />
-      ) : error ? (
-        <Alert variant="destructive">
+      {fromCache && !loading && !error && (
+        <Alert>
+          <AlertTitle>Pendências provisórias</AlertTitle>
           <AlertDescription>
-            {error}
-            <div className="mt-2">
-              <Button onClick={() => setAttempt((v) => v + 1)} variant="ghost">
-                Tentar novamente
-              </Button>
-            </div>
+            Dados locais ainda não confirmados. Aguarde a sincronização para
+            consultar todas as pendências.
           </AlertDescription>
         </Alert>
-      ) : (
-        <>
-          {fromCache && (
-            <Alert>
-              <AlertDescription>
-                Dados locais provisórios. Aguarde a sincronização para confirmar
-                todas as pendências.
-              </AlertDescription>
-            </Alert>
-          )}
-          <p className={cn('text-base')}>
-            {open.length}{' '}
-            {open.length === 1
-              ? 'registro sem finalização'
-              : 'registros sem finalização'}
-          </p>
-          {open.length === 0 ? (
-            <Alert>
-              <AlertDescription>
-                {fromCache
-                  ? 'Ainda não há pendências no cache local; o resultado não está confirmado.'
-                  : 'Tudo em dia. Você não tem registros sem finalização.'}
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              <div className={cn('flex flex-col flex sm:hidden gap-3')}>
-                {open.map((row) => (
-                  <Card key={row.id} className={cn('gap-0 p-4')}>
-                    <p className={cn('text-lg font-semibold')}>
-                      {text(
-                        safeProject(
-                          projects.rows.find((p) => p.id === row.data.projectId)
-                            ?.data,
-                          revealed,
-                        )?.title,
-                      )}
-                    </p>
-                    <p className={cn('text-sm text-muted-foreground')}>
-                      {date(row.data.startedAt, row.data.timeZone)}
-                    </p>
-                    <Button asChild variant="ghost">
-                      <RouterLink
-                        to={contextualRecordPath(
-                          '/pending',
-                          '?' + params.toString(),
-                          row.id,
-                        )}
-                      >
-                        Revisar fim
-                      </RouterLink>
-                    </Button>
-                  </Card>
-                ))}
-              </div>
-              <div
-                tabIndex={0}
-                aria-label="Pendências carregadas"
-                className={cn(
-                  'hidden sm:block overflow-x-auto rounded-xl border',
-                )}
-              >
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {['Projeto', 'Início', 'Detalhes'].map((label) => (
-                        <TableHead key={label} scope="col">
-                          {label}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {open.map((row) => {
-                      const project = projects.rows.find(
-                        (p) => p.id === row.data.projectId,
-                      )?.data;
-                      return (
-                        <TableRow key={row.id}>
-                          <TableCell>
-                            {text(safeProject(project, revealed)?.title)}
-                          </TableCell>
-                          <TableCell>
-                            {date(row.data.startedAt, row.data.timeZone)}
-                          </TableCell>
-                          <TableCell>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  aria-label={
-                                    isHidden(project, revealed)
-                                      ? 'Detalhes de registro reservado'
-                                      : 'Abrir detalhes do registro'
-                                  }
-                                  asChild
-                                  variant="ghost"
-                                  size="icon"
-                                  className={cn('shrink-0', 'size-9')}
-                                >
-                                  <RouterLink
-                                    to={contextualRecordPath(
-                                      '/pending',
-                                      '?' + params.toString(),
-                                      row.id,
-                                    )}
-                                    aria-label={
-                                      isHidden(project, revealed)
-                                        ? 'Detalhes de registro reservado'
-                                        : 'Abrir detalhes do registro'
-                                    }
-                                  >
-                                    <UiIcon kind="detail" />
-                                  </RouterLink>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {'Abrir detalhes do registro'}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </>
       )}
-      <span className={cn('text-xs text-muted-foreground')}>
-        Os registros são atualizados em tempo real. O sino destaca os abertos há
-        mais de 8 horas.
-      </span>
+      <RecordsList
+        state={{
+          rows: sortRecords(open),
+          loading,
+          error,
+          retry: () => setAttempt((v) => v + 1),
+        }}
+        catalog={projects.rows}
+        revealed={revealed}
+        pathname="/pending"
+        search={'?' + params.toString()}
+        complete={!fromCache}
+        pending
+      />
     </div>
   );
 }

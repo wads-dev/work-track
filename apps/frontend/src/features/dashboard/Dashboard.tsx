@@ -1,25 +1,19 @@
 import { CompactListToolbar } from '../../shared/ui/CompactListToolbar';
 import { useOwnRecords } from '../records/hooks/useOwnRecords';
 import { filterRecords, recordPage } from '../records/record-filters';
-import {
-  QueryToolbar,
-  QueryToolbarField,
-  QueryPeriodControls,
-} from '../../shared/ui/QueryToolbar';
 import { useProjects } from '../projects/hooks/useProjects';
 import { MetadataLink } from '../../shared/ui/MetadataLink';
 import { ProjectCreate } from '../projects/ProjectCreate';
 import { ProjectList } from '../projects/ProjectList';
 import { clearProjectFilters } from '../projects/project-list';
-import { ProjectSelector } from '../projects/ProjectSelector';
 import { writeUrlTab } from '../../app/url-tabs';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { isOpen } from '../pending/pending-utils';
-import { Alert } from '../../components/ui/alert';
+import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
+import { AlertTriangle, Info } from 'lucide-react';
+import { RecordsList } from '../records/RecordsList';
+import { RecordsToolbar } from '../records/RecordsToolbar';
 import { Button } from '../../components/ui/button';
-import { Card } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
 import {
   Select,
   SelectContent,
@@ -27,14 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../components/ui/table';
 import {
   Tabs,
   TabsContent,
@@ -46,12 +32,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '../../components/ui/tooltip';
-import { Skeleton } from '../../components/ui/skeleton';
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
 import { ProjectReport } from '../reports/ProjectReport';
 import { RecordDrawer } from '../records/RecordDrawer';
-import { date, object, objects, text, useRows } from '../../shared/data';
+import { date, object, objects, text } from '../../shared/data';
 import {
   Link as RouterLink,
   useLocation,
@@ -59,11 +44,7 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
-import {
-  detailPath,
-  matchesFilter,
-  contextualRecordPath,
-} from '../../app/routes';
+import { detailPath, matchesFilter } from '../../app/routes';
 import { UiIcon } from '../../shared/ui/UiIcons';
 import {
   usePrivacy,
@@ -77,114 +58,6 @@ import { ProjectHeader } from '../projects/ProjectHeader';
 import { ProjectArchive } from '../projects/ProjectArchive';
 import { matchesArchive } from '../projects/project-archive';
 
-function DataTable({
-  hideHeading = false,
-  historical = false,
-  complete = true,
-  title,
-  headers,
-  state,
-  render,
-}: {
-  hideHeading?: boolean;
-  historical?: boolean;
-  complete?: boolean;
-  title: string;
-  headers: string[];
-  state: ReturnType<typeof useRows>;
-  render: (data: Record<string, unknown>, id: string) => ReactNode[];
-}) {
-  return (
-    <section aria-label={title} className="mb-8">
-      {!hideHeading && <h2 className="text-2xl font-semibold mb-4">{title}</h2>}
-      {state.loading ? (
-        <div role="status" className="flex flex-row p-4 gap-4">
-          <Skeleton className="h-6 w-6 rounded-full" aria-label="Carregando" />
-          <span>Carregando {title.toLowerCase()}…</span>
-        </div>
-      ) : state.error ? (
-        <Alert variant="destructive">
-          {state.error}
-          <Button onClick={state.retry}>Tentar novamente</Button>
-        </Alert>
-      ) : state.rows.length === 0 ? (
-        <Alert>
-          {historical && !complete
-            ? 'Sem resultados nos dados locais disponíveis. Aguarde a sincronização para consultar todo o histórico.'
-            : 'Nenhum dado disponível em ' + title.toLowerCase() + '.'}
-        </Alert>
-      ) : (
-        <>
-          <div className="flex flex-col gap-3 sm:hidden">
-            {state.rows.map((row) => (
-              <Card key={row.id} className="p-4">
-                {render(row.data, row.id).map((cell, index) => (
-                  <div
-                    key={headers[index]}
-                    className="mb-2 [overflow-wrap:anywhere]"
-                  >
-                    <p className="text-xs text-muted-foreground">
-                      {headers[index]}
-                    </p>
-                    <div className="text-sm">{cell}</div>
-                  </div>
-                ))}
-              </Card>
-            ))}
-          </div>
-          <div
-            tabIndex={0}
-            aria-label={title + ' — role para ver todas as colunas'}
-            className="overflow-x-auto rounded-xl border bg-card hidden sm:block"
-          >
-            <Table className="min-w-[720px]">
-              <caption>
-                {title}
-                {title === 'Projetos'
-                  ? ' — catálogo autorizado'
-                  : historical
-                    ? ' — página do histórico'
-                    : ' — até 100 itens'}
-                {historical
-                  ? '. Mais recentes primeiro; datas inválidas ao final.'
-                  : '. A ordem não representa os mais recentes.'}
-              </caption>
-              <TableHeader>
-                <TableRow>
-                  {headers.map((header) => (
-                    <TableHead key={header} scope="col">
-                      {header}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {state.rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {render(row.data, row.id).map((cell, index) => (
-                      <TableCell
-                        key={headers[index]}
-                        className="[overflow-wrap:anywhere] whitespace-pre-wrap align-top min-w-[150px] max-w-[360px]"
-                      >
-                        {cell}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          {!historical && title !== 'Projetos' && state.rows.length === 100 && (
-            <Alert className="mt-2">
-              Limite de 100 itens atingido. Esta visão não representa
-              necessariamente todos os dados.
-            </Alert>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
 function topicLabels(data: Record<string, unknown>) {
   const snapshots = objects(data.topicSnapshots);
   return (
@@ -289,7 +162,7 @@ export function Dashboard({
   const topicFilter = params.get('topic') ?? '';
   const fromDate = params.get('fromDate') ?? '';
   const toDate = params.get('toDate') ?? '';
-  const zone = params.get('timeZone') ?? 'America/Sao_Paulo';
+  const zone = 'America/Sao_Paulo';
   const [pageSize] = useState(50);
   const pageKey = JSON.stringify([uid, revealed, filter, params.toString()]);
   const activePage = pageState.key === pageKey ? pageState.page : 0;
@@ -297,12 +170,20 @@ export function Dashboard({
   const archiveFilter = params.get('status') ?? 'active';
   const projectScope = params.get('scope') === 'personal' ? 'personal' : 'work';
   useEffect(() => {
-    if (params.has('q')) {
+    if (
+      params.has('q') ||
+      (mode !== 'projects' &&
+        (params.has('recordStatus') || params.has('timeZone')))
+    ) {
       const next = new URLSearchParams(params);
       next.delete('q');
+      if (mode !== 'projects') {
+        next.delete('recordStatus');
+        next.delete('timeZone');
+      }
       setParams(next, { replace: true });
     }
-  }, [params, setParams]);
+  }, [params, setParams, mode]);
   function updateFilter(key: string, value: string) {
     const next = new URLSearchParams(params);
     if (key === 'project') next.delete('topic');
@@ -485,7 +366,7 @@ export function Dashboard({
         fromDate,
         toDate,
         zone,
-        status: params.get('recordStatus') ?? 'all',
+        status: 'all',
       },
       objects(rawProjectsById.get(projectFilter)?.data.topics),
     );
@@ -522,7 +403,6 @@ export function Dashboard({
         ? recordPage(matchingSafeRecords, page, pageSize)
         : matchingSafeRecords,
   };
-  const topicOptions = objects(rawProjectsById.get(projectFilter)?.data.topics);
   return (
     <div
       className={
@@ -608,185 +488,82 @@ export function Dashboard({
           }}
         />
       )}
+      {mode !== 'projects' && (
+        <RecordsToolbar
+          key={uid + String(revealed)}
+          catalog={rawProjects.rows}
+          revealed={revealed}
+          loading={rawProjects.loading}
+          error={rawProjects.error}
+          params={params}
+          search={filter}
+          onFilter={updateFilter}
+          onClear={() => {
+            setLocalFilter('');
+            const next = new URLSearchParams(params);
+            for (const key of [
+              'q',
+              'project',
+              'topic',
+              'fromDate',
+              'toDate',
+              'recordStatus',
+              'timeZone',
+            ])
+              next.delete(key);
+            setParams(next);
+          }}
+        />
+      )}
       {mode !== 'projects' && records.rows.some((row) => isOpen(row.data)) && (
         <Alert className="mb-4">
-          Há registros abertos entre os itens carregados. Confira detalhes antes
-          de encerrar; nada será encerrado automaticamente.
-          <ul>
-            {records.rows
-              .filter((row) => isOpen(row.data))
-              .slice(0, 5)
-              .map((row) => (
-                <li key={row.id}>
-                  <MetadataLink
-                    projectId={text(row.data.projectId, '')}
-                    project={
-                      rawProjects.rows.find((p) => p.id === row.data.projectId)
-                        ?.data
-                    }
-                    revealed={revealed}
-                  />
-                  {' · '}
-                  <RouterLink
-                    to={detailPath('records', row.id, location.search)}
-                  >
-                    Registro iniciado{' '}
-                    {date(row.data.startedAt, row.data.timeZone)}
-                  </RouterLink>
-                </li>
-              ))}
-          </ul>
-          Até 5 registros abertos exibidos neste resumo.
+          <AlertTriangle aria-hidden="true" />
+          <AlertTitle>Registros em aberto</AlertTitle>
+          <AlertDescription>
+            Há registros abertos entre os itens carregados. Confira detalhes
+            antes de encerrar; nada será encerrado automaticamente.
+            <ul className="my-2 space-y-1">
+              {records.rows
+                .filter((row) => isOpen(row.data))
+                .slice(0, 5)
+                .map((row) => (
+                  <li key={row.id}>
+                    <MetadataLink
+                      projectId={text(row.data.projectId, '')}
+                      project={
+                        rawProjects.rows.find(
+                          (p) => p.id === row.data.projectId,
+                        )?.data
+                      }
+                      revealed={revealed}
+                    />
+                    {' · '}
+                    <RouterLink
+                      to={detailPath('records', row.id, location.search)}
+                    >
+                      Registro iniciado{' '}
+                      {date(row.data.startedAt, row.data.timeZone)}
+                    </RouterLink>
+                  </li>
+                ))}
+            </ul>
+            Até 5 registros abertos exibidos neste resumo.
+          </AlertDescription>
         </Alert>
       )}
-      {mode !== 'projects' && (
-        <QueryToolbar
-          label="Filtros de registros"
-          actions={
-            <>
-              {' '}
-              {rawRecords.error && (
-                <Button onClick={rawRecords.retry}>Tentar novamente</Button>
-              )}
-              <Button
-                className="whitespace-nowrap"
-                onClick={() => {
-                  const next = new URLSearchParams(params);
-                  setLocalFilter('');
-                  next.delete('q');
-                  for (const key of [
-                    'project',
-                    'topic',
-                    'fromDate',
-                    'toDate',
-                    'recordStatus',
-                    'timeZone',
-                  ])
-                    next.delete(key);
-                  setParams(next);
-                }}
-              >
-                Limpar filtros
-              </Button>
-            </>
-          }
-          secondary={
-            <>
-              {' '}
-              <QueryToolbarField kind="search">
-                {' '}
-                <Label className="grid gap-1.5">
-                  Pesquisar registros
-                  <Input
-                    value={filter}
-                    onChange={(event) => updateFilter('q', event.target.value)}
-                  />
-                </Label>
-              </QueryToolbarField>
-              <QueryToolbarField kind="standard">
-                {' '}
-                <div className="space-y-1.5">
-                  <Label>Tópico</Label>
-                  <Select
-                    value={topicFilter || '__all__'}
-                    disabled={!projectFilter}
-                    onValueChange={(value) =>
-                      updateFilter('topic', value === '__all__' ? '' : value)
-                    }
-                  >
-                    <SelectTrigger aria-label="Tópico">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">Todos os tópicos</SelectItem>
-                      {topicOptions.map((topic) => (
-                        <SelectItem key={text(topic.id)} value={text(topic.id)}>
-                          {isHidden(
-                            rawProjectsById.get(projectFilter)?.data,
-                            revealed,
-                          )
-                            ? 'Tópico reservado'
-                            : text(topic.title)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </QueryToolbarField>
-              <QueryToolbarField kind="standard">
-                {' '}
-                <Label className="grid gap-1.5">
-                  Fuso do período
-                  <Input
-                    value={zone}
-                    onChange={(e) => updateFilter('timeZone', e.target.value)}
-                  />
-                </Label>
-              </QueryToolbarField>
-              <QueryToolbarField kind="standard">
-                {' '}
-                <div className="space-y-1.5">
-                  <Label>Estado do registro</Label>
-                  <Select
-                    value={(params.get('recordStatus') ?? 'all') || '__all__'}
-                    onValueChange={(value) =>
-                      updateFilter(
-                        'recordStatus',
-                        value === '__all__' ? '' : value,
-                      )
-                    }
-                  >
-                    <SelectTrigger aria-label="Estado do registro">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="open">Em aberto</SelectItem>
-                      <SelectItem value="closed">Encerrados</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </QueryToolbarField>{' '}
-            </>
-          }
-          className="mb-4"
-        >
-          <QueryPeriodControls
-            fromDate={fromDate}
-            toDate={toDate}
-            onFromChange={(value) => updateFilter('fromDate', value)}
-            onToChange={(value) => updateFilter('toDate', value)}
-          />
-          <QueryToolbarField kind="project">
-            <ProjectSelector
-              key={uid + String(revealed)}
-              projects={rawProjects.rows.map((row) => ({
-                id: row.id,
-                label: text(
-                  safeProject(row.data, revealed).title,
-                  'Projeto reservado',
-                ),
-                searchText:
-                  text(row.data.title, '') +
-                  ' ' +
-                  text(row.data.description, ''),
-              }))}
-              projectId={projectFilter}
-              loading={rawProjects.loading}
-              error={rawProjects.error}
-              onChange={(id) => updateFilter('project', id)}
-            />
-          </QueryToolbarField>
-        </QueryToolbar>
-      )}
-      {mode !== 'projects' && (
-        <p className="text-xs text-muted-foreground">
-          {rawRecords.complete
-            ? 'Histórico completo sincronizado.'
-            : 'Dados locais podem estar incompletos; aguardando sincronização com o servidor.'}{' '}
-          Mais recentes primeiro; datas inválidas ao final.
-        </p>
-      )}
+      {mode !== 'projects' &&
+        !rawRecords.loading &&
+        !rawRecords.error &&
+        !rawRecords.complete && (
+          <Alert className="mb-4">
+            <Info aria-hidden="true" />
+            <AlertTitle>Histórico ainda não confirmado</AlertTitle>
+            <AlertDescription>
+              Dados locais podem estar incompletos. Aguarde a sincronização com
+              o servidor antes de concluir sua consulta.
+            </AlertDescription>
+          </Alert>
+        )}
       {mode !== 'records' && (
         <ProjectList
           hideHeading={mode === 'projects'}
@@ -796,77 +573,26 @@ export function Dashboard({
         />
       )}
       {mode !== 'projects' && (
-        <DataTable
-          hideHeading={mode === 'records'}
-          historical
-          complete={rawRecords.complete}
-          title="Meus registros"
-          headers={['Projeto / tópicos', 'Início / fim', 'Detalhes']}
+        <RecordsList
           state={filteredRecords}
-          render={(data, id) => [
-            <>
-              <MetadataLink
-                projectId={text(data.projectId, '')}
-                project={
-                  rawProjects.rows.find((p) => p.id === data.projectId)?.data
-                }
-                revealed={revealed}
-              />
-              <p className="whitespace-pre-wrap text-sm">
-                {objects(data.topics).map((t, index) => (
-                  <span key={index}>
-                    {index > 0 ? ' · ' : ''}
-                    {text(t.topicId, '') ? (
-                      <MetadataLink
-                        projectId={text(data.projectId, '')}
-                        project={
-                          rawProjects.rows.find((p) => p.id === data.projectId)
-                            ?.data
-                        }
-                        revealed={revealed}
-                        topicId={text(t.topicId)}
-                      />
-                    ) : (
-                      'Tópico indisponível'
-                    )}
-                  </span>
-                ))}
-              </p>
-            </>,
-            <>
-              {date(data.startedAt, data.timeZone)}
-              <br />
-              {data.endedAt
-                ? date(data.endedAt, data.timeZone)
-                : 'Fim não informado'}
-            </>,
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" asChild>
-                  <RouterLink
-                    to={contextualRecordPath(
-                      location.pathname,
-                      location.search,
-                      id,
-                    )}
-                    aria-label="Abrir detalhes e auditoria do registro"
-                  >
-                    <UiIcon kind="detail" />
-                  </RouterLink>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Abrir detalhes e auditoria</TooltipContent>
-            </Tooltip>,
-          ]}
+          catalog={rawProjects.rows}
+          revealed={revealed}
+          pathname={location.pathname}
+          search={location.search}
+          complete={rawRecords.complete}
+          hideHeading={mode === 'records'}
         />
       )}
       {mode === 'records' && (
         <>
-          <p className="text-xs">
-            Período: sobreposição para encerrados; data de início para abertos,
-            sem estimar horas.
-          </p>
-          <div className="flex flex-row gap-4 mt-4 items-center">
+          <details className="mt-4 text-xs text-muted-foreground">
+            <summary className="cursor-pointer">Sobre o período</summary>
+            <p className="mt-2">
+              Encerrados são incluídos quando sobrepõem o período; abertos, pela
+              data de início. Nenhuma hora é estimada nesta lista.
+            </p>
+          </details>
+          <div className="flex flex-wrap justify-between gap-3 mt-4 items-center">
             <Button
               disabled={page === 0}
               onClick={() => setPageState({ key: pageKey, page: page - 1 })}
