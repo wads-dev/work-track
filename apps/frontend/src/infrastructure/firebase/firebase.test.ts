@@ -1,14 +1,13 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   app: { name: 'work-track-dashboard' },
-  auth: {},
+  auth: { authStateReady: vi.fn() },
   db: {},
   functions: {},
   manager: { kind: 'multi-tab' },
   cache: { kind: 'persistent' },
   initializeApp: vi.fn(),
-  getAuth: vi.fn(),
-  setPersistence: vi.fn(),
+  initializeAuth: vi.fn(),
   initializeFirestore: vi.fn(),
   persistentLocalCache: vi.fn(),
   persistentMultipleTabManager: vi.fn(),
@@ -21,8 +20,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('firebase/app', () => ({ initializeApp: mocks.initializeApp }));
 vi.mock('firebase/auth', () => ({
-  getAuth: mocks.getAuth,
-  setPersistence: mocks.setPersistence,
+  initializeAuth: mocks.initializeAuth,
+  browserPopupRedirectResolver: 'popup-resolver',
   browserLocalPersistence: 'local-auth',
   connectAuthEmulator: mocks.connectAuthEmulator,
 }));
@@ -41,12 +40,12 @@ const config = { apiKey: 'public-key', projectId: 'wadsworktrack' };
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.initializeApp.mockReturnValue(mocks.app);
-  mocks.getAuth.mockReturnValue(mocks.auth);
+  mocks.initializeAuth.mockReturnValue(mocks.auth);
   mocks.getFunctions.mockReturnValue(mocks.functions);
   mocks.persistentMultipleTabManager.mockReturnValue(mocks.manager);
   mocks.persistentLocalCache.mockReturnValue(mocks.cache);
   mocks.initializeFirestore.mockReturnValue(mocks.db);
-  mocks.setPersistence.mockResolvedValue(undefined);
+  mocks.auth.authStateReady.mockResolvedValue(undefined);
   mocks.fetch.mockResolvedValue({
     ok: true,
     json: () => Promise.resolve(config),
@@ -75,7 +74,11 @@ it('initializes Firestore once with persistent multi-tab cache, separately from 
   expect(mocks.initializeFirestore).toHaveBeenCalledExactlyOnceWith(mocks.app, {
     localCache: mocks.cache,
   });
-  expect(mocks.setPersistence).toHaveBeenCalledWith(mocks.auth, 'local-auth');
+  expect(mocks.initializeAuth).toHaveBeenCalledExactlyOnceWith(mocks.app, {
+    persistence: 'local-auth',
+    popupRedirectResolver: 'popup-resolver',
+  });
+  expect(mocks.auth.authStateReady).toHaveBeenCalledExactlyOnceWith();
   expect(mocks.connectFirestoreEmulator).not.toHaveBeenCalled();
 });
 it('connects isolated demo emulators only after configuring persistent cache', async () => {
@@ -110,6 +113,41 @@ it('connects isolated demo emulators only after configuring persistent cache', a
     5015,
   );
 });
+it('connects demo Auth before awaiting session restoration', async () => {
+  mocks.fetch.mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve({ ...config, projectId: 'demo-work-track' }),
+  });
+  await initializeServices();
+  expect(mocks.connectAuthEmulator.mock.invocationCallOrder[0]!).toBeLessThan(
+    mocks.auth.authStateReady.mock.invocationCallOrder[0]!,
+  );
+});
+
+it('waits for restored auth before exposing services to protected routes', async () => {
+  let restore!: () => void;
+  mocks.auth.authStateReady.mockReturnValue(
+    new Promise<void>((resolve) => {
+      restore = resolve;
+    }),
+  );
+  let ready = false;
+  const initializing = initializeServices().then((services) => {
+    ready = true;
+    return services;
+  });
+  await vi.waitFor(() => expect(mocks.auth.authStateReady).toHaveBeenCalled());
+  expect(ready).toBe(false);
+  restore();
+  await initializing;
+  expect(ready).toBe(true);
+});
+
+it('propagates restoration failures without exposing partially initialized services', async () => {
+  mocks.auth.authStateReady.mockRejectedValue(new Error('restoration failed'));
+  await expect(initializeServices()).rejects.toThrow('restoration failed');
+});
+
 it('does not initialize persistence for malformed Hosting configuration', async () => {
   mocks.fetch.mockResolvedValue({
     ok: true,
