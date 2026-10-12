@@ -1,14 +1,8 @@
 import {
-  collection,
   collectionGroup,
-  doc,
-  onSnapshot,
   query,
   where,
   type Firestore,
-  type Query,
-  type DocumentData,
-  type QuerySnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { reportRecordSchema } from '@work-track/data/codecs/report-record';
@@ -19,14 +13,15 @@ import {
   type CalendarQueryRange,
 } from './calendar-firestore-query';
 import { AuthorizedReportRepository } from '@work-track/data/repositories/snapshots/authorized-report-repository';
-import type { ClientReportProject } from '@work-track/data/repositories/snapshots/personal-report-repository';
 import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
+import { observeWorkspace } from '../sync/workspace-runtime';
 export interface AuthorizedReportSnapshot {
   repository: AuthorizedReportRepository;
   coherent: boolean;
   fromCache: boolean;
   hasPendingWrites: boolean;
 }
+// Query builder retained for compatibility/tests; no UI observer executes these queries.
 export function authorizedRecordQueries(
   db: Firestore,
   projectId: string,
@@ -51,265 +46,83 @@ export function authorizedRecordQueries(
   ];
 }
 const schema = reportRecordSchema('authorized-web');
-/** No cross-project collection-group scan: each record query carries an authorized parent ID.
- * Full work context deliberately remains separate from bounded visible selection: company-v3
- * allocates the same person's 480-minute budget across ALL work projects.
- */
 export function subscribeAuthorizedReport(
   db: Firestore,
   uid: string,
   next: (s: AuthorizedReportSnapshot) => void,
   fail: (e: Error) => void,
-  requiredProjectIds: readonly string[] = [],
+  _requiredProjectIds: readonly string[] = [],
   range?: CalendarQueryRange,
 ): Unsubscribe {
-  // Required IDs come from the shared authorized discovery, including legacy projects without type.
-  const parentIds = [...new Set(requiredProjectIds)];
-  let disposed = false;
-  const catalog = new Map<number, Map<string, ClientReportProject>>(),
-    projects = new Map<string, ClientReportProject>(),
-    stops: Unsubscribe[] = [],
-    groups = new Map<
-      string,
-      {
-        token: object;
-        stops: Unsubscribe[];
-        batches: Map<number, QuerySnapshot<DocumentData>>;
-        queries: Query<DocumentData>[];
-      }
-    >(),
-    metadata = new Map<string, { cache: boolean; pending: boolean }>();
-  let last: AuthorizedReportRepository | undefined;
-  let lastDataKey = '';
-  const stop = () => {
-    disposed = true;
-    stops.forEach((s) => s());
-    groups.forEach((g) => g.stops.forEach((s) => s()));
-    groups.clear();
-    projects.clear();
-    catalog.clear();
-    metadata.clear();
-    last = undefined;
-  };
-  const error = (e: Error) => {
-    if (!disposed) {
-      fail(e);
-      stop();
+  void _requiredProjectIds; // Global materialization owns completeness and authorization.
+  return observeWorkspace(db, uid, (snapshot) => {
+    if (snapshot.error) {
+      fail(new Error(snapshot.error));
+      return;
     }
-  };
-  const emit = () => {
-    if (disposed || catalog.size < 2 + parentIds.length) return;
-    let coherent = true;
-    const records: ReportSourceRecord[] = [],
-      selected = new Set<string>();
-    for (const [id, g] of groups) {
-      if (g.batches.size !== g.queries.length) {
-        coherent = false;
-        continue;
-      }
-      const context = g.batches.get(0)!;
-      const facts = new Map(context.docs.map((d) => [d.ref.path, d]));
-      for (const d of context.docs) {
-        const raw = d.data(),
-          parts = d.ref.path.split('/');
+    if (!snapshot.complete) return;
+    try {
+      const projects = new Map(
+        snapshot.projects.map((p) => [
+          p.id,
+          decodeWebProjectSnapshot(
+            { data: () => p.data },
+            p.id,
+            'authorized-web',
+          )!,
+        ]),
+      );
+      const records: ReportSourceRecord[] = snapshot.records.flatMap((row) => {
+        const parts = row.path.split('/');
         if (
           parts.length !== 4 ||
           parts[0] !== 'users' ||
           parts[2] !== 'records' ||
-          raw.uid !== parts[1] ||
-          raw.projectId !== id
-        ) {
-          error(new Error('Registro canônico inválido.'));
-          return;
-        }
-        if (isDeletedRecord(raw)) continue;
-        const parsed = schema.safeParse(raw);
-        if (!parsed.success) {
-          error(new Error('Registro de relatório inválido.'));
-          return;
-        }
-        records.push({
-          ...raw,
-          ...parsed.data,
-          id: d.id,
-        } as ReportSourceRecord);
-      }
-      if (g.queries.length > 1) {
-        const { lower, upper } = calendarQueryBounds(range!);
-        for (let i = 1; i < g.queries.length; i++) {
-          const batch = g.batches.get(i)!,
-            keys = new Set(batch.docs.map((d) => d.ref.path));
-          for (const d of context.docs) {
-            const data = d.data(),
-              matches =
-                typeof data.startedAt === 'string' &&
-                data.startedAt < upper &&
-                (i === 1
-                  ? data.startedAt >= lower
-                  : typeof data.endedAt === 'string' && data.endedAt >= lower);
-            if (matches !== keys.has(d.ref.path)) coherent = false;
-          }
-          for (const d of batch.docs) {
-            const c = facts.get(d.ref.path);
-            if (!c || JSON.stringify(c.data()) !== JSON.stringify(d.data()))
-              coherent = false;
-            selected.add(d.ref.path);
-          }
-        }
-      } else if (!range || !range.projectId || range.projectId === id)
-        context.docs.forEach((d) => selected.add(d.ref.path));
-    }
-    const dataKey = JSON.stringify([
-      records,
-      [...projects],
-      range ? [...selected].sort() : null,
-    ]);
-    if (coherent && dataKey !== lastDataKey) {
-      lastDataKey = dataKey;
-      last = new AuthorizedReportRepository(
-        uid,
-        records,
-        new Map(projects),
-        range ? selected : undefined,
-      );
-    }
-    if (!last) return;
-    next({
-      repository: last,
-      coherent,
-      fromCache: [...metadata.values()].some((m) => m.cache),
-      hasPendingWrites: [...metadata.values()].some((m) => m.pending),
-    });
-  };
-  const reconcile = () => {
-    if (disposed) return;
-    const current = new Map<string, ClientReportProject>();
-    for (const [index, rows] of [...catalog].sort(([a], [b]) => a - b)) {
-      // Explicit parent reads override typed list snapshots, including deletions
-      // and access changes observed before those lists converge.
-      if (index >= 2) current.delete(parentIds[index - 2]);
-      for (const [id, p] of rows)
-        if (
-          p.type === undefined ||
-          p.type === 'work' ||
-          (p.type === 'personal' && p.createdBy === uid)
+          row.data.uid !== parts[1]
         )
-          current.set(id, p);
-    }
-    const catalogChanged =
-      JSON.stringify([...projects]) !== JSON.stringify([...current]);
-    projects.clear();
-    current.forEach((p, id) => projects.set(id, p)); // Immediately fence revoked projects, even before replacement record listeners converge.
-    if (last && catalogChanged)
-      last = new AuthorizedReportRepository(
-        uid,
-        last.records,
-        new Map(projects),
-        last.selectedKeys,
-      );
-    for (const [id, g] of groups)
-      if (!current.has(id)) {
-        g.stops.forEach((s) => s());
-        groups.delete(id);
-        for (let i = 0; i < g.queries.length; i++)
-          metadata.delete(id + ':' + i);
-      }
-    for (const id of current.keys())
-      if (!groups.has(id)) {
-        const queries = [
-          ...authorizedRecordQueries(db, id),
-          ...(range && (!range.projectId || range.projectId === id)
-            ? authorizedRecordQueries(db, id, range)
-            : []),
+          throw new Error('Registro canônico inválido.');
+        if (
+          !projects.has(String(row.data.projectId)) ||
+          isDeletedRecord(row.data)
+        )
+          return [];
+        return [
+          {
+            ...row.data,
+            ...schema.parse(row.data),
+            id: parts[3],
+          } as ReportSourceRecord,
         ];
-        const g = {
-          token: {},
-          stops: [] as Unsubscribe[],
-          batches: new Map<number, QuerySnapshot<DocumentData>>(),
-          queries,
-        };
-        groups.set(id, g);
-        queries.forEach((q, i) =>
-          g.stops.push(
-            onSnapshot(
-              q,
-              { includeMetadataChanges: true },
-              (batch) => {
-                if (disposed || groups.get(id) !== g) return;
-                g.batches.set(i, batch);
-                metadata.set(id + ':' + i, {
-                  cache: batch.metadata.fromCache,
-                  pending: batch.metadata.hasPendingWrites,
-                });
-                emit();
-              },
-              (e) => {
-                if (disposed || groups.get(id) !== g) return;
-                error(e);
-              },
-            ),
-          ),
-        );
-      }
-    emit();
-  };
-  [
-    query(collection(db, 'projects'), where('type', '==', 'work')),
-    query(
-      collection(db, 'projects'),
-      where('type', '==', 'personal'),
-      where('createdBy', '==', uid),
-    ),
-  ].forEach((q, i) =>
-    stops.push(
-      onSnapshot(
-        q,
-        { includeMetadataChanges: true },
-        (s) => {
-          if (disposed) return;
-          catalog.set(
-            i,
-            new Map(
-              s.docs.map((d) => [
-                d.id,
-                decodeWebProjectSnapshot(d, d.id, 'authorized-web')!,
-              ]),
-            ),
-          );
-          metadata.set('catalog:' + i, {
-            cache: s.metadata.fromCache,
-            pending: s.metadata.hasPendingWrites,
-          });
-          reconcile();
-        },
-        error,
-      ),
-    ),
-  );
-  parentIds.forEach((id, i) =>
-    stops.push(
-      onSnapshot(
-        doc(db, 'projects', id),
-        { includeMetadataChanges: true },
-        (s) => {
-          if (disposed) return;
-          catalog.set(
-            2 + i,
-            new Map(
-              s.exists()
-                ? [[id, decodeWebProjectSnapshot(s, id, 'authorized-web')!]]
-                : [],
-            ),
-          );
-          metadata.set('catalog:' + (2 + i), {
-            cache: s.metadata.fromCache,
-            pending: s.metadata.hasPendingWrites,
-          });
-          reconcile();
-        },
-        error,
-      ),
-    ),
-  );
-  return stop;
+      });
+      const bounds = range && calendarQueryBounds(range);
+      const selected = range
+        ? new Set(
+            records
+              .filter(
+                (r) =>
+                  (!range.projectId || r.projectId === range.projectId) &&
+                  (!bounds ||
+                    (r.startedAt < bounds.upper &&
+                      (r.startedAt >= bounds.lower ||
+                        (typeof r.endedAt === 'string' &&
+                          r.endedAt >= bounds.lower)))),
+              )
+              .map((r) => 'users/' + r.uid + '/records/' + r.id),
+          )
+        : undefined;
+      next({
+        repository: new AuthorizedReportRepository(
+          uid,
+          records,
+          projects,
+          selected,
+        ),
+        coherent: true,
+        fromCache: false,
+        hasPendingWrites: false,
+      });
+    } catch (error) {
+      fail(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
 }

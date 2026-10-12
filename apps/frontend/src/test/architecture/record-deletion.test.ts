@@ -1,48 +1,72 @@
 import { it, expect, vi } from 'vitest';
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  type Firestore,
-} from 'firebase/firestore';
-const recordListeners = vi.hoisted(
-  () =>
-    [] as {
-      query: { base: string; constraints: unknown[] };
-      options: { includeMetadataChanges: boolean };
-      next: (snapshot: unknown) => void;
-    }[],
-);
-const functions = vi.hoisted(() => ({}));
-vi.mock('firebase/functions', () => ({
-  getFunctions: () => functions,
-  httpsCallable: () => vi.fn(),
+import type { Firestore } from 'firebase/firestore';
+import type { WorkspaceSnapshot } from '../../data/sync/workspace-sync';
+const workspace = vi.hoisted(() => ({
+  listeners: [] as {
+    uid: string;
+    next: (snapshot: WorkspaceSnapshot) => void;
+    active: boolean;
+    stop: ReturnType<typeof vi.fn>;
+  }[],
+  onSnapshot: vi.fn(),
+  getDocs: vi.fn(),
+  getDoc: vi.fn(),
+  callable: vi.fn(),
 }));
-vi.mock('firebase/firestore', () => ({
-  collection: (_db: unknown, ...path: string[]) => path.join('/'),
-  query: (base: string, ...constraints: unknown[]) => ({ base, constraints }),
-  where: (...args: unknown[]) => ['where', ...args],
-  orderBy: (value: unknown) => ['orderBy', value],
-  documentId: () => '__name__',
-  startAfter: (value: unknown) => ['after', value],
-  limit: (value: number) => ['limit', value],
-  onSnapshot: (
-    query: { base: string; constraints: unknown[] },
-    options: { includeMetadataChanges: boolean },
-    next: (snapshot: unknown) => void,
+vi.mock('../../data/sync/workspace-runtime', () => ({
+  observeWorkspace: (
+    _db: Firestore,
+    uid: string,
+    next: (snapshot: WorkspaceSnapshot) => void,
   ) => {
-    recordListeners.push({ query, options, next });
-    return vi.fn();
+    const listener = {
+      uid,
+      next,
+      active: true,
+      stop: vi.fn(() => {
+        listener.active = false;
+      }),
+    };
+    workspace.listeners.push(listener);
+    return listener.stop;
   },
 }));
+vi.mock('firebase/firestore', () => ({
+  onSnapshot: workspace.onSnapshot,
+  getDocs: workspace.getDocs,
+  getDoc: workspace.getDoc,
+}));
+vi.mock('firebase/functions', () => ({ httpsCallable: workspace.callable }));
+const materialization = (rows: Row[], complete = true): WorkspaceSnapshot => ({
+  projects: [
+    { id: 'p', data: {} },
+    { id: 'q', data: {} },
+  ],
+  records: rows.map((row) => ({
+    path: 'users/' + String(row.data.uid ?? 'alice') + '/records/' + row.id,
+    data: { uid: 'alice', ...row.data },
+  })),
+  completedProjects: ['p', 'q'],
+  complete,
+  syncing: false,
+  error: '',
+});
+const emit = (snapshot: WorkspaceSnapshot) => {
+  const listener = workspace.listeners.at(-1)!;
+  if (listener.active) listener.next(snapshot);
+};
+const expectNoRemoteReads = () => {
+  expect(workspace.onSnapshot).not.toHaveBeenCalled();
+  expect(workspace.getDocs).not.toHaveBeenCalled();
+  expect(workspace.getDoc).not.toHaveBeenCalled();
+  expect(workspace.callable).not.toHaveBeenCalled();
+};
 import {
   subscribeAuthorizedOwnRecords,
   type OwnRecordPage,
 } from '../../data/sources/authorized-own-record-source';
 import { deletionAccount } from '../../data/cache/record-deletion';
 import { projectRepository } from '../../data/cache/project-repository';
-import * as projectSource from '../../data/sources/authorized-project-source';
 import { readFileSync } from 'node:fs';
 import {
   isDeletedRecord,
@@ -125,7 +149,21 @@ it('record editor hides deleted parent, audit is not filtered; reports guard rev
   expect(source('../../features/records/RecordDrawer.tsx')).toContain(
     'data && !isDeletedRecord(data) ? data : null',
   );
-  expect(source('../../shared/data.ts')).toContain("path.endsWith('/records')");
+  const audit = source('../../shared/data.ts');
+  expect(audit).toContain('observeWorkspace(db, uid');
+  expect(audit).toContain('snapshot.complete && visible');
+  expect(audit).toContain('!isDeletedRecord(parent.data)');
+  expect(audit).toContain('(snapshot.audits ?? [])');
+  expect(audit).toContain('row.path.startsWith(prefix)');
+  expect(audit).toContain("row.path.split('/').length === 6");
+  expect(audit).toContain('.slice(0, maxRows)');
+  expect(audit).not.toContain('isDeletedRecord(row.data)');
+  for (const remote of ['onSnapshot', 'getDoc(', 'getDocs', 'httpsCallable']) {
+    expect(audit).not.toContain(remote);
+    expect(source('../../features/records/RecordDrawer.tsx')).not.toContain(
+      remote,
+    );
+  }
   for (const name of [
     '../../features/reports/PersonalPage.tsx',
     '../../features/reports/ProjectReport.tsx',
@@ -142,44 +180,8 @@ it('record editor hides deleted parent, audit is not filtered; reports guard rev
   expect(pending).not.toContain('setNextCursor');
   expect(pending).not.toContain('Examinar próxima página');
 });
-it('caps merged raw pages and advances past tombstones without skipping live rows or repeating cursors', async () => {
-  // Typed projects are delivered by the live catalogs; no legacy parent reads.
-  const loadCatalog = vi
-    .spyOn(projectSource, 'subscribeAuthorizedProjects')
-    .mockImplementation((db, uid, next, error) => {
-      const rows = new Map<number, Row[]>();
-      const stops = [
-        query(collection(db, 'projects'), where('type', '==', 'work')),
-        query(
-          collection(db, 'projects'),
-          where('type', '==', 'personal'),
-          where('createdBy', '==', uid),
-        ),
-      ].map((target, index) =>
-        onSnapshot(
-          target,
-          { includeMetadataChanges: true },
-          (snapshot) => {
-            rows.set(
-              index,
-              snapshot.docs.map((document) => ({
-                id: document.id,
-                data: document.data(),
-              })),
-            );
-            if (rows.size === 2)
-              next({
-                rows: [...rows.values()].flat(),
-                fromCache: false,
-                hasPendingWrites: false,
-                complete: true,
-              });
-          },
-          error,
-        ),
-      );
-      return () => stops.forEach((stop) => stop());
-    });
+it('caps local raw pages and advances past tombstones without skipping live rows or repeating cursors', () => {
+  workspace.listeners.splice(0);
   const facts = Array.from({ length: 103 }, (_, i) => ({
     id: String(i).padStart(3, '0'),
     data: {
@@ -187,15 +189,10 @@ it('caps merged raw pages and advances past tombstones without skipping live row
       ...(i < 100 ? { deletedAt: 'gone' } : { endedAt: null }),
     },
   }));
-  const snapshot = (rows: Row[], pending = false) => ({
-    docs: rows.map((row) => ({ id: row.id, data: () => row.data })),
-    metadata: { fromCache: false, hasPendingWrites: pending },
-  });
   let cursor = '';
   const seen = new Set<string>();
   const active: string[] = [];
   for (let pageNumber = 0; pageNumber < 2; pageNumber++) {
-    recordListeners.splice(0);
     let page: OwnRecordPage | undefined;
     const stop = subscribeAuthorizedOwnRecords(
       {} as Firestore,
@@ -208,35 +205,16 @@ it('caps merged raw pages and advances past tombstones without skipping live row
       },
       { size: 100, after: cursor },
     );
-    recordListeners[0].next(
-      snapshot([
-        { id: 'p', data: {} },
-        { id: 'q', data: {} },
-      ]),
-    );
-    recordListeners[1].next(snapshot([]));
-    await Promise.resolve(); // Wait for authorized catalog discovery to hydrate.
-    for (const listener of recordListeners.slice(2)) {
-      const project = listener.query.constraints.find(
-        (constraint) =>
-          Array.isArray(constraint) && constraint[1] === 'projectId',
-      ) as string[];
-      expect(listener.options.includeMetadataChanges).toBe(true);
-      expect(listener.query.constraints).toContainEqual(['limit', 100]);
-      if (cursor)
-        expect(listener.query.constraints).toContainEqual(['after', cursor]);
-      listener.next(
-        snapshot(
-          facts
-            .filter(
-              (row) => row.data.projectId === project[3] && row.id > cursor,
-            )
-            .slice(0, 100),
-          pageNumber === 0,
-        ),
-      );
-    }
-    expect(page).toBeDefined();
+    expect(workspace.listeners.at(-1)!.uid).toBe('alice');
+    // Incomplete disk/bootstrap state never publishes stale facts as a complete page.
+    emit(materialization(facts, false));
+    expect(page).toMatchObject({
+      rows: [],
+      fromCache: true,
+      hasMore: false,
+      cursor,
+    });
+    emit(materialization([...facts].reverse()));
     const result = page!;
     expect(result.rows.length).toBeLessThanOrEqual(100);
     for (const row of result.rows) {
@@ -245,62 +223,28 @@ it('caps merged raw pages and advances past tombstones without skipping live row
       if (!isDeletedRecord(row.data)) active.push(row.id);
     }
     expect(result.cursor > cursor).toBe(true);
+    expect(result.fromCache).toBe(false);
     if (pageNumber === 0) {
       expect(result.rows).toHaveLength(100);
       expect(active).toEqual([]);
       expect(result.cursor).toBe('099');
       expect(result.hasMore).toBe(true);
-      expect(result.fromCache).toBe(true);
+      expect(result.rows[0].data.deletedAt).toBe('gone');
     } else {
+      expect(result.rows).toHaveLength(3);
       expect(result.hasMore).toBe(false);
-      expect(result.fromCache).toBe(false);
     }
     cursor = result.cursor;
     stop();
+    expect(workspace.listeners.at(-1)!.stop).toHaveBeenCalledOnce();
   }
   expect(active).toEqual(['100', '101', '102']);
   expect(seen.size).toBe(103);
-  expect(loadCatalog).toHaveBeenCalledTimes(2);
-  loadCatalog.mockRestore();
+  expect(workspace.listeners).toHaveLength(2);
+  expectNoRemoteReads();
 });
-it('pending queries null in Firestore without limits and stays live beyond 100 opens', async () => {
-  const catalog = vi
-    .spyOn(projectSource, 'subscribeAuthorizedProjects')
-    .mockImplementation((db, uid, next, error) => {
-      const rows = new Map<number, Row[]>();
-      const stops = [
-        query(collection(db, 'projects'), where('type', '==', 'work')),
-        query(
-          collection(db, 'projects'),
-          where('type', '==', 'personal'),
-          where('createdBy', '==', uid),
-        ),
-      ].map((target, index) =>
-        onSnapshot(
-          target,
-          { includeMetadataChanges: true },
-          (snapshot) => {
-            rows.set(
-              index,
-              snapshot.docs.map((document) => ({
-                id: document.id,
-                data: document.data(),
-              })),
-            );
-            if (rows.size === 2)
-              next({
-                rows: [...rows.values()].flat(),
-                fromCache: false,
-                hasPendingWrites: false,
-                complete: true,
-              });
-          },
-          error,
-        ),
-      );
-      return () => stops.forEach((stop) => stop());
-    });
-  recordListeners.splice(0);
+it('pending selects strict null locally without limits and stays live beyond 100 opens', () => {
+  workspace.listeners.splice(0);
   const next = vi.fn();
   const stop = subscribeAuthorizedOwnRecords(
     {} as Firestore,
@@ -309,43 +253,37 @@ it('pending queries null in Firestore without limits and stays live beyond 100 o
     vi.fn(),
     { openOnly: true },
   );
-  const snapshot = (rows: Row[]) => ({
-    docs: rows.map((row) => ({ id: row.id, data: () => row.data })),
-    metadata: { fromCache: false, hasPendingWrites: false },
-  });
-  recordListeners[0].next(snapshot([{ id: 'p', data: {} }]));
-  recordListeners[1].next(snapshot([]));
-  await Promise.resolve();
-  const listener = recordListeners[2];
-  expect(listener.query.base).toBe('users/alice/records');
-  expect(listener.query.constraints).toContainEqual([
-    'where',
-    'projectId',
-    '==',
-    'p',
-  ]);
-  expect(listener.query.constraints).toContainEqual([
-    'where',
-    'endedAt',
-    '==',
-    null,
-  ]);
-  expect(
-    listener.query.constraints.some(
-      (c) => Array.isArray(c) && ['limit', 'after'].includes(c[0]),
-    ),
-  ).toBe(false);
   const rows = Array.from({ length: 151 }, (_, i) => ({
     id: String(i),
     data: { projectId: 'p', endedAt: null },
   }));
-  listener.next(snapshot(rows));
+  const excluded: Row[] = [
+    { id: 'missing', data: { projectId: 'p' } },
+    { id: 'closed', data: { projectId: 'p', endedAt: '2026-10-08' } },
+    { id: 'other-owner', data: { uid: 'bob', projectId: 'p', endedAt: null } },
+    ...['', false, 0, {}, []].map((endedAt, i) => ({
+      id: 'malformed-' + i,
+      data: { projectId: 'p', endedAt },
+    })),
+  ];
+  emit(materialization([...rows, ...excluded]));
   expect(next.mock.lastCall![0].rows).toHaveLength(151);
+  expect(
+    next.mock.lastCall![0].rows.every(
+      (row: Row) => row.data.endedAt === null && row.data.uid === 'alice',
+    ),
+  ).toBe(true);
   expect(next.mock.lastCall![0].hasMore).toBe(false);
-  listener.next(snapshot(rows.slice(1)));
+  emit(materialization([...rows.slice(1), ...excluded]));
   expect(next.mock.lastCall![0].rows).toHaveLength(150);
+  // Revocation/removal replaces local state rather than retaining an old open row.
+  emit(materialization([]));
+  expect(next.mock.lastCall![0].rows).toEqual([]);
   stop();
-  catalog.mockRestore();
+  const calls = next.mock.calls.length;
+  emit(materialization(rows));
+  expect(next).toHaveBeenCalledTimes(calls);
+  expectNoRemoteReads();
 });
 it('non-null malformed endings are not open', () => {
   for (const endedAt of ['', false, 0, {}, []])

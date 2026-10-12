@@ -30,10 +30,22 @@ describe('shared query toolbar', () => {
     const recordSource = source(
       '../../data/sources/authorized-own-record-source.ts',
     );
-    expect(recordSource).toContain('includeMetadataChanges: true');
-    expect(recordSource).toContain('recordSnapshot.metadata.fromCache ||');
-    // Owner history supplies no pagination options; only paginated callers get limits.
-    expect(recordSource).toContain('options.size ? [limit(options.size)] : []');
+    expect(recordSource).toContain('observeWorkspace(db, uid');
+    expect(recordSource).toContain('fromCache: !snapshot.complete');
+    expect(recordSource).toContain('snapshot.complete ? snapshot.records : []');
+    // Only paginated callers slice the complete local owner history.
+    expect(recordSource).toContain(
+      'options.size ? all.slice(0, options.size) : all',
+    );
+    expect(recordSource).toContain('r.data.uid === uid');
+    for (const remote of [
+      'onSnapshot',
+      'getDocs',
+      'getDoc(',
+      'httpsCallable',
+      'limit(',
+    ])
+      expect(recordSource).not.toContain(remote);
     expect(hook).not.toContain('size:');
     expect(hook).not.toContain('limit(');
     expect(hook).not.toContain('httpsCallable');

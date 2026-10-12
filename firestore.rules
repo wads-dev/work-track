@@ -164,6 +164,18 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     // 5. Coleções: regras curtas que expressam intenção
     // -------------------------------------------------------------------------
+    // The global head contains only a revision, never project/record data.
+    match /webSyncState/head {
+      allow get: if isAuthenticated();
+      allow list, write: if false;
+    }
+    match /webSyncEvents/{revision} {
+      allow read, write: if false;
+    }
+    match /webSyncDeliveries/{deliveryId} {
+      allow read, write: if false;
+    }
+
     match /projects/{projectId} {
       allow get: if canAccessProject(resource.data);
       allow list: if canDiscoverProject(resource.data);

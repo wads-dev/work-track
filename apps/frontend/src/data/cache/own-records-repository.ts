@@ -87,7 +87,7 @@ export function createOwnRecordsRepository() {
               observeDeletion(rows);
               current.state = {
                 rows: rows.filter((row) => !isDeletedRecord(row.data)),
-                loading: false,
+                loading: fromCache,
                 complete: !fromCache,
                 fromCache,
                 error: '',

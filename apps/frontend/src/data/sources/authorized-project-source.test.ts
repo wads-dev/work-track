@@ -1,263 +1,139 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
+import type { WorkspaceSnapshot } from '../sync/workspace-sync';
 const mocks = vi.hoisted(() => ({
-  access: vi.fn(),
-  legacyIds: [] as string[],
-  listeners: [] as {
-    target: { path: string; constraints: unknown[] };
-    options: { source: 'cache' | 'default'; includeMetadataChanges: boolean };
-    next: (snapshot: unknown) => void;
-    error: () => void;
+  observers: [] as {
+    uid: string;
+    next: (value: WorkspaceSnapshot) => void;
     stop: ReturnType<typeof vi.fn>;
+    active: boolean;
   }[],
+  observe: vi.fn(),
+  onSnapshot: vi.fn(),
+  getDocs: vi.fn(),
+  callable: vi.fn(),
 }));
-vi.mock('../cache/project-access-revision', () => ({
-  invalidateProjectAccess: mocks.access,
-}));
-vi.mock('firebase/functions', () => ({
-  getFunctions: vi.fn(),
-  httpsCallable: () => () => ({
-    then: (callback: (result: { data: { ids: string[] } }) => void) => {
-      callback({ data: { ids: mocks.legacyIds } });
-      return { catch: vi.fn() };
-    },
-  }),
+vi.mock('../sync/workspace-runtime', () => ({
+  observeWorkspace: mocks.observe,
 }));
 vi.mock('firebase/firestore', () => ({
-  collection: (_db: unknown, path: string) => path,
-  doc: (_db: unknown, path: string, id: string) => ({
-    path: path + '/' + id,
-    constraints: [],
-  }),
-  query: (path: string, ...constraints: unknown[]) => ({ path, constraints }),
-  where: (...args: unknown[]) => args,
-  onSnapshot: (
-    target: { path: string; constraints: unknown[] },
-    options: { source: 'cache' | 'default'; includeMetadataChanges: boolean },
-    next: (snapshot: unknown) => void,
-    error: () => void,
-  ) => {
-    const stop = vi.fn();
-    mocks.listeners.push({ target, options, next, error, stop });
-    return stop;
-  },
+  onSnapshot: mocks.onSnapshot,
+  getDocs: mocks.getDocs,
 }));
-import { subscribeAuthorizedProjects } from './authorized-project-source';
+vi.mock('firebase/functions', () => ({ httpsCallable: mocks.callable }));
 const db = {} as Firestore;
-const batch = (
-  documents: [string, Record<string, unknown>][],
-  cache = true,
-  pending = false,
-) => ({
-  docs: documents.map(([id, data]) => ({ id, data: () => data })),
-  metadata: { fromCache: cache, hasPendingWrites: pending },
+const state = (patch: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot => ({
+  projects: [],
+  records: [],
+  completedProjects: [],
+  complete: true,
+  syncing: false,
+  error: '',
+  ...patch,
 });
+const emit = (value: WorkspaceSnapshot, index = 0) => {
+  const observer = mocks.observers[index];
+  if (observer.active) observer.next(value);
+};
 beforeEach(() => {
-  mocks.listeners.splice(0);
-  mocks.access.mockReset();
-  mocks.legacyIds = [];
-});
-it('includes authorized legacy documents without broad collection reads', () => {
-  mocks.legacyIds = ['legacy'];
-  const next = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  const legacy = mocks.listeners.find(
-    (l) => l.target.path === 'projects/legacy',
-  )!;
-  legacy.next({
-    data: () => ({ title: 'Legacy' }),
-    metadata: { fromCache: false, hasPendingWrites: false },
-  });
-  const live = mocks.listeners.filter((l) => l.options.source === 'default');
-  live[0]!.next(batch([], false));
-  live[1]!.next(batch([], false));
-  expect(next.mock.lastCall?.[0]).toMatchObject({
-    rows: [{ id: 'legacy', data: { title: 'Legacy' } }],
-    complete: true,
-  });
-  legacy.next({
-    data: () => ({ type: 'personal', createdBy: 'bob' }),
-    metadata: { fromCache: false, hasPendingWrites: false },
-  });
-  expect(next.mock.lastCall?.[0].rows).toEqual([]);
-});
-it('reads scoped cache first and keeps a default listener for remote synchronization', () => {
-  const next = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  expect(mocks.listeners.map((l) => l.options.source)).toEqual([
-    'cache',
-    'default',
-    'cache',
-    'default',
-  ]);
-  expect(mocks.listeners.every((l) => l.options.includeMetadataChanges)).toBe(
-    true,
+  vi.clearAllMocks();
+  mocks.observers.splice(0);
+  mocks.observe.mockImplementation(
+    (_db: Firestore, uid: string, next: (value: WorkspaceSnapshot) => void) => {
+      const observer = {
+        uid,
+        next,
+        active: true,
+        stop: vi.fn(() => {
+          observer.active = false;
+        }),
+      };
+      mocks.observers.push(observer);
+      return observer.stop;
+    },
   );
-  expect(mocks.listeners[0].target.constraints).toEqual([
-    ['type', '==', 'work'],
-  ]);
-  expect(mocks.listeners[2].target.constraints).toEqual([
-    ['type', '==', 'personal'],
-    ['createdBy', '==', 'alice'],
-  ]);
-  mocks.listeners[0].next(batch([['work', { type: 'work', title: 'cached' }]]));
-  mocks.listeners[2].next(batch([]));
-  expect(next.mock.lastCall?.[0]).toMatchObject({
+});
+afterEach(() => {
+  expect(mocks.onSnapshot).not.toHaveBeenCalled();
+  expect(mocks.getDocs).not.toHaveBeenCalled();
+  expect(mocks.callable).not.toHaveBeenCalled();
+});
+
+import { subscribeAuthorizedProjects } from './authorized-project-source';
+it('observes the account materialization without reconnecting or reading Firebase', () => {
+  const next = vi.fn();
+  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
+  expect(mocks.observe).toHaveBeenCalledWith(db, 'alice', expect.any(Function));
+  const projects = [
+    { id: 'legacy', data: { title: 'Legacy' } },
+    { id: 'own', data: { type: 'personal', createdBy: 'alice' } },
+  ];
+  emit(state({ projects }));
+  expect(next).toHaveBeenLastCalledWith({
+    rows: projects,
+    complete: true,
+    fromCache: false,
+    hasPendingWrites: false,
+  });
+  emit(state({ projects, syncing: true }));
+  expect(next.mock.lastCall?.[0].rows).toEqual(projects);
+  expect(mocks.observe).toHaveBeenCalledOnce();
+});
+it('does not confirm cold or incomplete materializations as an empty catalog', () => {
+  const next = vi.fn();
+  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
+  emit(state({ complete: false, projects: [{ id: 'stale', data: {} }] }));
+  expect(next).toHaveBeenLastCalledWith({
     rows: [],
+    complete: false,
     fromCache: true,
-    complete: false,
+    hasPendingWrites: false,
   });
-  mocks.listeners[1].next(
-    batch([['work', { type: 'work', title: 'current' }]], false),
-  );
-  mocks.listeners[3].next(batch([], false));
-  expect(next.mock.lastCall?.[0]).toMatchObject({
-    rows: [{ id: 'work', data: { title: 'current' } }],
-    fromCache: false,
-    complete: true,
-  });
-  const calls = next.mock.calls.length;
-  mocks.listeners[0].next(batch([['old', { type: 'work' }]]));
-  expect(next).toHaveBeenCalledTimes(calls);
-});
-it('applies server create update delete and revocation instead of retaining stale Promise data', () => {
-  const next = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  mocks.listeners[1].next(
-    batch([['p', { type: 'work', title: 'before' }]], false),
-  );
-  mocks.listeners[3].next(
-    batch([['own', { type: 'personal', createdBy: 'alice' }]], false),
-  );
-  mocks.listeners[1].next(
-    batch(
-      [
-        ['p', { type: 'work', title: 'after' }],
-        ['new', { type: 'work' }],
-      ],
-      false,
-    ),
-  );
-  expect(next.mock.lastCall?.[0].rows.map((r: { id: string }) => r.id)).toEqual(
-    ['new', 'own', 'p'],
-  );
-  expect(next.mock.lastCall?.[0].rows[2].data.title).toBe('after');
-  mocks.listeners[3].next(batch([], false));
-  expect(next.mock.lastCall?.[0].rows.map((r: { id: string }) => r.id)).toEqual(
-    ['new', 'p'],
-  );
-  mocks.listeners[1].next(batch([], false));
-  expect(next.mock.lastCall?.[0]).toMatchObject({ rows: [], complete: true });
-  expect(mocks.access).toHaveBeenCalled();
-});
-it('checks ownership even on cached results and treats pending metadata as provisional', () => {
-  const next = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  mocks.listeners[1].next(batch([['invalid', { type: null }]], false));
-  mocks.listeners[3].next(
-    batch(
-      [
-        ['foreign', { type: 'personal', createdBy: 'bob' }],
-        ['own', { type: 'personal', createdBy: 'alice' }],
-      ],
-      false,
-      true,
-    ),
-  );
-  expect(next.mock.lastCall?.[0]).toMatchObject({
-    rows: [],
-    fromCache: false,
-    hasPendingWrites: true,
-    complete: false,
-  });
-});
-it('does not let metadata-only emissions invalidate completed calculations', () => {
-  const next = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  mocks.listeners[0].next(batch([['p', { type: 'work' }]]));
-  mocks.listeners[2].next(batch([]));
-  mocks.access.mockClear();
-  mocks.listeners[1].next(batch([['p', { type: 'work' }]], false));
-  mocks.listeners[3].next(batch([], false));
-  mocks.access.mockClear();
-  mocks.listeners[1].next(batch([['p', { type: 'work' }]], false));
-  mocks.listeners[3].next(batch([], false));
-  expect(mocks.access).not.toHaveBeenCalled();
+  emit(state());
   expect(next.mock.lastCall?.[0].complete).toBe(true);
 });
-it('fails closed when a remote listener loses permission and detaches every branch', () => {
-  const next = vi.fn(),
-    fail = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, fail);
-  mocks.listeners[0].next(batch([['cached', { type: 'work' }]]));
-  mocks.listeners[2].next(batch([]));
-  mocks.listeners[1].error();
-  expect(fail).toHaveBeenCalledOnce();
-  expect(
-    mocks.listeners.every((listener) => listener.stop.mock.calls.length === 1),
-  ).toBe(true);
-  const calls = next.mock.calls.length;
-  mocks.listeners[3].next(
-    batch([['late', { type: 'personal', createdBy: 'alice' }]], false),
-  );
-  expect(next).toHaveBeenCalledTimes(calls);
-  expect(mocks.access).toHaveBeenCalled();
-});
-it('ignores late callbacks after account disposal and does not reconnect for logged-out callers', () => {
-  const next = vi.fn();
-  const stop = subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  stop();
-  stop();
-  mocks.listeners[1].next(batch([['old-account', { type: 'work' }]], false));
-  expect(next).not.toHaveBeenCalled();
-  expect(
-    mocks.listeners.every((listener) => listener.stop.mock.calls.length === 1),
-  ).toBe(true);
-  mocks.listeners.splice(0);
-  subscribeAuthorizedProjects(db, '', next, vi.fn());
-  expect(mocks.listeners).toHaveLength(0);
-  expect(next).toHaveBeenLastCalledWith({
-    rows: [],
-    fromCache: true,
-    hasPendingWrites: false,
-    complete: false,
-  });
-});
-it('a fresh subscription recovers after a failed authorization and never inherits the old rows', () => {
-  const next = vi.fn(),
-    fail = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, fail);
-  mocks.listeners[1].error();
-  const second = vi.fn();
-  const start = mocks.listeners.length;
-  subscribeAuthorizedProjects(db, 'alice', second, vi.fn());
-  mocks.listeners[start].next(batch([['stale', { type: 'work' }]]));
-  mocks.listeners[start + 2].next(batch([]));
-  expect(second.mock.lastCall?.[0].rows).toEqual([]);
-  mocks.listeners[start + 1].next(batch([['fresh', { type: 'work' }]], false));
-  mocks.listeners[start + 3].next(batch([], false));
-  expect(second.mock.lastCall?.[0]).toMatchObject({
-    rows: [{ id: 'fresh' }],
-    complete: true,
-  });
-});
-it('never marks an empty cold cache as a complete empty catalog', () => {
+it('replaces create/update/delete and revoked catalog rows atomically', () => {
   const next = vi.fn();
   subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  mocks.listeners[0].next(batch([]));
-  mocks.listeners[2].next(batch([]));
-  expect(next).toHaveBeenLastCalledWith({
-    rows: [],
-    fromCache: true,
-    hasPendingWrites: false,
-    complete: false,
-  });
-  mocks.listeners[1].next(batch([], false));
-  mocks.listeners[3].next(batch([], false));
-  expect(next).toHaveBeenLastCalledWith({
-    rows: [],
-    fromCache: false,
-    hasPendingWrites: false,
-    complete: true,
-  });
+  emit(state({ projects: [{ id: 'p', data: { title: 'Before' } }] }));
+  emit(
+    state({
+      projects: [
+        { id: 'p', data: { title: 'After' } },
+        { id: 'new', data: {} },
+      ],
+    }),
+  );
+  expect(next.mock.lastCall?.[0].rows).toHaveLength(2);
+  expect(next.mock.lastCall?.[0].rows[0].data.title).toBe('After');
+  // The session synchronizer owns ACL evaluation and removes revoked parents.
+  emit(state());
+  expect(next.mock.lastCall?.[0].rows).toEqual([]);
+});
+it('reports local authorization/storage errors without publishing stale rows and can recover', () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedProjects(db, 'alice', next, fail);
+  emit(
+    state({
+      error: 'permission-denied',
+      projects: [{ id: 'stale', data: {} }],
+    }),
+  );
+  expect(fail).toHaveBeenCalledOnce();
+  expect(next).not.toHaveBeenCalled();
+  emit(state());
+  expect(next.mock.lastCall?.[0].rows).toEqual([]);
+});
+it('disposes only its local observer and keeps accounts independent', () => {
+  const alice = vi.fn(),
+    bob = vi.fn();
+  const stop = subscribeAuthorizedProjects(db, 'alice', alice, vi.fn());
+  subscribeAuthorizedProjects(db, 'bob', bob, vi.fn());
+  stop();
+  emit(state());
+  emit(state(), 1);
+  expect(mocks.observers[0].stop).toHaveBeenCalledOnce();
+  expect(alice).not.toHaveBeenCalled();
+  expect(bob).toHaveBeenCalledOnce();
 });

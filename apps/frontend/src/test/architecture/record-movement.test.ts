@@ -148,7 +148,15 @@ describe('audited record movement', () => {
     expect(source).toContain('acknowledgeSharedDestination');
     expect(source).toContain('<RecordAuditEvent');
     expect(source).toContain('record.uid === uid');
-    expect(source).toContain("doc(db, 'users', uid, 'records', recordId)");
+    expect(source).toContain('observeWorkspace(db, uid');
+    expect(source).toContain(
+      "r.path === 'users/' + uid + '/records/' + recordId",
+    );
+    expect(source).toContain('if (!snapshot.complete)');
+    expect(source).toContain('activeRecord && !editorDirty.current');
+    expect(source).toContain('expectedUpdatedAt: editorVersion.current');
+    for (const remote of ['onSnapshot', 'getDoc(', 'getDocs', 'httpsCallable'])
+      expect(source).not.toContain(remote);
   });
 });
 it('accepts duplicate IDs only across distinct owner paths and rejects mismatched owner', () => {
