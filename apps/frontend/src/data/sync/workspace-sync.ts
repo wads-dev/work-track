@@ -265,6 +265,23 @@ export function createWorkspaceSync(
       running = false;
     }
   };
+  let headFailed = false;
+  const connectHead = () => {
+    stopHead();
+    const token = epoch;
+    headFailed = false;
+    stopHead = transport.listen(
+      () => {
+        if (current(token)) request();
+      },
+      (error) => {
+        if (!current(token)) return;
+        headFailed = true;
+        epoch++; // Fence in-flight pulls after the SDK terminates this listener.
+        fail(error);
+      },
+    );
+  };
   const request = () => {
     if (!disposed && focused) {
       requested = true;
@@ -289,11 +306,14 @@ export function createWorkspaceSync(
       // Authorization may have changed while unfocused: fail closed until revalidated.
       fence();
       if (value) {
-        stopHead = transport.listen(request, fail);
+        connectHead();
         request();
       }
     },
-    retry: request,
+    retry() {
+      if (focused && !disposed && headFailed) connectHead();
+      request();
+    },
     dispose() {
       disposed = true;
       focused = false;

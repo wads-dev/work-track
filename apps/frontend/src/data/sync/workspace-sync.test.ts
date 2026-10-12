@@ -339,3 +339,34 @@ it('central retry recovers transient pull failure without reload or bootstrap', 
   expect(pull).toHaveBeenCalledTimes(2);
   sync.dispose();
 });
+it('retry reattaches a terminated head listener and ignores its late callbacks', async () => {
+  const disk = memory({
+    cursor: 1,
+    projects: [project],
+    completedProjects: ['p'],
+    records: [row('r')],
+    audits: [],
+  });
+  const callbacks: { changed: () => void; failed: (e: Error) => void }[] = [];
+  const listen = vi.fn((changed: () => void, failed: (e: Error) => void) => {
+    callbacks.push({ changed, failed });
+    return () => {};
+  });
+  const pull = vi.fn(async () => response(1));
+  const sync = createWorkspaceSync('alice', disk.storage, { pull, listen });
+  sync.focus(true);
+  await settle();
+  callbacks[0].failed(new Error('permission'));
+  expect(sync.snapshot().complete).toBe(false);
+  sync.retry();
+  await settle();
+  expect(listen).toHaveBeenCalledTimes(2);
+  expect(sync.snapshot().complete).toBe(true);
+  const count = pull.mock.calls.length;
+  callbacks[0].changed();
+  callbacks[0].failed(new Error('late'));
+  await settle();
+  expect(pull).toHaveBeenCalledTimes(count);
+  expect(sync.snapshot().complete).toBe(true);
+  sync.dispose();
+});
