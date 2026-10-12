@@ -893,3 +893,36 @@ test('project authorization: public authenticated and own personal', async (t) =
     },
   );
 });
+
+test('sync head is read-only and journal/delivery/generation payloads stay private', async () => {
+  await allowed(write('webSyncState/head', { revision: 1 }, 'owner'));
+  await allowed(get('webSyncState/head', aliceToken));
+  await denied(get('webSyncState/head', null));
+  await denied(
+    get(
+      'webSyncState/head',
+      jwt(alice, { firebase: { sign_in_provider: 'anonymous' } }),
+    ),
+  );
+  await denied(list('webSyncState', aliceToken));
+  await denied(write('webSyncState/head', { revision: 999 }, aliceToken));
+  for (const [collection, id] of [
+    ['webSyncEvents', '0000000000000001'],
+    ['webSyncDeliveries', 'delivery'],
+    ['webSyncProjectGenerations', 'work'],
+  ]) {
+    await allowed(
+      write(
+        collection + '/' + id,
+        { revision: 1, secret: 'synthetic-private' },
+        'owner',
+      ),
+    );
+    await denied(get(collection + '/' + id, aliceToken));
+    await denied(get(collection + '/' + id, bobToken));
+    await denied(list(collection, aliceToken));
+    await denied(
+      write(collection + '/client-write', { revision: 2 }, aliceToken),
+    );
+  }
+});
