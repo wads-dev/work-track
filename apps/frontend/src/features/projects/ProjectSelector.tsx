@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState, useEffect } from 'react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import {
@@ -9,7 +9,9 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { cn } from '../../lib/utils';
-import { matchesProject, type ProjectOption } from './project-search';
+import type { ProjectOption } from './project-search';
+import { createProjectOptionRepository } from '../../data/repositories/browser-listing-repository';
+import { usePrivacy } from '../../shared/ui/privacy';
 
 // Radix reserves the empty string for its placeholder. Prefix real IDs so the
 // "all" option cannot collide with any project ID, while keeping the public API.
@@ -38,6 +40,7 @@ export function ProjectSelector({
   disabled?: boolean;
 }) {
   const id = useId();
+  const { revealed } = usePrivacy();
   const searchRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -53,13 +56,36 @@ export function ProjectSelector({
         : projects,
     [projects, allowAll],
   );
-  const selected = options.find((option) => option.id === projectId) ?? {
+  const repository = useMemo(
+    () => createProjectOptionRepository(options, revealed),
+    [options, revealed],
+  );
+  const selected = repository.read(projectId) ?? {
     id: projectId,
     label: projectId ? 'Projeto não disponível' : 'Escolha o projeto',
   };
-  const filtered = options.filter((option) =>
-    matchesProject(option, searchQuery),
-  );
+  const [searchResult, setSearchResult] = useState<{
+    repository: typeof repository;
+    query: string;
+    matches: ProjectOption[];
+  } | null>(null);
+  useEffect(() => {
+    let active = true;
+    void repository.search(searchQuery).then((matches) => {
+      if (active) setSearchResult({ repository, query: searchQuery, matches });
+    });
+    return () => {
+      active = false;
+    };
+  }, [repository, searchQuery]);
+  const filtered =
+    searchQuery === ''
+      ? options
+      : searchResult?.repository === repository &&
+          searchResult.query === searchQuery
+        ? searchResult.matches
+        : [];
+  const matchingIds = new Set(filtered.map((option) => option.id));
   function changeOpen(next: boolean) {
     focusSearchOnOpen.current = next;
     retainSearchFocus.current = next;
@@ -188,7 +214,8 @@ export function ProjectSelector({
           {/* Keep item refs stable: removing the selected item while filtering
               makes Radix's positioning effect move focus out of the input. */}
           {options.map((option) => {
-            const matches = matchesProject(option, searchQuery);
+            // Presentation-only visibility retains Radix item refs; the repository selected IDs.
+            const matches = matchingIds.has(option.id);
             return (
               <SelectItem
                 key={selectValue(option.id)}

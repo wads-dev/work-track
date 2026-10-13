@@ -3,8 +3,8 @@ import { calendarQueryBounds } from '../../data/sources/calendar-firestore-query
 import {
   ClientPersonalReportRepository,
   type ClientReportProject,
-} from '@work-track/data/repositories/snapshots/personal-report-repository';
-import { ownCalendarRepository } from '@work-track/data/repositories/snapshots/own-calendar-repository';
+} from '@work-track/data/test-support/personal-report-repository';
+import { ownCalendarRepository } from '@work-track/data/test-support/own-calendar-repository';
 import { executeCalendarReport } from '@work-track/core/reports/application/get-calendar-report';
 import { calendarInput } from '@work-track/core/reports/application/calendar-input';
 import {
@@ -325,7 +325,7 @@ describe('documented non-equivalence outside numeric visible intervals', () => {
       'Fuso inválido',
     );
   });
-  it('ancient mixed-zone warnings and historical scan/exclusion counts differ despite numeric parity', async () => {
+  it('ancient mixed-zone warnings survive complete context while repository selects only period facts', async () => {
     const records = [
       make(
         'mixed-ancient',
@@ -341,9 +341,9 @@ describe('documented non-equivalence outside numeric visible intervals', () => {
     expect(limited.warnings.some((w) => w.includes('Fusos mistos'))).toBe(
       false,
     );
-    expect(full.page.scannedCount).toBe(2);
+    expect(full.page.scannedCount).toBe(1);
     expect(limited.page.scannedCount).toBe(1);
-    expect(full.page.excludedCount).toBe(1);
+    expect(full.page.excludedCount).toBe(0);
     expect(limited.page.excludedCount).toBe(0);
   });
   it('full-history context cap can reject when a bounded snapshot succeeds', async () => {

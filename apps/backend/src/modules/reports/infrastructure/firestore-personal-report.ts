@@ -1,10 +1,19 @@
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
-import { FieldPath, type Firestore } from 'firebase-admin/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
+import {
+  nextReportCursor,
+  orderReportQuery,
+  reportUpperDatePrefix,
+  resumeReportQuery,
+} from './admin-report-query.js';
 import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 import { loadGlobalContext } from './firestore-global-context.js';
 import { reportRecordSchema } from '@work-track/data/codecs/report-record';
 import { readProjectCatalog, selectReportRecords } from './project-catalog.js';
-import type { PersonalReportRepository } from '@work-track/core/reports/domain/personal-report';
+import type {
+  PersonalReportRepository,
+  ReportRecordSelection,
+} from '@work-track/core/reports/domain/personal-report';
 const source = reportRecordSchema('admin-owned');
 export class FirestorePersonalReportRepository implements PersonalReportRepository {
   constructor(private readonly db: Firestore) {}
@@ -42,13 +51,22 @@ export class FirestorePersonalReportRepository implements PersonalReportReposito
         .map(([id, p]) => [id, p.topics]),
     );
   }
-  async readPage(uid: string, limit: number, cursor?: string) {
-    let query = this.db
+  async readPage(
+    uid: string,
+    limit: number,
+    cursor?: string,
+    selection?: ReportRecordSelection,
+  ) {
+    if (selection?.userIds && !selection.userIds.includes(uid))
+      return { records: [], scannedCount: 0, nextCursor: null };
+    const upper = reportUpperDatePrefix(selection);
+    let query: FirebaseFirestore.Query = this.db
       .collection('users')
       .doc(uid)
-      .collection('records')
-      .orderBy(FieldPath.documentId());
-    if (cursor) query = query.startAfter(cursor);
+      .collection('records');
+    if (selection?.projectId)
+      query = query.where('projectId', '==', selection.projectId);
+    query = resumeReportQuery(orderReportQuery(query, upper), cursor, upper);
     const snapshot = await query.limit(limit + 1).get(),
       docs = snapshot.docs.slice(0, limit);
     const catalog = await readProjectCatalog(
@@ -70,12 +88,19 @@ export class FirestorePersonalReportRepository implements PersonalReportReposito
         uid,
       }));
     return {
-      records: selectReportRecords(records, catalog, { viewerUid: uid }),
+      records: selectReportRecords(
+        records,
+        catalog,
+        { viewerUid: uid },
+        selection,
+      ),
       scannedCount: records.filter((r) =>
         canAccessProject(catalog.get(r.projectId), uid),
       ).length,
       nextCursor:
-        snapshot.docs.length > limit ? (docs.at(-1)?.id ?? null) : null,
+        snapshot.docs.length > limit
+          ? nextReportCursor(docs.at(-1), upper)
+          : null,
     };
   }
 }

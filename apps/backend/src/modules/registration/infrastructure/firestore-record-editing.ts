@@ -1,6 +1,10 @@
 import { buildRecordEditPlan } from '@work-track/data/repositories/record-edit-plan';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import {
+  FieldPath,
+  FieldValue,
+  type Firestore,
+} from 'firebase-admin/firestore';
 import { assertProjectWritable } from '@work-track/core/registration/domain/project-management';
 import {
   assertProjectAccess,
@@ -138,14 +142,20 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
       };
     });
   }
-  async listOpenRecords(uid: string, limit: number) {
+  async listOpenRecords(uid: string, limit: number, excludeRecordId?: string) {
     // Legacy missing fields cannot use equality-to-null or != tombstone filters.
     // Scan complete snapshot; exclude tombstones before active result limits.
-    const snapshot = await this.db
+    let query: FirebaseFirestore.Query = this.db
       .collection('users')
       .doc(uid)
-      .collection('records')
-      .get();
+      .collection('records');
+    if (excludeRecordId)
+      query = query.where(FieldPath.documentId(), '!=', excludeRecordId);
+    const snapshot = await query.limit(10001).get();
+    if (snapshot.docs.length > 10000)
+      throw new Error(
+        'Varredura de abertos excede 10000 documentos físicos; consulta indisponível, não presuma ausência de tracking.',
+      );
     const open = snapshot.docs
       .filter(
         (doc) =>

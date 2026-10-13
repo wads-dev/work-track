@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/require-await -- Test doubles preserve async repository rejection contracts without database I/O. */
 import type { CalendarRepository } from '@work-track/core/reports/application/get-calendar-report';
 import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
 import type { ClientPersonalReportRepository } from './personal-report-repository.js';
-/** Own facts remain directly readable; no corporate listing is authorized by current Rules. */
+/** TEST DOUBLE ONLY. Own facts fixture; no production imports or corporate authorization. */
 export function ownCalendarRepository(
   own: ClientPersonalReportRepository,
   viewerUid: string,

@@ -7,8 +7,8 @@ import {
   calendarReport,
   type CalendarResponse,
 } from '../../features/reports/calendar-people';
-import { ClientPersonalReportRepository } from '@work-track/data/repositories/snapshots/personal-report-repository';
-import { ownCalendarRepository } from '@work-track/data/repositories/snapshots/own-calendar-repository';
+import { ClientPersonalReportRepository } from '@work-track/data/test-support/personal-report-repository';
+import { ownCalendarRepository } from '@work-track/data/test-support/own-calendar-repository';
 import { executeCalendarReport } from '@work-track/core/reports/application/get-calendar-report';
 
 const data: CalendarResponse = {

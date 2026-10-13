@@ -16,7 +16,8 @@ it('masks project and topic before view model for confidential and unknown metad
     expect(result[0].projectLabel).toBe('Projeto reservado');
     expect(result[0].topicLabel).toBe('Tópico reservado');
     expect(JSON.stringify(result)).not.toContain('Secret');
-    expect(JSON.stringify(result)).not.toContain('raw-user');
+    expect(result[0].people[0].uid).toBe('raw-user');
+    expect(result[0].people[0].label).toBe('Pessoa 1');
   }
 });
 it('keeps authorized project-qualified allocations unchanged', () => {
@@ -44,10 +45,12 @@ it('personal drilldown contains only self with neutral label and never synthesiz
     false,
     'raw-user',
   );
-  expect(result[0].people).toEqual([{ key: '0', label: 'Você', minutes: 60 }]);
+  expect(result[0].people).toEqual([
+    { key: '0', uid: 'raw-user', label: 'Você', minutes: 60 },
+  ]);
   expect(result.every((b) => b.topicId !== null)).toBe(true);
 });
-it('includes self identity for the reusable component only when revealed', () => {
+it('includes self identity regardless of project presentation privacy', () => {
   const result = topicBuckets(
     [topic],
     () => ({ title: 'Project' }),
@@ -64,5 +67,5 @@ it('missing label does not fall back to uid', () => {
     false,
   );
   expect(result[0].people[0].label).toBe('Pessoa');
-  expect(JSON.stringify(result)).not.toContain('secretuid');
+  expect(result[0].people[0].uid).toBe('secretuid');
 });

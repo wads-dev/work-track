@@ -8,6 +8,7 @@ import {
   selectReportRecords,
   type ReportProjectMetadata,
 } from '../infrastructure/project-catalog.js';
+import type { ReportRecordSelection } from '@work-track/core/reports/domain/personal-report';
 import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
 import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
 const auth = {
@@ -63,23 +64,59 @@ function fixture() {
   );
   const repo: CalendarRepository = {
     own: {
-      readPage: (uid) =>
-        Promise.resolve({
-          records: visible(uid, 'own'),
+      readPage: async (uid, _limit, _cursor, options) => {
+        const topics = await repo.own.readTopics(
+          [...new Set(records.map((r) => r.projectId))],
+          uid,
+        );
+        const current = new Map(
+          [...catalog].map(([id, project]) => [
+            id,
+            { ...project, topics: topics[id] ?? project.topics },
+          ]),
+        );
+        return {
+          records: selectReportRecords(
+            visible(uid, 'own'),
+            current,
+            { viewerUid: uid },
+            options,
+          ),
           scannedCount: records.length,
           nextCursor: null,
-        }),
+        };
+      },
       loadContext: () => Promise.resolve(visible('alice', 'own')),
       archivedProjectIds: () => Promise.resolve([]),
       readTopics: () => Promise.resolve({}),
     },
     company: {
-      readPage: () =>
-        Promise.resolve({
-          records: visible('alice', 'global'),
+      readPage: async (
+        _limit,
+        _cursor,
+        projectId,
+        options?: ReportRecordSelection,
+      ) => {
+        const topics = await repo.company.readTopics([
+          ...new Set(records.map((r) => r.projectId)),
+        ]);
+        const current = new Map(
+          [...catalog].map(([id, project]) => [
+            id,
+            { ...project, topics: topics[id] ?? project.topics },
+          ]),
+        );
+        return {
+          records: selectReportRecords(
+            visible('alice', 'global'),
+            current,
+            { companyOnly: true },
+            { ...options, projectId },
+          ),
           scannedCount: records.length,
           nextCursor: null,
-        }),
+        };
+      },
       loadContext: (uids) =>
         Promise.resolve(
           visible('alice', 'global').filter((r) => uids.includes(r.uid)),
@@ -539,6 +576,41 @@ it('allWeeks true oldhistory gaps canonical aliases multishares preservefullinte
       getCalendarReportHandler(f.repo, bad, auth),
     ).rejects.toMatchObject({ code: 'invalid-argument' });
 });
+it('repository topic selection preserves a next-start cut from the unselected topic in full context', async () => {
+  const f = fixture();
+  f.setRecords([
+    {
+      ...record('alice', 'wanted-open'),
+      endedAt: undefined,
+      topics: [{ topicId: 'wanted' }],
+    },
+    {
+      ...record('alice', 'other-cut'),
+      startedAt: '2026-10-02T16:00:00Z',
+      endedAt: '2026-10-02T17:00:00Z',
+      topics: [{ topicId: 'other' }],
+    },
+  ]);
+  f.repo.own.readTopics = () =>
+    Promise.resolve({
+      w: [
+        { id: 'wanted', title: 'Wanted' },
+        { id: 'other', title: 'Other' },
+      ],
+    });
+  const result = await getCalendarReportHandler(
+    f.repo,
+    { ...input, projectId: 'w', topicId: 'wanted' },
+    auth,
+    Date.parse('2026-10-03T01:00:00Z'),
+  );
+  expect(result.intervals).toHaveLength(1);
+  expect(result.intervals[0]).toMatchObject({
+    id: 'wanted-open',
+    minutes: 240,
+    effectiveEndedAt: '2026-10-02T16:00:00.000Z',
+  });
+});
 it('topic filtering afterengine preserves six-hour estimates without daily cap and fails unsafe aliases or midread merges', async () => {
   const f = fixture();
   f.setRecords([
@@ -593,7 +665,7 @@ it('topic filtering afterengine preserves six-hour estimates without daily cap a
   let n = 0;
   f.repo.own.readTopics = () =>
     Promise.resolve({
-      w: [{ id: 'wanted', title: ++n === 1 ? 'Before' : 'After' }],
+      w: [{ id: 'wanted', title: 'Read ' + ++n }],
     });
   await expect(
     getCalendarReportHandler(

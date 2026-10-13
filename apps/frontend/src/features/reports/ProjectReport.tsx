@@ -213,6 +213,13 @@ export function ProjectReport({
       </Alert>
     );
   if (!report) return null;
+  // Presentation joins between the prepared report aggregates and record rows.
+  const personLabels = new Map(
+    report.byUser.map((person) => [person.uid, person.label]),
+  );
+  const topicLabels = new Map(
+    (report.byTopic ?? []).map((topic) => [topic.topicId, topic.label]),
+  );
   if (hidden)
     return (
       <Alert className={cn('mt-4')}>
@@ -294,14 +301,12 @@ export function ProjectReport({
               <InteractiveChart
                 title="Tempo por pessoa"
                 variant="pie"
-                data={report.byUser.map((person, index) => ({
+                data={report.byUser.map((person) => ({
                   key: person.uid,
-                  uid: hidden ? undefined : person.uid,
-                  label: hidden ? 'Pessoa ' + (index + 1) : person.label,
+                  uid: person.uid,
+                  label: person.label,
                   minutes: person.minutes,
-                  href: hidden
-                    ? undefined
-                    : '/people/' + encodeURIComponent(person.uid) + search,
+                  href: '/people/' + encodeURIComponent(person.uid) + search,
                 }))}
               />
             </Card>
@@ -319,7 +324,7 @@ export function ProjectReport({
                 minutes: topic.minutes,
                 people: (topic.byUser ?? []).map((person, index) => ({
                   key: String(index),
-                  uid: hidden ? undefined : person.uid,
+                  uid: person.uid,
                   label: person.label || 'Pessoa',
                   minutes: person.minutes,
                 })),
@@ -367,10 +372,7 @@ export function ProjectReport({
                 <p className={cn('text-lg font-semibold')}>
                   <PersonIdentity
                     uid={hidden ? undefined : record.uid}
-                    fallback={
-                      report.byUser.find((item) => item.uid === record.uid)
-                        ?.label || 'Pessoa'
-                    }
+                    fallback={personLabels.get(record.uid) || 'Pessoa'}
                   />
                 </p>
                 <p className={cn('text-sm text-muted-foreground')}>
@@ -417,10 +419,7 @@ export function ProjectReport({
                     <TableCell>
                       <PersonIdentity
                         uid={hidden ? undefined : record.uid}
-                        fallback={
-                          report.byUser.find((item) => item.uid === record.uid)
-                            ?.label || 'Pessoa'
-                        }
+                        fallback={personLabels.get(record.uid) || 'Pessoa'}
                       />
                       {record.uid === uid && (
                         <Tooltip>
@@ -450,9 +449,7 @@ export function ProjectReport({
                       {record.topics
                         .map(
                           (topic) =>
-                            report.byTopic.find(
-                              (item) => item.topicId === topic.topicId,
-                            )?.label ?? topic.topicId,
+                            topicLabels.get(topic.topicId) ?? topic.topicId,
                         )
                         .join(', ') || 'Não distribuído'}
                     </TableCell>

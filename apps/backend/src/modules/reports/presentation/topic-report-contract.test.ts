@@ -62,11 +62,22 @@ function personalRepository(
   archived: string[] = [],
 ) {
   return {
-    readPage: vi.fn<PersonalReportRepository['readPage']>().mockResolvedValue({
-      records,
-      scannedCount: records.length,
-      nextCursor: null,
-    }),
+    readPage: vi
+      .fn<PersonalReportRepository['readPage']>()
+      .mockImplementation((_uid, _limit, _cursor, selection) =>
+        Promise.resolve({
+          records: records.filter(
+            (record) =>
+              (!selection?.projectId ||
+                record.projectId === selection.projectId) &&
+              (!selection ||
+                selection.includeArchived ||
+                !archived.includes(record.projectId)),
+          ),
+          scannedCount: records.length,
+          nextCursor: null,
+        }),
+      ),
     loadContext: vi
       .fn<PersonalReportRepository['loadContext']>()
       .mockResolvedValue(records),
@@ -177,7 +188,17 @@ describe('personal report topic contract', () => {
       ['project'],
       'alice',
     );
-    expect(repository.readPage).not.toHaveBeenCalled();
+    expect(repository.readPage).toHaveBeenCalledExactlyOnceWith(
+      'alice',
+      100,
+      undefined,
+      {
+        projectId: undefined,
+        includeArchived: false,
+        from: undefined,
+        to: undefined,
+      },
+    );
     expect(result.byTopic).toEqual([
       {
         projectId: 'project',
@@ -213,10 +234,7 @@ describe('personal report topic contract', () => {
       asOf,
     );
 
-    expect(repository.archivedProjectIds).toHaveBeenCalledExactlyOnceWith([
-      'project',
-      'archive',
-    ]);
+    expect(repository.archivedProjectIds).not.toHaveBeenCalled();
     expect(repository.readTopics).toHaveBeenCalledExactlyOnceWith(
       ['project'],
       'alice',

@@ -132,3 +132,9 @@ it('resolves merged chains without accepting cycles missing targets duplicates',
   expect(resolveRecordTopic([{ id: 'x' }, { id: 'x' }], 'x')).toBeUndefined();
   expect(resolveRecordTopic([], 'historical')).toBe('historical');
 });
+it('retains compatibility exports while implementation is repository-owned', async () => {
+  const repository =
+    await import('../../data/repositories/browser-listing-repository');
+  expect(filterRecords).toBe(repository.filterRecords);
+  expect(recordPage).toBe(repository.recordPage);
+});

@@ -65,3 +65,11 @@ it('does not return partial data when later page fails', async () => {
     }),
   ).rejects.toThrow('denied');
 });
+it('sorts masked presentation labels without selecting the project dataset', () => {
+  const rows = [
+    { id: 'b', data: { title: 'Projeto reservado' } },
+    { id: 'a', data: { title: 'Projeto reservado' } },
+  ];
+  expect(sortProjectRows(rows)).toHaveLength(2);
+  expect(sortProjectRows(rows).map((row) => row.id)).toEqual(['a', 'b']);
+});

@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { CompactListToolbar } from '../../shared/ui/CompactListToolbar';
 import { useCompanyPeople } from './CompanyPeopleContext';
-import { personName } from './company-people';
 import { PersonIdentity } from './PersonIdentity';
-import { matchesFilter } from '../../app/routes';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 
 export function PeoplePage() {
-  const { people, loading, error, refresh } = useCompanyPeople();
   const [filter, setFilter] = useState('');
-  const visible = people.filter((person) =>
-    matchesFilter([personName(person), person.email, person.uid], filter),
-  );
+  const {
+    people: visible,
+    total,
+    loading,
+    error,
+    refresh,
+  } = useCompanyPeople(filter);
   return (
     <>
       <CompactListToolbar
@@ -40,11 +41,11 @@ export function PeoplePage() {
       ) : (
         <>
           <p role="status" className="mb-4 text-sm text-muted-foreground">
-            {visible.length} de {people.length} pessoas
+            {visible.length} de {total} pessoas
           </p>
           {visible.length === 0 ? (
             <p>
-              {people.length
+              {total
                 ? 'Nenhuma pessoa corresponde à busca.'
                 : 'Nenhuma pessoa encontrada na empresa.'}
             </p>

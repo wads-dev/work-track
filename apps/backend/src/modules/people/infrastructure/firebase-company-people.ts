@@ -14,6 +14,8 @@ export class FirebaseCompanyPeopleRepository implements CompanyPeopleRepository 
     // Page the Auth directory, not the filtered result. Empty corporate pages
     // can still have a continuation token; never scan the entire directory here.
     const page = await this.auth.listUsers(pageSize, pageToken);
+    // Firebase Auth listUsers has pagination but no domain/verified/provider query;
+    // enforce the corporate eligibility and secret-field allowlist in this repository.
     const people = page.users.flatMap((user) => {
       const email = user.email;
       // Match authorizeReport's corporate email and verification policy. Auth

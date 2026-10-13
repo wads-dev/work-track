@@ -37,7 +37,11 @@ it('exposes pause over authenticated MCP HTTP, preserves daily wiring, rejects U
     undefined,
     {
       loadOwnHistory: () =>
-        Promise.resolve({ records: [], projects: new Map() }),
+        Promise.resolve({
+          records: [],
+          selectedRecords: [],
+          projects: new Map(),
+        }),
     },
     { registerPause },
   );

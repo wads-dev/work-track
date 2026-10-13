@@ -1,5 +1,6 @@
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
+import { searchRepositoryContext } from '@work-track/core/registration/domain/repository-search';
 import { ProjectDiscoveryRepository } from '@work-track/data/repositories/project-discovery-repository';
 import {
   compactRecentRecords,
@@ -17,9 +18,14 @@ import {
   type PreviousRecord,
 } from '@work-track/core/registration/domain/close-previous';
 import { assertProjectWritable } from '@work-track/core/registration/domain/project-management';
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import {
+  FieldPath,
+  FieldValue,
+  type Firestore,
+} from 'firebase-admin/firestore';
 import type {
   Project,
+  ProjectSelection,
   Topic,
   WorkRepository,
   RegisterInput,
@@ -31,43 +37,122 @@ import {
   registerInput,
 } from '@work-track/core/registration/domain/work-model';
 import { normalize } from '@work-track/core/shared/text/normalize';
+import { readRecentRecordCandidates } from './firestore-recent-records.js';
 export class FirestoreWorkRepository implements WorkRepository {
   constructor(private readonly db: Firestore) {}
   async listRecentRecords(raw: RecentRecordsInput, uid: string) {
+    const now = new Date();
     const input = recentRecordsInput.parse(raw);
-    // Legacy open records may omit endedAt; bounded scan fails explicitly, never asserts absence from partial history.
-    const snapshot = await this.db
-      .collection('users')
-      .doc(uid)
-      .collection('records')
-      .limit(2001)
-      .get();
-    if (snapshot.docs.length > 2000)
-      throw new ProjectManagementError(
-        'resource-exhausted',
-        'Histórico excede orçamento de leitura; não é possível afirmar ausência de tracking.',
-      );
-    const projects = await this.listProjects(uid);
-    return compactRecentRecords(
-      snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
-      projects,
+    const records = await readRecentRecordCandidates(
+      this.db.collection('users').doc(uid).collection('records'),
       uid,
-      input,
+      input.hours,
+      now,
+    );
+    const projects = await this.listProjects(uid);
+    // Pure selection/compaction helper for repository-only residuals: exact ISO
+    // instant comparison, missing/null tombstones and current project ACL joins
+    // are not supported native predicates. Supported owner/padded-period guards
+    // already ran in Firestore; this is not an unrestricted collection scan.
+    return compactRecentRecords(records, projects, uid, input, now);
+  }
+  async searchRepositoryContext(term: string, uid: string, limit: number) {
+    // Firebase has no GitHub URL normalization, substring/fuzzy search or nested topic alias traversal.
+    return searchRepositoryContext(
+      await this.listProjects(uid),
+      term,
+      uid,
+      limit,
     );
   }
-  async listProjects(uid: string): Promise<Project[]> {
+  async listProjects(
+    uid: string,
+    selection?: ProjectSelection,
+  ): Promise<Project[]> {
     const discovery = new ProjectDiscoveryRepository({
-      scanProjects: async (limit) => {
-        const snapshot = await this.db
-          .collection('projects')
-          .limit(limit)
-          .get();
+      scanProjects: async (limit, options) => {
+        let query: FirebaseFirestore.Query = this.db.collection('projects');
+        if (options?.scope === 'personal')
+          query = query
+            .where('type', '==', 'personal')
+            .where('createdBy', '==', uid);
+        // Work/all must include legacy missing type; Firestore has no is-missing predicate.
+        const snapshot = await query.limit(limit).get();
         return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
       },
     });
-    return (await discovery.list(uid)).map(
+    return (await discovery.list(uid, selection)).map(
       (doc) => ({ ...doc.data, id: doc.id }) as Project,
     );
+  }
+  async listProjectsPage(
+    uid: string,
+    input: {
+      scope: 'all' | 'personal' | 'work';
+      includeArchived: boolean;
+      limit: number;
+      cursor?: string;
+    },
+  ) {
+    if (!uid)
+      throw new ProjectManagementError(
+        'permission-denied',
+        'Autenticação obrigatória.',
+      );
+    if (input.cursor) {
+      const previous = await this.db
+        .collection('projects')
+        .doc(input.cursor)
+        .get();
+      if (
+        !previous.exists ||
+        !ProjectDiscoveryRepository.selected(
+          [{ id: previous.id, data: previous.data()! }],
+          uid,
+          input,
+        ).length
+      )
+        throw new ProjectManagementError(
+          'invalid-argument',
+          'Cursor inválido.',
+        );
+    }
+    const selected: Project[] = [];
+    let after = input.cursor;
+    let scanned = 0;
+    for (;;) {
+      let query: FirebaseFirestore.Query = this.db.collection('projects');
+      if (input.scope === 'personal')
+        query = query
+          .where('type', '==', 'personal')
+          .where('createdBy', '==', uid);
+      query = query.orderBy(FieldPath.documentId());
+      if (after) query = query.startAfter(after);
+      const batchLimit = Math.min(101, 1001 - scanned);
+      const page = await query.limit(batchLimit).get();
+      scanned += page.docs.length;
+      if (scanned > 1000)
+        throw new ProjectManagementError(
+          'resource-exhausted',
+          'Catálogo excede orçamento de leitura; resultado não é parcial.',
+        );
+      const visible = ProjectDiscoveryRepository.selected(
+        page.docs.map((doc) => ({ id: doc.id, data: doc.data() })),
+        uid,
+        { scope: input.scope, includeArchived: input.includeArchived },
+      );
+      selected.push(
+        ...visible.map((doc) => ({ ...doc.data, id: doc.id }) as Project),
+      );
+      if (selected.length > input.limit)
+        return {
+          projects: selected.slice(0, input.limit),
+          nextCursor: selected[input.limit - 1]!.id,
+        };
+      if (page.docs.length < batchLimit)
+        return { projects: selected, nextCursor: null };
+      after = page.docs.at(-1)!.id;
+    }
   }
   async createProject(
     raw: Parameters<WorkRepository['createProject']>[0],
@@ -293,7 +378,18 @@ export class FirestoreWorkRepository implements WorkRepository {
           );
           previous = { ref: candidateRef, data };
         } else {
-          const snapshot = await tx.get(collection);
+          // Missing/null open and tombstone fields plus ISO-offset comparison
+          // require a residual; project and payload owner are supported natively.
+          const snapshot = await tx.get(
+            collection
+              .where('projectId', '==', input.projectId)
+              .where('uid', '==', uid)
+              .limit(10001),
+          );
+          if (snapshot.docs.length > 10000)
+            throw new Error(
+              'Varredura física de anteriores excede limite; informe closedPreviousRecordId explícito.',
+            );
           if (
             snapshot.docs.filter((doc) => !isDeletedRecord(doc.data())).length >
             2000

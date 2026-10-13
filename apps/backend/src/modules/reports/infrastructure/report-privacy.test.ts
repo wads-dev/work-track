@@ -361,6 +361,19 @@ describe('company reports use only current work-project metadata', () => {
     },
   );
 
+  it('bounds residual private/tombstone physical context rather than scanning indefinitely or returning partial totals', async () => {
+    const mock = sdk(
+      Array.from({ length: 10001 }, (_, i) =>
+        record('alice', String(i).padStart(5, '0'), 'alice-private'),
+      ),
+    );
+    await expect(
+      new FirestoreCompanyReportRepository(mock.db, mock.auth).loadContext([
+        'alice',
+      ]),
+    ).rejects.toThrow('10000 documentos físicos');
+    expect(mock.transactionGet).toHaveBeenCalledTimes(20);
+  });
   it('still rejects invalid or oversized visible work context', async () => {
     const invalid = sdk([record('alice', 'bad', 'work', { startedAt: null })]);
     await expect(

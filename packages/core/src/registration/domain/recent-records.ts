@@ -13,6 +13,18 @@ export type RecentRecordsInput = z.infer<typeof recentRecordsInput>;
 export interface RecentRecordsRepository {
   listRecentRecords(input: RecentRecordsInput, uid: string): Promise<unknown>;
 }
+const documentIdEncoder = new TextEncoder();
+function compareRecentDocumentIds(firstId: string, secondId: string) {
+  // Firestore document IDs use UTF-8 byte order, including ASCII case and
+  // non-BMP legacy IDs; locale or UTF-16 string ordering is not equivalent.
+  const first = documentIdEncoder.encode(firstId);
+  const second = documentIdEncoder.encode(secondId);
+  for (let index = 0; index < Math.min(first.length, second.length); index++) {
+    const order = first[index]! - second[index]!;
+    if (order) return order;
+  }
+  return first.length - second.length;
+}
 export function compactRecentRecords(
   records: Array<Record<string, unknown> & { id: string }>,
   projects: Project[],
@@ -40,8 +52,8 @@ export function compactRecentRecords(
     )
     .sort(
       (a, b) =>
-        String(b.startedAt).localeCompare(String(a.startedAt)) ||
-        a.id.localeCompare(b.id),
+        Date.parse(String(b.startedAt)) - Date.parse(String(a.startedAt)) ||
+        compareRecentDocumentIds(a.id, b.id),
     );
   const offset = input.cursor
     ? visible.findIndex((r) => r.id === input.cursor) + 1

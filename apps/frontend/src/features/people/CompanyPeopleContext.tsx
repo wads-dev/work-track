@@ -10,13 +10,15 @@ import {
 import type { Functions } from 'firebase/functions';
 import {
   loadCompanyPeople,
-  personName,
   type CompanyPerson,
   type CompanyPeoplePage,
 } from './company-people';
+import { createCompanyPeopleRepository } from './company-people-repository';
 
 type Directory = {
   people: CompanyPerson[];
+  total: number;
+  select: (query?: string) => { people: CompanyPerson[]; total: number };
   loading: boolean;
   error: string;
   refresh: () => void;
@@ -25,13 +27,18 @@ type Directory = {
 };
 const Context = createContext<Directory>({
   people: [],
+  total: 0,
+  select: () => ({ people: [], total: 0 }),
   loading: false,
   error: '',
   refresh: () => {},
   name: () => undefined,
   person: () => undefined,
 });
-export const useCompanyPeople = () => useContext(Context);
+export function useCompanyPeople(query = '') {
+  const directory = useContext(Context);
+  return { ...directory, ...directory.select(query) };
+}
 
 export function CompanyPeopleProvider({
   functions,
@@ -45,13 +52,26 @@ export function CompanyPeopleProvider({
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{
     owner: string;
+    connection: Functions;
     people: CompanyPerson[];
     loading: boolean;
     error: string;
-  }>({ owner: uid, people: [], loading: true, error: '' });
+  }>({
+    owner: uid,
+    connection: functions,
+    people: [],
+    loading: true,
+    error: '',
+  });
   useEffect(() => {
     let active = true;
-    setState({ owner: uid, people: [], loading: true, error: '' });
+    setState({
+      owner: uid,
+      connection: functions,
+      people: [],
+      loading: true,
+      error: '',
+    });
     const call = createCallable<
       { pageSize: number; pageToken?: string },
       CompanyPeoplePage
@@ -72,12 +92,20 @@ export function CompanyPeopleProvider({
           count: people.length,
           active,
         });
-        if (active) setState({ owner: uid, people, loading: false, error: '' });
+        if (active)
+          setState({
+            owner: uid,
+            connection: functions,
+            people,
+            loading: false,
+            error: '',
+          });
       })
       .catch(() => {
         if (active)
           setState({
             owner: uid,
+            connection: functions,
             people: [],
             loading: false,
             error: 'Não foi possível carregar as pessoas. Tente novamente.',
@@ -88,23 +116,24 @@ export function CompanyPeopleProvider({
     };
   }, [functions, uid, attempt]);
   const current =
-    state.owner === uid ? state : { people: [], loading: true, error: '' };
+    state.owner === uid && state.connection === functions
+      ? state
+      : { people: [], loading: true, error: '' };
   traceFirestore('people.memory.read', {
     count: current.people.length,
     loading: current.loading,
     ownerMatches: state.owner === uid,
   });
-  const byUid = new Map(current.people.map((person) => [person.uid, person]));
+  const repository = createCompanyPeopleRepository(current.people);
   return (
     <Context.Provider
       value={{
         ...current,
         refresh: () => setAttempt((value) => value + 1),
-        person: (id) => byUid.get(id),
-        name: (id) => {
-          const person = byUid.get(id);
-          return person ? personName(person) : undefined;
-        },
+        total: current.people.length,
+        select: repository.select,
+        person: repository.read,
+        name: repository.name,
       }}
     >
       {children}

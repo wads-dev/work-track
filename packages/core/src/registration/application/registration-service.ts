@@ -5,8 +5,6 @@ import {
   type RegisterInput,
   type WorkRepository,
 } from '../domain/work-model.js';
-import { searchProjects } from '../domain/project-search.js';
-import { canAccessProject } from '../domain/project-access.js';
 export class RegistrationService {
   constructor(private readonly repository: WorkRepository) {}
   async search(
@@ -16,15 +14,11 @@ export class RegistrationService {
     includeArchived = false,
   ) {
     return {
-      projects: searchProjects(
-        (await this.repository.listProjects(uid)).filter(
-          (project) =>
-            canAccessProject(project, uid) &&
-            (includeArchived || (!project.archived && !project.mergedInto)),
-        ),
+      projects: await this.repository.listProjects(uid, {
         query,
         limit,
-      ),
+        includeArchived,
+      }),
     };
   }
   createProject(

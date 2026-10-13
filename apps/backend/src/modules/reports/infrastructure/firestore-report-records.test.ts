@@ -5,7 +5,20 @@ import { FirestoreReportRecordsRepository } from './firestore-report-records.js'
 function setup(
   docs: { id: string; data: () => Record<string, unknown> }[] = [],
 ) {
-  const get = vi.fn().mockResolvedValue({ docs });
+  const get = vi.fn().mockResolvedValue({
+    docs: docs.map((doc) => ({
+      ...doc,
+      ref: {
+        path:
+          'users/' +
+          (typeof doc.data().uid === 'string'
+            ? (doc.data().uid as string)
+            : 'alice') +
+          '/records/' +
+          doc.id,
+      },
+    })),
+  });
   const limit = vi.fn().mockReturnValue({ get });
   const where = vi.fn().mockReturnValue({ limit, get });
   const collectionGroup = vi.fn().mockReturnValue({ where });
@@ -79,7 +92,7 @@ describe('FirestoreReportRecordsRepository', () => {
     const result = await repository.listByProject('project', 25, 'alice');
     expect(collectionGroup).toHaveBeenCalledExactlyOnceWith('records');
     expect(where).toHaveBeenCalledExactlyOnceWith('projectId', '==', 'project');
-    expect(limit).not.toHaveBeenCalled();
+    expect(limit).toHaveBeenCalledExactlyOnceWith(2001);
     expect(get).toHaveBeenCalledExactlyOnceWith();
     expect(result).toEqual([
       { id: 'alice-record', projectId: 'project', uid: 'alice', startedAt },
@@ -113,6 +126,25 @@ describe('FirestoreReportRecordsRepository', () => {
     },
   );
 
+  it('rejects forged payload owners in canonical record paths', async () => {
+    const { repository, get } = setup();
+    get.mockResolvedValue({
+      docs: [
+        {
+          id: 'forged',
+          ref: { path: 'users/alice/records/forged' },
+          data: () => ({
+            projectId: 'project',
+            uid: 'bob',
+            startedAt: '2026-10-08T10:00:00Z',
+          }),
+        },
+      ],
+    });
+    await expect(
+      repository.listByProject('project', 100, 'alice'),
+    ).rejects.toThrow('canonical record ownership');
+  });
   it('returns an empty collection when no records match', async () => {
     const { repository } = setup();
     await expect(

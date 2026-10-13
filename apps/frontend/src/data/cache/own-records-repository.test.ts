@@ -105,3 +105,45 @@ it('reconnects one central entry and updates both active subscribers', () => {
   expect(a).toHaveBeenCalledOnce();
   expect(b).toHaveBeenCalledOnce();
 });
+it('isolates filter/page result entries and keeps complete counts supplied by the native repository', () => {
+  const repo = createOwnRecordsRepository();
+  repo.account('a');
+  const db = {};
+  repo.subscribe(
+    db,
+    'a',
+    (next) => {
+      next([{ id: 'page', data: {} }], false, {
+        rows: [],
+        total: 151,
+        page: 2,
+        hasMore: true,
+        cursor: 'page',
+        openRows: [],
+        openCount: 0,
+      });
+      return () => {};
+    },
+    () => {},
+    'page:2',
+  );
+  repo.subscribe(
+    db,
+    'a',
+    (next) => {
+      next([{ id: 'open', data: {} }], false);
+      return () => {};
+    },
+    () => {},
+    'open',
+  );
+  expect(repo.snapshot(db, 'a', 'page:2')).toMatchObject({
+    total: 151,
+    page: 2,
+    hasMore: true,
+  });
+  expect(repo.snapshot(db, 'a', 'open').rows[0].id).toBe('open');
+  expect(repo.snapshot(db, 'a')).toBe(emptyRecords);
+  repo.account('b');
+  expect(repo.snapshot(db, 'a', 'page:2')).toBe(emptyRecords);
+});

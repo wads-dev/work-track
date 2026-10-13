@@ -1,8 +1,21 @@
-import { expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { nativeCache } from '../repositories/firestore-report-fixture';
+vi.mock(
+  'firebase/firestore',
+  async () =>
+    (await import('../repositories/firestore-report-fixture')).nativeCache
+      .firestore,
+);
+beforeEach(() => nativeCache.reset());
+afterEach(() => {
+  expect(nativeCache.onSnapshot).not.toHaveBeenCalled();
+  expect(nativeCache.getDocs).not.toHaveBeenCalled();
+  expect(nativeCache.getDocsFromServer).not.toHaveBeenCalled();
+});
 import { getTopicReport } from '@work-track/core/reports/application/get-topic-report';
 import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
 import type { ReportProjectMetadata } from '@work-track/data/codecs/report-project-metadata';
-import { AuthorizedReportRepository } from '@work-track/data/repositories/snapshots/authorized-report-repository';
+import { FirestoreReportRepository } from '../repositories/firestore-report-repository';
 import { LocalTopicReportRepository } from './local-topic-report';
 import { validateTopicReport } from '../../features/reports/topic-details';
 
@@ -28,20 +41,26 @@ function fixture(
   records: ReportSourceRecord[],
   extras: [string, ReportProjectMetadata][] = [],
 ) {
+  const projects = new Map<string, ReportProjectMetadata>([
+    ['w', { type: 'work', topics }],
+    ['another', { type: 'work', archived: true, topics }],
+    ['mine', { type: 'personal', createdBy: 'alice', topics }],
+    ['private', { type: 'personal', createdBy: 'bob', topics }],
+    ['invalid', { type: 'bad', topics }],
+    ...extras,
+  ]);
+  nativeCache.seed([
+    ...[...projects].map(([id, data]) => ({
+      path: 'projects/' + id,
+      data: { ...data },
+    })),
+    ...records.map(({ id, ...data }) => ({
+      path: 'users/' + data.uid + '/records/' + id,
+      data,
+    })),
+  ]);
   return new LocalTopicReportRepository(
-    new AuthorizedReportRepository(
-      'alice',
-      records,
-      new Map<string, ReportProjectMetadata>([
-        ['w', { type: 'work', topics }],
-        ['another', { type: 'work', archived: true, topics }],
-        ['mine', { type: 'personal', createdBy: 'alice', topics }],
-        ['private', { type: 'personal', createdBy: 'bob', topics }],
-        ['invalid', { type: 'bad', topics }],
-        ...extras,
-      ]),
-      new Set(),
-    ),
+    new FirestoreReportRepository(nativeCache.db, 'alice', projects),
   );
 }
 const request = { projectId: 'w', topicId: 'old', includeArchived: true };
@@ -91,11 +110,15 @@ it('filters deleted, missing, invalid and other-owner personal sources; rejects 
   expect(await repo.loadContext(['alice'])).toEqual([record('ok')]);
   expect(
     await repo.revalidate(
-      [record('ok'), deleted, { ...record('ok'), endedAt: undefined }],
+      [
+        ...(await repo.readPage('w', 100, undefined, 'alice'))!.records,
+        deleted,
+        { ...record('ok'), endedAt: undefined },
+      ],
       'alice',
       false,
     ),
-  ).toEqual([record('ok')]);
+  ).toEqual([expect.objectContaining(record('ok'))]);
   await expect(repo.revalidate([], 'bob', false)).rejects.toThrow(
     'Visualizador',
   );
@@ -149,7 +172,7 @@ it('global context retains archived activity without introducing a daily cap', a
   });
   expect(
     (await fixture([open, context]).loadContext(['alice'])).map((r) => r.id),
-  ).toEqual(['open', 'context']);
+  ).toEqual(['context', 'open']);
 });
 
 it('estimates before topic membership filtering and reads every local history page', async () => {

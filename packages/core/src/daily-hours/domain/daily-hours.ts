@@ -1,6 +1,7 @@
 import { activeRecords } from '../../registration/domain/record-lifecycle.js';
 import { z } from 'zod';
 import {
+  assertContext,
   globalEstimates,
   recordKey,
 } from '../../reports/domain/global-estimates.js';
@@ -82,12 +83,24 @@ export function canReadDailyProject(
       (project.type === 'personal' && project.createdBy === uid)),
   );
 }
+export interface DailyHoursSelection {
+  startedAt: number;
+  endedAt: number;
+  includeArchived: boolean;
+}
 export interface DailyHoursContext {
+  // Full authorized history, including archived projects, for personal-v3 estimates.
   records: ReportSourceRecord[];
+  // Repository-selected candidates; the domain only validates and clips intervals.
+  selectedRecords: ReportSourceRecord[];
   projects: Map<string, DailyProject>;
 }
 export interface DailyHoursRepository {
-  loadOwnHistory(uid: string, projectId?: string): Promise<DailyHoursContext>;
+  loadOwnHistory(
+    uid: string,
+    projectId?: string,
+    selection?: DailyHoursSelection,
+  ): Promise<DailyHoursContext>;
 }
 export function dailyBounds(date: string, timeZone: string) {
   const middle = Date.parse(date + 'T12:00:00Z');
@@ -156,6 +169,12 @@ export function buildDailyHours(
     throw new DailyHoursError('not-found', 'Projeto não encontrado.');
   // Baseline personal-v3: resolve estimates from all authorized history before selection filters.
   const estimates = globalEstimates(records, asOf);
+  const selectedRecords = activeRecords(context.selectedRecords).filter(
+    (r) =>
+      r.uid === uid &&
+      canReadDailyProject(context.projects.get(r.projectId), uid),
+  );
+  assertContext(selectedRecords, records);
   const warnings = new Set([
     'Política personal-v3: contexto global America/Sao_Paulo antes dos filtros de projeto e arquivados, sem teto diário. Fatos fechados são preservados.',
     'Abertos são estimativas não persistidas: até 6h, agora, meia-noite do registro e do fuso canônico, próximo início próprio no mesmo projeto (fechados menores que 15min não cortam).',
@@ -198,16 +217,12 @@ export function buildDailyHours(
     string,
     { projectId: string } & ReturnType<typeof zeroTotals>
   >();
-  const sorted = [...records].sort(
+  const sorted = [...selectedRecords].sort(
     (a, b) =>
       Date.parse(a.startedAt) - Date.parse(b.startedAt) ||
       a.id.localeCompare(b.id, 'en'),
   );
   for (const record of sorted) {
-    if (input.projectId && record.projectId !== input.projectId) continue;
-    const project = context.projects.get(record.projectId)!;
-    if (!input.includeArchived && (project.archived || project.mergedInto))
-      continue;
     const effectiveStart = Math.max(start, Date.parse(record.startedAt));
     const effectiveEnd = Math.min(
       end,
@@ -268,7 +283,11 @@ export async function getDailyHours(
       'invalid-argument',
       'Data YYYY-MM-DD real, fuso IANA ou filtros inválidos; uid não é aceito.',
     );
-  dailyBounds(parsed.data.date, parsed.data.timeZone);
-  const context = await repository.loadOwnHistory(uid, parsed.data.projectId);
+  const { start, end } = dailyBounds(parsed.data.date, parsed.data.timeZone);
+  const context = await repository.loadOwnHistory(uid, parsed.data.projectId, {
+    startedAt: start,
+    endedAt: end,
+    includeArchived: parsed.data.includeArchived,
+  });
   return buildDailyHours(parsed.data, context, uid, asOf);
 }

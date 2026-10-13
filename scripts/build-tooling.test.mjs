@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { createServer, loadConfigFromFile } from 'vite';
+// Included by the existing explicit npm test/tooling entrypoints.
+import './patch-firestore-local-index.test.mjs';
 import backendVitest from './build-vitest.config.mjs';
 import demoVite from '../docker/firebase/vite.config.mjs';
 
@@ -181,8 +183,7 @@ test('Docker uses Alpine and removes installation cache in the same image layer'
 });
 
 const core = '@work-track/core/registration/domain/project-access';
-const data =
-  '@work-track/data/repositories/snapshots/personal-report-repository';
+const data = '@work-track/data/test-support/personal-report-repository';
 
 async function resolvedSources(configuration, command = 'serve') {
   const server = await createServer({
@@ -226,7 +227,7 @@ test('Vite development resolves shared source, production resolves built default
     );
     assert(
       resolved[1].endsWith(
-        '/packages/data/src/repositories/snapshots/personal-report-repository.ts',
+        '/packages/data/src/test-support/personal-report-repository.ts',
       ),
     );
     assert(
@@ -245,7 +246,7 @@ test('Vite development resolves shared source, production resolves built default
   );
   assert(
     built[1].endsWith(
-      '/packages/data/lib/repositories/snapshots/personal-report-repository.js',
+      '/packages/data/lib/test-support/personal-report-repository.js',
     ),
   );
 });
@@ -281,7 +282,7 @@ test(
           'packages/core/src/reports/application/get-personal-report.ts',
         '/@fs' +
           root +
-          'packages/data/src/repositories/snapshots/authorized-report-repository.ts',
+          'packages/data/src/test-support/authorized-report-repository.ts',
       ];
       for (const url of urls) {
         const transformed = await server.transformRequest(url);
@@ -318,7 +319,7 @@ test(
         join(fixture, 'shared-source.test.ts'),
         "import { expect, test, vi } from 'vitest';\n" +
           "import * as access from '@work-track/core/registration/domain/project-access';\n" +
-          "import { ClientPersonalReportRepository } from '@work-track/data/repositories/snapshots/personal-report-repository';\n" +
+          "import { ClientPersonalReportRepository } from '@work-track/data/test-support/personal-report-repository';\n" +
           "test('data sees mocked core dependency', async () => {\n" +
           "  const spy = vi.spyOn(access, 'canAccessProject').mockReturnValue(true);\n" +
           "  const record = { id: 'fixture', uid: 'synthetic', projectId: 'missing', startedAt: '2026-01-01T00:00:00Z', timeZone: 'UTC', topics: [] };\n" +

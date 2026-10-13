@@ -1,5 +1,9 @@
 import type { ReportSourceRecord } from './project-report.js';
-import type { PersonalReport, PersonalReportInput } from './personal-report.js';
+import type {
+  PersonalReport,
+  PersonalReportInput,
+  ReportRecordSelection,
+} from './personal-report.js';
 export interface CompanyReportInput extends PersonalReportInput {
   includeArchived?: boolean;
 }
@@ -21,6 +25,7 @@ export interface CompanyReportRepository {
     limit: number,
     cursor?: string,
     projectId?: string,
+    selection?: ReportRecordSelection,
   ): Promise<{
     records: ReportSourceRecord[];
     scannedCount: number;

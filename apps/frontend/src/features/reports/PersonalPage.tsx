@@ -20,11 +20,7 @@ import {
 } from '../../data/cache/project-access-revision';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarHistory } from './CalendarHistory';
-import {
-  calendarTopics,
-  updateCalendarFilters,
-  updateCalendarView,
-} from './calendar-history';
+import { updateCalendarFilters, updateCalendarView } from './calendar-history';
 import {
   calendarPerson,
   calendarRequest,
@@ -36,6 +32,11 @@ import { useProjects } from '../projects/hooks/useProjects';
 import { TopicReport } from './TopicReport';
 import { topicBuckets } from './topic-report-model';
 import { useEffect, useState } from 'react';
+import {
+  BrowserDetailRepository,
+  descriptionKey,
+  type DescriptionSource,
+} from '../../data/repositories/browser-detail-repository';
 import {
   useDeletionRevision,
   deletionRevision,
@@ -65,9 +66,10 @@ import { RecordDrawer } from '../records/RecordDrawer';
 import { contextualRecordPath } from '../../app/routes';
 import { CalendarTimeline } from './CalendarTimeline';
 import { calendarEventDetails } from './calendar-event-details';
+import { layoutDay } from './timeline-layout';
 import { updatePersonalFilters } from './calendar-project-filter';
 import { date, text } from '../../shared/data';
-import { isHidden, safeProject, usePrivacy } from '../../shared/ui/privacy';
+import { safeProject, usePrivacy } from '../../shared/ui/privacy';
 import { hours } from './report-chart';
 import {
   calendarDays,
@@ -143,16 +145,67 @@ export function PersonalPage({
   const recordId = params.get('record');
   const allWeeks = calendar && params.get('allWeeks') === 'true';
   const subject = calendar ? params.get('subject') || '' : '';
-  const topics = calendarTopics(
-    projects.rows.find((p) => p.id === projectId)?.data,
+  const catalogKey = JSON.stringify([
+    uid,
+    calendar,
+    company,
+    projects.rows,
     revealed,
+    person.mode,
+    projectId,
     includeArchived,
-  );
+  ]);
+  const [catalogError, setCatalogError] = useState<{
+    key: string;
+    message: string;
+  } | null>(null);
+  const [catalogState, setCatalogState] = useState<{
+    key: string;
+    value: Awaited<ReturnType<BrowserDetailRepository['readReportCatalog']>>;
+  } | null>(null);
+  useEffect(() => {
+    let active = true;
+    setCatalogState(null);
+    setCatalogError(null);
+    if (projects.loading || !projects.complete || projects.error) return;
+    const repository = new BrowserDetailRepository(
+      db,
+      uid,
+      new Set(projects.rows.map((project) => project.id)),
+    );
+    void repository
+      .readReportCatalog({
+        revealed,
+        global: calendar && person.mode === 'global',
+        projectId,
+        includeArchived,
+      })
+      .then((value) => {
+        if (active) setCatalogState({ key: catalogKey, value });
+      })
+      .catch((error) => {
+        if (active)
+          setCatalogError({ key: catalogKey, message: reportError(error) });
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    db,
+    uid,
+    catalogKey,
+    projects.loading,
+    projects.complete,
+    projects.error,
+  ]);
+  const catalog =
+    catalogState?.key === catalogKey ? catalogState.value : undefined;
+  const projectData = (id: string) => catalog?.projects.get(id);
+  const topics = catalog?.topics ?? [];
   const privacyBlocked =
     calendar &&
     person.mode === 'global' &&
-    !!projectId &&
-    !projects.rows.some((p) => p.id === projectId);
+    Boolean(catalog && !catalog.selectionAvailable);
   let validated: ReturnType<typeof range> | null = null;
   let invalid = '';
   let view: View = 'day';
@@ -168,12 +221,8 @@ export function PersonalPage({
       );
     if (
       subject &&
-      (!projectId ||
-        !calendarTopics(
-          projects.rows.find((p) => p.id === projectId)?.data,
-          true,
-          includeArchived,
-        ).some((t) => t.id === subject))
+      catalog &&
+      (!projectId || !catalog.validTopicIds.has(subject))
     )
       throw new Error('Selecione um tópico disponível no projeto escolhido.');
     validated =
@@ -221,20 +270,18 @@ export function PersonalPage({
           label: companyPeople.name(person.uid) || person.label,
         }))
       : [];
-  const participants =
-    calendar || revealed
-      ? [
-          ...new Map(
-            [
-              ...scopedParticipants,
-              ...companyPeople.people.map((person) => ({
-                uid: person.uid,
-                label: companyPeople.name(person.uid) || person.email,
-              })),
-            ].map((person) => [person.uid, person]),
-          ).values(),
-        ]
-      : [];
+  // People are not confidential: project masking never hides the participant menu.
+  const participants = [
+    ...new Map(
+      [
+        ...scopedParticipants,
+        ...companyPeople.people.map((person) => ({
+          uid: person.uid,
+          label: companyPeople.name(person.uid) || person.email,
+        })),
+      ].map((person) => [person.uid, person]),
+    ).values(),
+  ];
   const [reportQuery, setReportQuery] = useState('');
   const queryIdentity = JSON.stringify([
     calendar,
@@ -258,6 +305,9 @@ export function PersonalPage({
   >(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [descriptions, setDescriptions] = useState<
+    ReadonlyMap<string, DescriptionSource>
+  >(new Map());
   const [attempt, setAttempt] = useState(0);
   const [localSnapshot, setLocalSnapshot] = useState<{
     owner: string;
@@ -338,6 +388,7 @@ export function PersonalPage({
       : null;
   const localRepository = local?.repository;
   const report =
+    catalog &&
     !privacyBlocked &&
     reportRevision === revision &&
     reportOwner === uid &&
@@ -361,9 +412,11 @@ export function PersonalPage({
     setLoading(true);
     setError('');
     setReport(null);
-    if (!localRepository) {
-      setError(localError);
-      setLoading(!localError);
+    if (!localRepository || !catalog) {
+      const failure =
+        catalogError?.key === catalogKey ? catalogError.message : localError;
+      setError(failure);
+      setLoading(!failure);
       return;
     }
     const request =
@@ -408,7 +461,14 @@ export function PersonalPage({
               },
             ).then((data) => ({ data: data as PersonalReport }));
     void request
-      .then((result) => {
+      .then(async (result) => {
+        const sources = calendar
+          ? await new BrowserDetailRepository(
+              db,
+              uid,
+              new Set(catalog.projects.keys()),
+            ).readDescriptions(result.data.intervals)
+          : new Map<string, DescriptionSource>();
         if (active) {
           if (
             deletionRevision(uid) !== revision ||
@@ -420,6 +480,7 @@ export function PersonalPage({
           setReportQuery(queryIdentity);
           setReportRevision(revision);
           setReportRepository(localRepository);
+          setDescriptions(sources);
           setReport(result.data);
           if (calendar)
             setDirectory({
@@ -446,6 +507,10 @@ export function PersonalPage({
       active = false;
     };
   }, [
+    db,
+    catalog,
+    catalogError,
+    catalogKey,
     localRepository,
     localError,
     functions,
@@ -468,25 +533,34 @@ export function PersonalPage({
     invalid,
   ]);
   const label = (id: string) =>
-    text(
-      safeProject(projects.rows.find((p) => p.id === id)?.data, revealed)
-        ?.title,
-    );
+    text(safeProject(projectData(id), revealed).title);
   const projectLink = (id: string) => (
     <MetadataLink
       projectId={id}
-      project={projects.rows.find((p) => p.id === id)?.data}
+      project={projectData(id)}
       revealed={revealed}
     />
   );
-  const colorCatalog = projects.rows.map((p) => ({
-    id: p.id,
-    color: p.data.color,
+  const colorCatalog = Array.from(catalog?.projects ?? [], ([id, data]) => ({
+    id,
+    color: safeProject(data, revealed).color,
   }));
   const color = (id: string) =>
-    new ProjectAppearance(
-      colorCatalog.find((p) => p.id === id) ?? { id },
-    ).getColor(colorCatalog);
+    new ProjectAppearance({
+      id,
+      color: safeProject(projectData(id), revealed).color,
+    }).getColor(colorCatalog);
+  const participantLabels = new Map(
+    participants.map((person) => [person.uid, person.label]),
+  );
+  const eventDetails = (item: Parameters<typeof calendarEventDetails>[0]) =>
+    calendarEventDetails(
+      item,
+      descriptions.get(descriptionKey(item, uid)),
+      projectData(item.projectId),
+      revealed,
+      uid,
+    );
   function update(key: string, value: string) {
     const next = calendar
       ? updateCalendarFilters(params, key, value)
@@ -533,12 +607,7 @@ export function PersonalPage({
           fromDate={firstDate}
           toDate={lastDate}
           projectId={projectId}
-          projects={projects.rows.map((p) => ({
-            id: p.id,
-            label: label(p.id),
-            searchText:
-              text(p.data.title, '') + ' ' + text(p.data.description, ''),
-          }))}
+          projects={catalog?.projectOptions ?? []}
           onFilter={update}
           onRefresh={() => {
             if (projects.error) projects.retry();
@@ -554,21 +623,12 @@ export function PersonalPage({
           density={density}
           allWeeks={allWeeks}
           projectId={projectId}
-          projects={projects.rows
-            .filter(
-              (p) =>
-                person.mode !== 'global' ||
-                (!isHidden(p.data, revealed) &&
-                  (!p.data.type || p.data.type === 'work')),
-            )
-            .map((p) => ({
-              id: p.id,
-              label: label(p.id),
-              searchText:
-                text(p.data.title, '') + ' ' + text(p.data.description, ''),
-            }))}
-          projectsLoading={projects.loading}
-          projectsError={projects.error}
+          projects={catalog?.projectOptions ?? []}
+          projectsLoading={projects.loading || !catalog}
+          projectsError={
+            projects.error ||
+            (catalogError?.key === catalogKey ? catalogError.message : '')
+          }
           personId={person.selected}
           personDisabled={profile}
           personAvatar={
@@ -579,11 +639,37 @@ export function PersonalPage({
             )
           }
           personOptions={[
-            {
-              value: uid,
-              text: 'Meu calendário',
-              label: <PersonIdentity uid={uid} label="Meu calendário" />,
-            },
+            // Identity directory is a presentation join, not a report filter.
+            ...new Map([
+              [
+                uid,
+                {
+                  value: uid,
+                  text: 'Meu calendário',
+                  label: <PersonIdentity uid={uid} label="Meu calendário" />,
+                },
+              ],
+              ...participants.map(
+                (person) =>
+                  [
+                    person.uid,
+                    {
+                      value: person.uid,
+                      text:
+                        person.uid === uid ? 'Meu calendário' : person.label,
+                      label: (
+                        <PersonIdentity
+                          uid={person.uid}
+                          fallback={person.label}
+                          label={
+                            person.uid === uid ? 'Meu calendário' : undefined
+                          }
+                        />
+                      ),
+                    },
+                  ] as const,
+              ),
+            ]).values(),
             ...(participants.length > 0 &&
             (!directory.unavailable || companyPeople.people.length > 0)
               ? [
@@ -594,13 +680,6 @@ export function PersonalPage({
                   },
                 ]
               : []),
-            ...participants
-              .filter((p) => p.uid !== uid)
-              .map((p) => ({
-                value: p.uid,
-                text: p.label,
-                label: <PersonIdentity uid={p.uid} fallback={p.label} />,
-              })),
             ...(person.selected !== uid &&
             person.selected !== 'all' &&
             !participants.some((p) => p.uid === person.selected)
@@ -652,7 +731,7 @@ export function PersonalPage({
             Tópico:{' '}
             <MetadataLink
               projectId={projectId}
-              project={projects.rows.find((p) => p.id === projectId)?.data}
+              project={projectData(projectId)}
               revealed={revealed}
               topicId={subject}
             />{' '}
@@ -758,9 +837,7 @@ export function PersonalPage({
                         data={report.byProject.map((project) => {
                           const navigation = metadataNavigation(
                             project.projectId,
-                            projects.rows.find(
-                              (row) => row.id === project.projectId,
-                            )?.data,
+                            projectData(project.projectId),
                             revealed,
                           );
                           return {
@@ -807,20 +884,19 @@ export function PersonalPage({
                       <InteractiveChart
                         title="Tempo por pessoa"
                         variant="bar"
-                        data={report.byUser.map((person, index) => ({
+                        data={report.byUser.map((person) => ({
                           key: person.uid,
-                          uid: revealed ? person.uid : undefined,
-                          label: revealed
-                            ? companyPeople.name(person.uid) ||
-                              'Pessoa da empresa'
-                            : 'Pessoa ' + (index + 1),
+                          kind: 'person' as const,
+                          uid: person.uid,
+                          label:
+                            companyPeople.name(person.uid) ||
+                            'Pessoa da empresa',
                           minutes: person.minutes,
-                          href:
-                            revealed && person.uid
-                              ? '/people/' +
-                                encodeURIComponent(person.uid) +
-                                location.search
-                              : undefined,
+                          href: person.uid
+                            ? '/people/' +
+                              encodeURIComponent(person.uid) +
+                              location.search
+                            : undefined,
                         }))}
                       />
                     </Card>
@@ -833,7 +909,7 @@ export function PersonalPage({
                   personal={!company}
                   buckets={topicBuckets(
                     report.byTopic ?? [],
-                    (id) => projects.rows.find((row) => row.id === id)?.data,
+                    (id) => projectData(id),
                     revealed,
                     company ? undefined : uid,
                   )}
@@ -844,15 +920,7 @@ export function PersonalPage({
             {calendar && allWeeks && (
               <CalendarHistory
                 showPeople={person.selected === 'all'}
-                details={(item) =>
-                  calendarEventDetails(
-                    item,
-                    localRepository?.records ?? [],
-                    projects.rows.find((p) => p.id === item.projectId)?.data,
-                    revealed,
-                    uid,
-                  )
-                }
+                details={eventDetails}
                 weeks={report.occupiedWeeks ?? []}
                 occurrences={report.weekOccurrences ?? []}
                 items={report.intervals}
@@ -862,8 +930,7 @@ export function PersonalPage({
                 color={color}
                 viewerUid={uid}
                 authorLabel={(id) =>
-                  participants.find((p) => p.uid === id)?.label ||
-                  'Pessoa da organização'
+                  participantLabels.get(id) || 'Pessoa da organização'
                 }
                 returnTo={location.pathname + location.search}
               />
@@ -871,15 +938,7 @@ export function PersonalPage({
             {calendar && !allWeeks && density === 'timeline' && (
               <CalendarTimeline
                 showPeople={person.selected === 'all'}
-                details={(item) =>
-                  calendarEventDetails(
-                    item,
-                    localRepository?.records ?? [],
-                    projects.rows.find((p) => p.id === item.projectId)?.data,
-                    revealed,
-                    uid,
-                  )
-                }
+                details={eventDetails}
                 items={report.intervals}
                 day={selected}
                 view={view}
@@ -889,8 +948,7 @@ export function PersonalPage({
                 color={color}
                 viewerUid={uid}
                 authorLabel={(id) =>
-                  participants.find((p) => p.uid === id)?.label ||
-                  'Pessoa da organização'
+                  participantLabels.get(id) || 'Pessoa da organização'
                 }
                 returnTo={location.pathname + location.search}
               />
@@ -920,13 +978,10 @@ export function PersonalPage({
                       zone,
                     ),
                   );
-                  const entries = report.intervals.filter(
-                    (item) =>
-                      Date.parse(item.effectiveStartedAt) < end &&
-                      (Date.parse(item.effectiveEndedAt) > start ||
-                        (item.estimated &&
-                          item.effectiveStartedAt === item.effectiveEndedAt &&
-                          Date.parse(item.effectiveStartedAt) >= start)),
+                  // Domain clipping assigns authorized intervals to rendered day cells.
+                  // It does not change the repository selection or report totals.
+                  const entries = layoutDay(report.intervals, start, end).map(
+                    (event) => event.item,
                   );
                   return (
                     <Card
@@ -1046,32 +1101,11 @@ export function PersonalPage({
                                           )}
                                         {label(item.projectId)}
                                         <span className="block whitespace-normal text-xs">
-                                          {
-                                            calendarEventDetails(
-                                              item,
-                                              localRepository?.records ?? [],
-                                              projects.rows.find(
-                                                (p) => p.id === item.projectId,
-                                              )?.data,
-                                              revealed,
-                                              uid,
-                                            ).topics
-                                          }
+                                          {eventDetails(item).topics}
                                         </span>
                                         {density !== 'supercompact' && (
                                           <span className="block whitespace-normal text-sm">
-                                            {
-                                              calendarEventDetails(
-                                                item,
-                                                localRepository?.records ?? [],
-                                                projects.rows.find(
-                                                  (p) =>
-                                                    p.id === item.projectId,
-                                                )?.data,
-                                                revealed,
-                                                uid,
-                                              ).summary
-                                            }
+                                            {eventDetails(item).summary}
                                           </span>
                                         )}
                                         {density !== 'supercompact' && (
@@ -1168,32 +1202,11 @@ export function PersonalPage({
                                           )}
                                         {label(item.projectId)}
                                         <span className="block whitespace-normal text-xs">
-                                          {
-                                            calendarEventDetails(
-                                              item,
-                                              localRepository?.records ?? [],
-                                              projects.rows.find(
-                                                (p) => p.id === item.projectId,
-                                              )?.data,
-                                              revealed,
-                                              uid,
-                                            ).topics
-                                          }
+                                          {eventDetails(item).topics}
                                         </span>
                                         {density !== 'supercompact' && (
                                           <span className="block whitespace-normal text-sm">
-                                            {
-                                              calendarEventDetails(
-                                                item,
-                                                localRepository?.records ?? [],
-                                                projects.rows.find(
-                                                  (p) =>
-                                                    p.id === item.projectId,
-                                                )?.data,
-                                                revealed,
-                                                uid,
-                                              ).summary
-                                            }
+                                            {eventDetails(item).summary}
                                           </span>
                                         )}
                                         {density !== 'supercompact' && (

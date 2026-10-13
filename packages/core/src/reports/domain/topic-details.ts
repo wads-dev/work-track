@@ -16,7 +16,8 @@ export function buildTopicDetails(
   const resolved = resolveTopic(topicMetadataMap(topics), requestedTopicId);
   if ('error' in resolved) throw new Error(resolved.error);
   const valid = activeRecords(records).filter((r) => {
-    if (r.projectId !== projectId) return false;
+    if (r.projectId !== projectId)
+      throw new Error('Fonte de outro projeto recebida do repository.');
     const start = Date.parse(r.startedAt),
       end = r.endedAt === undefined ? undefined : Date.parse(r.endedAt);
     return (
@@ -34,12 +35,19 @@ export function buildTopicDetails(
   }
   const warnings = new Set<string>();
   if (resolved.warning) warnings.add(resolved.warning);
-  const source = [...distinct.values()].filter((r) => {
+  // Repository has selected canonical topic membership; math never chooses the dataset.
+  const source = [...distinct.values()];
+  for (const r of source) {
     const membership = calendarTopics(r, 0, topics);
     for (const w of membership.warnings) warnings.add(w);
-    return membership.topics.some((t) => t.topicId === resolved.topicId);
-  });
+    if (!membership.topics.some((t) => t.topicId === resolved.topicId))
+      throw new Error(
+        'Fonte fora da seleção de tópico recebida do repository.',
+      );
+  }
   // Full source/context is estimated BEFORE subject membership filtering; no per-subject budget.
+  // Per-author partitioning and canonical source joins are aggregate math; no
+  // person/project/topic selection is performed by the report engine.
   const reports = [...new Set([...distinct.values()].map((r) => r.uid))].map(
     (uid) => {
       const report = buildPersonalReport(

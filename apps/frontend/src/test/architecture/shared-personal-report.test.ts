@@ -18,8 +18,15 @@ it('executes the existing personal use case with a client repository and unchang
       expect(uids).toEqual(['alice']);
       return records;
     },
-    readPage: async () => {
-      throw new Error('Unnecessary paging of complete client snapshot');
+    readPage: async (uid, size, cursor, selection) => {
+      expect(uid).toBe('alice');
+      expect(size).toBe(100);
+      expect(cursor).toBeUndefined();
+      expect(selection).toMatchObject({
+        from: '2026-10-08T00:00:00Z',
+        to: '2026-10-09T00:00:00Z',
+      });
+      return { records, scannedCount: records.length, nextCursor: null };
     },
     archivedProjectIds: async () => [],
     readTopics: async () => ({ p1: [] }),

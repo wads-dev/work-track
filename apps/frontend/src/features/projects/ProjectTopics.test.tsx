@@ -6,6 +6,34 @@ import { readFileSync } from 'node:fs';
 import { ProjectTopics } from './ProjectTopics';
 
 describe('project topics are read-only metadata', () => {
+  it('receives embedded-topic repository selection and keeps archived topics visible', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <ProjectTopics
+          functions={{} as Functions}
+          projectId="p"
+          project={{
+            topics: [
+              { id: 'archived', title: 'Archived history', archived: true },
+              {
+                id: 'alias',
+                title: 'Alias hidden',
+                mergedIntoTopicId: 'archived',
+              },
+            ],
+          }}
+        />
+      </MemoryRouter>,
+    );
+    expect(html).toContain('Archived history');
+    expect(html).not.toContain('Alias hidden');
+    const source = readFileSync(
+      new URL('./ProjectTopics.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).toContain('selectProjectTopics(project)');
+    expect(source).not.toMatch(/\.(filter|slice|find)\(/);
+  });
   it('renders a compact list with safe GitHub links and no structural actions', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>

@@ -18,7 +18,8 @@ export async function loadGlobalContext(
       const loaded: ReportSourceRecord[] = [];
       for (const uid of uids) {
         let cursor: string | undefined,
-          count = 0;
+          count = 0,
+          physicalCount = 0;
         for (;;) {
           let q = db
             .collection('users')
@@ -27,6 +28,11 @@ export async function loadGlobalContext(
             .orderBy(FieldPath.documentId());
           if (cursor) q = q.startAfter(cursor);
           const page = await tx.get(q.limit(501));
+          physicalCount += page.docs.length;
+          if (physicalCount > 10000)
+            throw new ReportContextError(
+              'Varredura de contexto excede 10000 documentos físicos por pessoa; nenhum total parcial retornado.',
+            );
           const catalog = scope
             ? await readProjectCatalog(
                 db,

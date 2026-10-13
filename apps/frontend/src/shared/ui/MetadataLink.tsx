@@ -1,8 +1,8 @@
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { isHidden } from './privacy';
-import { objects, text } from '../data';
+import { text } from '../data';
 import { topicDetailsPath } from '../../app/routes';
-import { canonicalCatalogTopic } from '../../features/reports/topic-details';
+import { readTopicMetadata } from '../../data/repositories/metadata-presentation-repository';
 export function metadataNavigation(
   projectId: string,
   project: Record<string, unknown> | undefined,
@@ -12,14 +12,11 @@ export function metadataNavigation(
   if (isHidden(project, revealed))
     return { label: topicId ? 'Tópico reservado' : 'Projeto reservado' };
   if (topicId) {
-    const canonical = canonicalCatalogTopic(objects(project?.topics), topicId);
-    if (!canonical) return { label: 'Tópico indisponível' };
+    const topic = readTopicMetadata(project, topicId);
+    if (!topic) return { label: 'Tópico indisponível' };
     return {
-      label: text(
-        objects(project?.topics).find((t) => t.id === canonical)?.title,
-        'Tópico',
-      ),
-      path: topicDetailsPath(projectId, canonical),
+      label: topic.title,
+      path: topicDetailsPath(projectId, topic.id),
     };
   }
   return {

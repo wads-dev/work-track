@@ -2,6 +2,7 @@ import type {
   PersonalReportInput,
   PersonalReportRepository,
 } from '../domain/personal-report.js';
+import { completeSelection } from './complete-selection.js';
 import { buildPersonalReport } from '../domain/build-personal-report.js';
 import { buildTopicBreakdown } from '../domain/topic-breakdown.js';
 
@@ -13,14 +14,14 @@ export async function executePersonalReport(
   asOf = Date.now(),
 ) {
   const context = await repository.loadContext([uid]);
-  const selected = context.filter(
-    (r) => !input.projectId || r.projectId === input.projectId,
+  const page = await completeSelection((cursor) =>
+    repository.readPage(uid, 100, cursor, {
+      projectId: input.projectId,
+      includeArchived: input.includeArchived,
+      from: input.from,
+      to: input.to,
+    }),
   );
-  const page = {
-    records: selected,
-    scannedCount: context.length,
-    nextCursor: null,
-  };
   const report = buildPersonalReport(
     { ...input, cursor: undefined },
     page,
@@ -31,24 +32,6 @@ export async function executePersonalReport(
   report.page.partial = false;
   report.page.limit = 2000;
   if (!input.includeArchived) {
-    const archived = new Set(
-      await repository.archivedProjectIds([
-        ...new Set(page.records.map((r) => r.projectId)),
-      ]),
-    );
-    const removed = report.intervals.filter((r) => archived.has(r.projectId));
-    report.intervals = report.intervals.filter(
-      (r) => !archived.has(r.projectId),
-    );
-    report.byProject = report.byProject.filter(
-      (r) => !archived.has(r.projectId),
-    );
-    report.totalMinutes = report.intervals.reduce(
-      (sum, r) => sum + r.minutes,
-      0,
-    );
-    report.estimatedCount = report.intervals.filter((r) => r.estimated).length;
-    report.page.excludedCount += removed.length;
     report.warnings.push(
       'Seleção ativa exclui projetos arquivados ou ausentes da visualização; orçamento global continua incluindo todos os fatos.',
     );

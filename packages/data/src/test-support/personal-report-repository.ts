@@ -1,14 +1,19 @@
-import type { PersonalReportRepository } from '@work-track/core/reports/domain/personal-report';
+/* eslint-disable @typescript-eslint/require-await -- Test doubles preserve async repository rejection contracts without database I/O. */
+import type {
+  PersonalReportRepository,
+  ReportRecordSelection,
+} from '@work-track/core/reports/domain/personal-report';
 import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
 import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
 
-import type { ReportProjectMetadata } from '../../codecs/report-project-metadata.js';
+import type { ReportProjectMetadata } from '../codecs/report-project-metadata.js';
+import { matchesReportRecordSelection } from './report-record-selection.js';
 
 /** Compatibility name for callers of the immutable personal snapshot. */
 export type ClientReportProject = ReportProjectMetadata;
-/** An immutable snapshot is used for an entire calculation; no mixed revisions. */
+/** TEST DOUBLE ONLY. In-memory snapshot selection is forbidden in production. */
 export class ClientPersonalReportRepository implements PersonalReportRepository {
   constructor(
     private readonly uid: string,
@@ -60,9 +65,18 @@ export class ClientPersonalReportRepository implements PersonalReportRepository 
       }),
     );
   }
-  async readPage(uid: string, limit: number, cursor?: string) {
+  async readPage(
+    uid: string,
+    limit: number,
+    cursor?: string,
+    selection?: ReportRecordSelection,
+  ) {
     const records = (await this.loadContext([uid]))
-      .filter((r) => !this.selectedIds || this.selectedIds.has(r.id))
+      .filter(
+        (r) =>
+          (!this.selectedIds || this.selectedIds.has(r.id)) &&
+          matchesReportRecordSelection(r, this.projects, selection),
+      )
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .filter((r) => !cursor || r.id > cursor);
     const page = records.slice(0, limit);

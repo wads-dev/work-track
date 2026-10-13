@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
-import { isDeletedRecord } from '../data/cache/record-deletion';
-import {
-  observeWorkspaceAudit,
-  workspaceRetry,
-} from '../data/sync/workspace-runtime';
+import { observeRecordAudit } from '../data/repositories/browser-detail-repository';
+import { workspaceRetry } from '../data/sync/workspace-runtime';
 import { Timestamp, type Firestore } from 'firebase/firestore';
 
 export type Row = { id: string; data: Record<string, unknown> };
@@ -45,41 +42,21 @@ export function useRows(db: Firestore, path: string, maxRows = 100) {
   const uid = path.split('/')[1] ?? '';
   useEffect(() => {
     setState({ rows: [], loading: true, error: '' });
-    const parentPath = path.split('/').slice(0, 4).join('/');
-    return observeWorkspaceAudit(db, uid, parentPath, (snapshot) => {
-      const prefix = path + '/';
-      const parent = snapshot.records.find((row) => row.path === parentPath);
-      const visible =
-        parent &&
-        !isDeletedRecord(parent.data) &&
-        snapshot.projects.some(
-          (project) => project.id === parent.data.projectId,
-        );
+    const parts = path.split('/');
+    if (
+      parts.length !== 5 ||
+      parts[0] !== 'users' ||
+      parts[2] !== 'records' ||
+      parts[4] !== 'audit'
+    ) {
       setState({
-        rows:
-          snapshot.complete && visible
-            ? (snapshot.audits ?? [])
-                .filter(
-                  (row) =>
-                    row.path.startsWith(prefix) &&
-                    row.path.split('/').length === 6,
-                )
-                .sort((a, b) =>
-                  a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
-                )
-                .slice(0, maxRows)
-                .map((row) => ({
-                  id: row.path.split('/').at(-1)!,
-                  data: row.data,
-                }))
-            : [],
-        loading:
-          (!snapshot.complete ||
-            (Boolean(visible) && !snapshot.auditReady?.includes(parentPath))) &&
-          !snapshot.error,
-        error: snapshot.error,
+        rows: [],
+        loading: false,
+        error: 'Caminho de auditoria inválido.',
       });
-    });
+      return;
+    }
+    return observeRecordAudit(db, uid, parts[3], maxRows, setState);
   }, [db, uid, path, maxRows]);
   return { ...state, retry: () => workspaceRetry(db, uid) };
 }

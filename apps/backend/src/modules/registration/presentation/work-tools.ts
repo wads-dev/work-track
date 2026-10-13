@@ -5,7 +5,6 @@ import {
   type MovementRepository,
 } from '@work-track/core/registration/domain/record-movement';
 import { recentRecordsInput } from '@work-track/core/registration/domain/recent-records';
-import { searchRepositoryContext } from '@work-track/core/registration/domain/repository-search';
 import {
   mergeTopicsInput,
   type TopicManagementRepository,
@@ -116,14 +115,11 @@ export function registerWorkTools(
       annotations: { readOnlyHint: true, destructiveHint: false },
     },
     ({ repository: term, limit }) =>
-      run(async () =>
-        searchRepositoryContext(
-          await repository.listProjects(uid),
-          term,
-          uid,
-          limit,
-        ),
-      ),
+      run(async () => {
+        if (!repository.searchRepositoryContext)
+          throw new Error('Consulta de repositórios indisponível.');
+        return repository.searchRepositoryContext(term, uid, limit);
+      }),
   );
   const output = (data: unknown) => ({
     content: [{ type: 'text' as const, text: JSON.stringify(data) }],
@@ -246,10 +242,8 @@ export function registerWorkTools(
         const saved = await service.register(input, uid);
         if (!editing) return saved;
         try {
-          const open = await editing.listOpenRecords(uid, 10);
-          const previous = open.records.filter(
-            (record) => record.id !== saved.id,
-          );
+          const open = await editing.listOpenRecords(uid, 10, String(saved.id));
+          const previous = open.records;
           return {
             ...saved,
             openRecords: previous,

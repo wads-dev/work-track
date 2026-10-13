@@ -5,15 +5,22 @@ import { Textarea } from '../../components/ui/textarea';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
 import { ProjectSelector } from '../projects/ProjectSelector';
-import { objects, text, type Row } from '../../shared/data';
-import { isHidden, safeProject } from '../../shared/ui/privacy';
-export type EditedTopic = {
-  topicId: string;
-  percentage?: number;
-  durationMinutes?: number;
-};
+import { useEffect, useMemo, useState } from 'react';
+import type { Firestore } from 'firebase/firestore';
+import type { Row } from '../../shared/data';
+import {
+  EditorOptionsRepository,
+  emptyEditorOptions,
+  setEditorTopicChecked,
+  type EditorOptions,
+  type EditorTopic,
+} from '../../data/repositories/editor-options-repository';
+export type EditedTopic = EditorTopic;
 export function RecordEditorForm({
   catalog,
+  db,
+  uid,
+  options: preparedOptions,
   revealed,
   projectId,
   topics,
@@ -33,6 +40,10 @@ export function RecordEditorForm({
   onSave,
 }: {
   catalog: Row[];
+  db?: Firestore;
+  uid?: string;
+  /** Prepared options for isolated renderers; live screens use db/uid native reads. */
+  options?: EditorOptions;
   revealed: boolean;
   projectId: string;
   topics: EditedTopic[];
@@ -51,13 +62,57 @@ export function RecordEditorForm({
   onAck: (value: boolean) => void;
   onSave: () => void;
 }) {
-  const project = catalog.find((row) => row.id === projectId)?.data;
-  const hidden = isHidden(project, revealed);
-  const available = objects(project?.topics).filter(
-    (t) =>
-      (!t.archived && !t.mergedIntoTopicId) ||
-      topics.some((selected) => selected.topicId === t.id),
+  const repository = useMemo(
+    () =>
+      db && uid
+        ? new EditorOptionsRepository(
+            db,
+            uid,
+            new Set(catalog.map((row) => row.id)),
+          )
+        : undefined,
+    [db, uid, catalog],
   );
+  const selection = useMemo(
+    () => ({ projectId, revealed, selectedTopics: topics }),
+    [projectId, revealed, topics],
+  );
+  const [result, setResult] = useState<{
+    repository: EditorOptionsRepository;
+    selection: typeof selection;
+    options: EditorOptions;
+    error: string;
+  } | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (!repository) return;
+    void repository
+      .read(selection)
+      .then((options) => {
+        if (active) setResult({ repository, selection, options, error: '' });
+      })
+      .catch(() => {
+        if (active)
+          setResult({
+            repository,
+            selection,
+            options: emptyEditorOptions,
+            error: 'Não foi possível consultar os projetos para edição.',
+          });
+      });
+    return () => {
+      active = false;
+    };
+  }, [repository, selection]);
+  const current =
+    result?.repository === repository && result?.selection === selection
+      ? result
+      : undefined;
+  const options = repository
+    ? (current?.options ?? emptyEditorOptions)
+    : (preparedOptions ?? emptyEditorOptions);
+  const { hidden, topics: available } = options;
+  const loadingOptions = Boolean(repository && !current);
   return (
     <form
       id="record-edit-form"
@@ -75,23 +130,18 @@ export function RecordEditorForm({
         allowAll={false}
         disabled={busy}
         projectId={projectId}
-        projects={catalog
-          .filter(
-            (row) =>
-              row.id === projectId ||
-              (!isHidden(row.data, revealed) &&
-                !row.data.archived &&
-                !row.data.mergedInto &&
-                !row.data.mergeLock),
-          )
-          .map((row) => ({
-            id: row.id,
-            label: text(safeProject(row.data, revealed).title),
-            searchText: text(safeProject(row.data, revealed).title),
-          }))}
+        projects={options.projects}
+        loading={loadingOptions}
+        error={current?.error}
         onChange={onProject}
       />
-      {hidden ? (
+      {loadingOptions || current?.error ? (
+        <Alert role={current?.error ? 'alert' : 'status'}>
+          <AlertDescription>
+            {current?.error || 'Consultando opções de edição no cache local…'}
+          </AlertDescription>
+        </Alert>
+      ) : hidden ? (
         <Alert>
           <AlertDescription>
             Revele o projeto autorizado para editar seus tópicos.
@@ -102,23 +152,21 @@ export function RecordEditorForm({
           <legend className="mb-2 text-sm font-medium">Tópicos</legend>
           <div className="flex min-w-0 flex-wrap gap-2">
             {available.map((t) => {
-              const selected = topics.find((item) => item.topicId === t.id);
+              const selected = t.selected;
               return (
                 <Label
-                  key={text(t.id)}
+                  key={t.id}
                   className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm [overflow-wrap:anywhere]"
                 >
                   <Checkbox
                     checked={!!selected}
                     onCheckedChange={(checked) =>
                       onTopics(
-                        checked === true
-                          ? [...topics, { topicId: text(t.id) }]
-                          : topics.filter((item) => item.topicId !== t.id),
+                        setEditorTopicChecked(topics, t.id, checked === true),
                       )
                     }
                   />
-                  {text(t.title)}
+                  {t.title}
                   {selected?.percentage !== undefined && (
                     <span className="text-xs text-muted-foreground">
                       {selected.percentage}%

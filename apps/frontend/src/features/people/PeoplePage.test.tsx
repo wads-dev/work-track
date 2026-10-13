@@ -30,6 +30,7 @@ const directory = vi.hoisted(() => ({
 vi.mock('./CompanyPeopleContext', () => ({
   useCompanyPeople: () => ({
     ...directory,
+    total: directory.people.length,
     person: (uid: string) =>
       directory.people.find((person) => person.uid === uid),
   }),

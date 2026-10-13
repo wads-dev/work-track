@@ -68,20 +68,4 @@ export function validateTopicReport(
   }
   return data;
 }
-export function canonicalCatalogTopic(
-  topics: Record<string, unknown>[],
-  requested: string,
-): string | null {
-  let id = requested;
-  const seen = new Set<string>();
-  for (let n = 0; n < 200; n++) {
-    if (seen.has(id)) return null;
-    seen.add(id);
-    const topic = topics.find((t) => t.id === id);
-    if (!topic) return null;
-    if (!topic.mergedIntoTopicId) return id;
-    if (typeof topic.mergedIntoTopicId !== 'string') return null;
-    id = topic.mergedIntoTopicId;
-  }
-  return null;
-}
+export { canonicalCatalogTopic } from '../../data/repositories/browser-detail-repository';

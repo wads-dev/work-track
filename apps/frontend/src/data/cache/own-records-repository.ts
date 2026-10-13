@@ -1,6 +1,10 @@
 import type { Row } from '../../shared/data';
 import { isDeletedRecord, createDeletionObserver } from './record-deletion';
-export type RecordSnapshot = {
+import {
+  emptyListing,
+  type ListingResult,
+} from '../repositories/browser-listing-repository';
+export type RecordSnapshot = ListingResult & {
   rows: Row[];
   loading: boolean;
   complete: boolean;
@@ -8,6 +12,7 @@ export type RecordSnapshot = {
   error: string;
 };
 export const emptyRecords: RecordSnapshot = {
+  ...emptyListing,
   rows: [],
   loading: true,
   complete: false,
@@ -15,8 +20,8 @@ export const emptyRecords: RecordSnapshot = {
   error: '',
 };
 type Connect = (
-  next: (rows: Row[], fromCache: boolean) => void,
-  error: () => void,
+  next: (rows: Row[], fromCache: boolean, listing?: ListingResult) => void,
+  error: (message?: string) => void,
 ) => () => void;
 type Entry = {
   state: RecordSnapshot;
@@ -57,6 +62,7 @@ export function createOwnRecordsRepository() {
       uid: string,
       connect: Connect,
       notify: () => void,
+      key = '',
     ) {
       if (uid !== account) return () => {};
       let map = stores.get(owner);
@@ -64,7 +70,8 @@ export function createOwnRecordsRepository() {
         map = new Map();
         stores.set(owner, map);
       }
-      let entry = map.get(uid);
+      const cacheKey = uid + ':' + key;
+      let entry = map.get(cacheKey);
       if (!entry) {
         entry = {
           state: emptyRecords,
@@ -72,7 +79,7 @@ export function createOwnRecordsRepository() {
           stop: () => {},
           start: () => {},
         };
-        map.set(uid, entry);
+        map.set(cacheKey, entry);
         const current = entry;
         const observeDeletion = createDeletionObserver(uid);
         current.start = () => {
@@ -82,11 +89,17 @@ export function createOwnRecordsRepository() {
           const epoch = generation;
           let alive = true;
           const stop = connect(
-            (rows, fromCache) => {
+            (rows, fromCache, listing) => {
               if (!alive || epoch !== generation || uid !== account) return;
               observeDeletion(rows);
+              // Native listings already exclude tombstones; retain lifecycle
+              // validation for legacy raw connectors, with coherent totals.
+              const visible = listing
+                ? rows
+                : rows.filter((row) => !isDeletedRecord(row.data));
               current.state = {
-                rows: rows.filter((row) => !isDeletedRecord(row.data)),
+                ...(listing ?? { ...emptyListing, total: visible.length }),
+                rows: visible,
                 loading: fromCache,
                 complete: !fromCache,
                 fromCache,
@@ -94,12 +107,13 @@ export function createOwnRecordsRepository() {
               };
               emit(current);
             },
-            () => {
+            (message) => {
               if (!alive || epoch !== generation || uid !== account) return;
               current.state = {
                 ...emptyRecords,
                 loading: false,
                 error:
+                  message ??
                   'Não foi possível carregar o histórico. Verifique a conexão e tente novamente.',
               };
               emit(current);
@@ -120,17 +134,21 @@ export function createOwnRecordsRepository() {
           entry.stop();
           entry.state = emptyRecords;
           active.delete(entry);
-          map.delete(uid);
+          map.delete(cacheKey);
         }
       };
     },
-    snapshot(owner: object, uid: string) {
+    snapshot(owner: object, uid: string, key = '') {
       return uid === account
-        ? (stores.get(owner)?.get(uid)?.state ?? emptyRecords)
+        ? (stores.get(owner)?.get(uid + ':' + key)?.state ?? emptyRecords)
         : emptyRecords;
     },
-    retry(owner: object, uid: string) {
-      if (uid === account) stores.get(owner)?.get(uid)?.start();
+    retry(owner: object, uid: string, key = '') {
+      if (uid === account)
+        stores
+          .get(owner)
+          ?.get(uid + ':' + key)
+          ?.start();
     },
   };
 }

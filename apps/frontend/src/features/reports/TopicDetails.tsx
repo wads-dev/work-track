@@ -14,6 +14,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getTopicReport } from '@work-track/core/reports/application/get-topic-report';
 import { subscribeAuthorizedReport } from '../../data/sources/authorized-report-source';
 import { LocalTopicReportRepository } from '../../data/sources/local-topic-report';
+import { BrowserDetailRepository } from '../../data/repositories/browser-detail-repository';
 import { PersonIdentity } from '../people/PersonIdentity';
 import { TableHead } from '../../components/ui/table';
 import { cn } from '../../lib/utils';
@@ -37,7 +38,7 @@ import {
 } from 'react-router-dom';
 import { useProjects } from '../projects/hooks/useProjects';
 import { usePrivacy, isHidden } from '../../shared/ui/privacy';
-import { objects, text, date } from '../../shared/data';
+import { text, date } from '../../shared/data';
 import { hours } from './report-chart';
 import { safeReturnTo, topicDetailsPath } from '../../app/routes';
 import {
@@ -49,11 +50,7 @@ import {
   useDeletionRevision,
 } from '../../data/cache/record-deletion';
 import { reportError } from './report-error';
-import {
-  canonicalCatalogTopic,
-  validateTopicReport,
-  type TopicDetailReport,
-} from './topic-details';
+import { validateTopicReport, type TopicDetailReport } from './topic-details';
 export function TopicDetails({
   functions,
   uid,
@@ -69,9 +66,56 @@ export function TopicDetails({
   const { revealed } = usePrivacy();
   const access = useProjectAccessRevision();
   const deletion = useDeletionRevision(uid);
-  const project = projects.rows.find((p) => p.id === projectId)?.data;
+  const catalogKey = JSON.stringify([
+    uid,
+    projectId,
+    topicId,
+    projects.rows,
+    access,
+  ]);
+  const [catalogState, setCatalogState] = useState<{
+    key: string;
+    value: Awaited<ReturnType<BrowserDetailRepository['readProjectTopic']>>;
+    error?: string;
+  } | null>(null);
+  useEffect(() => {
+    let active = true;
+    setCatalogState(null);
+    if (projects.loading || !projects.complete || projects.error) return;
+    const repository = new BrowserDetailRepository(
+      getFirestore(functions.app),
+      uid,
+      new Set(projects.rows.map((project) => project.id)),
+    );
+    void repository
+      .readProjectTopic(projectId, topicId)
+      .then((value) => {
+        if (active) setCatalogState({ key: catalogKey, value });
+      })
+      .catch((error) => {
+        if (active)
+          setCatalogState({
+            key: catalogKey,
+            value: { project: undefined, canonical: null, topic: undefined },
+            error: reportError(error),
+          });
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    functions,
+    uid,
+    catalogKey,
+    projects.loading,
+    projects.complete,
+    projects.error,
+  ]);
+  const catalog = catalogState?.key === catalogKey ? catalogState : undefined;
+  const project = catalog?.value.project;
   const hidden = isHidden(project, revealed);
-  const canonical = canonicalCatalogTopic(objects(project?.topics), topicId);
+  const canonical = catalog?.value.canonical;
+  const topic = catalog?.value.topic;
   const [attempt, setAttempt] = useState(0);
   const identity = JSON.stringify([
     uid,
@@ -165,7 +209,7 @@ export function TopicDetails({
   ]);
   const current =
     state.identity === identity && projects.complete ? state : undefined;
-  if (projects.loading)
+  if (projects.loading || (!catalog && !projects.error))
     return (
       <Skeleton
         role="status"
@@ -173,10 +217,10 @@ export function TopicDetails({
         className={cn('size-6 rounded-full')}
       />
     );
-  if (projects.error)
+  if (projects.error || catalog?.error)
     return (
       <Alert variant="destructive">
-        <AlertDescription>{projects.error}</AlertDescription>
+        <AlertDescription>{projects.error || catalog?.error}</AlertDescription>
       </Alert>
     );
   if (hidden)
@@ -197,19 +241,16 @@ export function TopicDetails({
         </AlertDescription>
       </Alert>
     );
-  const topic = objects(project?.topics).find((t) => t.id === canonical);
   const colors = projects.rows.map((p) => ({
     id: p.id,
     color: safeProject(p.data, revealed).color,
   }));
-  const color = new ProjectAppearance(
-    colors.find((p) => p.id === projectId) ?? { id: projectId },
-  ).getColor(colors);
+  const color = new ProjectAppearance({
+    id: projectId,
+    color: safeProject(project, revealed).color,
+  }).getColor(colors);
   const data = current?.data;
-  const label = text(
-    objects(project?.topics).find((t) => t.id === canonical)?.title,
-    'Tópico',
-  );
+  const label = text(topic?.title, 'Tópico');
   return (
     <div className={cn('flex flex-col min-w-0 gap-4')}>
       <div

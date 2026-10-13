@@ -165,6 +165,34 @@ it('atomically audits edits, preserves immutable fields, and replays the same re
   ).rejects.toThrow('não encontrado');
 });
 
+it('pushes excluded record identity into the native owner query', async () => {
+  let excluded: string | undefined;
+  const calls: unknown[][] = [];
+  const query = {
+    where: (field: unknown, operator: string, value: string) => {
+      calls.push([field, operator, value]);
+      excluded = value;
+      return query;
+    },
+    limit: () => query,
+    get: () =>
+      Promise.resolve({
+        docs: ['saved', 'previous']
+          .filter((id) => id !== excluded)
+          .map((id) => ({
+            id,
+            data: () => ({ projectId: 'p', startedAt: '2026-10-08T10:00:00Z' }),
+          })),
+      }),
+  };
+  const repo = new FirestoreRecordEditingRepository({
+    collection: () => ({ doc: () => ({ collection: () => query }) }),
+  } as unknown as Firestore);
+  expect(
+    (await repo.listOpenRecords('alice', 10, 'saved')).records.map((r) => r.id),
+  ).toEqual(['previous']);
+  expect(calls[0]?.slice(1)).toEqual(['!=', 'saved']);
+});
 it('lists nullable and legacy open records but not closed or deleted records', async () => {
   const rows = [
     { id: 'legacy' },
@@ -173,6 +201,7 @@ it('lists nullable and legacy open records but not closed or deleted records', a
     { id: 'deleted', endedAt: null, deletedAt: '2026-10-08T11:00:00Z' },
   ];
   const collection = {
+    limit: () => collection,
     get: () =>
       Promise.resolve({
         docs: rows.map((row) => ({

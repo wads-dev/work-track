@@ -1,4 +1,5 @@
 import { completeSelection } from './complete-selection.js';
+import { completeReportWarnings } from '../domain/calendar-occurrences.js';
 import { buildTopicBreakdown } from '../domain/topic-breakdown.js';
 import { ReportContextError } from '../domain/global-estimates.js';
 import { buildCompanyReport } from '../domain/build-company-report.js';
@@ -13,7 +14,11 @@ export async function executeCompanyReport(
   asOf = Date.now(),
 ) {
   const page = await completeSelection((cursor) =>
-      repository.readPage(100, cursor, input.projectId),
+      repository.readPage(100, cursor, input.projectId, {
+        includeArchived: input.includeArchived,
+        from: input.from,
+        to: input.to,
+      }),
     ),
     uids = [...new Set(page.records.map((r) => r.uid))];
   if (uids.length > 10)
@@ -21,11 +26,6 @@ export async function executeCompanyReport(
       'Página contém mais de10 pessoas; reduza limit para consultar contexto global completo.',
     );
   const context = await repository.loadContext(uids),
-    archived = input.includeArchived
-      ? []
-      : await repository.archivedProjectIds([
-          ...new Set(page.records.map((r) => r.projectId)),
-        ]),
     labels = await repository.userLabels(uids);
   const report = buildCompanyReport(
     { ...input, cursor: undefined },
@@ -33,14 +33,12 @@ export async function executeCompanyReport(
     context,
     asOf,
     labels,
-    archived,
+    [],
   );
   report.scope = 'all-selected';
   report.page.partial = false;
   report.page.limit = 2000;
-  report.warnings = report.warnings.filter(
-    (w) => !w.includes('página selecionada'),
-  );
+  report.warnings = completeReportWarnings(report.warnings);
   report.warnings.push(
     'Totais completos da seleção dentro dos limites operacionais; nenhum subtotal de primeira página.',
   );

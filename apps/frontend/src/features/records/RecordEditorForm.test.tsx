@@ -6,8 +6,9 @@ import { RecordEditorForm } from './RecordEditorForm';
 import { RecordDetails } from './RecordDetails';
 import { RecordAuditEvent } from './RecordAuditEvent';
 import { readFileSync } from 'node:fs';
+import { prepareEditorOptions } from '../../data/repositories/editor-options-repository';
 const noop = () => {};
-const props = {
+const initialProps = {
   catalog: [
     {
       id: 'p',
@@ -36,7 +37,90 @@ const props = {
   onAck: noop,
   onSave: noop,
 };
+const props = {
+  ...initialProps,
+  options: prepareEditorOptions(
+    initialProps.catalog,
+    {
+      projectId: initialProps.projectId,
+      revealed: initialProps.revealed,
+      selectedTopics: initialProps.topics,
+    },
+    initialProps.catalog[0].data,
+  ),
+};
 describe('compact shared record editor', () => {
+  it('renders repository-retained archived and merged selections with untouched allocations', () => {
+    const selection = [
+      { topicId: 'old', percentage: 75 },
+      { topicId: 'alias', durationMinutes: 15 },
+    ];
+    const options = prepareEditorOptions(
+      [
+        {
+          id: 'p',
+          data: {
+            title: 'Project',
+            archived: true,
+            topics: [
+              { id: 'active', title: 'Active' },
+              { id: 'old', title: 'Retired selected', archived: true },
+              {
+                id: 'alias',
+                title: 'Merged selected',
+                mergedIntoTopicId: 'active',
+              },
+              { id: 'retired', title: 'Retired unused', archived: true },
+            ],
+          },
+        },
+      ],
+      { projectId: 'p', revealed: true, selectedTopics: selection },
+      {
+        title: 'Project',
+        archived: true,
+        topics: [
+          { id: 'active', title: 'Active' },
+          { id: 'old', title: 'Retired selected', archived: true },
+          {
+            id: 'alias',
+            title: 'Merged selected',
+            mergedIntoTopicId: 'active',
+          },
+          { id: 'retired', title: 'Retired unused', archived: true },
+        ],
+      },
+    );
+    const html = renderToStaticMarkup(
+      <RecordEditorForm
+        {...props}
+        options={options}
+        topics={selection}
+        revealed
+      />,
+    );
+    expect(html).toContain('Retired selected');
+    expect(html).toContain('Merged selected');
+    expect(html).toContain('75%');
+    expect(html).toContain('15 min');
+    expect(html).not.toContain('Retired unused');
+  });
+  it('does not derive live options from catalog snapshots and delegates all selection to repository', () => {
+    const html = renderToStaticMarkup(<RecordEditorForm {...initialProps} />);
+    expect(html).not.toContain('Entrega');
+    const source = readFileSync(
+      new URL('./RecordEditorForm.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).toContain('EditorOptionsRepository');
+    expect(source).toMatch(/repository\s*\.read\(selection\)/);
+    expect(source).not.toMatch(/\.(filter|find|slice)\(/);
+    const caller = readFileSync(
+      new URL('./RecordDrawer.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(caller).toMatch(/<RecordEditorForm[\s\S]*?db={db}[\s\S]*?uid={uid}/);
+  });
   it('groups period fields together and removes redundant confirmations and manual reason', () => {
     const html = renderToStaticMarkup(<RecordEditorForm {...props} />);
     expect(html).toContain('data-record-period');
@@ -63,6 +147,19 @@ describe('compact shared record editor', () => {
             },
           },
         ]}
+        options={prepareEditorOptions(
+          [
+            {
+              id: 'q',
+              data: {
+                title: 'Outro',
+                topics: [{ id: 'q-topic', title: 'Destino' }],
+              },
+            },
+          ],
+          { projectId: 'q', revealed: false, selectedTopics: [] },
+          { title: 'Outro', topics: [{ id: 'q-topic', title: 'Destino' }] },
+        )}
         sharing
       />,
     );

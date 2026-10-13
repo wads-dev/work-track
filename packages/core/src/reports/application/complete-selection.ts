@@ -7,7 +7,11 @@ export async function completeSelection<T>(
   const records: T[] = [];
   let cursor: string | undefined;
   const seen = new Set<string>();
-  for (;;) {
+  for (let pages = 0; ; pages++) {
+    if (pages >= 20)
+      throw new ReportContextError(
+        'Varredura excede 20 páginas físicas; nenhuma seleção parcial retornada.',
+      );
     const page = await read(cursor);
     records.push(...page.records);
     if (records.length > 2000)

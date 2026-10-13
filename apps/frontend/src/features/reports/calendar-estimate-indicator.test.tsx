@@ -46,7 +46,7 @@ const render = ({
     details: () =>
       calendarEventDetails(
         item,
-        [{ ...item, interpretation: 'Secret summary' }],
+        { ...item, interpretation: 'Secret summary' },
         { confidential: hidden },
         false,
         'me',

@@ -1,3 +1,4 @@
+import { selectReportRecords } from '../infrastructure/project-catalog.js';
 import { expect, it } from 'vitest';
 import {
   getTopicReportHandler,
@@ -28,9 +29,25 @@ function fixture(records: ReportSourceRecord[] = []) {
       { id: 'other', title: 'Other' },
     ];
   const repo: TopicReportRepository = {
-    readPage: () =>
+    readPage: (_projectId, _limit, _cursor, viewerUid, selection) =>
       Promise.resolve({
-        records,
+        records: selection
+          ? selectReportRecords(
+              records,
+              new Map([
+                [
+                  'w',
+                  {
+                    type: personal ? 'personal' : 'work',
+                    createdBy: 'alice',
+                    topics,
+                  },
+                ],
+              ]),
+              { viewerUid: viewerUid! },
+              selection,
+            )
+          : records,
         topics,
         personal,
         archived: false,

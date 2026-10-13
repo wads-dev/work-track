@@ -28,11 +28,15 @@ it('active selection excludes archive totals but archived closed facts do not re
     topics: [],
   };
   const repo: PersonalReportRepository = {
-    readPage: vi.fn().mockResolvedValue({
-      records: [closed, open],
-      scannedCount: 2,
-      nextCursor: null,
-    }),
+    readPage: vi
+      .fn<PersonalReportRepository['readPage']>()
+      .mockImplementation((_uid, _limit, _cursor, options) =>
+        Promise.resolve({
+          records: options?.includeArchived ? [closed, open] : [open],
+          scannedCount: 2,
+          nextCursor: null,
+        }),
+      ),
     readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi.fn().mockResolvedValue([closed, open]),
     archivedProjectIds: vi.fn().mockResolvedValue(['archived']),

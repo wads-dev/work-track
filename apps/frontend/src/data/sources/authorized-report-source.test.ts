@@ -1,65 +1,35 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { Firestore } from 'firebase/firestore';
-import type { WorkspaceSnapshot } from '../sync/workspace-sync';
-const mocks = vi.hoisted(() => ({
-  observers: [] as {
-    uid: string;
-    next: (value: WorkspaceSnapshot) => void;
-    stop: ReturnType<typeof vi.fn>;
-    active: boolean;
-  }[],
-  observe: vi.fn(),
-  onSnapshot: vi.fn(),
-  getDocs: vi.fn(),
-  callable: vi.fn(),
+import {
+  nativeCache as mocks,
+  project,
+  row,
+  state,
+  flushCache,
+  type CacheQuery,
+} from '../repositories/firestore-report-fixture';
+vi.mock(
+  'firebase/firestore',
+  async () =>
+    (await import('../repositories/firestore-report-fixture')).nativeCache
+      .firestore,
+);
+vi.mock('../sync/workspace-runtime', async () => ({
+  observeWorkspace: (await import('../repositories/firestore-report-fixture'))
+    .nativeCache.observe,
 }));
-vi.mock('../sync/workspace-runtime', () => ({
-  observeWorkspace: mocks.observe,
+vi.mock('firebase/functions', async () => ({
+  httpsCallable: (await import('../repositories/firestore-report-fixture'))
+    .nativeCache.callable,
 }));
-vi.mock('firebase/firestore', () => ({
-  onSnapshot: mocks.onSnapshot,
-  getDocs: mocks.getDocs,
-  collectionGroup: (_db: unknown, group: string) => ({ group }),
-  collection: (_db: unknown, ...parts: string[]) => parts.join('/'),
-  query: (base: unknown, ...constraints: unknown[]) => ({ base, constraints }),
-  where: (field: string, op: string, value: unknown) => ({ field, op, value }),
-}));
-vi.mock('firebase/functions', () => ({ httpsCallable: mocks.callable }));
-const db = {} as Firestore;
-const state = (patch: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot => ({
-  projects: [],
-  records: [],
-  completedProjects: [],
-  complete: true,
-  syncing: false,
-  error: '',
-  ...patch,
-});
-const emit = (value: WorkspaceSnapshot, index = 0) => {
-  const observer = mocks.observers[index];
-  if (observer.active) observer.next(value);
-};
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.observers.splice(0);
-  mocks.observe.mockImplementation(
-    (_db: Firestore, uid: string, next: (value: WorkspaceSnapshot) => void) => {
-      const observer = {
-        uid,
-        next,
-        active: true,
-        stop: vi.fn(() => {
-          observer.active = false;
-        }),
-      };
-      mocks.observers.push(observer);
-      return observer.stop;
-    },
-  );
-});
+const db = mocks.db;
+const emit = (value: Parameters<typeof mocks.emit>[0], index = 0) =>
+  mocks.emit(value, index);
+beforeEach(() => mocks.reset());
 afterEach(() => {
   expect(mocks.onSnapshot).not.toHaveBeenCalled();
   expect(mocks.getDocs).not.toHaveBeenCalled();
+  expect(mocks.getDocsFromServer).not.toHaveBeenCalled();
+  expect(mocks.getDoc).not.toHaveBeenCalled();
   expect(mocks.callable).not.toHaveBeenCalled();
 });
 
@@ -68,21 +38,6 @@ import {
   subscribeAuthorizedReport,
 } from './authorized-report-source';
 import { decodeWebProjectSnapshot } from '../../infrastructure/firebase/web-read-adapter';
-const project = (id = 'p', data: Record<string, unknown> = {}) => ({
-  id,
-  data: { type: 'work', topics: [], ...data },
-});
-const row = (id = 'r', patch: Record<string, unknown> = {}, uid = 'alice') => ({
-  path: 'users/' + uid + '/records/' + id,
-  data: {
-    uid,
-    projectId: 'p',
-    startedAt: '2026-10-08T12:00:00Z',
-    timeZone: 'UTC',
-    topics: [],
-    ...patch,
-  },
-});
 const range = {
   from: '2026-10-08T00:00:00Z',
   to: '2026-10-09T00:00:00Z',
@@ -95,11 +50,13 @@ it('retains the exported query builder independently of local UI subscriptions',
       constraints: [{ field: 'projectId', op: '==', value: 'p' }],
     },
   ]);
-  const queries = authorizedRecordQueries(db, 'p', range) as unknown as {
-    constraints: unknown[];
-  }[];
-  expect(queries).toHaveLength(2);
-  for (const q of queries) {
+  const queries = authorizedRecordQueries(
+    db,
+    'p',
+    range,
+  ) as unknown as CacheQuery[];
+  expect(queries).toHaveLength(3);
+  for (const q of queries.slice(0, 2)) {
     expect(q.constraints).toContainEqual({
       field: 'projectId',
       op: '==',
@@ -148,16 +105,19 @@ it('decodes project snapshots synchronously without mutating raw data or SDK met
     decodeWebProjectSnapshot({ data: () => undefined }, 'gone', 'personal-web'),
   ).toBeUndefined();
 });
-it('waits for complete atomic context and reports local errors without partial totals', () => {
+it('waits for complete atomic context and reports local errors without partial totals', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
-  emit(state({ complete: false, projects: [project()], records: [row()] }));
+  await emit(
+    state({ complete: false, projects: [project()], records: [row()] }),
+  );
   expect(next).not.toHaveBeenCalled();
-  emit(state({ error: 'permission-denied' }));
+  expect(mocks.getDocsFromCache).not.toHaveBeenCalled();
+  await emit(state({ error: 'permission-denied' }));
   expect(fail.mock.lastCall?.[0]).toBeInstanceOf(Error);
   expect(next).not.toHaveBeenCalled();
-  emit(state());
+  await emit(state());
   expect(next.mock.lastCall?.[0]).toMatchObject({
     coherent: true,
     fromCache: false,
@@ -178,7 +138,7 @@ it('retains authorized raw extras and permissive negative legacy allocations', a
     topics: [{ topicId: 't', percentage: -2, durationMinutes: -1 }],
     originalText: 'legacy-extra',
   });
-  emit(
+  await emit(
     state({
       projects: [
         project('p', {
@@ -217,7 +177,7 @@ it.each([null, false, 0, {}, 'invalid'])(
   async (type) => {
     const next = vi.fn();
     subscribeAuthorizedReport(db, 'viewer', next, vi.fn());
-    emit(state({ projects: [project('p', { type })], records: [row()] }));
+    await emit(state({ projects: [project('p', { type })], records: [row()] }));
     expect(
       await next.mock.lastCall![0].repository.loadContext(['alice']),
     ).toEqual([]);
@@ -227,7 +187,7 @@ it('keeps legacy parents and excludes absent parents and tombstones before field
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
-  emit(
+  await emit(
     state({
       projects: [project('p', { type: undefined })],
       records: [
@@ -244,32 +204,35 @@ it('keeps legacy parents and excludes absent parents and tombstones before field
   ).toEqual(['live']);
   expect(fail).not.toHaveBeenCalled();
 });
-it.each([
-  'users/alice/records/r/extra',
-  'projects/p/records/r',
-  'users/bob/records/r',
-])('rejects invalid canonical path or owner %s without publishing', (path) => {
+it.each(['projects/p/records/r', 'users/bob/records/r'])(
+  'rejects queried invalid canonical path or owner %s rather than returning totals',
+  async (path) => {
+    const next = vi.fn(),
+      fail = vi.fn();
+    subscribeAuthorizedReport(db, 'viewer', next, fail);
+    await emit(state({ projects: [project()], records: [{ ...row(), path }] }));
+    await expect(
+      next.mock.lastCall![0].repository.loadContext(['alice']),
+    ).rejects.toThrow('canônico');
+    expect(fail).not.toHaveBeenCalled();
+  },
+);
+it('rejects malformed active records rather than silently dropping context', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
-  emit(state({ projects: [project()], records: [{ ...row(), path }] }));
-  expect(next).not.toHaveBeenCalled();
-  expect(fail).toHaveBeenCalledOnce();
-});
-it('rejects malformed active records rather than silently dropping context', () => {
-  const next = vi.fn(),
-    fail = vi.fn();
-  subscribeAuthorizedReport(db, 'viewer', next, fail);
-  emit(
+  await emit(
     state({ projects: [project()], records: [row('bad', { startedAt: 42 })] }),
   );
-  expect(next).not.toHaveBeenCalled();
-  expect(fail).toHaveBeenCalledOnce();
+  await expect(
+    next.mock.lastCall![0].repository.loadContext(['alice']),
+  ).rejects.toThrow();
+  expect(fail).not.toHaveBeenCalled();
 });
 it('selects locally but preserves full global context and UID-qualified pagination', async () => {
   const next = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, vi.fn(), ['p'], range);
-  emit(
+  await emit(
     state({
       projects: [project(), project('q')],
       records: [
@@ -285,39 +248,38 @@ it('selects locally but preserves full global context and UID-qualified paginati
   );
   const repository = next.mock.lastCall![0].repository;
   expect(await repository.loadContext(['alice'])).toHaveLength(3);
-  const page = await repository.readPage(2);
+  const page = await repository.readPage(2, undefined, 'p', range);
   expect(page.records.map((r: { id: string }) => r.id)).toEqual([
     'overlap',
     'same',
   ]);
   expect(page.nextCursor).toBe('users/alice/records/same');
-  expect((await repository.readPage(2, page.nextCursor)).records).toEqual([
-    expect.objectContaining({ uid: 'bob', id: 'same' }),
-  ]);
+  expect(
+    (await repository.readPage(2, page.nextCursor, 'p', range)).records,
+  ).toEqual([expect.objectContaining({ uid: 'bob', id: 'same' })]);
 });
 it('keeps prior calculations immutable across updates and revocation', async () => {
   const next = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, vi.fn());
-  emit(
+  await emit(
     state({
       projects: [project()],
       records: [row('r', { endedAt: '2026-10-08T13:00:00Z' })],
     }),
   );
   const old = next.mock.lastCall![0].repository;
-  emit(
+  const oldContext = await old.loadContext(['alice']);
+  await emit(
     state({
       projects: [project()],
       records: [row('r', { endedAt: '2026-10-08T14:00:00Z' })],
     }),
   );
-  expect((await old.loadContext(['alice']))[0].endedAt).toBe(
-    '2026-10-08T13:00:00Z',
-  );
+  expect(oldContext[0].endedAt).toBe('2026-10-08T13:00:00Z');
   expect(
     (await next.mock.lastCall![0].repository.loadContext(['alice']))[0].endedAt,
   ).toBe('2026-10-08T14:00:00Z');
-  emit(state({ records: [row()] }));
+  await emit(state({ records: [row()] }));
   expect(
     await next.mock.lastCall![0].repository.loadContext(['alice']),
   ).toEqual([]);
@@ -325,7 +287,7 @@ it('keeps prior calculations immutable across updates and revocation', async () 
 it('rejects oversized complete global context instead of returning partial totals', async () => {
   const next = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, vi.fn());
-  emit(
+  await emit(
     state({
       projects: [project()],
       records: Array.from({ length: 2001 }, (_, i) => row(String(i))),
@@ -335,14 +297,14 @@ it('rejects oversized complete global context instead of returning partial total
     next.mock.lastCall![0].repository.loadContext(['alice']),
   ).rejects.toThrow('2000');
 });
-it('disposes a local observer without affecting concurrent subscriptions', () => {
+it('disposes a local observer without affecting concurrent subscriptions', async () => {
   const next = vi.fn(),
     other = vi.fn();
   const stop = subscribeAuthorizedReport(db, 'viewer', next, vi.fn());
   subscribeAuthorizedReport(db, 'other', other, vi.fn());
   stop();
-  emit(state());
-  emit(state(), 1);
+  await emit(state());
+  await emit(state(), 1);
   expect(next).not.toHaveBeenCalled();
   expect(other).toHaveBeenCalledOnce();
   expect(mocks.observers[0].stop).toHaveBeenCalledOnce();
@@ -352,10 +314,10 @@ it('does not publish duplicate content, audit-only changes or incomplete refresh
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
   const complete = state({ projects: [project()], records: [row()] });
-  emit(complete);
+  await emit(complete);
   const repository = next.mock.lastCall![0].repository;
-  emit(structuredClone(complete));
-  emit(
+  await emit(structuredClone(complete));
+  await emit(
     state({
       ...complete,
       projects: [{ id: 'p', data: { topics: [], type: 'work' } }],
@@ -372,50 +334,48 @@ it('does not publish duplicate content, audit-only changes or incomplete refresh
       completedProjects: ['p'],
     }),
   );
-  emit(state({ complete: false, syncing: true }));
-  emit(structuredClone(complete));
+  await emit(state({ complete: false, syncing: true }));
+  await emit(structuredClone(complete));
   expect(next).toHaveBeenCalledOnce();
   expect(next.mock.lastCall![0].repository).toBe(repository);
   expect(await repository.loadContext(['alice'])).toHaveLength(1);
   expect(fail).not.toHaveBeenCalled();
 });
-it('fails once per repeated error and publishes identical recovery content', () => {
+it('fails once per repeated error and publishes identical recovery content', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
   const complete = state({ projects: [project()], records: [row()] });
-  emit(complete);
+  await emit(complete);
   const repository = next.mock.lastCall![0].repository;
-  emit(state({ error: 'permission-denied' }));
-  emit(state({ error: 'permission-denied', audits: [] }));
-  emit(state({ complete: false }));
-  emit(state({ error: 'permission-denied' }));
+  await emit(state({ error: 'permission-denied' }));
+  await emit(state({ error: 'permission-denied', audits: [] }));
+  await emit(state({ complete: false }));
+  await emit(state({ error: 'permission-denied' }));
   expect(fail).toHaveBeenCalledOnce();
-  emit(structuredClone(complete));
+  await emit(structuredClone(complete));
   expect(next).toHaveBeenCalledTimes(2);
   expect(next.mock.lastCall![0].repository).not.toBe(repository);
-  emit(structuredClone(complete));
+  await emit(structuredClone(complete));
   expect(next).toHaveBeenCalledTimes(2);
-  emit(state({ error: 'permission-denied' }));
+  await emit(state({ error: 'permission-denied' }));
   expect(fail).toHaveBeenCalledTimes(2);
 });
-it('deduplicates invalid content errors and recovers even when valid data is unchanged', () => {
+it('deduplicates local catalog failures and retries unchanged valid data without remote fallback', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
   const complete = state({ projects: [project()], records: [row()] });
-  emit(complete);
-  const invalid = state({
-    projects: [project()],
-    records: [row('r', { startedAt: 42 })],
-  });
-  emit(invalid);
-  emit(structuredClone(invalid));
+  mocks.getDocsFromCache.mockRejectedValueOnce(new Error('cache-unavailable'));
+  await emit(complete);
+  mocks.getDocsFromCache.mockRejectedValueOnce(new Error('cache-unavailable'));
+  await emit(complete);
   expect(fail).toHaveBeenCalledOnce();
-  emit(structuredClone(complete));
-  expect(next).toHaveBeenCalledTimes(2);
+  expect(next).not.toHaveBeenCalled();
+  await emit(complete);
+  expect(next).toHaveBeenCalledOnce();
 });
-it('publishes nested mutations with new immutable repositories, including unselected global context', async () => {
+it('publishes nested mutations with new repositories and immutable computed snapshots, including unselected global context', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail, [], {
@@ -433,25 +393,33 @@ it('publishes nested mutations with new immutable repositories, including unsele
       row('budget', { projectId: 'q' }),
     ],
   });
-  emit(complete);
+  await emit(complete);
   const old = next.mock.lastCall![0].repository;
+  const oldContext = await old.loadContext(['alice']);
+  const oldTopics = await old.readTopics(['p']);
   (complete.projects[0].data.topics as { title: string }[])[0].title = 'After';
   (complete.records[0].data.topics as { percentage: number }[])[0].percentage =
     75;
   Object.assign(complete.records[1].data, { endedAt: '2026-10-08T14:00:00Z' });
-  emit(complete);
+  await emit(complete);
   const updated = next.mock.lastCall![0].repository;
   expect(next).toHaveBeenCalledTimes(2);
   expect(updated).not.toBe(old);
-  expect((await old.loadContext(['alice']))[0].topics[0].percentage).toBe(50);
-  expect((await updated.loadContext(['alice']))[0].topics[0].percentage).toBe(
-    75,
-  );
-  expect((await old.readTopics(['p'])).p[0].title).toBe('Before');
+  expect(
+    oldContext.find((r: { id: string }) => r.id === 'r')!.topics[0].percentage,
+  ).toBe(50);
+  expect(
+    (await updated.loadContext(['alice'])).find(
+      (r: { id: string }) => r.id === 'r',
+    )!.topics[0].percentage,
+  ).toBe(75);
+  expect(oldTopics.p[0].title).toBe('Before');
   expect((await updated.readTopics(['p'])).p[0].title).toBe('After');
-  expect((await updated.loadContext(['alice']))[1].endedAt).toBe(
-    '2026-10-08T14:00:00Z',
-  );
+  expect(
+    (await updated.loadContext(['alice'])).find(
+      (r: { id: string }) => r.id === 'budget',
+    )!.endedAt,
+  ).toBe('2026-10-08T14:00:00Z');
   expect(fail).not.toHaveBeenCalled();
 });
 
@@ -459,8 +427,10 @@ it('does not memoize over owner, tombstone or project access changes', async () 
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
-  emit(state({ projects: [project()], records: [row('same')] }));
-  emit(state({ projects: [project()], records: [row('same', {}, 'bob')] }));
+  await emit(state({ projects: [project()], records: [row('same')] }));
+  await emit(
+    state({ projects: [project()], records: [row('same', {}, 'bob')] }),
+  );
   expect(next).toHaveBeenCalledTimes(2);
   expect(
     await next.mock.lastCall![0].repository.loadContext(['alice']),
@@ -468,7 +438,7 @@ it('does not memoize over owner, tombstone or project access changes', async () 
   expect(
     await next.mock.lastCall![0].repository.loadContext(['bob']),
   ).toHaveLength(1);
-  emit(
+  await emit(
     state({
       projects: [project()],
       records: [row('same', { deletedAt: 'removed' }, 'bob')],
@@ -478,8 +448,10 @@ it('does not memoize over owner, tombstone or project access changes', async () 
   expect(await next.mock.lastCall![0].repository.loadContext(['bob'])).toEqual(
     [],
   );
-  emit(state({ projects: [project()], records: [row('same', {}, 'bob')] }));
-  emit(
+  await emit(
+    state({ projects: [project()], records: [row('same', {}, 'bob')] }),
+  );
+  await emit(
     state({
       projects: [project('p', { type: 'personal', createdBy: 'bob' })],
       records: [row('same', {}, 'bob')],
@@ -489,7 +461,42 @@ it('does not memoize over owner, tombstone or project access changes', async () 
   expect(await next.mock.lastCall![0].repository.loadContext(['bob'])).toEqual(
     [],
   );
-  emit(state({ records: [row('same', {}, 'bob')] }));
+  await emit(state({ records: [row('same', {}, 'bob')] }));
   expect(next).toHaveBeenCalledTimes(6);
+  expect(fail).not.toHaveBeenCalled();
+});
+
+it('awaits native catalog readiness and ignores obsolete generations and disposal', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  const stop = subscribeAuthorizedReport(db, 'viewer', next, fail);
+  const obsolete = mocks.deferRead();
+  await emit(state({ projects: [project('old')] }));
+  expect(next).not.toHaveBeenCalled();
+  await emit(state({ projects: [project('current')] }));
+  expect([...next.mock.lastCall![0].repository.projects.keys()]).toEqual([
+    'current',
+  ]);
+  obsolete.release();
+  await flushCache();
+  expect(next).toHaveBeenCalledOnce();
+  const late = mocks.deferRead();
+  await emit(state({ projects: [project('late')] }));
+  stop();
+  late.release();
+  await flushCache();
+  expect(next).toHaveBeenCalledOnce();
+  expect(fail).not.toHaveBeenCalled();
+});
+it('does not publish or report a catalog failure from a superseded generation', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedReport(db, 'viewer', next, fail);
+  const obsolete = mocks.deferRead();
+  await emit(state({ projects: [project('old')] }));
+  await emit(state({ projects: [project('current')] }));
+  obsolete.reject(new Error('obsolete-cache-error'));
+  await flushCache();
+  expect(next).toHaveBeenCalledOnce();
   expect(fail).not.toHaveBeenCalled();
 });
