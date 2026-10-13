@@ -26,6 +26,8 @@ import {
   layoutDay,
   commonGaps,
   axisSegments,
+  GAP_LABEL_HEIGHT,
+  GAP_LABEL_MARGIN,
   projectMinute,
   type Timed,
 } from './timeline-layout';
@@ -164,6 +166,10 @@ export function CalendarTimeline({
         </AlertDescription>
       </Alert>
     );
+  // Layout uses design pixels at the default 16px root size. Convert every
+  // axis dimension to rem so larger text grows labels, margins and ruler
+  // together instead of clipping the two-line idle notice.
+  const axisSize = (pixels: number) => pixels / 16 + 'rem';
   const px = 1.8;
   const gaps = commonGaps(
     data.flatMap((d) =>
@@ -197,10 +203,8 @@ export function CalendarTimeline({
           className={cn('grid gap-2')}
           style={{
             gridTemplateColumns:
-              view === 'month'
-                ? 'repeat(7,minmax(100px,1fr))'
-                : 'repeat(' + Math.min(days.length, 7) + ',minmax(240px,1fr))',
-            minWidth: view === 'month' ? 700 : Math.min(days.length, 7) * 240,
+              'repeat(' + Math.min(days.length, 7) + ',minmax(15rem,1fr))',
+            minWidth: axisSize(Math.min(days.length, 7) * 240),
           }}
         >
           {data.map((d) => (
@@ -223,17 +227,19 @@ export function CalendarTimeline({
               )}
               <div
                 className={cn('relative pl-12')}
-                style={{ height: height + 30 }}
+                style={{ height: axisSize(height + 30) }}
               >
                 {ticks.map((minute, i) => (
                   <div
                     key={i}
                     className={cn('absolute left-0 right-0')}
-                    style={{ top: 15 + projectMinute(minute, segments) }}
+                    style={{
+                      top: axisSize(15 + projectMinute(minute, segments)),
+                    }}
                   >
                     <span
                       className={cn(
-                        'text-xs absolute left-0 w-[42px] leading-none -translate-y-1/2',
+                        'text-xs absolute left-0 w-[2.625rem] leading-none -translate-y-1/2',
                       )}
                     >
                       {clock(minute)}
@@ -268,18 +274,27 @@ export function CalendarTimeline({
                       }}
                       variant="ghost"
                       className={cn(
-                        'absolute left-12 right-0 min-h-0 p-0 text-xs bg-muted overflow-hidden',
+                        'absolute left-12 right-0 min-h-0 flex-col gap-0 p-0 text-xs leading-4 bg-muted overflow-hidden',
                       )}
-                      style={{ top: 15 + s.top, height: s.collapsed ? 32 : 24 }}
+                      style={{
+                        top: axisSize(15 + s.top + GAP_LABEL_MARGIN),
+                        height: axisSize(GAP_LABEL_HEIGHT),
+                      }}
                     >
-                      … {clock(s.start)}–{clock(s.end)} ·{' '}
-                      {Math.floor((s.end - s.start) / 60)}h{' '}
-                      {Math.round((s.end - s.start) % 60)}min sem atividades
+                      <span>
+                        … {clock(s.start)}–{clock(s.end)}
+                      </span>
+                      <span>
+                        {Math.floor((s.end - s.start) / 60)}h{' '}
+                        {Math.round((s.end - s.start) % 60)}min sem atividades
+                      </span>
                     </Button>
                   ))}
                 <div
-                  className={cn('absolute top-[15px] left-12 right-0')}
-                  style={{ height }}
+                  className={cn(
+                    'pointer-events-none absolute top-[0.9375rem] left-12 right-0',
+                  )}
+                  style={{ height: axisSize(height) }}
                 >
                   {d.events
                     .filter((e) => !e.point)
@@ -314,16 +329,20 @@ export function CalendarTimeline({
                               asChild
                               variant="ghost"
                               className={cn(
-                                'absolute min-h-0 hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-sm leading-snug',
+                                'pointer-events-auto absolute min-h-0 hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-sm leading-snug',
                               )}
                               style={{
-                                top: projectMinute(e.wallStart, segments),
-                                minHeight:
-                                  projectMinute(e.wallEnd, segments) -
+                                top: axisSize(
                                   projectMinute(e.wallStart, segments),
-                                height:
+                                ),
+                                minHeight: axisSize(
                                   projectMinute(e.wallEnd, segments) -
-                                  projectMinute(e.wallStart, segments),
+                                    projectMinute(e.wallStart, segments),
+                                ),
+                                height: axisSize(
+                                  projectMinute(e.wallEnd, segments) -
+                                    projectMinute(e.wallStart, segments),
+                                ),
                                 left: (e.column / e.columns) * 100 + '%',
                                 width: 100 / e.columns + '%',
                                 borderColor: color(e.item.projectId),

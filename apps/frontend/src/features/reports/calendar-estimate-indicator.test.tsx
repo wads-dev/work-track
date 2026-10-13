@@ -86,7 +86,7 @@ it.each(['me', 'other'])(
       'aria-label="Projeto · 09:00 — 09:10 · 10 min · Estimado"',
     );
     expect(html).toContain('Secret topic · Secret summary');
-    expect(html).toContain('min-height:18px;height:18px');
+    expect(html).toContain('min-height:1.125rem;height:1.125rem');
     expect(html).toContain('hover:!h-auto');
     expect(html).toContain('focus-visible:!h-auto');
     if (uid === 'me')
@@ -99,7 +99,7 @@ it('does not mark closed actual intervals as estimated', () => {
   const html = render({ estimated: false });
   expect(html).not.toContain('<svg ');
   expect(html).not.toContain('Estimado');
-  expect(html).toContain('min-height:18px;height:18px');
+  expect(html).toContain('min-height:1.125rem;height:1.125rem');
 });
 
 it.each(['me', 'other'])(
@@ -128,7 +128,7 @@ it('inherits the icon-only indicator in paginated calendar history', () => {
   const html = render({ history: true });
   expect(visibleText(html)).not.toMatch(/estimad|estimativa|◷/i);
   expect(withoutTooltips(html).match(/<svg /g)).toHaveLength(1);
-  expect(html).toContain('min-height:18px;height:18px');
+  expect(html).toContain('min-height:1.125rem;height:1.125rem');
   expect(html).toContain(' · Estimado');
 });
 

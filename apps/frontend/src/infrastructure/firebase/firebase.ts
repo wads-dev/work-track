@@ -61,12 +61,6 @@ export async function initializeServices() {
       tabManager: persistentMultipleTabManager(),
     }),
   });
-  const indexManager = getPersistentCacheIndexManager(db);
-  if (indexManager) enablePersistentCacheIndexAutoCreation(indexManager);
-  traceFirestore('cache.indexes', {
-    persistent: true,
-    autoCreation: Boolean(indexManager),
-  });
   const functions = getFunctions(app, 'southamerica-east1');
   if (emulator) {
     const ports =
@@ -95,6 +89,14 @@ export async function initializeServices() {
       port('functions', 5001),
     );
   }
+  // The index-manager API starts the Firestore client. Connect emulators first,
+  // while settings can still change, before any cache/index or network operation.
+  const indexManager = getPersistentCacheIndexManager(db);
+  if (indexManager) enablePersistentCacheIndexAutoCreation(indexManager);
+  traceFirestore('cache.indexes', {
+    persistent: true,
+    autoCreation: Boolean(indexManager),
+  });
   // Connect demo emulators synchronously above, before restoration makes requests.
   // Never expose services to protected pages before the persisted session settles.
   await auth.authStateReady();

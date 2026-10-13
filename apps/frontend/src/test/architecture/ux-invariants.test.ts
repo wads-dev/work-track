@@ -330,7 +330,7 @@ describe('timeline stays mathematically faithful while surfaces change', () => {
     const folded = axisSegments(0, 1440, gaps, [], 1.1);
     const expanded = axisSegments(0, 1440, gaps, ['120-600'], 1.1);
     expect(folded.filter((s) => s.collapsed).map((s) => s.height)).toEqual([
-      32, 32,
+      48, 48,
     ]);
     const activityHeight = (
       axis: ReturnType<typeof axisSegments>,
