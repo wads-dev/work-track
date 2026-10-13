@@ -1,213 +1,175 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
-import type { ProjectSnapshot } from './authorized-project-source';
+import type { WorkspaceSnapshot } from '../sync/workspace-sync';
 const mocks = vi.hoisted(() => ({
-  catalogNext: undefined as ((snapshot: ProjectSnapshot) => void) | undefined,
-  catalogError: undefined as (() => void) | undefined,
-  catalogStop: vi.fn(),
-  listeners: [] as {
-    q: { base: string; constraints: unknown[][] };
-    options: { includeMetadataChanges: boolean };
-    next: (snapshot: unknown) => void;
-    error: () => void;
+  observers: [] as {
+    uid: string;
+    next: (value: WorkspaceSnapshot) => void;
     stop: ReturnType<typeof vi.fn>;
+    active: boolean;
   }[],
+  observe: vi.fn(),
+  onSnapshot: vi.fn(),
+  getDocs: vi.fn(),
+  callable: vi.fn(),
 }));
-vi.mock('./authorized-project-source', () => ({
-  subscribeAuthorizedProjects: (
-    _db: unknown,
-    _uid: string,
-    next: (s: ProjectSnapshot) => void,
-    error: () => void,
-  ) => {
-    mocks.catalogNext = next;
-    mocks.catalogError = error;
-    return mocks.catalogStop;
-  },
+vi.mock('../sync/workspace-runtime', () => ({
+  observeWorkspace: mocks.observe,
 }));
 vi.mock('firebase/firestore', () => ({
-  collection: (_db: unknown, ...parts: string[]) => parts.join('/'),
-  query: (base: string, ...constraints: unknown[][]) => ({ base, constraints }),
-  where: (...args: unknown[]) => ['where', ...args],
-  orderBy: (...args: unknown[]) => ['orderBy', ...args],
-  documentId: () => '__name__',
-  startAfter: (id: string) => ['after', id],
-  limit: (n: number) => ['limit', n],
-  onSnapshot: (
-    q: { base: string; constraints: unknown[][] },
-    options: { includeMetadataChanges: boolean },
-    next: (s: unknown) => void,
-    error: () => void,
-  ) => {
-    const stop = vi.fn();
-    mocks.listeners.push({ q, options, next, error, stop });
-    return stop;
-  },
+  onSnapshot: mocks.onSnapshot,
+  getDocs: mocks.getDocs,
 }));
-import { subscribeAuthorizedOwnRecords } from './authorized-own-record-source';
+vi.mock('firebase/functions', () => ({ httpsCallable: mocks.callable }));
 const db = {} as Firestore;
-const catalog = (ids: string[], cache = false): ProjectSnapshot => ({
-  rows: ids.map((id) => ({ id, data: { type: 'work' } })),
-  fromCache: cache,
-  hasPendingWrites: false,
-  complete: !cache,
+const state = (patch: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot => ({
+  projects: [],
+  records: [],
+  completedProjects: [],
+  complete: true,
+  syncing: false,
+  error: '',
+  ...patch,
 });
-const records = (
-  rows: [string, Record<string, unknown>][],
-  cache = false,
-  pending = false,
-) => ({
-  docs: rows.map(([id, data]) => ({ id, data: () => data })),
-  metadata: { fromCache: cache, hasPendingWrites: pending },
-});
+const emit = (value: WorkspaceSnapshot, index = 0) => {
+  const observer = mocks.observers[index];
+  if (observer.active) observer.next(value);
+};
 beforeEach(() => {
-  mocks.listeners.splice(0);
-  mocks.catalogNext = undefined;
-  mocks.catalogError = undefined;
-  mocks.catalogStop.mockReset();
-});
-it('does not confirm a provisional empty catalog as an empty history', () => {
-  const next = vi.fn();
-  subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn());
-  mocks.catalogNext!(catalog([], true));
-  expect(next).not.toHaveBeenCalled();
-  expect(mocks.listeners).toHaveLength(0);
-  mocks.catalogNext!(catalog(['p']));
-  mocks.listeners[0].next(records([['real', { projectId: 'p' }]]));
-  expect(
-    next.mock.lastCall?.[0].rows.map((row: { id: string }) => row.id),
-  ).toEqual(['real']);
-});
-it('subscribes only to authorized project-scoped owner queries, never an unfiltered scan', () => {
-  const next = vi.fn();
-  subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn());
-  mocks.catalogNext!(catalog(['p']));
-  expect(mocks.listeners[0].q).toEqual({
-    base: 'users/alice/records',
-    constraints: [
-      ['where', 'projectId', '==', 'p'],
-      ['orderBy', '__name__'],
-    ],
-  });
-  expect(mocks.listeners[0].options.includeMetadataChanges).toBe(true);
-  mocks.listeners[0].next(records([['r', { projectId: 'p' }]]));
-  expect(next).toHaveBeenLastCalledWith({
-    rows: [{ id: 'r', data: { projectId: 'p' } }],
-    fromCache: false,
-    hasMore: false,
-    cursor: 'r',
-  });
-});
-it('revocation immediately removes old rows and prevents late snapshots from restoring them', () => {
-  const next = vi.fn(),
-    fail = vi.fn();
-  subscribeAuthorizedOwnRecords(db, 'alice', next, fail);
-  mocks.catalogNext!(catalog(['p']));
-  const old = mocks.listeners[0];
-  old.next(records([['private', { projectId: 'p' }]]));
-  mocks.catalogNext!(catalog([]));
-  expect(old.stop).toHaveBeenCalledOnce();
-  expect(next.mock.lastCall?.[0].rows).toEqual([]);
-  old.next(records([['late', { projectId: 'p' }]]));
-  old.error();
-  expect(next.mock.lastCall?.[0].rows).toEqual([]);
-  expect(fail).not.toHaveBeenCalled();
-});
-it('new projects open new queries while metadata-only catalog changes do not reconnect', () => {
-  subscribeAuthorizedOwnRecords(db, 'alice', vi.fn(), vi.fn());
-  mocks.catalogNext!(catalog(['p']));
-  mocks.catalogNext!(catalog(['p'], true));
-  expect(mocks.listeners).toHaveLength(1);
-  mocks.catalogNext!(catalog(['p', 'q']));
-  expect(mocks.listeners).toHaveLength(2);
-});
-it('keeps complete owner histories unlimited and preserves cache/pending indicators', () => {
-  const next = vi.fn();
-  subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn());
-  mocks.catalogNext!(catalog(['p']));
-  const rows = Array.from(
-    { length: 150 },
-    (_, i) =>
-      [String(i).padStart(3, '0'), { projectId: 'p' }] as [
-        string,
-        Record<string, unknown>,
-      ],
+  vi.clearAllMocks();
+  mocks.observers.splice(0);
+  mocks.observe.mockImplementation(
+    (_db: Firestore, uid: string, next: (value: WorkspaceSnapshot) => void) => {
+      const observer = {
+        uid,
+        next,
+        active: true,
+        stop: vi.fn(() => {
+          observer.active = false;
+        }),
+      };
+      mocks.observers.push(observer);
+      return observer.stop;
+    },
   );
-  mocks.listeners[0].next(records(rows, false, true));
-  expect(next.mock.lastCall?.[0]).toMatchObject({
+});
+afterEach(() => {
+  expect(mocks.onSnapshot).not.toHaveBeenCalled();
+  expect(mocks.getDocs).not.toHaveBeenCalled();
+  expect(mocks.callable).not.toHaveBeenCalled();
+});
+
+import { subscribeAuthorizedOwnRecords } from './authorized-own-record-source';
+const row = (
+  id: string,
+  patch: Record<string, unknown> = {},
+  uid = 'alice',
+) => ({
+  path: 'users/' + uid + '/records/' + id,
+  data: { uid, projectId: 'p', ...patch },
+});
+it('fences incomplete history and never confirms a provisional empty result', () => {
+  const next = vi.fn();
+  subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn());
+  emit(state({ complete: false, records: [row('stale')] }));
+  expect(next).toHaveBeenLastCalledWith({
+    rows: [],
     fromCache: true,
     hasMore: false,
+    cursor: '',
   });
-  expect(next.mock.lastCall?.[0].rows).toHaveLength(150);
+  emit(state());
+  expect(next.mock.lastCall?.[0].fromCache).toBe(false);
 });
-it('filters pending records by endedAt null without limits or paging', () => {
-  subscribeAuthorizedOwnRecords(db, 'alice', vi.fn(), vi.fn(), {
-    openOnly: true,
+it('reads only own records from authorized local state and replaces revoked histories', () => {
+  const next = vi.fn();
+  subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn());
+  emit(state({ records: [row('own'), row('other', {}, 'bob')] }));
+  expect(next.mock.lastCall?.[0].rows.map((r: { id: string }) => r.id)).toEqual(
+    ['own'],
+  );
+  emit(state());
+  expect(next.mock.lastCall?.[0].rows).toEqual([]);
+  expect(mocks.observe).toHaveBeenCalledOnce();
+});
+it('keeps complete raw owner history unlimited including physical tombstones', () => {
+  const next = vi.fn();
+  subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn());
+  const records = Array.from({ length: 501 }, (_, i) =>
+    row(
+      String(i).padStart(4, '0'),
+      i === 1 ? { deletedAt: 'legacy', topics: 'invalid' } : {},
+    ),
+  );
+  emit(state({ records }));
+  expect(next.mock.lastCall?.[0].rows).toHaveLength(501);
+  expect(next.mock.lastCall?.[0].rows[1].data.deletedAt).toBe('legacy');
+  expect(next.mock.lastCall?.[0]).toMatchObject({
+    hasMore: false,
+    cursor: '0500',
+    fromCache: false,
   });
-  mocks.catalogNext!(catalog(['p']));
-  expect(mocks.listeners[0].q.constraints).toContainEqual([
-    'where',
-    'endedAt',
-    '==',
-    null,
-  ]);
-  expect(mocks.listeners[0].q.constraints.some((c) => c[0] === 'limit')).toBe(
-    false,
+});
+it('open-only preserves strict endedAt null semantics without defaulting missing end', () => {
+  const next = vi.fn();
+  subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn(), { openOnly: true });
+  emit(
+    state({
+      records: [
+        row('missing'),
+        row('closed', { endedAt: '2026-10-08' }),
+        row('open', { endedAt: null }),
+      ],
+    }),
+  );
+  expect(next.mock.lastCall?.[0].rows.map((r: { id: string }) => r.id)).toEqual(
+    ['open'],
   );
 });
-it('merges scoped raw pages with physical cursors and no skip over tombstones', () => {
+it('sorts local physical IDs and pages past tombstones without skipping the cursor', () => {
   const next = vi.fn();
   subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn(), {
     size: 2,
-    after: '100',
+    after: 'a',
   });
-  mocks.catalogNext!(catalog(['p', 'q']));
-  for (const listener of mocks.listeners) {
-    expect(listener.q.constraints).toContainEqual(['after', '100']);
-    expect(listener.q.constraints).toContainEqual(['limit', 2]);
-  }
-  mocks.listeners[0].next(
-    records([
-      ['101', { projectId: 'p', deletedAt: 'gone' }],
-      ['104', { projectId: 'p' }],
-    ]),
-  );
-  mocks.listeners[1].next(
-    records([
-      ['102', { projectId: 'q' }],
-      ['103', { projectId: 'q' }],
-    ]),
+  emit(
+    state({
+      records: [
+        row('d'),
+        row('a'),
+        row('c'),
+        row('b', { deletedAt: 'removed' }),
+      ],
+    }),
   );
   expect(next.mock.lastCall?.[0]).toMatchObject({
-    rows: [{ id: '101' }, { id: '102' }],
+    rows: [{ id: 'b' }, { id: 'c' }],
     hasMore: true,
-    cursor: '102',
+    cursor: 'c',
   });
+  const page = vi.fn();
+  subscribeAuthorizedOwnRecords(db, 'alice', page, vi.fn(), {
+    size: 2,
+    after: 'c',
+  });
+  emit(state({ records: [row('d'), row('c')] }), 1);
+  expect(page.mock.lastCall?.[0]).toMatchObject({
+    rows: [{ id: 'd' }],
+    hasMore: false,
+    cursor: 'd',
+  });
+  emit(state(), 1);
+  expect(page.mock.lastCall?.[0].cursor).toBe('c');
 });
-it('fails closed on catalog or active record errors and stops every subscription', () => {
+it('reports errors without publishing stale rows and detaches on disposal', () => {
   const next = vi.fn(),
     fail = vi.fn();
-  subscribeAuthorizedOwnRecords(db, 'alice', next, fail);
-  mocks.catalogNext!(catalog(['p']));
-  mocks.listeners[0].next(records([['r', { projectId: 'p' }]]));
-  mocks.catalogError!();
+  const stop = subscribeAuthorizedOwnRecords(db, 'alice', next, fail);
+  emit(state({ error: 'cache failure', records: [row('stale')] }));
   expect(fail).toHaveBeenCalledOnce();
-  expect(mocks.catalogStop).toHaveBeenCalledOnce();
-  expect(mocks.listeners[0].stop).toHaveBeenCalledOnce();
-  mocks.listeners[0].next(records([['late', {}]]));
-  expect(next.mock.lastCall?.[0].rows).toEqual([
-    { id: 'r', data: { projectId: 'p' } },
-  ]);
-});
-it('account disposal ignores callbacks and stops the catalog as well as records', () => {
-  const next = vi.fn();
-  const stop = subscribeAuthorizedOwnRecords(db, 'alice', next, vi.fn());
-  mocks.catalogNext!(catalog(['p']));
+  expect(next).not.toHaveBeenCalled();
   stop();
-  stop();
-  mocks.catalogNext!(catalog(['q']));
-  mocks.listeners[0].next(records([['late', {}]]));
-  expect(next).toHaveBeenCalledTimes(1);
-  expect(mocks.listeners).toHaveLength(1);
-  expect(mocks.catalogStop).toHaveBeenCalledOnce();
+  emit(state({ records: [row('late')] }));
+  expect(next).not.toHaveBeenCalled();
+  expect(mocks.observers[0].stop).toHaveBeenCalledOnce();
 });

@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore, useCallback } from 'react';
 import { type Firestore } from 'firebase/firestore';
+import { workspaceRetry } from '../../../data/sync/workspace-runtime';
 import { subscribeAuthorizedOwnRecords } from '../../../data/sources/authorized-own-record-source';
 import { ownRecordsRepository } from '../../../data/cache/own-records-repository';
 export function useOwnRecords(db: Firestore, uid: string, enabled = true) {
@@ -28,6 +29,7 @@ export function useOwnRecords(db: Firestore, uid: string, enabled = true) {
   return {
     ...state,
     retry: () => {
+      workspaceRetry(db, uid);
       ownRecordsRepository.retry(db, uid);
       setAttempt((value) => value + 1);
     },

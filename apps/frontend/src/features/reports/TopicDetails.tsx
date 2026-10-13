@@ -10,7 +10,10 @@ import {
 import { UiIcon } from '../../shared/ui/UiIcons';
 import { TopicEditor } from '../projects/TopicEditor';
 import { safeProject } from '../../shared/ui/privacy';
-import { createCallable } from '../../infrastructure/firebase/callable-command-gateway';
+import { getFirestore } from 'firebase/firestore';
+import { getTopicReport } from '@work-track/core/reports/application/get-topic-report';
+import { subscribeAuthorizedReport } from '../../data/sources/authorized-report-source';
+import { LocalTopicReportRepository } from '../../data/sources/local-topic-report';
 import { PersonIdentity } from '../people/PersonIdentity';
 import { TableHead } from '../../components/ui/table';
 import { cn } from '../../lib/utils';
@@ -99,35 +102,50 @@ export function TopicDetails({
     )
       return;
     setState({ identity });
-    void createCallable(
-      functions,
-      'getTopicReport',
-    )({ projectId, topicId, includeArchived: true })
-      .then((r) => {
-        const data = validateTopicReport(
-          r.data as TopicDetailReport,
+    let revision = 0;
+    const isCurrent = (version: number) =>
+      active &&
+      version === revision &&
+      projectAccessRevision() === access &&
+      deletionRevision(uid) === deletion;
+    const stop = subscribeAuthorizedReport(
+      getFirestore(functions.app),
+      uid,
+      (snapshot) => {
+        const version = ++revision;
+        if (!isCurrent(version)) return;
+        setState({ identity });
+        if (!snapshot.coherent) return;
+        void getTopicReport(
+          new LocalTopicReportRepository(snapshot.repository),
+          { projectId, topicId, includeArchived: true },
           uid,
-          projectId,
-          topicId,
-          canonical,
-        );
-        if (
-          active &&
-          projectAccessRevision() === access &&
-          deletionRevision(uid) === deletion
         )
-          setState({ identity, data });
-      })
-      .catch((e) => {
-        if (
-          active &&
-          projectAccessRevision() === access &&
-          deletionRevision(uid) === deletion
-        )
-          setState({ identity, error: reportError(e) });
-      });
+          .then((result) => {
+            const data = validateTopicReport(
+              result,
+              uid,
+              projectId,
+              topicId,
+              canonical,
+            );
+            if (isCurrent(version)) setState({ identity, data });
+          })
+          .catch((error) => {
+            if (isCurrent(version))
+              setState({ identity, error: reportError(error) });
+          });
+      },
+      (error) => {
+        const version = ++revision;
+        if (isCurrent(version))
+          setState({ identity, error: reportError(error) });
+      },
+      [projectId],
+    );
     return () => {
       active = false;
+      stop();
     };
   }, [
     functions,

@@ -1,6 +1,7 @@
 import { ownRecordsRepository } from './data/cache/own-records-repository';
 import { deletionAccount } from './data/cache/record-deletion';
 import { useEffect, useState } from 'react';
+import { startWorkspaceSession } from './data/sync/workspace-runtime';
 import { projectRepository } from './data/cache/project-repository';
 import { TopicDetails } from './features/reports/TopicDetails';
 import { createRoot } from 'react-dom/client';
@@ -178,6 +179,10 @@ function App() {
       unsubscribe?.();
     };
   }, []);
+  useEffect(() => {
+    if (!services || !user || !allowed(user)) return;
+    return startWorkspaceSession(services.db, user.uid);
+  }, [services, user?.uid]);
   async function login() {
     if (!services) return;
     setBusy(true);

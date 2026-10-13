@@ -24,7 +24,8 @@ import {
 import { writeUrlTab } from '../../app/url-tabs';
 import { UiIcon } from '../../shared/ui/UiIcons';
 import { useEffect, useRef, useState } from 'react';
-import { doc, onSnapshot, type Firestore } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
+import { observeWorkspace } from '../../data/sync/workspace-runtime';
 import type { Functions } from 'firebase/functions';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { date, object, objects, text, useRows } from '../../shared/data';
@@ -154,46 +155,50 @@ export function RecordDrawer({
     setError('');
     const observeDeletion = createDeletionObserver(uid);
     let alive = true;
-    const stop = onSnapshot(
-      doc(db, 'users', uid, 'records', recordId),
-      (snapshot) => {
-        if (!alive) return;
-        const data = snapshot.exists()
-          ? (snapshot.data() as Record<string, unknown>)
-          : null;
-        if (data) observeDeletion([{ id: recordId, data }]);
-        const activeRecord = data && !isDeletedRecord(data) ? data : null;
-        setRecord(activeRecord);
-        setLoading(false);
-        if (activeRecord && !editorDirty.current) {
-          editorVersion.current =
-            typeof activeRecord.updatedAt === 'string'
-              ? activeRecord.updatedAt
-              : null;
-          setEditedProject(text(activeRecord.projectId, ''));
-          setSharingAck(false);
-          setEnd(endToLocal(activeRecord.endedAt));
-          setStart(endToLocal(activeRecord.startedAt));
-          setDescription(text(activeRecord.interpretation));
-          setEditedTopics(
-            objects(activeRecord.topics).map((t) => ({
-              topicId: text(t.topicId),
-              ...(typeof t.percentage === 'number'
-                ? { percentage: t.percentage }
-                : {}),
-              ...(typeof t.durationMinutes === 'number'
-                ? { durationMinutes: t.durationMinutes }
-                : {}),
-            })),
-          );
-        }
-      },
-      () => {
-        if (!alive) return;
+    const stop = observeWorkspace(db, uid, (snapshot) => {
+      if (!alive) return;
+      if (snapshot.error) {
+        setRecord(null);
         setLoading(false);
         setError('Não foi possível consultar este registro privado.');
-      },
-    );
+        return;
+      }
+      if (!snapshot.complete) {
+        setRecord(null);
+        setLoading(true);
+        return;
+      }
+      const data =
+        snapshot.records.find(
+          (r) => r.path === 'users/' + uid + '/records/' + recordId,
+        )?.data ?? null;
+      if (data) observeDeletion([{ id: recordId, data }]);
+      const activeRecord = data && !isDeletedRecord(data) ? data : null;
+      setRecord(activeRecord);
+      setLoading(false);
+      if (activeRecord && !editorDirty.current) {
+        editorVersion.current =
+          typeof activeRecord.updatedAt === 'string'
+            ? activeRecord.updatedAt
+            : null;
+        setEditedProject(text(activeRecord.projectId, ''));
+        setSharingAck(false);
+        setEnd(endToLocal(activeRecord.endedAt));
+        setStart(endToLocal(activeRecord.startedAt));
+        setDescription(text(activeRecord.interpretation));
+        setEditedTopics(
+          objects(activeRecord.topics).map((t) => ({
+            topicId: text(t.topicId),
+            ...(typeof t.percentage === 'number'
+              ? { percentage: t.percentage }
+              : {}),
+            ...(typeof t.durationMinutes === 'number'
+              ? { durationMinutes: t.durationMinutes }
+              : {}),
+          })),
+        );
+      }
+    });
     return () => {
       alive = false;
       stop();

@@ -1,292 +1,253 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-import type { PersonalReportSnapshot } from '../../data/sources/personal-report-source';
-interface MockSnapshot {
-  metadata: { fromCache: boolean; hasPendingWrites: boolean };
-  docs?: { id: string; data: () => Record<string, unknown> }[];
-  data?: () => Record<string, unknown>;
-}
-
-const listeners = vi.hoisted(
-  () =>
-    new Map<
-      string,
-      {
-        next: (s: MockSnapshot) => void;
-        error: (e: Error) => void;
-        stop: ReturnType<typeof vi.fn>;
-      }
-    >(),
-);
-vi.mock('firebase/firestore', () => ({
-  collection: (_db: unknown, ...parts: string[]) => parts.join('/'),
-  doc: (_db: unknown, ...parts: string[]) => parts.join('/'),
-  where: (field: string, op: string, value: string) => ({ field, op, value }),
-  query: (
-    path: string,
-    ...filters: { field: string; op: string; value: string }[]
-  ) =>
-    path +
-    ':' +
-    (filters[0].field === 'projectId'
-      ? 'project:' + filters[1].field
-      : filters[0].field),
-  and: (...c: unknown[]) => c,
-  or: (...c: unknown[]) => c,
-  onSnapshot: (
-    ref: string,
-    _options: unknown,
-    next: (snapshot: MockSnapshot) => void,
-    error: (error: Error) => void,
-  ) => {
-    const stop = vi.fn();
-    listeners.set(ref, { next, error, stop });
-    return stop;
-  },
-}));
-import { subscribePersonalReport } from '../../data/sources/personal-report-source';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
-const metadata = { fromCache: false, hasPendingWrites: false };
-const r = (id: string, endedAt?: string) => ({
+import type { WorkspaceSnapshot } from '../../data/sync/workspace-sync';
+const mocks = vi.hoisted(() => ({
+  observers: [] as {
+    uid: string;
+    next: (value: WorkspaceSnapshot) => void;
+    stop: ReturnType<typeof vi.fn>;
+    active: boolean;
+  }[],
+  observe: vi.fn(),
+  onSnapshot: vi.fn(),
+  getDocs: vi.fn(),
+  callable: vi.fn(),
+}));
+vi.mock('../../data/sync/workspace-runtime', () => ({
+  observeWorkspace: mocks.observe,
+}));
+vi.mock('firebase/firestore', () => ({
+  onSnapshot: mocks.onSnapshot,
+  getDocs: mocks.getDocs,
+  collectionGroup: (_db: unknown, group: string) => ({ group }),
+  collection: (_db: unknown, ...parts: string[]) => parts.join('/'),
+  query: (base: unknown, ...constraints: unknown[]) => ({ base, constraints }),
+  where: (field: string, op: string, value: unknown) => ({ field, op, value }),
+}));
+vi.mock('firebase/functions', () => ({ httpsCallable: mocks.callable }));
+const db = {} as Firestore;
+const state = (patch: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot => ({
+  projects: [],
+  records: [],
+  completedProjects: [],
+  complete: true,
+  syncing: false,
+  error: '',
+  ...patch,
+});
+const emit = (value: WorkspaceSnapshot, index = 0) => {
+  const observer = mocks.observers[index];
+  if (observer.active) observer.next(value);
+};
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.observers.splice(0);
+  mocks.observe.mockImplementation(
+    (_db: Firestore, uid: string, next: (value: WorkspaceSnapshot) => void) => {
+      const observer = {
+        uid,
+        next,
+        active: true,
+        stop: vi.fn(() => {
+          observer.active = false;
+        }),
+      };
+      mocks.observers.push(observer);
+      return observer.stop;
+    },
+  );
+});
+afterEach(() => {
+  expect(mocks.onSnapshot).not.toHaveBeenCalled();
+  expect(mocks.getDocs).not.toHaveBeenCalled();
+  expect(mocks.callable).not.toHaveBeenCalled();
+});
+
+import { subscribePersonalReport } from '../../data/sources/personal-report-source';
+import { subscribeAuthorizedReport } from '../../data/sources/authorized-report-source';
+
+const project = (id = 'p', data: Record<string, unknown> = {}) => ({
   id,
-  data: () => ({
+  data: { type: 'work', topics: [], ...data },
+});
+const row = (id = 'r', patch: Record<string, unknown> = {}, uid = 'alice') => ({
+  path: 'users/' + uid + '/records/' + id,
+  data: {
+    uid,
     projectId: 'p',
     startedAt: '2026-10-08T12:00:00Z',
-    endedAt,
     timeZone: 'UTC',
     topics: [],
-  }),
+    ...patch,
+  },
 });
-beforeEach(() => listeners.clear());
-it('waits for both query branches, keeps missing-end records, deduplicates and disposes', async () => {
-  const next = vi.fn<(snapshot: PersonalReportSnapshot) => void>(),
-    fail = vi.fn();
-  const stop = subscribePersonalReport({} as Firestore, 'a', next, fail, [], {
-    from: '2026-10-08T00:00:00Z',
-    to: '2026-10-09T00:00:00Z',
-  });
-  const starts = listeners.get('users/a/records:startedAt')!,
-    ends = listeners.get('users/a/records:endedAt')!;
-  starts.next({
-    docs: [r('open'), r('closed', '2026-10-08T13:00:00Z')],
-    metadata,
-  });
-  expect(next).not.toHaveBeenCalled();
-  ends.next({ docs: [r('closed', '2026-10-08T13:00:00Z')], metadata });
-  expect(next).not.toHaveBeenCalled();
-  listeners
-    .get('projects/p')!
-    .next({ data: () => ({ type: 'work', topics: [] }), metadata });
-  const context = await next.mock.lastCall![0].repository.loadContext(['a']);
-  expect(context.map((r) => r.id).sort()).toEqual(['closed', 'open']);
-  expect(next.mock.lastCall![0].fromCache).toBe(false);
-  stop();
-  for (const l of listeners.values()) expect(l.stop).toHaveBeenCalled();
-  expect(fail).not.toHaveBeenCalled();
-});
-it('waits for project-filtered selection to converge with budget context', async () => {
-  const next = vi.fn<(snapshot: PersonalReportSnapshot) => void>(),
-    fail = vi.fn();
-  const stop = subscribePersonalReport(
-    {} as Firestore,
-    'a',
-    next,
-    fail,
+
+const range = {
+  from: '2026-10-08T00:00:00Z',
+  to: '2026-10-09T00:00:00Z',
+  projectId: 'p',
+};
+it('navigation, date and project changes use local observers with ZERO Firebase reads or callables', async () => {
+  const personal = vi.fn(),
+    company = vi.fn();
+  const stopPersonal = subscribePersonalReport(
+    db,
+    'alice',
+    personal,
+    vi.fn(),
     ['p'],
-    {
-      from: '2026-10-08T00:00:00Z',
-      to: '2026-10-09T00:00:00Z',
-      projectId: 'p',
-    },
+    range,
   );
-  const batch = { docs: [r('open')], metadata };
-  listeners.get('users/a/records:startedAt')!.next(batch);
-  listeners.get('users/a/records:endedAt')!.next({ docs: [], metadata });
-  listeners
-    .get('users/a/records:project:startedAt')!
-    .next({ docs: [], metadata });
-  listeners
-    .get('users/a/records:project:endedAt')!
-    .next({ docs: [], metadata });
-  expect(next).not.toHaveBeenCalled();
-  listeners.get('users/a/records:project:startedAt')!.next(batch);
-  listeners
-    .get('projects/p')!
-    .next({ data: () => ({ type: 'work', topics: [] }), metadata });
+  const stopCompany = subscribeAuthorizedReport(
+    db,
+    'alice',
+    company,
+    vi.fn(),
+    ['q'],
+    { ...range, projectId: 'q' },
+  );
+  const local = state({
+    projects: [project(), project('q')],
+    records: [
+      row('open'),
+      row('closed', { endedAt: '2026-10-08T13:00:00Z' }),
+      row('budget', { projectId: 'q', startedAt: '2026-01-01T00:00:00Z' }),
+    ],
+  });
+  emit(local);
+  emit(local, 1);
   expect(
-    (await next.mock.lastCall![0].repository.readPage('a', 100)).records.map(
-      (r) => r.id,
-    ),
-  ).toEqual(['open']);
-  expect(fail).not.toHaveBeenCalled();
-  stop();
+    (
+      await personal.mock.lastCall![0].repository.readPage('alice', 100)
+    ).records.map((r: { id: string }) => r.id),
+  ).toEqual(['closed', 'open']);
+  expect(
+    await personal.mock.lastCall![0].repository.loadContext(['alice']),
+  ).toHaveLength(3);
+  expect(
+    await company.mock.lastCall![0].repository.readPage(100),
+  ).toMatchObject({ records: [] });
+  stopPersonal();
+  stopCompany();
+  const month = vi.fn();
+  const stopMonth = subscribePersonalReport(db, 'alice', month, vi.fn(), [], {
+    from: '2026-01-01T00:00:00Z',
+    to: '2026-02-01T00:00:00Z',
+  });
+  emit(local, 2);
+  expect(
+    (
+      await month.mock.lastCall![0].repository.readPage('alice', 100)
+    ).records.map((r: { id: string }) => r.id),
+  ).toEqual(['budget']);
+  stopMonth();
+  expect(mocks.observe).toHaveBeenCalledTimes(3);
+  for (const observer of mocks.observers)
+    expect(observer.stop).toHaveBeenCalledOnce();
 });
-it('marks filtered membership moves incomplete until context and selection agree', async () => {
-  const next = vi.fn<(snapshot: PersonalReportSnapshot) => void>(),
+it('waits for a full atomic materialization and retains missing-end records without query branches', async () => {
+  const next = vi.fn(),
     fail = vi.fn();
-  const stop = subscribePersonalReport(
-    {} as Firestore,
-    'a',
-    next,
-    fail,
-    ['p'],
-    {
-      from: '2026-10-08T00:00:00Z',
-      to: '2026-10-09T00:00:00Z',
-      projectId: 'p',
-    },
+  subscribePersonalReport(db, 'alice', next, fail, [], range);
+  emit(
+    state({ complete: false, projects: [project()], records: [row('open')] }),
   );
-  const starts = listeners.get('users/a/records:startedAt')!,
-    selected = listeners.get('users/a/records:project:startedAt')!;
-  starts.next({ docs: [r('open')], metadata });
-  listeners.get('users/a/records:endedAt')!.next({ docs: [], metadata });
-  selected.next({ docs: [r('open')], metadata });
-  listeners
-    .get('users/a/records:project:endedAt')!
-    .next({ docs: [], metadata });
-  listeners
-    .get('projects/p')!
-    .next({ data: () => ({ type: 'work', topics: [] }), metadata });
-  const confirmed = next.mock.lastCall![0];
-  selected.next({ docs: [], metadata });
-  expect(next.mock.lastCall![0].coherent).toBe(false);
-  expect(next.mock.lastCall![0].repository).toBe(confirmed.repository);
-  const moved = {
-    id: 'open',
-    data: () => ({ ...r('open').data(), projectId: 'q' }),
-  };
-  starts.next({ docs: [moved], metadata });
-  expect(next.mock.lastCall![0].coherent).toBe(false);
-  listeners
-    .get('projects/q')!
-    .next({ data: () => ({ type: 'work', topics: [] }), metadata });
+  expect(next).not.toHaveBeenCalled();
+  emit(
+    state({
+      projects: [project()],
+      records: [
+        row('open'),
+        row('null-end', { endedAt: null }),
+        row('closed', { endedAt: '2026-10-08T13:00:00Z' }),
+      ],
+    }),
+  );
+  const context = await next.mock.lastCall![0].repository.loadContext([
+    'alice',
+  ]);
+  expect(context.map((r: { id: string }) => r.id)).toEqual([
+    'open',
+    'null-end',
+    'closed',
+  ]);
+  expect(context[0].endedAt).toBeUndefined();
+  expect(context[1].endedAt).toBeUndefined();
+  expect(fail).not.toHaveBeenCalled();
+});
+it('local project moves update selection atomically without narrowing global budget context', async () => {
+  const next = vi.fn();
+  subscribePersonalReport(db, 'alice', next, vi.fn(), ['p'], range);
+  emit(
+    state({ projects: [project(), project('q')], records: [row('moving')] }),
+  );
+  const old = next.mock.lastCall![0].repository;
+  emit(
+    state({
+      complete: false,
+      projects: [project(), project('q')],
+      records: [row('moving', { projectId: 'q' })],
+    }),
+  );
+  expect(next).toHaveBeenCalledOnce();
+  emit(
+    state({
+      projects: [project(), project('q')],
+      records: [row('moving', { projectId: 'q' })],
+    }),
+  );
   expect(next.mock.lastCall![0].coherent).toBe(true);
   expect(
-    (await next.mock.lastCall![0].repository.readPage('a', 100)).records,
+    (await next.mock.lastCall![0].repository.readPage('alice', 100)).records,
   ).toEqual([]);
-  const pendingMetadata = { fromCache: true, hasPendingWrites: true };
-  selected.next({ docs: [], metadata: pendingMetadata });
-  expect(next.mock.lastCall![0]).toMatchObject({
-    coherent: true,
-    ...pendingMetadata,
-  });
-  selected.next({ docs: [], metadata });
-  expect(next.mock.lastCall![0]).toMatchObject({ coherent: true, ...metadata });
-  stop();
-  expect(fail).not.toHaveBeenCalled();
+  expect(
+    (await next.mock.lastCall![0].repository.loadContext(['alice']))[0]
+      .projectId,
+  ).toBe('q');
+  expect((await old.readPage('alice', 100)).records[0].projectId).toBe('p');
 });
-it('does not publish mixed duplicate versions through project metadata callbacks', async () => {
-  const next = vi.fn<(snapshot: PersonalReportSnapshot) => void>(),
+it('one revision updates facts and metadata together; removal/revocation cannot resurrect old rows', async () => {
+  const next = vi.fn(),
     fail = vi.fn();
-  const stop = subscribePersonalReport({} as Firestore, 'a', next, fail, [], {
-    from: '2026-10-08T00:00:00Z',
-    to: '2026-10-09T00:00:00Z',
-  });
-  const starts = listeners.get('users/a/records:startedAt')!,
-    ends = listeners.get('users/a/records:endedAt')!;
-  const old = r('closed', '2026-10-08T13:00:00Z'),
-    updated = r('closed', '2026-10-08T14:00:00Z');
-  starts.next({ docs: [old], metadata });
-  ends.next({ docs: [old], metadata });
-  const project = listeners.get('projects/p')!;
-  project.next({ data: () => ({ type: 'work', topics: [] }), metadata });
-  const confirmed = next.mock.lastCall![0];
-  expect(confirmed.coherent).toBe(true);
-  next.mockClear();
-  starts.next({ docs: [updated], metadata });
-  project.next({ data: () => ({ type: 'work', topics: [] }), metadata });
-  expect(next.mock.lastCall![0]).toMatchObject({
-    coherent: false,
-    fromCache: false,
-    hasPendingWrites: false,
-  });
-  expect(next.mock.lastCall![0].repository).toBe(confirmed.repository);
+  const stop = subscribePersonalReport(db, 'alice', next, fail, [], range);
+  emit(
+    state({
+      projects: [project()],
+      records: [row('closed', { endedAt: '2026-10-08T13:00:00Z' })],
+    }),
+  );
+  const old = next.mock.lastCall![0].repository;
+  emit(
+    state({
+      projects: [project('p', { topics: [{ id: 'new', title: 'New' }] })],
+      records: [row('closed', { endedAt: '2026-10-08T14:00:00Z' })],
+    }),
+  );
   expect(
-    (await next.mock.lastCall![0].repository.loadContext(['a']))[0].endedAt,
-  ).toBe('2026-10-08T13:00:00Z');
-  ends.next({ docs: [updated], metadata });
-  expect(next.mock.lastCall![0].coherent).toBe(true);
-  expect(
-    (await next.mock.lastCall![0].repository.loadContext(['a']))[0].endedAt,
+    (await next.mock.lastCall![0].repository.loadContext(['alice']))[0].endedAt,
   ).toBe('2026-10-08T14:00:00Z');
+  expect(
+    await next.mock.lastCall![0].repository.readTopics(['p'], 'alice'),
+  ).toEqual({ p: [{ id: 'new', title: 'New' }] });
+  expect((await old.loadContext(['alice']))[0].endedAt).toBe(
+    '2026-10-08T13:00:00Z',
+  );
+  emit(state());
+  expect(
+    await next.mock.lastCall![0].repository.loadContext(['alice']),
+  ).toEqual([]);
   const calls = next.mock.calls.length;
   stop();
-  starts.next({ docs: [old], metadata });
+  emit(state({ projects: [project()], records: [row('late')] }));
   expect(next).toHaveBeenCalledTimes(calls);
   expect(fail).not.toHaveBeenCalled();
 });
-it('marks partial removal incomplete and revokes retained project while branches diverge', async () => {
-  const next = vi.fn<(snapshot: PersonalReportSnapshot) => void>(),
+it('reports synchronization errors instead of emitting silently partial calendar totals', () => {
+  const next = vi.fn(),
     fail = vi.fn();
-  const stop = subscribePersonalReport({} as Firestore, 'a', next, fail, [], {
-    from: '2026-10-08T00:00:00Z',
-    to: '2026-10-09T00:00:00Z',
-  });
-  const starts = listeners.get('users/a/records:startedAt')!,
-    ends = listeners.get('users/a/records:endedAt')!;
-  const batch = { docs: [r('closed', '2026-10-08T13:00:00Z')], metadata };
-  starts.next(batch);
-  ends.next(batch);
-  const parent = listeners.get('projects/p')!;
-  parent.next({ data: () => ({ type: 'work', topics: [] }), metadata });
-  const confirmed = next.mock.lastCall![0];
-  starts.next({ docs: [], metadata });
-  expect(next.mock.lastCall![0].coherent).toBe(false);
-  expect(next.mock.lastCall![0].repository).toBe(confirmed.repository);
-  expect(next.mock.lastCall![0].fromCache).toBe(false);
-  expect(
-    (await next.mock.lastCall![0].repository.loadContext(['a'])).length,
-  ).toBe(1);
-  parent.error(
-    Object.assign(new Error('denied'), { code: 'permission-denied' }),
-  );
-  expect(next.mock.lastCall![0].coherent).toBe(false);
-  expect(await next.mock.lastCall![0].repository.loadContext(['a'])).toEqual(
-    [],
-  );
-  const count = next.mock.calls.length;
-  parent.next({ data: () => ({ type: 'work', topics: [] }), metadata });
-  expect(next).toHaveBeenCalledTimes(count);
-  ends.next({ docs: [], metadata });
-  expect(next.mock.lastCall![0].coherent).toBe(true);
-  expect(await next.mock.lastCall![0].repository.loadContext(['a'])).toEqual(
-    [],
-  );
-  stop();
-  expect(fail).not.toHaveBeenCalled();
-});
-it('retains last snapshot provisionally until metadata of a new project arrives', async () => {
-  const next = vi.fn<(snapshot: PersonalReportSnapshot) => void>(),
-    fail = vi.fn();
-  const stop = subscribePersonalReport({} as Firestore, 'a', next, fail, [], {
-    from: '2026-10-08T00:00:00Z',
-    to: '2026-10-09T00:00:00Z',
-  });
-  const starts = listeners.get('users/a/records:startedAt')!,
-    ends = listeners.get('users/a/records:endedAt')!;
-  starts.next({ docs: [r('open')], metadata });
-  ends.next({ docs: [], metadata });
-  listeners
-    .get('projects/p')!
-    .next({ data: () => ({ type: 'work', topics: [] }), metadata });
-  const confirmed = next.mock.lastCall![0];
-  const moved = {
-    id: 'open',
-    data: () => ({ ...r('open').data(), projectId: 'q' }),
-  };
-  starts.next({ docs: [moved], metadata });
-  expect(next.mock.lastCall![0]).toMatchObject({
-    coherent: false,
-    fromCache: false,
-    hasPendingWrites: false,
-  });
-  expect(next.mock.lastCall![0].repository).toBe(confirmed.repository);
-  listeners
-    .get('projects/q')!
-    .next({ data: () => ({ type: 'work', topics: [] }), metadata });
-  expect(next.mock.lastCall![0].coherent).toBe(true);
-  expect(
-    (await next.mock.lastCall![0].repository.loadContext(['a']))[0].projectId,
-  ).toBe('q');
-  stop();
-  expect(fail).not.toHaveBeenCalled();
+  subscribePersonalReport(db, 'alice', next, fail, [], range);
+  emit(state({ complete: false }));
+  emit(state({ error: 'IndexedDB unavailable' }));
+  expect(next).not.toHaveBeenCalled();
+  expect(fail.mock.lastCall?.[0].message).toContain('IndexedDB');
 });

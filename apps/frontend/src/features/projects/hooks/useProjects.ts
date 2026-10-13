@@ -7,6 +7,7 @@ import {
 } from '../../../data/sources/authorized-project-source';
 import { projectRepository } from '../../../data/cache/project-repository';
 import type { ProjectScope } from '../project-list';
+import { workspaceRetry } from '../../../data/sync/workspace-runtime';
 
 /** Query results are projected from the SDK cache/live listeners, never cached Callable payloads. */
 export function useProjects(
@@ -35,7 +36,6 @@ export function useProjects(
   });
   useEffect(() => {
     let active = true;
-    let ready = false;
     setState({
       uid,
       db,
@@ -55,8 +55,13 @@ export function useProjects(
       uid,
       (snapshot) => {
         if (active) {
-          ready ||= snapshot.complete;
-          setState({ ...snapshot, uid, db, loading: !ready, error: '' });
+          setState({
+            ...snapshot,
+            uid,
+            db,
+            loading: !snapshot.complete,
+            error: '',
+          });
         }
       },
       () => {
@@ -98,6 +103,7 @@ export function useProjects(
         (row.data.type === 'personal' ? 'personal' : 'work') === scope,
     ),
     retry: () => {
+      workspaceRetry(db, uid);
       projectRepository.invalidate();
       setAttempt((value) => value + 1);
     },

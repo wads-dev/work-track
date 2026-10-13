@@ -194,6 +194,11 @@
       "development": "./src/reports/application/get-personal-report.ts",
       "default": "./lib/reports/application/get-personal-report.js"
     },
+    "./reports/application/get-topic-report": {
+      "types": "./lib/reports/application/get-topic-report.d.ts",
+      "development": "./src/reports/application/get-topic-report.ts",
+      "default": "./lib/reports/application/get-topic-report.js"
+    },
     "./reports/application/get-project-report": {
       "types": "./lib/reports/application/get-project-report.d.ts",
       "development": "./src/reports/application/get-project-report.ts",

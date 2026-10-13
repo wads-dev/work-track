@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react';
+import { isDeletedRecord } from '../data/cache/record-deletion';
 import {
-  isDeletedRecord,
-  createDeletionObserver,
-} from '../data/cache/record-deletion';
-import {
-  collection,
-  limit,
-  onSnapshot,
-  query,
-  Timestamp,
-  type Firestore,
-} from 'firebase/firestore';
+  observeWorkspace,
+  workspaceRetry,
+} from '../data/sync/workspace-runtime';
+import { Timestamp, type Firestore } from 'firebase/firestore';
 
 export type Row = { id: string; data: Record<string, unknown> };
 export function text(value: unknown, fallback = 'Não informado'): string {
@@ -48,46 +42,41 @@ export function useRows(db: Firestore, path: string, maxRows = 100) {
     loading: boolean;
     error: string;
   }>({ rows: [], loading: true, error: '' });
-  const [attempt, setAttempt] = useState(0);
+  const uid = path.split('/')[1] ?? '';
   useEffect(() => {
     setState({ rows: [], loading: true, error: '' });
-    const records = path.endsWith('/records');
-    const observeDeletion = createDeletionObserver(path.split('/')[1]);
-    let alive = true;
-    const stop = onSnapshot(
-      query(collection(db, path), ...(records ? [] : [limit(maxRows)])),
-      (snapshot) => {
-        if (!alive) return;
-        if (records)
-          observeDeletion(
-            snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() })),
-          );
-        setState({
-          rows: snapshot.docs
-            .map((doc) => ({
-              id: doc.id,
-              data: doc.data() as Record<string, unknown>,
-            }))
-            .filter((row) => !records || !isDeletedRecord(row.data))
-            .slice(0, maxRows),
-          loading: false,
-          error: '',
-        });
-      },
-      () => {
-        if (!alive) return;
-        setState({
-          rows: [],
-          loading: false,
-          error:
-            'Não foi possível ler os dados. Confira sua conexão e a permissão de acesso.',
-        });
-      },
-    );
-    return () => {
-      alive = false;
-      stop();
-    };
-  }, [db, path, attempt, maxRows]);
-  return { ...state, retry: () => setAttempt((value) => value + 1) };
+    return observeWorkspace(db, uid, (snapshot) => {
+      const prefix = path + '/';
+      const parentPath = path.split('/').slice(0, 4).join('/');
+      const parent = snapshot.records.find((row) => row.path === parentPath);
+      const visible =
+        parent &&
+        !isDeletedRecord(parent.data) &&
+        snapshot.projects.some(
+          (project) => project.id === parent.data.projectId,
+        );
+      setState({
+        rows:
+          snapshot.complete && visible
+            ? (snapshot.audits ?? [])
+                .filter(
+                  (row) =>
+                    row.path.startsWith(prefix) &&
+                    row.path.split('/').length === 6,
+                )
+                .sort((a, b) =>
+                  a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+                )
+                .slice(0, maxRows)
+                .map((row) => ({
+                  id: row.path.split('/').at(-1)!,
+                  data: row.data,
+                }))
+            : [],
+        loading: !snapshot.complete && !snapshot.error,
+        error: snapshot.error,
+      });
+    });
+  }, [db, uid, path, maxRows]);
+  return { ...state, retry: () => workspaceRetry(db, uid) };
 }

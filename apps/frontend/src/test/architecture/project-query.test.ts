@@ -51,7 +51,7 @@ describe('privacy query lifetime regressions', () => {
     expect(selector).not.toContain('onChange(searchQuery)');
   });
 });
-it('project catalog uses Firestore subscriptions without Callable payload caching', () => {
+it('project catalog observes complete local materialization with zero remote reads', () => {
   const hook = readFileSync(
     new URL('../../features/projects/hooks/useProjects.ts', import.meta.url),
     'utf8',
@@ -63,8 +63,37 @@ it('project catalog uses Firestore subscriptions without Callable payload cachin
   expect(hook).toContain('subscribeAuthorizedProjects(');
   expect(hook).not.toContain('loadAllProjects');
   expect(hook).not.toContain('listProjects');
-  expect(source).toContain("['cache', 'default']");
-  expect(source).toContain('authorized.size === 2');
+  expect(source).toContain('observeWorkspace(db, uid');
+  expect(source).toContain('snapshot.complete ? snapshot.projects : []');
+  expect(source).toContain('fromCache: !snapshot.complete');
+  expect(source).toContain('complete: snapshot.complete');
+  for (const remote of ['onSnapshot', 'getDocs', 'getDoc(', 'httpsCallable']) {
+    expect(source).not.toContain(remote);
+    expect(hook).not.toContain(remote);
+  }
+});
+it('topic detail runs the local usecase only on coherent authorized state', () => {
+  const details = source('../../features/reports/TopicDetails.tsx');
+  expect(details).toContain('subscribeAuthorizedReport(');
+  expect(details).toContain('if (!snapshot.coherent) return;');
+  expect(details).toContain('void getTopicReport(');
+  expect(details).toContain(
+    'new LocalTopicReportRepository(snapshot.repository)',
+  );
+  expect(details).toContain('projectAccessRevision() === access');
+  expect(details).toContain('deletionRevision(uid) === deletion');
+  expect(details).toContain('version === revision');
+  expect(details).toContain('validateTopicReport(');
+  const repository = source('../../data/sources/local-topic-report.ts');
+  expect(repository).toContain('!isDeletedRecord(record)');
+  expect(repository).toContain(
+    "project.type !== 'personal' || record.uid === snapshot.viewer",
+  );
+  expect(repository).toContain('personalOwnerUid !== this.source.viewer');
+  expect(repository).toContain('this.projectRepository.readPage(');
+  for (const text of [details, repository])
+    for (const remote of ['onSnapshot', 'getDoc(', 'getDocs', 'httpsCallable'])
+      expect(text).not.toContain(remote);
 });
 it('report errors remain visible and retries reopen project subscriptions', () => {
   for (const file of ['PersonalPage', 'ProjectReport']) {
