@@ -15,6 +15,13 @@ const m = vi.hoisted(() => ({
     fail: (e: Error) => void;
     stop: ReturnType<typeof vi.fn>;
   }[],
+  cacheListeners: [] as {
+    target: Target;
+    options: Options;
+    next: (s: Snapshot) => void;
+    fail: (e: Error) => void;
+    stop: ReturnType<typeof vi.fn>;
+  }[],
   cache: new Map<string, LocalDocument[]>(),
   disable: vi.fn(async () => {}),
   enable: vi.fn(async () => {}),
@@ -34,6 +41,10 @@ vi.mock('firebase/firestore', () => ({
     fail: (e: Error) => void,
   ) => {
     const stop = vi.fn();
+    if (options.source === 'cache') {
+      m.cacheListeners.push({ target, options, next, fail, stop });
+      return stop;
+    }
     m.listeners.push({ target, options, next, fail, stop });
     return stop;
   },
@@ -94,6 +105,7 @@ async function send(path: string, rows: LocalDocument[]) {
 afterEach(() => {
   vi.unstubAllGlobals();
   m.listeners = [];
+  m.cacheListeners = [];
   m.cache.clear();
   vi.clearAllMocks();
 });
@@ -336,4 +348,43 @@ it('audit observer mounted before authentication session acquires its demand whe
   ).toBe(true);
   observer();
   stop();
+});
+
+it('collection-wide cache-only notification reflects deletion absent from partial indexed remote view', async () => {
+  env();
+  const stop = startWorkspaceSession(db, 'alice');
+  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  const target = m.listeners.find((l) =>
+    l.target.key.includes('group:records'),
+  )!;
+  const all = [
+    { path: 'users/alice/records/a', data: { uid: 'alice', projectId: 'p' } },
+    { path: 'users/alice/records/z', data: { uid: 'alice', projectId: 'p' } },
+  ];
+  m.cache.set(JSON.stringify(['group:records']), all);
+  target.next({
+    metadata: { fromCache: false, hasPendingWrites: false },
+    size: 1,
+    docChanges: () => [],
+  });
+  await settle();
+  let snapshot: WorkspaceSnapshot | undefined;
+  const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
+  expect(snapshot!.records).toHaveLength(2);
+  m.cache.set(JSON.stringify(['group:records']), all.slice(0, 1));
+  m.cacheListeners[0].next({
+    metadata: { fromCache: true, hasPendingWrites: false },
+    size: 1,
+    docChanges: () => [{}],
+  });
+  await settle();
+  expect(snapshot!.records).toHaveLength(1);
+  expect(m.cacheListeners).toHaveLength(1);
+  expect(m.cacheListeners[0].options.source).toBe('cache');
+  expect(
+    m.listeners.filter((l) => l.target.key.includes('group:records')),
+  ).toHaveLength(1);
+  observe();
+  stop();
+  expect(m.cacheListeners[0].stop).toHaveBeenCalledOnce();
 });

@@ -112,9 +112,12 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
   const projectStops = new Map<string, () => void>();
   const auditStops = new Map<string, () => void>();
   let catalogStops: (() => void)[] = [];
+  let cacheRecordsStop = () => {};
+  const recordCacheReaders = new Map<string, () => Promise<void>>();
   const fail = (error: unknown) => {
     if (disposed) return;
     epoch++;
+    cacheRecordsStop();
     catalogStops.forEach((stop) => stop());
     projectStops.forEach((stop) => stop());
     auditStops.forEach((stop) => stop());
@@ -233,6 +236,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
         if (current()) fail(error);
       }
     };
+    if (collectionName === 'records') recordCacheReaders.set(key, readLocal);
     const remote = onSnapshot(
       target,
       { includeMetadataChanges: true },
@@ -268,6 +272,8 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
       live = false;
       serial++;
       remote();
+      if (recordCacheReaders.get(key) === readLocal)
+        recordCacheReaders.delete(key);
       ready.delete(key);
     };
   };
@@ -356,6 +362,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
   };
   const start = () => {
     epoch++;
+    cacheRecordsStop();
     catalogStops.forEach((s) => s());
     projectStops.forEach((s) => s());
     auditStops.forEach((s) => s());
@@ -370,6 +377,30 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     entry.snapshot = initialSnapshot();
     publishedKey = '';
     emit();
+    const token = epoch;
+    // Local collection-wide notification covers deletions absent from a
+    // partially-indexed remote view, without creating a remote query target.
+    traceFirestore('listen.cache.attach', {
+      collection: 'records',
+      remote: false,
+    });
+    cacheRecordsStop = onSnapshot(
+      query(collectionGroup(db, 'records')),
+      { source: 'cache', includeMetadataChanges: true },
+      (s) => {
+        if (disposed || token !== epoch) return;
+        traceFirestore('listen.cache.event', {
+          collection: 'records',
+          count: s.size,
+          changed: s.docChanges().length,
+          source: 'persistent-local',
+        });
+        for (const read of recordCacheReaders.values()) void read();
+      },
+      (error) => {
+        if (!disposed && token === epoch) fail(error);
+      },
+    );
     [
       query(collection(db, 'projects'), where('type', '==', 'work')),
       query(collection(db, 'projects'), where('createdBy', '==', uid)),
@@ -427,6 +458,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
   return () => {
     disposed = true;
     epoch++;
+    cacheRecordsStop();
     catalogStops.forEach((s) => s());
     projectStops.forEach((s) => s());
     auditStops.forEach((s) => s());
