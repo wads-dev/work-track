@@ -156,7 +156,7 @@ it('queries recent branches and compacts exact instants with one captured now an
       endedAt: '2026-10-11T02:30:00+02:00',
     },
     { id: 'chronologically-later', startedAt: '2026-10-10T23:30:00-02:00' },
-    { id: 'legacy-open', startedAt: '2026-09-01T00:00:00Z' },
+    { id: 'historical-open', startedAt: '2026-09-01T00:00:00Z' },
     { id: 'null-open', startedAt: '2026-09-02T00:00:00Z', endedAt: null },
     {
       id: 'span',
@@ -262,7 +262,7 @@ it('queries recent branches and compacts exact instants with one captured now an
       'lower-edge',
       'span',
       'null-open',
-      'legacy-open',
+      'historical-open',
     ]);
     expect(rest).toMatchObject({
       queriedAt: at.toISOString(),

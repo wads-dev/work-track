@@ -1,5 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type { WorkspaceSnapshot, LocalDocument } from './workspace-sync';
+it('synchronizes only explicit work and owner-qualified personal projects', () => {
+  env();
+  const stop = startWorkspaceSession(db, 'alice');
+  expect(
+    m.listeners.map((listener) => JSON.parse(listener.target.key)),
+  ).toEqual([
+    ['projects', ['type', '==', 'work']],
+    ['projects', ['type', '==', 'personal'], ['createdBy', '==', 'alice']],
+  ]);
+  stop();
+});
 type Target = { key: string };
 type Options = { source?: string; includeMetadataChanges: boolean };
 type Snapshot = {

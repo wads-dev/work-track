@@ -80,7 +80,7 @@ it('sorts offset dates by instant and ties by stable ASCII document ID across pa
   ]);
   expect(second).toMatchObject({ hasMore: false, nextCursor: null });
 });
-it('orders equal-instant Unicode legacy IDs by UTF-8, not UTF-16 or locale', () => {
+it('orders equal-instant Unicode historical IDs by UTF-8, not UTF-16 or locale', () => {
   const records = ['𐀀', '', 'a', 'Z'].map((id) => ({
     id,
     uid: 'alice',

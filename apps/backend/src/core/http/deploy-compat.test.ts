@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 
-it('exports only canonical topic callable after legacy retirement', () => {
+it('exports only canonical topic callable after historical retirement', () => {
   const entry = readFileSync(
     new URL('../../index.ts', import.meta.url),
     'utf8',

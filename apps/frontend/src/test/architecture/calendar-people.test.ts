@@ -242,7 +242,7 @@ it('formats a factual calendar from the public shared repository and use case', 
         topics: [],
       },
     ],
-    new Map([['p1', { topics: [] }]]),
+    new Map([['p1', { type: 'work', topics: [] }]]),
   );
   const result = await executeCalendarReport(
     ownCalendarRepository(repository, 'alice'),

@@ -168,7 +168,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
       targetRef = this.db.collection('projects').doc(input.targetProjectId);
     // Personal merges never read another UID's records, including stale canonical references.
     // UID equality also excludes spoofed owner-collection facts from preview and migration.
-    // deletedAt is legacy optional/null: Firestore has no missing-field predicate.
+    // deletedAt is historical optional/null: Firestore has no missing-field predicate.
     // Query project/owner first; residual tombstone selection precedes mutation limits.
     const recordsQuery = (source: ManagedProject) =>
       effectiveProjectType(source) === 'personal'

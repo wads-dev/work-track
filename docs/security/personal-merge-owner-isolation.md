@@ -2,7 +2,7 @@
 
 ## Scope
 
-The personal-project merge repository now queries only `users/{source.createdBy}/records`, with equality filters on both `projectId` and `uid`. Preview and execution use this same owner-scoped query after project ACL validation. Execution additionally checks the canonical path and personal owner before preparing migration writes. Work/legacy project collection-group behavior is unchanged.
+The personal-project merge repository now queries only `users/{source.createdBy}/records`, with equality filters on both `projectId` and `uid`. Preview and execution use this same owner-scoped query after project ACL validation. Execution additionally checks the canonical path and personal owner before preparing migration writes. Collection-group behavior for explicitly typed `work` projects is unchanged. Projects require `type: work` or `type: personal`; missing or invalid type denies access, without fallback.
 
 The patch changes only the project-management repository and its focused owner-isolation regression. It does not change Firestore rules, report behavior, UI history, or pause tooling. The pending release under review is `4d42a63`; pause tooling is separate and was not part of this runtime proof or deployment.
 

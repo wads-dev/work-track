@@ -63,8 +63,8 @@ const specs = [
     'Estudo pessoal demonstrativo sobre acessibilidade e prototipação de interfaces.',
   ],
   [
-    'legado',
-    'Migração do legado',
+    'estrutura',
+    'Migração da estrutura',
     'Projeto demonstrativo arquivado após concluir a migração e documentar o aprendizado.',
   ],
 ];

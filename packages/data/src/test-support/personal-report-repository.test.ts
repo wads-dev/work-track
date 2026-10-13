@@ -25,7 +25,7 @@ it('preserves full budget context and excludes inaccessible, deleted and foreign
       } as typeof base & { id: string; projectId: string },
     ],
     new Map([
-      ['work', { topics: [] }],
+      ['work', { type: 'work', topics: [] }],
       [
         'personal',
         { type: 'personal', createdBy: 'alice', archived: true, topics: [] },
@@ -57,7 +57,7 @@ it('uses consistent cursor ordering for mixed-case document IDs', async () => {
   const repo = new ClientPersonalReportRepository(
     'alice',
     ids.map((id) => ({ ...base, id, projectId: 'work' })),
-    new Map([['work', { topics: [] }]]),
+    new Map([['work', { type: 'work', topics: [] }]]),
   );
   const seen: string[] = [];
   let cursor: string | undefined;
@@ -76,8 +76,8 @@ it('reads selected page without dropping other-project budget context', async ()
       { ...base, id: 'selected', projectId: 'work' },
     ],
     new Map([
-      ['work', { topics: [] }],
-      ['other', { topics: [] }],
+      ['work', { type: 'work', topics: [] }],
+      ['other', { type: 'work', topics: [] }],
     ]),
     new Set(['selected']),
   );
@@ -97,7 +97,7 @@ it('refuses to silently truncate the context', async () => {
       id: String(i),
       projectId: 'work',
     })),
-    new Map([['work', { topics: [] }]]),
+    new Map([['work', { type: 'work', topics: [] }]]),
   );
   await expect(repo.loadContext(['alice'])).rejects.toThrow('2000 registros');
 });

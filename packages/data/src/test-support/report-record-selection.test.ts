@@ -167,8 +167,10 @@ for (const kind of [
 
     it('preserves omitted include-all reads but defaults supplied options to active projects', async () => {
       const repo = repository(kind, true);
-      const legacy = await repo.read();
-      expect(legacy!.records.some((r) => r.projectId === 'project')).toBe(true);
+      const historical = await repo.read();
+      expect(historical!.records.some((r) => r.projectId === 'project')).toBe(
+        true,
+      );
       expect((await repo.read({ projectId: 'project' }))!.records).toEqual([]);
       expect(
         (await repo.read({ projectId: 'project', includeArchived: true }))!
@@ -236,6 +238,7 @@ it('keeps company participants independent of selected person/date/topic', async
 
 it('fails rather than pretending a cyclic topic alias has canonical membership', async () => {
   const cyclic: ReportProjectMetadata = {
+    type: 'work',
     topics: [
       { id: 'a', title: 'A', mergedIntoTopicId: 'b' },
       { id: 'b', title: 'B', mergedIntoTopicId: 'a' },

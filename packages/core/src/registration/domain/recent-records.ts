@@ -16,7 +16,7 @@ export interface RecentRecordsRepository {
 const documentIdEncoder = new TextEncoder();
 function compareRecentDocumentIds(firstId: string, secondId: string) {
   // Firestore document IDs use UTF-8 byte order, including ASCII case and
-  // non-BMP legacy IDs; locale or UTF-16 string ordering is not equivalent.
+  // non-BMP historical IDs; locale or UTF-16 string ordering is not equivalent.
   const first = documentIdEncoder.encode(firstId);
   const second = documentIdEncoder.encode(secondId);
   for (let index = 0; index < Math.min(first.length, second.length); index++) {

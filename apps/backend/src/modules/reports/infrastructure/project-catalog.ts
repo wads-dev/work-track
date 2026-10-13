@@ -23,7 +23,7 @@ export function readProjectCatalog(
     'admin',
   ).readCatalog(ids);
 }
-/** Firebase residuals: archive/type are joined project metadata with legacy missing fields;
+/** Firebase residuals: archive/type are joined project metadata; type must be explicit;
  * tombstones can be absent or null. ISO-offset strings do not sort chronologically, so
  * a startedAt/endedAt lexical range would omit valid spanning records. Array-of-object
  * topic allocations and alias chains cannot be queried by a nested array member ID.

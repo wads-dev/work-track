@@ -22,6 +22,6 @@ Os doubles simulam `ReportRecordSelection` (projeto, pessoa, arquivamento, inter
 
 ## Perfis de compatibilidade
 
-Admin-owned/company preservam alocações não negativas e removem extras; Admin-project/Web-authorized preservam a aceitação histórica de negativos. Web-personal admite topics nullish, preserva extras das alocações e valida IDs próprios. Metadata Admin descarta todo o array de tópicos se um item for inválido; Web-personal filtra itens; Web-authorized retém o array raw. Tipos de projeto presentes e inválidos nunca se tornam legados compartilhados.
+Admin-owned/company preservam alocações não negativas e removem extras; Admin-project/Web-authorized preservam a aceitação histórica de negativos. Web-personal admite topics nullish, preserva extras das alocações e valida IDs próprios. Metadata Admin descarta todo o array de tópicos se um item for inválido; Web-personal filtra itens; Web-authorized retém o array raw. Tipos de projeto ausentes ou inválidos negam acesso; somente work/personal explícitos são autorizáveis.
 
 Build: `npm run build:packages` na raiz. Testes: `npm run test --workspace @work-track/data`, depois do build dos pacotes.

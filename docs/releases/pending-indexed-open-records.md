@@ -1,6 +1,6 @@
 # Pendências indexadas sem paginação
 
-Página e sino consultam registros canônicos por projeto autorizado com `where("endedAt", "==", null)`, sem limite ou cursor. O filtro de projeto preserva as regras atuais. Não foi criado endpoint de pendências; o catálogo existente ainda descobre projetos legados. Exclusões lógicas continuam ocultas; o sino conta abertos há mais de oito horas.
+Página e sino consultam registros canônicos por projeto autorizado com `where("endedAt", "==", null)`, sem limite ou cursor. O filtro de projeto preserva as regras atuais. Não foi criado endpoint de pendências; o catálogo exige projetos com `type` explícito `work` ou `personal`; ausência ou tipo inválido nega acesso, sem fallback. Exclusões lógicas continuam ocultas; o sino conta abertos há mais de oito horas.
 
 Firestore não retorna campos ausentes numa consulta `== null`. Escritores agora persistem null e leitores o normalizam para o contrato opcional do domínio.
 

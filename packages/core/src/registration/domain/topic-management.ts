@@ -153,12 +153,12 @@ export function previewTopicMerge(
         'not-found',
         'Tópico origem não existe neste projeto.',
       );
-    const legacyAlias =
+    const existingAlias =
       topic.mergedIntoTopicId &&
       resolveTopicId(project.topics, topic.id) === target.id;
     if (
       topic.id === 'general' ||
-      (!legacyAlias && (topic.archived || topic.mergedIntoTopicId))
+      (!existingAlias && (topic.archived || topic.mergedIntoTopicId))
     )
       throw new ProjectManagementError(
         'failed-precondition',

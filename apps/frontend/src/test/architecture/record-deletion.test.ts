@@ -265,7 +265,7 @@ it('native fixture executes document ID, owner, project and date predicates befo
   ).toBe(false);
   expectNoRemoteReads();
 });
-it('legacy undefined/null active, all nonnull malformed tombstones excluded', () => {
+it('existing undefined/null active, all nonnull malformed tombstones excluded', () => {
   for (const value of ['2026-10-09T00:00:00Z', '', false, 0, {}, []])
     expect(isDeletedRecord({ deletedAt: value })).toBe(true);
   expect(isDeletedRecord({})).toBe(false);
@@ -449,7 +449,7 @@ it('caps native raw pages and advances past tombstones without skipping live row
   expect(workspace.listeners).toHaveLength(2);
   expectNoRemoteReads();
 });
-it('pending selects native open history including legacy missing endings without truncation beyond 100 opens', async () => {
+it('pending selects native open history including existing missing endings without truncation beyond 100 opens', async () => {
   workspace.listeners.splice(0);
   const next = vi.fn();
   const stop = subscribeAuthorizedOwnRecords(
@@ -471,12 +471,12 @@ it('pending selects native open history including legacy missing endings without
       data: { projectId: 'p', endedAt },
     })),
   ];
-  const legacy: Row = { id: 'missing', data: { projectId: 'p' } };
+  const existing: Row = { id: 'missing', data: { projectId: 'p' } };
   const tombstones: Row[] = ['', false, 0, {}, []].map((deletedAt, i) => ({
     id: 'deleted-' + i,
     data: { projectId: 'p', endedAt: null, deletedAt },
   }));
-  emit(materialization([...rows, legacy, ...excluded, ...tombstones]));
+  emit(materialization([...rows, existing, ...excluded, ...tombstones]));
   await vi.waitFor(() => expect(next.mock.lastCall![0].fromCache).toBe(false));
   expect(next.mock.lastCall![0].rows).toHaveLength(152);
   expect(
@@ -487,7 +487,9 @@ it('pending selects native open history including legacy missing endings without
     ),
   ).toBe(true);
   expect(next.mock.lastCall![0].hasMore).toBe(false);
-  emit(materialization([...rows.slice(1), legacy, ...excluded, ...tombstones]));
+  emit(
+    materialization([...rows.slice(1), existing, ...excluded, ...tombstones]),
+  );
   await vi.waitFor(() => expect(next.mock.lastCall![0].fromCache).toBe(false));
   expect(next.mock.lastCall![0].rows).toHaveLength(151);
   // Revocation/removal replaces local state rather than retaining an old open row.

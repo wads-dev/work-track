@@ -468,7 +468,7 @@ describe('project report common topic contract', () => {
     const page: ReportPage = {
       records,
       nextCursor: null,
-      topicLabels: { old: 'Rótulo legado', code: 'Cache obsoleto' },
+      topicLabels: { old: 'Rótulo anterior', code: 'Cache obsoleto' },
       topics: aliases.project,
     };
     const repository = {

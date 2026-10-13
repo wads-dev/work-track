@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export interface ReportProjectMetadata {
-  type?: string;
+  type: string;
   createdBy?: string;
   archived?: boolean;
   mergedInto?: string;
@@ -20,13 +20,9 @@ const topicsSchema = z.array(
   }),
 );
 
-function projectType(value: unknown): string | undefined {
-  // An absent legacy type is shared; an invalid present type must never be absent.
-  return typeof value === 'string'
-    ? value
-    : value === undefined
-      ? undefined
-      : '__invalid__';
+function projectType(value: unknown): string {
+  // Missing and malformed types are invalid; neither can grant shared access.
+  return value === 'work' || value === 'personal' ? value : '__invalid__';
 }
 
 export function decodeReportProjectMetadata(
@@ -45,7 +41,7 @@ export function decodeReportProjectMetadata(
   }
   let topics: ReportProjectMetadata['topics'];
   if (mode === 'personal-web') {
-    // Filter individual entries, retaining topic extras and legacy alias values.
+    // Filter individual entries, retaining topic extras and historical alias values.
     const raw: unknown[] = Array.isArray(data.topics) ? data.topics : [];
     topics = raw.filter(
       (topic): topic is ReportProjectMetadata['topics'][number] => {

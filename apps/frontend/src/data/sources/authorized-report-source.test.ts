@@ -86,7 +86,7 @@ it('decodes project snapshots synchronously without mutating raw data or SDK met
   const raw = {
     type: 'work',
     topics: [{ id: 't', title: 'Title', custom: true }, null],
-    archived: 'legacy',
+    archived: 'existing',
     custom: { raw: true },
   };
   const snapshot = {
@@ -124,7 +124,7 @@ it('waits for complete atomic context and reports local errors without partial t
     hasPendingWrites: false,
   });
 });
-it('retains authorized raw extras and permissive negative legacy allocations', async () => {
+it('retains authorized raw extras and permissive negative existing allocations', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
@@ -136,14 +136,14 @@ it('retains authorized raw extras and permissive negative legacy allocations', a
   };
   const fact = row('r', {
     topics: [{ topicId: 't', percentage: -2, durationMinutes: -1 }],
-    originalText: 'legacy-extra',
+    originalText: 'existing-extra',
   });
   await emit(
     state({
       projects: [
         project('p', {
           topics: [topic],
-          archived: 'legacy',
+          archived: 'existing',
           custom: { raw: true },
         }),
       ],
@@ -153,13 +153,13 @@ it('retains authorized raw extras and permissive negative legacy allocations', a
   const repository = next.mock.lastCall![0].repository;
   expect(repository.projects.get('p')).toMatchObject({
     topics: [topic],
-    archived: 'legacy',
+    archived: 'existing',
     custom: { raw: true },
   });
   expect(await repository.loadContext(['alice'])).toEqual([
     expect.objectContaining({
       topics: [{ topicId: 't', percentage: -2, durationMinutes: -1 }],
-      originalText: 'legacy-extra',
+      originalText: 'existing-extra',
     }),
   ]);
   expect((await repository.loadContext(['alice']))[0].endedAt).toBeUndefined();
@@ -172,8 +172,8 @@ it('retains authorized raw extras and permissive negative legacy allocations', a
   ]);
   expect(fail).not.toHaveBeenCalled();
 });
-it.each([null, false, 0, {}, 'invalid'])(
-  'invalid metadata type %s never becomes legacy work',
+it.each([undefined, null, false, 0, {}, 'invalid'])(
+  'invalid metadata type %s never becomes existing work',
   async (type) => {
     const next = vi.fn();
     subscribeAuthorizedReport(db, 'viewer', next, vi.fn());
@@ -183,13 +183,13 @@ it.each([null, false, 0, {}, 'invalid'])(
     ).toEqual([]);
   },
 );
-it('keeps legacy parents and excludes absent parents and tombstones before field validation', async () => {
+it('keeps existing parents and excludes absent parents and tombstones before field validation', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
   await emit(
     state({
-      projects: [project('p', { type: undefined })],
+      projects: [project('p', { type: 'work' })],
       records: [
         row('live', { deletedAt: null }),
         row('deleted', { deletedAt: false, topics: 'invalid' }),

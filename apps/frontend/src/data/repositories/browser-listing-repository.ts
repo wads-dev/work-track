@@ -172,10 +172,10 @@ export async function readProjectListing(
     const clauses: QueryConstraint[] = [
       where(documentId(), 'in', ids.slice(start, start + 30)),
     ];
-    if (options.scope === 'personal')
-      clauses.push(where('type', '==', 'personal'));
+    if (options.scope === 'personal' || options.scope === 'work')
+      clauses.push(where('type', '==', options.scope));
     // Archived-only has no missing-field inclusion: query the union of archived
-    // flags and merge targets, including the empty-string legacy merge marker.
+    // flags and merge targets, including the empty-string existing merge marker.
     // Separate AND branches also stay within Firestore's 30-disjunction ID cap.
     const branches =
       options.archive === 'archived'
@@ -194,15 +194,14 @@ export async function readProjectListing(
       );
   }
   const candidates = [...new Map(rows.map((row) => [row.id, row])).values()];
-  // Firebase has no predicate for missing fields. Work includes legacy missing
-  // type; active includes missing archived/mergedInto. Substring/full-text and
+  // Firebase has no predicate for missing fields. Active includes missing
+  // archived/mergedInto. Substring/full-text and
   // properties inside embedded topic arrays are also unsupported. The archived
   // union is native; its range can include higher Firestore types, so validate
   // the string merge marker and ACL after deduplicating the two query branches.
   const selected = candidates.filter((row) => {
     if (!authorizedIds.has(row.id) || !canAccessProject(row.data, uid))
       return false;
-    if (options.scope === 'work' && row.data.type === 'personal') return false;
     const archived =
       row.data.archived === true || typeof row.data.mergedInto === 'string';
     if (

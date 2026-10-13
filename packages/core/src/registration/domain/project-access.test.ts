@@ -6,7 +6,7 @@ import {
   assertProjectMergeAccess,
   effectiveProjectType,
 } from './project-access.js';
-it('owner-only personal, shared legacy/work, malformed fail closed', () => {
+it('owner-only personal, shared explicit work, malformed fail closed', () => {
   expect(
     canAccessProject({ type: 'personal', createdBy: 'alice' }, 'alice'),
   ).toBe(true);
@@ -15,9 +15,21 @@ it('owner-only personal, shared legacy/work, malformed fail closed', () => {
   ).toBe(false);
   expect(canAccessProject({ type: 'personal' }, 'alice')).toBe(false);
   expect(canAccessProject({ type: 'work' }, 'bob')).toBe(true);
-  expect(canAccessProject({}, 'bob')).toBe(true);
+  const confidentialWork = {
+    type: 'work',
+    confidential: true,
+    createdBy: 'alice',
+  };
+  expect(canAccessProject(confidentialWork, 'bob')).toBe(true);
+  for (const project of [{}, { type: undefined }, { type: 'unknown' }]) {
+    expect(canAccessProject(project, 'alice')).toBe(false);
+    expect(() => assertProjectAccess(project, 'alice')).toThrow(
+      'Projeto não encontrado.',
+    );
+  }
+  expect(canAccessProject({}, 'bob')).toBe(false);
   expect(canAccessProject({ type: 'weird' }, 'bob')).toBe(false);
-  expect(effectiveProjectType({})).toBe('work');
+  expect(effectiveProjectType({})).toBe('invalid');
   for (const p of [undefined, { type: 'personal', createdBy: 'alice' }])
     expect(() => assertProjectAccess(p, 'bob')).toThrow(
       'Projeto não encontrado.',
@@ -45,7 +57,7 @@ it('merges never broaden personal scope or transfer other owners', () => {
       'alice',
     ),
   ).toThrow('Projeto não encontrado.');
-  expect(() =>
-    assertProjectMergeAccess({}, { type: 'work' }, 'bob'),
-  ).not.toThrow();
+  expect(() => assertProjectMergeAccess({}, { type: 'work' }, 'bob')).toThrow(
+    'Projeto não encontrado.',
+  );
 });

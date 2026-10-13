@@ -10,7 +10,7 @@ export interface Topic {
 }
 export interface Project {
   color?: string | null;
-  type?: 'personal' | 'work';
+  type: 'personal' | 'work';
   githubUrl?: string | null;
   confidential?: boolean;
   publicAlias?: string;

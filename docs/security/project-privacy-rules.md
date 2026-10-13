@@ -18,11 +18,11 @@ as identity or use hardcoded privileged client accounts.
 | `projects/{id}` get, `type: personal`                        | Only `createdBy == request.auth.uid`; owner must be a nonempty string of at most 128 characters |
 | Project get, missing/null/malformed personal owner           | Deny to everyone                                                                                |
 | Project get, `type: work`                                    | Company shared, independent of creator                                                          |
-| Project get, missing `type`                                  | Legacy work, preserving existing explicit organizational sharing                                |
+| Project get, missing `type`                                  | Deny to everyone; explicit `work` or `personal` type is required, without fallback              |
 | Project get, any other `type` (including null)               | Deny to everyone                                                                                |
 | Project list/query, including owner/work filters             | Deny; use authorized `listProjects` callable                                                    |
 | `users/{uid}/records/{id}` get/list for path owner           | Allow complete own history, including personal, malformed and orphaned records                  |
-| Other user's canonical record get                            | Allow only if a valid `projectId` resolves to an existing current work/legacy-work project      |
+| Other user's canonical record get                            | Allow only if a valid `projectId` resolves to an existing current explicitly typed work project |
 | Other user's record list/query                               | Deny, even when filtering a work project                                                        |
 | Record `audit` get/list                                      | Only canonical record path owner; not project owner or company coworkers                        |
 | Any client `collectionGroup('records')` query                | Deny, including UID-filtered collection-group queries                                           |
@@ -32,7 +32,8 @@ as identity or use hardcoded privileged client accounts.
 
 A record's denormalized `uid`, `type`, and `projectSnapshot` do not authorize
 cross-user access. Authorization follows its current project document, not a
-stale snapshot; project disappearance or invalid type removes coworker access.
+stale snapshot; project disappearance or missing/invalid type removes coworker access.
+Projects require explicit `type: work` or `type: personal`, without fallback.
 Project IDs use the existing registration contract `[A-Za-z0-9_-]{1,128}` to
 avoid accepting path-like references. Record ownership follows the canonical
 path, not a spoofable payload field. An owner's malformed/orphaned history is
@@ -135,7 +136,7 @@ Final execution on 2026-10-09: **250 passed, 0 failed, 0 skipped/cancelled**
 This is actual emulator rules execution, not only a string/regex assertion on
 the rules source; it does not claim production deployment or privileged API tests.
 
-Coverage: owner/coworker personal get, work/legacy get, malformed enum/owner,
+Coverage: owner/coworker personal get, work get and missing-type denial, malformed enum/owner,
 project list/query/filtered query, own whole-history and ordered query,
 other-personal/invalid/orphan record gets, work record gets, cross-user lists,
 collection-group queries, nested topics/audit, strict record-owner audit,

@@ -26,7 +26,7 @@ const nonnegativeTopics = z
     }),
   )
   .default([]);
-const legacyTopics = z
+const permissiveTopics = z
   .array(
     z.object({
       topicId: z.string(),
@@ -41,10 +41,10 @@ const adminCompanySchema = z.object({
   ...fields,
   topics: nonnegativeTopics,
 });
-const legacySchema = z.object({
+const permissiveSchema = z.object({
   uid: z.string(),
   ...fields,
-  topics: legacyTopics,
+  topics: permissiveTopics,
 });
 const personalTopics = z
   .custom<ReportSourceRecord['topics']>(
@@ -82,7 +82,7 @@ export function reportRecordSchema(
 ): typeof adminCompanySchema;
 export function reportRecordSchema(
   mode: 'admin-project' | 'authorized-web',
-): typeof legacySchema;
+): typeof permissiveSchema;
 export function reportRecordSchema(
   mode: 'personal-web',
 ): typeof personalWebSchema;
@@ -94,7 +94,7 @@ export function reportRecordSchema(mode: ReportRecordMode) {
       return adminCompanySchema;
     case 'admin-project':
     case 'authorized-web':
-      return legacySchema;
+      return permissiveSchema;
     case 'personal-web':
       return personalWebSchema;
   }

@@ -37,9 +37,10 @@ it('Admin adapter maps getAll snapshots, skips data on missing documents and per
 it('Admin catalog uses100-document batches, preserves archive metadata and rejects invalid types without repairing topics', async () => {
   const metadata = new Map<string, Record<string, unknown>>([
     [
-      'legacy',
+      'historical',
       {
-        archived: 'legacy',
+        type: 'work',
+        archived: 'historical',
         mergedInto: 'target',
         topics: [{ id: 't', title: 'Title', extra: 'strip' }],
       },
@@ -64,15 +65,15 @@ it('Admin catalog uses100-document batches, preserves archive metadata and rejec
     getAll,
   } as unknown as Firestore;
   const ids = [
-    'legacy',
+    'historical',
     'invalid',
     'private',
     ...Array.from({ length: 101 }, (_, i) => 'missing' + i),
   ];
-  const catalog = await readProjectCatalog(db, [...ids, 'legacy']);
+  const catalog = await readProjectCatalog(db, [...ids, 'historical']);
   expect(getAll.mock.calls.map((batch) => batch.length)).toEqual([100, 4]);
   expect(catalog.size).toBe(3);
-  expect(catalog.get('legacy')).toMatchObject({
+  expect(catalog.get('historical')).toMatchObject({
     archived: true,
     mergedInto: 'target',
     topics: [{ id: 't', title: 'Title' }],
@@ -81,27 +82,27 @@ it('Admin catalog uses100-document batches, preserves archive metadata and rejec
     type: '__invalid__',
     topics: [],
   });
-  const records = ['legacy', 'invalid', 'private'].map((projectId) => ({
+  const records = ['historical', 'invalid', 'private'].map((projectId) => ({
     id: projectId,
     uid: 'alice',
     projectId,
-    startedAt: 'legacy',
+    startedAt: 'historical',
     timeZone: 'UTC',
     topics: [],
   }));
   const tombstone = {
     ...records[0],
     id: 'removed',
-    deletedAt: 'legacy',
+    deletedAt: 'historical',
   } as ReportSourceRecord;
   expect(
     selectReportRecords([...records, tombstone], catalog, {
       viewerUid: 'alice',
     }).map((r) => r.id),
-  ).toEqual(['legacy']);
+  ).toEqual(['historical']);
   expect(
     selectReportRecords(records, catalog, { companyOnly: true }).map(
       (r) => r.id,
     ),
-  ).toEqual(['legacy']);
+  ).toEqual(['historical']);
 });

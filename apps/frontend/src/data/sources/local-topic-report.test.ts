@@ -229,6 +229,7 @@ it('archived history requires explicit inclusion and alias cycles fail closed', 
       [
         'w',
         {
+          type: 'work',
           topics: [
             { id: 'x', title: 'X', mergedIntoTopicId: 'old' },
             { id: 'old', title: 'Old', mergedIntoTopicId: 'x' },

@@ -376,15 +376,15 @@ describe('versioned bounded complete deletion inventory', () => {
       expect([...f.data]).toEqual(before);
     },
   );
-  it('rejects legacy omitted-inventory digest and expired/wrong-identity receipts', async () => {
-    for (const kind of ['legacy', 'expired', 'uid', 'project']) {
+  it('rejects historical omitted-inventory digest and expired/wrong-identity receipts', async () => {
+    for (const kind of ['historical', 'expired', 'uid', 'project']) {
       const f = fixture();
       const old = await f.repo.exportProject('p', 'alice');
       seedNewInventory(f);
       const receipt = f.data.get(
         'projectDeletionExports/' + old.snapshotToken,
       )!;
-      if (kind === 'legacy') {
+      if (kind === 'historical') {
         delete receipt.inventoryVersion;
         receipt.digest = createHash('sha256')
           .update(JSON.stringify(old.export.documents))

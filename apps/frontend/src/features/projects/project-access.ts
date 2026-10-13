@@ -18,11 +18,7 @@ export function scopeDisabledReason(
     return 'Projeto indisponível: Pessoal exige o criador; Global exige autenticação.';
   if (project.archived === true || project.mergedInto || project.mergeLock)
     return 'Projeto arquivado, mesclado ou bloqueado: alteração indisponível.';
-  if (
-    project.type !== undefined &&
-    project.type !== 'personal' &&
-    project.type !== 'work'
-  )
+  if (project.type !== 'personal' && project.type !== 'work')
     return 'Escopo não identificado: alteração indisponível.';
   return '';
 }

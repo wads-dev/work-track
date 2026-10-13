@@ -17,7 +17,7 @@ type QueryState = {
 };
 function setup(
   pages: Document[][],
-  projects: Record<string, DailyProject> = { a: {} },
+  projects: Record<string, DailyProject> = { a: { type: 'work' } },
 ) {
   let reads = 0,
     historyReads = 0;
@@ -188,7 +188,7 @@ describe('read-only daily-hours own canonical repository', () => {
       source('r' + i, { uid: 'untrusted' }),
     );
     const mock = setup([first, [source('last', { projectId: 'personal' })]], {
-      a: {},
+      a: { type: 'work' },
       personal: { type: 'personal', createdBy: 'alice' },
     });
     const result = await mock.repository.loadOwnHistory('alice');
@@ -219,7 +219,7 @@ describe('read-only daily-hours own canonical repository', () => {
         ],
       ],
       {
-        a: {},
+        a: { type: 'work' },
         foreign: { type: 'personal', createdBy: 'bob' },
         invalidtype: { type: 123 },
       },
@@ -266,7 +266,10 @@ describe('read-only daily-hours own canonical repository', () => {
       source('future', { startedAt: '2026-11-01T09:00:00Z' }),
       source('other', { projectId: 'b' }),
     ];
-    const mock = setup([facts], { a: {}, b: { archived: true } });
+    const mock = setup([facts], {
+      a: { type: 'work' },
+      b: { type: 'work', archived: true },
+    });
     const selection = daySelection(false);
     const context = await mock.repository.loadOwnHistory(
       'alice',
@@ -312,9 +315,9 @@ describe('read-only daily-hours own canonical repository', () => {
       source('open', { startedAt: '2026-10-09T14:00:00-03:00' }),
     ];
     const mock = setup([facts], {
-      a: {},
-      b: { archived: true },
-      c: { mergedInto: 'a' },
+      a: { type: 'work' },
+      b: { type: 'work', archived: true },
+      c: { type: 'work', mergedInto: 'a' },
     });
     const context = await mock.repository.loadOwnHistory(
       'alice',
@@ -337,9 +340,9 @@ describe('read-only daily-hours own canonical repository', () => {
       closedMinutes: 0,
     });
     const archived = await setup([facts], {
-      a: {},
-      b: { archived: true },
-      c: { mergedInto: 'a' },
+      a: { type: 'work' },
+      b: { type: 'work', archived: true },
+      c: { type: 'work', mergedInto: 'a' },
     }).repository.loadOwnHistory('alice', 'b', daySelection(false));
     expect(archived.records).toHaveLength(3);
     expect(archived.selectedRecords).toEqual([]);
@@ -358,8 +361,8 @@ describe('read-only daily-hours own canonical repository', () => {
       }),
     ];
     const context = await setup([facts], {
-      a: {},
-      b: { archived: true },
+      a: { type: 'work' },
+      b: { type: 'work', archived: true },
     }).repository.loadOwnHistory('alice', 'a', daySelection(false));
     expect(context.records.map((r) => r.id)).toEqual([
       'open',
@@ -457,8 +460,8 @@ describe('read-only daily-hours own canonical repository', () => {
     expect(mock.options).toBeUndefined();
     await expect(
       setup([[source('corrupt-other', { projectId: 'b', startedAt: 'bad' })]], {
-        a: {},
-        b: { archived: true },
+        a: { type: 'work' },
+        b: { type: 'work', archived: true },
       }).repository.loadOwnHistory('alice', 'a', daySelection(false)),
     ).rejects.toMatchObject({ code: 'resource-exhausted' });
   });

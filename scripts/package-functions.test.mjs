@@ -165,7 +165,6 @@ test(
         'mergeTopics',
         'moveTopic',
         'getTopicReport',
-        'discoverLegacyProjectIds',
         'getCalendarReport',
         'getCompanyReport',
         'getPersonalReport',

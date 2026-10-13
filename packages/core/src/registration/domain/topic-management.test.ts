@@ -12,6 +12,7 @@ const topics = ['general', 'a', 'b', 'c'].map((id) => ({
   description: 'Synthetic topic',
 }));
 const project: Project = {
+  type: 'work',
   id: 'p',
   title: 'Project',
   description: 'Synthetic project scope',

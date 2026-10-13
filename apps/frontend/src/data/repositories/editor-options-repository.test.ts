@@ -26,11 +26,12 @@ afterEach(() => {
   expect(nativeCache.getDocsFromServer).not.toHaveBeenCalled();
   expect(nativeCache.onSnapshot).not.toHaveBeenCalled();
 });
-it('queries current authorized project IDs natively and preserves legacy active options', async () => {
+it('queries current authorized project IDs natively and preserves existing active options', async () => {
   nativeCache.seed([
     {
       path: 'projects/p',
       data: {
+        type: 'work',
         title: 'Project',
         topics: [
           { id: 'active', title: 'Active' },
@@ -40,19 +41,32 @@ it('queries current authorized project IDs natively and preserves legacy active 
         ],
       },
     },
-    { path: 'projects/hidden', data: { title: 'Secret', confidential: true } },
-    { path: 'projects/archived', data: { title: 'Archive', archived: true } },
-    { path: 'projects/merged', data: { title: 'Merged', mergedInto: 'p' } },
+    {
+      path: 'projects/hidden',
+      data: { type: 'work', title: 'Secret', confidential: true },
+    },
+    {
+      path: 'projects/archived',
+      data: { type: 'work', title: 'Archive', archived: true },
+    },
+    {
+      path: 'projects/merged',
+      data: { type: 'work', title: 'Merged', mergedInto: 'p' },
+    },
     {
       path: 'projects/locked',
-      data: { title: 'Locked', mergeLock: { requestId: 'merge' } },
+      data: {
+        type: 'work',
+        title: 'Locked',
+        mergeLock: { requestId: 'merge' },
+      },
     },
     {
       path: 'projects/foreign',
       data: { title: 'Foreign', type: 'personal', createdBy: 'other' },
     },
     { path: 'projects/invalid', data: { title: 'Invalid', type: 'invalid' } },
-    { path: 'projects/revoked', data: { title: 'Revoked' } },
+    { path: 'projects/revoked', data: { type: 'work', title: 'Revoked' } },
   ]);
   const ids = [
     'p',
@@ -94,6 +108,7 @@ it('retains current archived/locked project and selected retired topics without 
     {
       path: 'projects/p',
       data: {
+        type: 'work',
         title: 'Secret',
         confidential: true,
         archived: true,
@@ -125,7 +140,7 @@ it('retention never bypasses current ACL, allowlist, uid isolation or malformed 
       path: 'projects/foreign',
       data: { title: 'Foreign', type: 'personal', createdBy: 'other' },
     },
-    { path: 'projects/revoked', data: { title: 'Revoked' } },
+    { path: 'projects/revoked', data: { type: 'work', title: 'Revoked' } },
   ]);
   const repo = new EditorOptionsRepository(
     nativeCache.db,
@@ -162,7 +177,10 @@ it('batches native in queries at Firestore limit without truncating options', as
     (_, index) => 'p' + String(index).padStart(2, '0'),
   );
   nativeCache.seed(
-    ids.map((id) => ({ path: 'projects/' + id, data: { title: id } })),
+    ids.map((id) => ({
+      path: 'projects/' + id,
+      data: { type: 'work', title: id },
+    })),
   );
   const result = await new EditorOptionsRepository(
     nativeCache.db,
@@ -205,6 +223,7 @@ it('prepared options and checkbox commands preserve allocations without mutating
       {
         id: 'p',
         data: {
+          type: 'work',
           title: 'Project',
           topics: [{ id: 'old', archived: true }, { id: 'active' }],
         },

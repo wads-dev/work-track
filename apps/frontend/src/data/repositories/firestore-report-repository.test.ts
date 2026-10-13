@@ -178,7 +178,7 @@ it('batches project and person in predicates without dropping combinations or du
     });
   }
 });
-it('preserves missing/null legacy tombstones and opens while excluding non-null tombstones before schema checks', async () => {
+it('preserves missing/null existing tombstones and opens while excluding non-null tombstones before schema checks', async () => {
   const repo = fixture(
     [
       row('missing', { endedAt: undefined }),
@@ -188,7 +188,7 @@ it('preserves missing/null legacy tombstones and opens while excluding non-null 
       ),
       row('orphan', { projectId: 'gone', topics: 'bad' }),
     ],
-    [project('p', { type: undefined })],
+    [project('p', { type: 'work' })],
   );
   const context = await repo.own().loadContext(['alice']);
   expect(context.map((r) => r.id)).toEqual(['missing', 'null']);
@@ -230,7 +230,7 @@ it('queries full-spanning closed intervals, old missing/null opens and offset IS
   ).toEqual(['offset', 'old-missing', 'old-null', 'spanning']);
   expect(recordQueries()).toHaveLength(3);
 });
-it('matches legacy shared domain interval math, overlap sums, UTC-offset clipping and open 6h cap without daily cap', async () => {
+it('matches existing shared domain interval math, overlap sums, UTC-offset clipping and open 6h cap without daily cap', async () => {
   const records = [
     row('span', {
       startedAt: '2026-10-07T22:00:00-03:00',
@@ -388,15 +388,15 @@ it('qualifies cursors by owner and pushes pagination through documentId predicat
     value: 'same',
   });
 });
-it('queries active/archived legacy parents but never narrows full-context estimate facts', async () => {
+it('queries active/archived existing parents but never narrows full-context estimate facts', async () => {
   const repo = fixture(
     [
-      row('legacy', closed),
+      row('existing', closed),
       row('archived', { ...closed, projectId: 'a' }),
       row('merged', { ...closed, projectId: 'm' }),
     ],
     [
-      project('p', { type: undefined, archived: undefined }),
+      project('p', { type: 'work', archived: undefined }),
       project('a', { archived: true }),
       project('m', { mergedInto: 'p' }),
     ],
@@ -405,7 +405,7 @@ it('queries active/archived legacy parents but never narrows full-context estima
     (await repo.own().readPage('alice', 100, undefined, {})).records.map(
       (r) => r.id,
     ),
-  ).toEqual(['legacy']);
+  ).toEqual(['existing']);
   expect(
     (
       await repo
@@ -540,10 +540,10 @@ it('preserves Firestore owner segment ordering across UID prefixes during compan
 it('retains historical authorized calendar/project codecs separately from strict personal report codecs', async () => {
   const repo = fixture(
     [
-      row('legacy', {
+      row('existing', {
         ...closed,
         topics: [{ topicId: 'x', percentage: -1 }],
-        originalText: 'legacy',
+        originalText: 'existing',
       }),
     ],
     [project('p', { topics: [{ id: 'x', title: 'X' }] })],
@@ -551,7 +551,7 @@ it('retains historical authorized calendar/project codecs separately from strict
   await expect(repo.own().readPage('alice', 100)).rejects.toThrow();
   const page = await repo.calendar().own.readPage('alice', 100);
   expect(page.records[0]).toMatchObject({
-    originalText: 'legacy',
+    originalText: 'existing',
     topics: [{ percentage: -1 }],
   });
   expect(

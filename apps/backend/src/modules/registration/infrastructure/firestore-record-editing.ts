@@ -143,7 +143,7 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
     });
   }
   async listOpenRecords(uid: string, limit: number, excludeRecordId?: string) {
-    // Legacy missing fields cannot use equality-to-null or != tombstone filters.
+    // Historical missing fields cannot use equality-to-null or != tombstone filters.
     // Scan complete snapshot; exclude tombstones before active result limits.
     let query: FirebaseFirestore.Query = this.db
       .collection('users')

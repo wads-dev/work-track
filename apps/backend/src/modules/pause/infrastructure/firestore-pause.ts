@@ -104,7 +104,7 @@ export class FirestorePauseRepository implements PauseRepository {
             'resource-exhausted',
             'Contexto excede limite; informe recordId explícito.',
           );
-        // Repository residual: legacy endedAt/deletedAt may be missing or null,
+        // Repository residual: historical endedAt/deletedAt may be missing or null,
         // ISO-offset timestamps cannot use chronological lexical ranges, and project
         // ACL/archive/locks live in another document (Firestore has no joins).
         const open = scanned.docs.filter((doc) => {

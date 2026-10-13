@@ -98,7 +98,7 @@ export class FirestoreReportRepository implements CompanyReportRepository {
         throw new Error('Registro canônico inválido.');
       const project = projects.get(String(data.projectId));
       // Firestore has no join with current project ACL and no missing-field predicate.
-      // Legacy tombstones/open fields remain absent: neither ==null nor != filters are equivalent.
+      // Existing tombstones/open fields remain absent: neither ==null nor != filters are equivalent.
       if (
         !project ||
         !canAccessProject(project, this.viewer) ||
@@ -165,7 +165,7 @@ export class FirestoreReportRepository implements CompanyReportRepository {
         .filter(
           ([, p]) =>
             canAccessProject(p, this.viewer) &&
-            (own || p.type === undefined || p.type === 'work') &&
+            (own || p.type === 'work') &&
             (!selection ||
               selection.includeArchived ||
               (!p.archived && !p.mergedInto)),
@@ -243,7 +243,7 @@ export class FirestoreReportRepository implements CompanyReportRepository {
             if (bounds && branch === 2 && row.endedAt !== undefined) continue;
             // Arbitrary ISO offsets are not sortable instants, and topic arrays contain objects
             // with optional weights. Exact overlap/alias matching cannot be expressed against
-            // these legacy fields: all supported owner/project/date guards above run in DB.
+            // these existing fields: all supported owner/project/date guards above run in DB.
             if (selection?.from || selection?.to) {
               const start = Date.parse(row.startedAt),
                 end =

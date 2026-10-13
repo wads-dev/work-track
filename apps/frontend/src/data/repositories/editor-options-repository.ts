@@ -41,7 +41,7 @@ export function selectProjectTopics(project: Record<string, unknown>) {
 }
 
 /** Residual over native-query candidates, also usable with prepared test data.
- * Firestore inequalities omit absent fields. Legacy archived/mergedInto/mergeLock
+ * Firestore inequalities omit absent fields. Existing archived/mergedInto/mergeLock
  * and confidential fields default to active/unmerged/unlocked/public, so their
  * falsy-or-absent predicates cannot be expressed by a Firestore query. Retaining
  * the current selected project intentionally overrides only these states, not ACL.

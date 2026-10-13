@@ -64,7 +64,7 @@ function record(uid: string, id: string, projectId: string, patch: Data = {}) {
 function metadata() {
   return new Map<string, Data>([
     ['work', { type: 'work', topics: [{ id: 'general', title: 'Geral' }] }],
-    ['legacy', { createdBy: 'bob' }],
+    ['historical', { type: 'work', createdBy: 'bob' }],
     ['alice-private', { type: 'personal', createdBy: 'alice' }],
     ['bob-private', { type: 'personal', createdBy: 'bob' }],
     ['invalid', { type: 'unrecognized', createdBy: 'alice' }],
@@ -263,7 +263,7 @@ describe('company reports use only current work-project metadata', () => {
   it('excludes all personal projects, including both owners, before counting', async () => {
     const rows = UIDS.flatMap((uid) => [
       record(uid, 'a-work', 'work'),
-      record(uid, 'b-legacy', 'legacy'),
+      record(uid, 'b-historical', 'historical'),
       ...HIDDEN_PROJECTS.map((id) => record(uid, 'hidden-' + id, id)),
     ]);
     const mock = sdk(rows);
@@ -273,9 +273,9 @@ describe('company reports use only current work-project metadata', () => {
     expect(page.nextCursor).toBeNull();
     expect(page.records.map((r) => [r.uid, r.projectId])).toEqual([
       ['alice', 'work'],
-      ['alice', 'legacy'],
+      ['alice', 'historical'],
       ['bob', 'work'],
-      ['bob', 'legacy'],
+      ['bob', 'historical'],
     ]);
     expect(mock.collectionGroup).toHaveBeenCalledExactlyOnceWith('records');
     expect(mock.getAll).toHaveBeenCalled();
@@ -444,13 +444,13 @@ describe('company reports use only current work-project metadata', () => {
 
 describe('personal report reads are owner-path and current-metadata scoped', () => {
   it.each(UIDS)(
-    'returns only %s own records and accessible projects, including legacy work',
+    'returns only %s own records and accessible projects, including historical work',
     async (uid) => {
       const other = uid === 'alice' ? 'bob' : 'alice';
       const mock = sdk([
         record(uid, 'a-work', 'work', { uid: other }),
         record(uid, 'b-own', uid + '-private'),
-        record(uid, 'c-legacy', 'legacy'),
+        record(uid, 'c-historical', 'historical'),
         record(uid, 'd-stale', other + '-private', {
           startedAt: null,
           topics: 'poison',
@@ -465,7 +465,7 @@ describe('personal report reads are owner-path and current-metadata scoped', () 
       expect(page.records.map((r) => [r.id, r.uid])).toEqual([
         ['a-work', uid],
         ['b-own', uid],
-        ['c-legacy', uid],
+        ['c-historical', uid],
       ]);
       expect(page).toMatchObject({ scannedCount: 3, nextCursor: null });
       expect(mock.userDoc).toHaveBeenCalledExactlyOnceWith(uid);
@@ -500,6 +500,8 @@ describe('project report authorization precedes any data or topic disclosure', (
       { type: 'personal', createdBy: 'bob' },
       'alice',
     ],
+    ['missing type', { createdBy: 'alice' }, 'alice'],
+    ['missing type other viewer', { createdBy: 'alice' }, 'bob'],
     ['unknown type', { type: 'unknown', createdBy: 'alice' }, 'alice'],
     ['invalid type shape', { type: null, createdBy: 'bob' }, 'bob'],
     ['ownerless personal', { type: 'personal' }, 'alice'],
@@ -619,7 +621,7 @@ describe('project report authorization precedes any data or topic disclosure', (
     },
   );
 
-  it.each(['work', 'legacy'])(
+  it.each(['work', 'historical'])(
     'allows both viewers to read shared %s and preserves both UID records',
     async (projectId) => {
       for (const viewer of UIDS) {

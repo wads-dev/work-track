@@ -1,4 +1,4 @@
-/** Legacy undefined/null markers remain active; any other marker fails closed. */
+/** historical undefined/null markers remain active; any other marker fails closed. */
 export function isDeletedRecord(record: unknown): boolean {
   return Boolean(
     record &&

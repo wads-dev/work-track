@@ -25,7 +25,7 @@ it('reuses the project use case with full personal budget context before selecti
       },
     ],
     new Map([
-      ['work', { topics: [] }],
+      ['work', { type: 'work', topics: [] }],
       ['personal', { type: 'personal', createdBy: 'alice', topics: [] }],
     ]),
   );

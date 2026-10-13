@@ -5,7 +5,7 @@ import { FirestoreTopicManagementRepository } from './firestore-topic-management
 it.each([
   'normal',
   'inbound-alias',
-  'legacy-alias',
+  'historical-alias',
   'participants',
   'percentages',
   'minutes',
@@ -22,7 +22,7 @@ it.each([
       description: 'Synthetic topic',
     }));
     const values = new Map<string, Record<string, unknown>>([
-      ['projects/p', { id: 'p', topics }],
+      ['projects/p', { id: 'p', type: 'work', topics }],
       [
         'users/u/records/r',
         {
@@ -36,6 +36,7 @@ it.each([
     if (scenario === 'inbound-alias')
       values.set('projects/p', {
         id: 'p',
+        type: 'work',
         topics: [
           ...topics,
           {
@@ -47,9 +48,10 @@ it.each([
           },
         ],
       });
-    if (scenario === 'legacy-alias') {
+    if (scenario === 'historical-alias') {
       values.set('projects/p', {
         id: 'p',
+        type: 'work',
         topics: topics.map((t) =>
           t.id === 'a' ? { ...t, archived: true, mergedIntoTopicId: 'b' } : t,
         ),
@@ -219,7 +221,7 @@ it.each([
       key.includes('/topicMerges/'),
     )![1];
     expect(audit.before).toEqual(
-      scenario === 'legacy-alias'
+      scenario === 'historical-alias'
         ? topics.map((t) =>
             t.id === 'a' ? { ...t, archived: true, mergedIntoTopicId: 'b' } : t,
           )

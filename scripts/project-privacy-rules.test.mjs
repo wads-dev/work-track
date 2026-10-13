@@ -229,8 +229,8 @@ before(async () => {
   const projects = [
     ['work', { type: 'work', createdBy: alice }],
     ['work-bob', { type: 'work', createdBy: bob, confidential: true }],
-    ['legacy', { createdBy: alice }],
-    ['legacy-no-owner', {}],
+    ['shared', { type: 'work', createdBy: alice }],
+    ['shared-no-owner', { type: 'work' }],
     ['personal-alice', { type: 'personal', createdBy: alice }],
     ['personal-bob', { type: 'personal', createdBy: bob }],
     ['personal-no-owner', { type: 'personal' }],
@@ -240,6 +240,7 @@ before(async () => {
     ['personal-map-owner', { type: 'personal', createdBy: { uid: alice } }],
     ['personal-empty-owner', { type: 'personal', createdBy: '' }],
     ['personal-long-owner', { type: 'personal', createdBy: 'x'.repeat(129) }],
+    ['missing-type', { createdBy: alice }],
     ['bad-type', { type: 'company', createdBy: alice }],
     ['null-type', { type: null, createdBy: alice }],
     ['number-type', { type: 1, createdBy: alice }],
@@ -269,10 +270,11 @@ before(async () => {
   }
   const records = [
     ['work', { projectId: 'work' }],
-    ['legacy', { projectId: 'legacy' }],
-    ['legacy-no-owner', { projectId: 'legacy-no-owner' }],
+    ['shared', { projectId: 'shared' }],
+    ['shared-no-owner', { projectId: 'shared-no-owner' }],
     ['personal', { projectId: 'personal-alice', type: 'work', uid: alice }],
     ['personal-bob', { projectId: 'personal-bob' }],
+    ['missing-type', { projectId: 'missing-type' }],
     ['bad-type', { projectId: 'bad-type' }],
     ['bad-owner', { projectId: 'personal-no-owner' }],
     [
@@ -393,7 +395,7 @@ test('project authorization: public authenticated and own personal', async (t) =
     'public means any authenticated provider; private uses parent owner only',
     async () => {
       for (const token of [aliceToken, bobToken, external]) {
-        for (const p of ['work', 'legacy', 'legacy-no-owner'])
+        for (const p of ['work', 'shared', 'shared-no-owner'])
           await allowed(get('projects/' + p, token));
         await allowed(get('users/' + alice + '/records/work', token));
         await denied(
@@ -414,6 +416,7 @@ test('project authorization: public authenticated and own personal', async (t) =
     'invalid parents, forged snapshots and own orphan history fail closed',
     async () => {
       for (const id of [
+        'missing-type',
         'bad-type',
         'bad-owner',
         'orphan',
@@ -429,6 +432,10 @@ test('project authorization: public authenticated and own personal', async (t) =
           await denied(get('users/' + alice + '/records/' + id, token));
       }
       await denied(get('projects/bad-type', aliceToken));
+      for (const token of [aliceToken, bobToken]) {
+        await denied(get('projects/missing-type', token));
+        await allowed(get('projects/work-bob', token));
+      }
     },
   );
   await t.test(
@@ -448,6 +455,9 @@ test('project authorization: public authenticated and own personal', async (t) =
         }),
       );
       await denied(list('projects', aliceToken));
+      await denied(
+        query('', 'projects', aliceToken, { where: equal('createdBy', alice) }),
+      );
       await denied(
         query('', 'projects', undefined, { where: equal('type', 'work') }),
       );
@@ -549,26 +559,26 @@ test('project authorization: public authenticated and own personal', async (t) =
       await allowed(write('projects/client-project', p, aliceToken));
       await allowed(
         write(
-          'projects/legacy',
-          { ...validProject('legacy', alice), type: 'personal' },
+          'projects/shared',
+          { ...validProject('shared', alice), type: 'personal' },
           bobToken,
         ),
       );
-      await denied(get('projects/legacy', bobToken));
+      await denied(get('projects/shared', bobToken));
       await allowed(
-        write('projects/legacy', validProject('legacy', alice), aliceToken),
+        write('projects/shared', validProject('shared', alice), aliceToken),
       );
       await allowed(
         write(
-          'projects/legacy-no-owner',
-          { id: 'legacy-no-owner', title: 'Edited legacy' },
+          'projects/shared-no-owner',
+          { id: 'shared-no-owner', type: 'work', title: 'Edited shared' },
           bobToken,
         ),
       );
       await denied(
         write(
-          'projects/legacy-no-owner',
-          { id: 'legacy-no-owner', createdBy: bob },
+          'projects/shared-no-owner',
+          { id: 'shared-no-owner', createdBy: bob },
           bobToken,
         ),
       );
@@ -898,7 +908,9 @@ test('native project creation can read a missing key without granting private pr
   assert.equal((await get('projects/native-new', aliceToken)).status, 404);
   await denied(get('projects/personal-bob', aliceToken));
   await allowed(
-    query('', 'projects', aliceToken, { where: equal('createdBy', alice) }),
+    query('', 'projects', aliceToken, {
+      where: and(equal('type', 'personal'), equal('createdBy', alice)),
+    }),
   );
   await allowed(
     batch(

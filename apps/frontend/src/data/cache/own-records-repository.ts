@@ -93,7 +93,7 @@ export function createOwnRecordsRepository() {
               if (!alive || epoch !== generation || uid !== account) return;
               observeDeletion(rows);
               // Native listings already exclude tombstones; retain lifecycle
-              // validation for legacy raw connectors, with coherent totals.
+              // validation for existing raw connectors, with coherent totals.
               const visible = listing
                 ? rows
                 : rows.filter((row) => !isDeletedRecord(row.data));

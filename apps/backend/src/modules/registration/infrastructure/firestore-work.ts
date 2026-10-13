@@ -76,7 +76,9 @@ export class FirestoreWorkRepository implements WorkRepository {
           query = query
             .where('type', '==', 'personal')
             .where('createdBy', '==', uid);
-        // Work/all must include legacy missing type; Firestore has no is-missing predicate.
+        else if (options?.scope === 'work')
+          query = query.where('type', '==', 'work');
+        else query = query.where('type', 'in', ['work', 'personal']);
         const snapshot = await query.limit(limit).get();
         return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
       },
@@ -126,6 +128,9 @@ export class FirestoreWorkRepository implements WorkRepository {
         query = query
           .where('type', '==', 'personal')
           .where('createdBy', '==', uid);
+      else if (input.scope === 'work')
+        query = query.where('type', '==', 'work');
+      else query = query.where('type', 'in', ['work', 'personal']);
       query = query.orderBy(FieldPath.documentId());
       if (after) query = query.startAfter(after);
       const batchLimit = Math.min(101, 1001 - scanned);

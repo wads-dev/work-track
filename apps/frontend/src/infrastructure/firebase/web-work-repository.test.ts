@@ -69,6 +69,7 @@ vi.mock('firebase/firestore', () => {
 import { WebWorkRepository } from './web-work-repository';
 const repo = new WebWorkRepository({} as Firestore);
 const project = {
+  type: 'work' as const,
   title: 'Projeto',
   description: 'Descrição generosa suficiente para validar metadados.',
   createdBy: 'alice',
@@ -95,7 +96,7 @@ beforeEach(() => {
   state.data.set('projects/p', project);
   state.data.set('users/alice/records/r', record);
 });
-it('allows authenticated noncreator work/legacy writes and atomic actor audit, retries same intent', async () => {
+it('allows authenticated noncreator work/existing writes and atomic actor audit, retries same intent', async () => {
   const input = {
     projectId: 'p',
     requestId: 'req',
@@ -445,6 +446,7 @@ it('rejects inaccessible or scope-changed projects and archived or merged reuse 
   for (const metadata of [
     { type: 'personal', createdBy: 'bob' },
     { type: 'personal', createdBy: 'alice' },
+    { type: undefined },
     { type: 'work', archived: true },
     { type: 'work', mergeLock: 'job' },
     { type: 'work', mergedInto: 'target' },
@@ -454,7 +456,7 @@ it('rejects inaccessible or scope-changed projects and archived or merged reuse 
   }
   expect(state.writes).toHaveLength(0);
 });
-it('reuses readable legacy work projects without changing their scope or evidence', async () => {
+it('reuses readable existing work projects without changing their scope or evidence', async () => {
   const id = backendKey(createInput.title);
   state.data.set('projects/' + id, { ...project, id });
   expect(await repo.createProject(createInput, 'bob')).toEqual({

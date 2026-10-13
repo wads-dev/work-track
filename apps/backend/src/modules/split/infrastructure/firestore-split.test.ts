@@ -226,6 +226,8 @@ it('rejects opens, malformed times, invalid bounds, foreign sources and allocati
 it('rechecks destination ACL, missing metadata, archived and canonical topics', async () => {
   for (const project of [
     undefined,
+    { type: undefined },
+    { type: null },
     { type: 'personal', createdBy: 'bob' },
     { type: 'work', archived: true },
     {

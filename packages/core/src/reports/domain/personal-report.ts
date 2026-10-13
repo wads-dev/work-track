@@ -1,7 +1,7 @@
 import type { ReportSourceRecord } from './project-report.js';
 import type { TopicBreakdown } from './topic-breakdown.js';
 /** Repository-owned display selection; never apply to loadContext's global estimate facts.
- * Omitted options preserve legacy include-all reads; supplied options default to active projects.
+ * Omitted options preserve historical include-all reads; supplied options default to active projects.
  * Period selection is interval intersection, including spanning and open records.
  */
 export interface ReportRecordSelection {

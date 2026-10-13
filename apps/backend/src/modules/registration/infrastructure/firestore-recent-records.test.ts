@@ -114,7 +114,7 @@ it('deduplicates physical IDs and retains only missing/null-ended old-start resi
     [duplicate],
     [duplicate, { id: 'span', endedAt: '2026-10-11T00:00:00Z' }],
     [
-      { id: 'legacy-open' },
+      { id: 'historical-open' },
       { id: 'null-open', endedAt: null },
       { id: 'old-closed', endedAt: '2026-10-02T00:00:00Z' },
     ],
@@ -129,7 +129,7 @@ it('deduplicates physical IDs and retains only missing/null-ended old-start resi
     expect(records.map(({ id }) => id)).toEqual([
       'recent',
       'span',
-      'legacy-open',
+      'historical-open',
       'null-open',
     ]);
     expect(reads.limits).toEqual([2001, 2000, 1998]);

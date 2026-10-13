@@ -18,6 +18,7 @@ it('atomically audits edits, preserves immutable fields, and replays the same re
     topics: [{ topicId: 'general' }],
   });
   values.set('projects/project', {
+    type: 'work',
     title: 'Project',
     description: 'Description of project',
     topics: [{ id: 'general', title: 'Geral', description: 'General work' }],
@@ -193,9 +194,9 @@ it('pushes excluded record identity into the native owner query', async () => {
   ).toEqual(['previous']);
   expect(calls[0]?.slice(1)).toEqual(['!=', 'saved']);
 });
-it('lists nullable and legacy open records but not closed or deleted records', async () => {
+it('lists nullable and historical open records but not closed or deleted records', async () => {
   const rows = [
-    { id: 'legacy' },
+    { id: 'historical' },
     { id: 'nullable', endedAt: null },
     { id: 'closed', endedAt: '2026-10-08T11:00:00Z' },
     { id: 'deleted', endedAt: null, deletedAt: '2026-10-08T11:00:00Z' },
@@ -220,6 +221,6 @@ it('lists nullable and legacy open records but not closed or deleted records', a
   const repo = new FirestoreRecordEditingRepository(db);
   expect(
     (await repo.listOpenRecords('alice', 10)).records.map((r) => r.id),
-  ).toEqual(['legacy', 'nullable']);
+  ).toEqual(['historical', 'nullable']);
   expect((await repo.listOpenRecords('alice', 1)).partial).toBe(true);
 });

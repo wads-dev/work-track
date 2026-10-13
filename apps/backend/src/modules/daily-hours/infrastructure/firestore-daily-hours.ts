@@ -100,7 +100,7 @@ export class FirestoreDailyHoursRepository implements DailyHoursRepository {
           .doc(uid)
           .collection('records');
         // Never constrain global context by project, archive state or display dates.
-        // Missing/null deletedAt is active: Firestore cannot query both missing legacy
+        // Missing/null deletedAt is active: Firestore cannot query both missing historical
         // fields and null, so the tombstone residual is bounded by physicalLimit.
         let cursor: QueryDocumentSnapshot | undefined,
           scanned = 0;
@@ -184,7 +184,7 @@ export class FirestoreDailyHoursRepository implements DailyHoursRepository {
             )
               continue;
             // Exact epoch overlap is unsupported over persisted offset strings;
-            // endedAt equality/ranges also omit legacy records with a missing end.
+            // endedAt equality/ranges also omit historical records with a missing end.
             // Native owner/project/start-upper constraints precede this residual;
             // no lower start bound: spanning closed facts and old opens must survive.
             if (

@@ -18,11 +18,7 @@ export function compatibleMoveProject(
   target: Record<string, unknown>,
 ) {
   const type = (p: Record<string, unknown>) =>
-    p.type === 'personal'
-      ? 'personal'
-      : p.type === undefined || p.type === 'work'
-        ? 'work'
-        : '';
+    p.type === 'personal' ? 'personal' : p.type === 'work' ? 'work' : '';
   const aliases = (p: Record<string, unknown>) =>
     Array.isArray(p.topics) &&
     p.topics.some((t) => t && typeof t === 'object' && t.mergedIntoTopicId);

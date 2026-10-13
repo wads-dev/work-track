@@ -120,8 +120,7 @@ export class FirestoreSplitRepository implements SplitRepository {
         ? ({ ...destDoc.data(), id: destDoc.id } as Project)
         : undefined;
       const requiresSharedAcknowledgment =
-        origin?.type === 'personal' &&
-        (destination?.type === 'work' || destination?.type === undefined);
+        origin?.type === 'personal' && destination?.type === 'work';
       if (
         confirmed &&
         requiresSharedAcknowledgment &&

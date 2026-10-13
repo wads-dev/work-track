@@ -35,7 +35,7 @@ O navegador calcula relatórios com os mesmos casos de uso do core e repositóri
 
 Nomes, schemas públicos, URLs MCP/OAuth, coleções, documentos e algoritmos existentes são preservados. A extração não muda permissões Firestore nem a política de exclusão. Adaptadores mantêm paginação física e transações Admin onde são necessárias; listeners Web não simulam transação remota. Leitura completa não significa atomicidade conjunta de facts e catálogo: o loader Admin atual transaciona facts, mas lê parents separadamente.
 
-Os decoders de leitura toleram legados conforme o perfil; schemas de escrita continuam mais restritos. Autorização precede decodificação de conteúdo privado nos caminhos que já exigiam essa ordem. Diretório completo de pessoas e labels de relatório são capacidades distintas.
+Os decoders de leitura toleram representações históricas de registros conforme o perfil; schemas de escrita continuam mais restritos. Projetos exigem `type` explícito `work` ou `personal`; ausência ou tipo inválido nega acesso, sem fallback. Autorização precede decodificação de conteúdo privado nos caminhos que já exigiam essa ordem. Diretório completo de pessoas e labels de relatório são capacidades distintas.
 
 ## Validação
 

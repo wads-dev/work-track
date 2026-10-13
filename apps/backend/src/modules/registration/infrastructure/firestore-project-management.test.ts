@@ -4,6 +4,7 @@ import { FirestoreProjectManagementRepository } from './firestore-project-manage
 it('previews without writes then resumes bounded audited batches and preserves evidence', async () => {
   const values = new Map<string, Record<string, unknown>>();
   const base = {
+    type: 'work',
     title: 'Project',
     description: 'Project description long',
     topics: [{ id: 'general', title: 'Geral', description: 'Default' }],

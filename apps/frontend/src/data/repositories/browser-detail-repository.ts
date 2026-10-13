@@ -187,13 +187,12 @@ export class BrowserDetailRepository {
       }
     }
     const byId = new Map(rows.map((row) => [row.id, row.data]));
-    // Firebase cannot test absent fields: legacy work type and confidentiality
-    // default to work/public. The supported ID allowlist is queried above.
+    // Firebase cannot test absent confidentiality fields; the presentation
+    // default is public. The supported ID allowlist is queried above.
     const available = options.global
       ? rows.filter(
           (row) =>
-            row.data.type !== 'personal' &&
-            !isHidden(row.data, options.revealed),
+            row.data.type === 'work' && !isHidden(row.data, options.revealed),
         )
       : rows;
     const projectOptions = available.map((row) => {
@@ -212,7 +211,7 @@ export class BrowserDetailRepository {
       Boolean(
         selectedProject &&
         (!options.global ||
-          (selectedProject.type !== 'personal' &&
+          (selectedProject.type === 'work' &&
             !isHidden(selectedProject, options.revealed))),
       );
     const topics = selectCalendarTopics(

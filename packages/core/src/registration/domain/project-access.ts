@@ -3,7 +3,7 @@ export type ProjectAccessMetadata = { type?: string; createdBy?: string };
 export function effectiveProjectType(
   project: ProjectAccessMetadata,
 ): 'personal' | 'work' | 'invalid' {
-  return project.type === undefined || project.type === 'work'
+  return project.type === 'work'
     ? 'work'
     : project.type === 'personal'
       ? 'personal'

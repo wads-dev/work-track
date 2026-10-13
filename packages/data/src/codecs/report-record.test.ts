@@ -7,13 +7,13 @@ import {
 const fact = {
   uid: 'payload',
   projectId: 'project',
-  startedAt: 'legacy-not-an-iso-date',
-  timeZone: 'legacy-zone',
+  startedAt: 'historical-not-an-iso-date',
+  timeZone: 'historical-zone',
   originalText: 'private',
 };
 describe('explicit report record reader modes', () => {
-  it.each([undefined, null, 'legacy-ended'])(
-    'keeps nullish end normalization without validating legacy timestamps %s',
+  it.each([undefined, null, 'historical-ended'])(
+    'keeps nullish end normalization without validating historical timestamps %s',
     (endedAt) => {
       const raw = { ...fact, endedAt };
       const schemas = [

@@ -31,7 +31,7 @@ import {
   createProjectOptionRepository,
 } from './browser-listing-repository';
 const db = {} as Firestore;
-const allowed = new Set(['p', 'legacy', 'private', 'archived', 'revoked']);
+const allowed = new Set(['p', 'existing', 'private', 'archived', 'revoked']);
 const record = (id: string, data: Record<string, unknown> = {}) =>
   mocks.docs.set('users/alice/records/' + id, {
     uid: 'alice',
@@ -75,15 +75,15 @@ beforeEach(() => {
     },
   );
 });
-it('pushes supported project predicates into native cache and retains legacy absent fields', async () => {
-  mocks.docs.set('projects/legacy', { title: 'Legacy' });
+it('pushes supported project predicates into native cache and retains existing absent fields', async () => {
+  mocks.docs.set('projects/existing', { type: 'work', title: 'Existing' });
   mocks.docs.set('projects/private', { type: 'personal', createdBy: 'alice' });
   mocks.docs.set('projects/archived', { type: 'work', archived: true });
   const result = await readProjectListing(db, 'alice', allowed, {
     scope: 'work',
     archive: 'active',
   });
-  expect(result.rows.map((r) => r.id)).toEqual(['p', 'legacy']);
+  expect(result.rows.map((r) => r.id)).toEqual(['p', 'existing']);
   await readProjectListing(db, 'alice', allowed, {
     scope: 'personal',
     archive: 'archived',
@@ -102,8 +102,18 @@ it('pushes supported project predicates into native cache and retains legacy abs
   ]);
   expect(mocks.trace).toHaveBeenCalledWith(
     'cache.result',
-    expect.objectContaining({ count: 4 }),
+    expect.objectContaining({ count: 3 }),
   );
+});
+it('excludes missing project type from listings, direct reads and owner access', async () => {
+  mocks.docs.set('projects/existing', { title: 'Untyped', createdBy: 'alice' });
+  for (const scope of ['all', 'work', 'personal'] as const) {
+    const result = await readProjectListing(db, 'alice', allowed, { scope });
+    expect(result.rows.map((row) => row.id)).not.toContain('existing');
+  }
+  expect(
+    (await readProjectListing(db, 'alice', allowed, { id: 'existing' })).rows,
+  ).toEqual([]);
 });
 it('search uses masked display metadata, never hidden raw titles/descriptions/topics', async () => {
   mocks.docs.set('projects/private', {
@@ -166,7 +176,7 @@ it('queries uid/project/ID/date guards and rechecks current parent ACL before ex
   ).toEqual([]);
   expect(mocks.getDoc).toHaveBeenCalledWith({ path: 'projects/revoked' });
 });
-it('retains offset/date-spanning/open legacy records and paginates complete selected history', async () => {
+it('retains offset/date-spanning/open existing records and paginates complete selected history', async () => {
   for (let i = 0; i < 151; i++)
     record(String(i).padStart(3, '0'), { originalText: 'match' });
   record('deleted', { deletedAt: '2026-10-09T00:00:00Z' });
@@ -228,7 +238,7 @@ it('rejects incomplete/reversed date selection before any DB read', async () => 
   ).rejects.toThrow('duas datas');
   expect(mocks.get).not.toHaveBeenCalled();
 });
-it('pushes closed status/end guards and keeps legacy missing/null ends in open selection', async () => {
+it('pushes closed status/end guards and keeps existing missing/null ends in open selection', async () => {
   record('missing');
   record('null', { endedAt: null });
   record('closed', {
@@ -318,15 +328,19 @@ it('logs read/result counts for cache failures and never falls back remotely for
 });
 
 it('retains merged projects without archived flags and excludes them from active selection', async () => {
-  mocks.docs.set('projects/legacy', { title: 'merged', mergedInto: 'p' });
+  mocks.docs.set('projects/existing', {
+    type: 'work',
+    title: 'merged',
+    mergedInto: 'p',
+  });
   const active = await readProjectListing(db, 'alice', allowed, {
     archive: 'active',
   });
-  expect(active.rows.map((r) => r.id)).not.toContain('legacy');
+  expect(active.rows.map((r) => r.id)).not.toContain('existing');
   const archived = await readProjectListing(db, 'alice', allowed, {
     archive: 'archived',
   });
-  expect(archived.rows.map((r) => r.id)).toEqual(['legacy']);
+  expect(archived.rows.map((r) => r.id)).toEqual(['existing']);
 });
 it('covers writer-accepted offsets beyond fourteen hours without dropping civil-day overlap', async () => {
   record('offset', {
@@ -375,7 +389,7 @@ it('queries archived flags and merge markers natively, deduplicates the union an
   };
   const ids = new Set(Object.keys(fixtures));
   for (const [id, data] of Object.entries(fixtures))
-    mocks.docs.set('projects/' + id, data);
+    mocks.docs.set('projects/' + id, { type: 'work', ...data });
   mocks.docs.set('projects/not-authorized', { archived: true });
   const result = await readProjectListing(db, 'alice', ids, {
     archive: 'archived',

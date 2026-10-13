@@ -541,7 +541,7 @@ it('foreign personal and missing records produce identical errors without writes
   expect(await capture('r')).toEqual(await capture('missing'));
   expect(f.writes).not.toHaveBeenCalled();
 });
-it('rejects legacy subject parameters and actor injection in canonical topic schema', () => {
+it('rejects historical subject parameters and actor injection in canonical topic schema', () => {
   expect(
     moveTopicInput.safeParse({ ...input, subject_origin: 's' }).success,
   ).toBe(false);

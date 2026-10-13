@@ -29,9 +29,9 @@ export class ProjectDiscoveryRepository {
       );
     return ProjectDiscoveryRepository.selected(docs, uid, selection);
   }
-  /** Firebase cannot query missing type (legacy work), missing archived/mergedInto,
+  /** Firebase cannot query missing archived/mergedInto,
    * normalized substring/bigram similarity or nested topic-title search. Adapters
-   * push explicit personal type/owner predicates before these concrete residuals.
+   * push explicit work/personal type and personal owner predicates before these residuals.
    */
   static selected(
     docs: readonly ProjectDiscoveryDocument[],

@@ -24,7 +24,7 @@ export class FirestoreReportRecordsRepository implements ReportRecordsRepository
       .collectionGroup('records')
       .where('projectId', '==', projectId);
     if (personal) query = query.where('uid', '==', viewerUid);
-    // Missing/null deletedAt is active; Firestore equality/null drops missing legacy
+    // Missing/null deletedAt is active; Firestore equality/null drops missing historical
     // documents. Bound the unavoidable tombstone residual and fail before truncating.
     const snapshot = await query.limit(2001).get();
     if (snapshot.docs.length > 2000)

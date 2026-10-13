@@ -31,7 +31,7 @@ export function calendarQueryBounds(range: CalendarQueryRange) {
     upper: isoDateCandidatePrefix(to, 1),
   };
 }
-/** Local candidate branches, not listeners. Missing legacy endedAt requires an
+/** Local candidate branches, not listeners. Missing existing endedAt requires an
  * old-start branch and an open-only residual in the repository; OR/range support
  * does not provide an IS MISSING predicate. */
 export function calendarRecordQueries(

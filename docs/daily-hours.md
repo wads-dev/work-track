@@ -23,7 +23,7 @@ Reutiliza a política personal-v3 existente: todos os fatos próprios de projeto
 
 Histórico e metadados são carregados em transação Firestore readOnly: true, em páginas de 500 até conclusão. Limite operacional de 2000 registros próprios: exceder ou encontrar registro autorizado inválido causa erro, nunca total parcial. A identidade dentro do payload histórico não concede acesso: o caminho canônico users/{uid autenticado}/records determina o dono.
 
-ACL independente read-only: projeto legado sem type é work; work acessível; personal apenas createdBy correspondente; tipo malformado nega acesso. Referências históricas pessoais estrangeiras são excluídas antes de interpretar datas/estimativas. Projeto solicitado ausente ou inacessível responde genericamente “Projeto não encontrado”.
+ACL independente read-only: projeto exige `type` explícito `work` ou `personal`; `work` acessível à identidade corporativa autorizada; `personal` apenas com `createdBy` correspondente; ausência ou tipo inválido nega acesso, sem fallback. Referências históricas pessoais estrangeiras são excluídas antes de interpretar datas/estimativas. Projeto solicitado ausente ou inacessível responde genericamente “Projeto não encontrado”.
 
 ## Exemplo
 

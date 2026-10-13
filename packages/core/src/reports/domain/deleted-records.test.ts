@@ -102,6 +102,6 @@ it.each(['now', 0, false, {}, []])(
     expect(breakdown.unassignedMinutes).toBe(0);
   },
 );
-it.each([undefined, null])('legacy marker %s remains active', (deletedAt) =>
+it.each([undefined, null])('historical marker %s remains active', (deletedAt) =>
   expect(isDeletedRecord({ ...open, deletedAt })).toBe(false),
 );

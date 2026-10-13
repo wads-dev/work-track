@@ -27,7 +27,6 @@ const retiredWebCallables = [
   'mergeTopics',
   'moveTopic',
   'getTopicReport',
-  'discoverLegacyProjectIds',
 ];
 
 async function retirementScript() {
@@ -97,7 +96,7 @@ function assertRetirementCalls(calls, targets) {
   }
 }
 
-test('backend retirement deletes only the six deployed Web callables in the target region/codebase', async () => {
+test('backend retirement deletes only the configured deployed Web callables in the target region/codebase', async () => {
   const calls = await runRetirement([
     ...retiredWebCallables.map((name) => deployedCallable(name)),
     deployedCallable('mcp'),

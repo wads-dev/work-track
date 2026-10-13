@@ -94,7 +94,7 @@ function AccessForm({
   const scope =
     project.type === 'personal'
       ? 'personal'
-      : project.type === 'work' || project.type === undefined
+      : project.type === 'work'
         ? 'work'
         : '';
   const confidential = project.confidential === true;
@@ -255,11 +255,7 @@ function AccessForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={'personal'}>Pessoal</SelectItem>
-              <SelectItem value={'work'}>
-                {project.type === undefined
-                  ? 'Global · organização (legado)'
-                  : 'Global · organização'}
-              </SelectItem>
+              <SelectItem value={'work'}>Global · organização</SelectItem>
             </SelectContent>
           </Select>
           <p

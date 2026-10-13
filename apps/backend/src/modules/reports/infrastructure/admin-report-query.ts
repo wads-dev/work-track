@@ -12,7 +12,7 @@ import type { ReportRecordSelection } from '@work-track/core/reports/domain/pers
  * Two full days cover even +/-23:59 offsets accepted by the write schema, plus
  * truncation to a date prefix. Exact instant overlap stays in the repository.
  * Never add a lower startedAt bound: closed spans and old opens must survive.
- * A lower endedAt bound cannot cover legacy opens whose endedAt field is absent:
+ * A lower endedAt bound cannot cover historical opens whose endedAt field is absent:
  * Firestore inequalities/orderBy exclude missing fields and has no IS MISSING.
  */
 export function reportUpperDatePrefix(selection?: ReportRecordSelection) {

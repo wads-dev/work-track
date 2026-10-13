@@ -20,8 +20,9 @@ const catalog = [
   { id: 'a', type: 'personal', createdBy: 'alice', title: 'Private Alice' },
   { id: 'b', type: 'personal', createdBy: 'bob', title: 'Private Bob' },
   { id: 'c', type: 'work', createdBy: 'alice', title: 'Shared' },
-  { id: 'd', createdBy: 'bob', title: 'Legacy' },
+  { id: 'd', type: 'work', createdBy: 'bob', title: 'Shared Bob' },
   { id: 'e', type: 'invalid', title: 'Deny malformed' },
+  { id: 'f', createdBy: 'alice', title: 'Deny missing type' },
 ].map((p) => ({
   ...p,
   description: 'Synthetic project description',
@@ -30,11 +31,18 @@ const catalog = [
 })) as Project[];
 it('filters server authorized projects before pagination and rejects hidden or absent cursors identically', async () => {
   const query = (rows: Project[]) => ({
-    where: (field: string, _operator: string, value: string): unknown =>
+    where: (
+      field: string,
+      operator: string,
+      value: string | string[],
+    ): unknown =>
       query(
-        rows.filter(
-          (row) => (row as unknown as Record<string, unknown>)[field] === value,
-        ),
+        rows.filter((row) => {
+          const actual = (row as unknown as Record<string, unknown>)[field];
+          return operator === 'in'
+            ? (value as string[]).includes(actual as string)
+            : actual === value;
+        }),
       ),
     orderBy: (): unknown =>
       query([...rows].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))),
@@ -92,7 +100,7 @@ it('filters server authorized projects before pagination and rejects hidden or a
       await listProjectsHandler(repo, { scope: 'personal' }, auth('bob'))
     ).projects.map((p) => p.id),
   ).toEqual(['b']);
-  for (const cursor of ['b', 'missing'])
+  for (const cursor of ['b', 'f', 'missing'])
     await expect(
       listProjectsHandler(repo, { cursor }, auth('alice')),
     ).rejects.toMatchObject({

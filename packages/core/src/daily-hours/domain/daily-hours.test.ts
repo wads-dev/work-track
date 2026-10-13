@@ -27,7 +27,7 @@ const record = (
 const context = (
   records: ReportSourceRecord[],
   projects: DailyHoursContext['projects'] = new Map([
-    ['a', {}],
+    ['a', { type: 'work' }],
     ['b', { type: 'work', archived: true }],
     ['personal', { type: 'personal', createdBy: uid }],
   ]),
@@ -258,9 +258,10 @@ describe('daily-hours factual versus estimated totals', () => {
   });
   it('excludes foreign personal, malformed type and foreign UID before parsing', () => {
     const projects = new Map([
-      ['a', {}],
+      ['a', { type: 'work' }],
       ['foreign', { type: 'personal', createdBy: 'bob' }],
       ['bad', { type: null }],
+      ['untyped', {}],
       ['personal', { type: 'personal', createdBy: uid }],
     ]);
     const history = context(
@@ -273,6 +274,7 @@ describe('daily-hours factual versus estimated totals', () => {
         ),
         record('stale', 'foreign', 'invalid', 'also invalid'),
         record('invalidtype', 'bad', 'invalid'),
+        record('missingtype', 'untyped', 'invalid'),
         { ...record('foreignuid', 'a', 'invalid'), uid: 'bob' },
         record(
           'own',
@@ -286,7 +288,7 @@ describe('daily-hours factual versus estimated totals', () => {
     expect(buildDailyHours(input(), history, uid, asOf).closedMinutes).toBe(
       120,
     );
-    for (const projectId of ['foreign', 'bad', 'missing'])
+    for (const projectId of ['foreign', 'bad', 'missing', 'untyped'])
       expect(() =>
         buildDailyHours(input({ projectId }), history, uid, asOf),
       ).toThrow('Projeto não encontrado.');

@@ -17,7 +17,7 @@ it('executes original calendar use case without private/company scans and marks 
         topics: [],
       },
     ],
-    new Map([['p1', { topics: [] }]]),
+    new Map([['p1', { type: 'work', topics: [] }]]),
   );
   const repository = ownCalendarRepository(own, 'alice');
   const input = calendarInput.parse({

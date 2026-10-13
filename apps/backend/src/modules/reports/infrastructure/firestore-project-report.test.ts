@@ -47,7 +47,10 @@ it.each([undefined, null, '2026-10-08T11:00:00Z'])(
           get: () =>
             Promise.resolve({
               exists: true,
-              data: () => ({ topics: [{ id: 'code', title: 'Código' }] }),
+              data: () => ({
+                type: 'work',
+                topics: [{ id: 'code', title: 'Código' }],
+              }),
             }),
         }),
       }),
@@ -254,7 +257,7 @@ it('advances the dated cursor by the physical page even when all rows fail tombs
   });
 });
 
-it('keeps full-span and legacy old opens, offset overlap and topic aliases under the padded native date guard', async () => {
+it('keeps full-span and historical old opens, offset overlap and topic aliases under the padded native date guard', async () => {
   const { repo, pages, record, queries } = nativePageFixture();
   pages.push([
     record('span', {

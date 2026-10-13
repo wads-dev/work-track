@@ -5,14 +5,14 @@
 A arquitetura de sincronização do PR28 está **superseded**. O transporte Web passa a usar o Firestore SDK nativo, suas consultas/listeners e persistência local, sem Function de sincronização, head, journal, ledger ou triggers auxiliares. O frontend nativo é implementado e validado separadamente nesta worktree; os requisitos abaixo não são evidência de execução.
 
 - Removidos do backend: syncWorkspace, journalProjectForWebSync, journalRecordForWebSync e journalAuditForWebSync, incluindo implementação e testes específicos do protocolo antigo.
-- Removidos os exports HTTP/callable getTopicReport e discoverLegacyProjectIds. O handler de relatório de tópicos, seu repositório e testes continuam preservados; comandos e MCP não são alterados.
+- Removidos os exports HTTP/callable getTopicReport e o endpoint anterior de descoberta de projetos. O handler de relatório de tópicos, seu repositório e testes continuam preservados; comandos e MCP não são alterados.
 - As Rules não concedem mais leitura do head e não declaram coleções de journal/ledger. Dados antigos em webSyncState, webSyncEvents, webSyncDeliveries e webSyncProjectGenerations continuam privados pela regra final de negação; nenhum documento é apagado por esta mudança.
 
 ## Contrato da substituição
 
 Calendário, relatórios, catálogo, pendências, listas, detalhe de registro e auditoria devem continuar observando dados locais. Navegação, datas e filtros não devem abrir leituras remotas por tela. A sessão central usa o SDK nativo para receber mudanças nos documentos canônicos, inclusive escritas Web, MCP e Admin, sem copiar mudanças para journal ou depender de publicação assíncrona de triggers.
 
-A descoberta frontend usa queries nativas de projetos work e personal do próprio UID, além de referências conhecidas. Projetos legados sem type não são descobertos por essas queries; a leitura individual autorizada continua possível. Uma broad query para legados exige análise/ajuste separado de discovery Rules e não é habilitada pela remoção do sync. Rules de descoberta, acesso a projetos/registros/auditoria e outras Functions permanecem inalteradas neste recorte.
+A descoberta frontend usa queries nativas de projetos work e personal do próprio UID, além de referências conhecidas. Projetos exigem `type` explícito `work` ou `personal`; ausência ou tipo inválido nega acesso também na leitura individual, sem fallback de descoberta ou autorização. Não habilitar broad query para documentos sem tipo válido. Rules de descoberta, acesso a projetos/registros/auditoria e outras Functions permanecem inalteradas neste recorte.
 
 A persistência precisa manter isolamento por ambiente e UID, tratamento explícito de erros, fencing/revalidação de autorização e encerramento de listeners em logout/perda de foco conforme o ciclo de vida definido pelo frontend. Não prometer revogação instantânea offline, consistência transacional entre snapshots independentes ou totais completos antes de concluir a sincronização autorizada. Cache ausente ainda exige transferência inicial; reconexão, mudanças de query e duração da desconexão podem gerar leituras cobradas pelo Firestore. Não existe promessa de zero leituras nem de retomada incremental sem custo em todo cenário.
 

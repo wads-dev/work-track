@@ -48,7 +48,7 @@ it('uses personal codecs: null topics default, record extras stripped, topic ext
     state({
       projects: [
         project('p', {
-          archived: 'legacy',
+          archived: 'existing',
           topics: [topic, null, { id: 'bad' }],
           custom: 'strip',
         }),
@@ -122,7 +122,7 @@ it('excludes tombstones before validation and isolates personal ownership and au
         row('work'),
         row('foreign', { projectId: 'foreign' }),
         row('other', {}, 'bob'),
-        row('deleted', { deletedAt: 'legacy', topics: 'invalid' }),
+        row('deleted', { deletedAt: 'existing', topics: 'invalid' }),
       ],
     }),
   );

@@ -12,12 +12,12 @@ const modes: ReportProjectMetadataMode[] = [
 ];
 describe('report project metadata reader modes', () => {
   it.each(modes)(
-    'keeps legacy missing type and fails closed for invalid present types in %s',
+    'fails closed for missing and malformed types in %s',
     (mode) => {
       expect(
         canAccessProject(decodeReportProjectMetadata({}, mode), 'alice'),
-      ).toBe(true);
-      for (const type of [null, false, 0, {}, [], 'unknown']) {
+      ).toBe(false);
+      for (const type of [undefined, null, false, 0, {}, [], 'unknown']) {
         const metadata = decodeReportProjectMetadata(
           { type, createdBy: 'alice' },
           mode,
@@ -51,14 +51,14 @@ describe('report project metadata reader modes', () => {
       id: 'code',
       title: 'Code',
       mergedIntoTopicId: 42,
-      extra: 'legacy',
+      extra: 'historical',
     };
     const topics = [topic, null, { id: 'bad' }];
     const raw = {
       type: 'work',
       topics,
       custom: { retained: true },
-      archived: 'legacy',
+      archived: 'historical',
       mergedInto: 42,
     };
     expect(decodeReportProjectMetadata(raw, 'admin')).toMatchObject({

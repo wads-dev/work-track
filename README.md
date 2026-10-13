@@ -25,7 +25,7 @@ Configuração de um cliente MCP baseado em stdio:
 
 O cliente descobre o OAuth, registra seu callback, abre o navegador e solicita login Google. Confira o nome do cliente e o endereço de retorno antes de autorizar. Somente usuários com e-mail verificado @wads.dev e login Google recebem acesso ao MCP.
 
-A ferramenta temporária `whoami` permite confirmar a identidade autenticada. Ela não registra trabalho. Estão disponíveis search_projects, create_project, create_topic e register. Projetos são compartilhados; registros ficam separados por usuário. Todo projeto nasce com tópico Geral. A busca V1 usa similaridade textual, não embeddings. O registro preserva texto, interpretação, início, fim opcional, momento da fala opcional e timestamp do servidor. Não divide tempo automaticamente nem encerra outros registros. requestId evita duplicações em retries.
+A ferramenta temporária `whoami` permite confirmar a identidade autenticada. Ela não registra trabalho. Estão disponíveis search_projects, create_project, create_topic e register. Projetos exigem `type` explícito `work` (compartilhado no domínio corporativo) ou `personal` (restrito ao proprietário); ausência ou tipo inválido nega acesso, sem fallback. Registros ficam separados por usuário. Todo projeto nasce com tópico Geral. A busca V1 usa similaridade textual, não embeddings. O registro preserva texto, interpretação, início, fim opcional, momento da fala opcional e timestamp do servidor. Não divide tempo automaticamente nem encerra outros registros. requestId evita duplicações em retries.
 
 ## Arquitetura e segurança
 
@@ -39,7 +39,7 @@ A ferramenta temporária `whoami` permite confirmar a identidade autenticada. El
 - Refresh tokens expiram em 7 dias e são rotacionados em cada uso.
 - A cada chamada, contas desativadas, revogadas ou fora do domínio são recusadas.
 - ID tokens Firebase não são aceitos diretamente como tokens MCP nem repassados para o cliente.
-- As regras Firestore permitem leitura de projetos a contas Google verificadas @wads.dev e leitura dos próprios registros pelo UID do caminho. Escritas cliente e dados OAuth ficam negados. O Admin SDK usa IAM e as verificações do servidor.
+- As regras Firestore exigem contas Google verificadas @wads.dev: projetos com `type: work` são compartilhados no domínio, e projetos com `type: personal` são restritos ao proprietário. Ausência ou tipo inválido nega acesso ao projeto, sem fallback. A leitura dos próprios registros segue o UID do caminho. Escritas cliente e dados OAuth ficam negados. O Admin SDK usa IAM e as verificações do servidor.
 - Sem Identity Platform: uma conta externa pode autenticar no Firebase, mas não pode obter autorização MCP.
 
 Região Functions: southamerica-east1. O banco existente fica em nam5; nenhuma migração de região é feita nesta etapa.

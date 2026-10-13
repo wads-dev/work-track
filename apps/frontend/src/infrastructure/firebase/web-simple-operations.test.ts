@@ -145,8 +145,19 @@ describe('simple Web transactions', () => {
     ).toBe('execution');
     expect(sdk.writes).toHaveLength(2);
   });
-  it('rejects stale scope preview without writes and permits missing-type work', async () => {
+  it('rejects absent project type even for its creator without writes', async () => {
     sdk.data.set('projects/source', { id: 'source', createdBy: 'owner' });
+    for (const uid of ['owner', 'actor']) {
+      await expect(scope.changeScope(scopeIntent, uid)).rejects.toThrow();
+    }
+    expect(sdk.writes).toHaveLength(0);
+  });
+  it('rejects stale scope preview without writes', async () => {
+    sdk.data.set('projects/source', {
+      id: 'source',
+      createdBy: 'owner',
+      type: 'work',
+    });
     const preview = await scope.changeScope(scopeIntent, 'actor');
     sdk.data.set('projects/source', {
       ...sdk.data.get('projects/source'),
