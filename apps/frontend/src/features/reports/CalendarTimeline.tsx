@@ -26,6 +26,8 @@ import {
   layoutDay,
   commonGaps,
   axisSegments,
+  GAP_LABEL_HEIGHT,
+  GAP_LABEL_MARGIN,
   projectMinute,
   type Timed,
 } from './timeline-layout';
@@ -265,13 +267,20 @@ export function CalendarTimeline({
                       }}
                       variant="ghost"
                       className={cn(
-                        'absolute left-12 right-0 min-h-0 p-0 text-xs bg-muted overflow-hidden',
+                        'absolute left-12 right-0 min-h-0 flex-col gap-0 p-0 text-xs leading-4 bg-muted overflow-hidden',
                       )}
-                      style={{ top: 15 + s.top, height: s.collapsed ? 32 : 24 }}
+                      style={{
+                        top: 15 + s.top + GAP_LABEL_MARGIN,
+                        height: GAP_LABEL_HEIGHT,
+                      }}
                     >
-                      … {clock(s.start)}–{clock(s.end)} ·{' '}
-                      {Math.floor((s.end - s.start) / 60)}h{' '}
-                      {Math.round((s.end - s.start) % 60)}min sem atividades
+                      <span>
+                        … {clock(s.start)}–{clock(s.end)}
+                      </span>
+                      <span>
+                        {Math.floor((s.end - s.start) / 60)}h{' '}
+                        {Math.round((s.end - s.start) % 60)}min sem atividades
+                      </span>
                     </Button>
                   ))}
                 <div

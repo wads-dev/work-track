@@ -69,6 +69,74 @@ it('keeps short activities only in the timeline with hover expansion', () => {
   expect(html).toContain('min-height:18px');
 });
 
+it('renders idle labels with space above and below and shifts cards with the ruler', () => {
+  const html = renderToStaticMarkup(
+    <MemoryRouter>
+      <TooltipProvider>
+        <CalendarTimeline
+          items={[
+            {
+              id: 'early',
+              effectiveStartedAt: '2026-10-09T04:40:00Z',
+              effectiveEndedAt: '2026-10-09T05:00:00Z',
+            },
+            {
+              id: 'short',
+              effectiveStartedAt: '2026-10-09T09:37:00Z',
+              effectiveEndedAt: '2026-10-09T10:09:00Z',
+            },
+            {
+              id: 'later',
+              effectiveStartedAt: '2026-10-09T15:00:00Z',
+              effectiveEndedAt: '2026-10-09T16:00:00Z',
+            },
+          ].map((item) => ({
+            ...item,
+            projectId: 'project',
+            estimated: false,
+          }))}
+          day="2026-10-09"
+          view="day"
+          zone="America/Sao_Paulo"
+          label={() => 'Projeto'}
+          color={() => '#123456'}
+          returnTo="/calendar"
+          viewerUid="me"
+          authorLabel={() => 'Ana Silva'}
+          showPeople={false}
+        />
+      </TooltipProvider>
+    </MemoryRouter>,
+  );
+  const buttons = html
+    .split('<button')
+    .slice(1)
+    .map((part) => part.split('</button>')[0]);
+  expect(buttons).toHaveLength(2);
+  expect(buttons[0]).toContain('aria-expanded="false"');
+  expect(buttons[0]).toContain('top:131px;height:32px');
+  expect(buttons[0]).toContain(
+    '<span>… 02:00–06:37</span><span>4h 37min sem atividades</span>',
+  );
+  expect(buttons[1]).toContain('top:236.6px;height:32px');
+  // Short card: top = 108px of activity + a 48px collapsed band; no duration inflation.
+  const shortCardStyle = html.match(
+    /aria-label="Projeto · 06:37 — 07:09 · 32 min" style="([^"]+)"/,
+  )?.[1];
+  expect(shortCardStyle).toBeDefined();
+  const numericStyle = Object.fromEntries(
+    shortCardStyle!.split(';').map((rule) => {
+      const [key, value] = rule.split(':');
+      return [key, Number.parseFloat(value)];
+    }),
+  );
+  expect(numericStyle.top).toBe(156);
+  expect(numericStyle.height).toBeCloseTo(57.6);
+  expect(numericStyle['min-height']).toBeCloseTo(57.6);
+  // 12:00 ruler: two 48px bands plus the original activity durations.
+  expect(html).toContain('top:276.6px');
+});
+
 it('keeps events and people in confidentiality mode for multiple people', () => {
   expect(render(true, false)).toBe(render(true, true));
   expect(render(true, false)).toContain('Ana Silva');

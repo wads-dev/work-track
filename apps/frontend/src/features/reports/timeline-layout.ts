@@ -43,6 +43,11 @@ export function commonGaps(
     .map((item, index) => ({ start: union[index].end, end: item.start }))
     .filter((g) => g.end - g.start >= 240);
 }
+// The collapsed axis reserves room for the label plus breathing space on
+// both sides. Events and ruler ticks share this same projection.
+export const GAP_LABEL_HEIGHT = 32;
+export const GAP_LABEL_MARGIN = 8;
+
 export function axisSegments(
   first: number,
   last: number,
@@ -66,7 +71,9 @@ export function axisSegments(
       top += height;
     }
     const collapsed = !expanded.includes(gap.start + '-' + gap.end);
-    const height = collapsed ? 32 : (gap.end - gap.start) * px;
+    const height = collapsed
+      ? GAP_LABEL_HEIGHT + GAP_LABEL_MARGIN * 2
+      : (gap.end - gap.start) * px;
     segments.push({ ...gap, top, height, collapsed });
     top += height;
     minute = gap.end;
