@@ -18,14 +18,16 @@ import { useProjects } from '../projects/hooks/useProjects';
 import { canFinishNow, createFinishNowCommand } from './finish-now';
 import {
   isDeletedRecord,
-  createDeletionObserver,
   notifyRecordDeletion,
 } from '../../data/cache/record-deletion';
 import { writeUrlTab } from '../../app/url-tabs';
 import { UiIcon } from '../../shared/ui/UiIcons';
 import { useEffect, useRef, useState } from 'react';
 import type { Firestore } from 'firebase/firestore';
-import { observeWorkspace } from '../../data/sync/workspace-runtime';
+import {
+  BrowserDetailRepository,
+  observeRecordDetail,
+} from '../../data/repositories/browser-detail-repository';
 import type { Functions } from 'firebase/functions';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { date, object, objects, text, useRows } from '../../shared/data';
@@ -153,29 +155,14 @@ export function RecordDrawer({
     setFinishSuccess(false);
     setLoading(true);
     setError('');
-    const observeDeletion = createDeletionObserver(uid);
     let alive = true;
-    const stop = observeWorkspace(db, uid, (snapshot) => {
+    const stop = observeRecordDetail(db, uid, recordId, (detail) => {
       if (!alive) return;
-      if (snapshot.error) {
-        setRecord(null);
-        setLoading(false);
-        setError('Não foi possível consultar este registro privado.');
-        return;
-      }
-      if (!snapshot.complete) {
-        setRecord(null);
-        setLoading(true);
-        return;
-      }
-      const data =
-        snapshot.records.find(
-          (r) => r.path === 'users/' + uid + '/records/' + recordId,
-        )?.data ?? null;
-      if (data) observeDeletion([{ id: recordId, data }]);
+      const data = detail.record;
       const activeRecord = data && !isDeletedRecord(data) ? data : null;
       setRecord(activeRecord);
-      setLoading(false);
+      setLoading(detail.loading);
+      setError(detail.error);
       if (activeRecord && !editorDirty.current) {
         editorVersion.current =
           typeof activeRecord.updatedAt === 'string'
@@ -277,12 +264,52 @@ export function RecordDrawer({
       }
     }
   }
-  const originProject = projects.rows.find(
-    (p) => p.id === record?.projectId,
-  )?.data;
-  const destinationProject = projects.rows.find(
-    (p) => p.id === editedProject,
-  )?.data;
+  const projectContextKey = JSON.stringify([
+    uid,
+    record?.projectId,
+    editedProject,
+    projects.rows,
+  ]);
+  const [projectContext, setProjectContext] = useState<{
+    key: string;
+    origin?: Record<string, unknown>;
+    destination?: Record<string, unknown>;
+  } | null>(null);
+  useEffect(() => {
+    let active = true;
+    setProjectContext(null);
+    if (projects.loading || !projects.complete || projects.error) return;
+    const repository = new BrowserDetailRepository(
+      db,
+      uid,
+      new Set(projects.rows.map((project) => project.id)),
+    );
+    void Promise.all([
+      repository.readProject(text(record?.projectId, '')),
+      repository.readProject(editedProject),
+    ])
+      .then(([origin, destination]) => {
+        if (active)
+          setProjectContext({ key: projectContextKey, origin, destination });
+      })
+      .catch(() => {
+        if (active) setProjectContext(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    db,
+    uid,
+    projectContextKey,
+    projects.loading,
+    projects.complete,
+    projects.error,
+  ]);
+  const currentProjectContext =
+    projectContext?.key === projectContextKey ? projectContext : undefined;
+  const originProject = currentProjectContext?.origin;
+  const destinationProject = currentProjectContext?.destination;
   const requiresSharing =
     originProject?.type === 'personal' &&
     editedProject !== record?.projectId &&
@@ -309,13 +336,7 @@ export function RecordDrawer({
         : null;
       if (!editedTopics.length)
         throw new Error('Selecione pelo menos um tópico.');
-      if (
-        !editedProject ||
-        isHidden(
-          projects.rows.find((p) => p.id === editedProject)?.data,
-          revealed,
-        )
-      )
+      if (!editedProject || isHidden(destinationProject, revealed))
         throw new Error('Selecione um projeto autorizado e visível.');
       if (requiresSharing && !sharingAck)
         throw new Error('Autorize o compartilhamento com a organização.');
@@ -448,264 +469,253 @@ export function RecordDrawer({
             <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
-        {record &&
-          isHidden(
-            projects.rows.find((item) => item.id === record.projectId)?.data,
-            revealed,
-          ) && (
-            <Alert className="my-2">
-              <AlertDescription>
-                Detalhes, edição e auditoria ocultos na apresentação com dados
-                ocultos. Revele dados no topo para continuar.
-              </AlertDescription>
-            </Alert>
-          )}
-        {record &&
-          !isHidden(
-            projects.rows.find((item) => item.id === record.projectId)?.data,
-            revealed,
-          ) && (
-            <>
-              <p className="text-lg font-semibold">
-                {text(
-                  object(record.projectSnapshot).title,
-                  text(record.projectId),
-                )}
-              </p>
-              <p className="text-sm leading-relaxed">
-                {date(record.startedAt, 'America/Sao_Paulo')}—{' '}
-                {record.endedAt
-                  ? date(record.endedAt, 'America/Sao_Paulo')
-                  : 'Aberto'}
-              </p>
-              {removeError && (
-                <Alert variant="destructive" role="alert" className="my-2">
-                  <AlertDescription>{removeError}</AlertDescription>
-                </Alert>
-              )}
-              {finishError && (
-                <Alert variant="destructive" className="my-2">
-                  <AlertDescription>{finishError}</AlertDescription>
-                </Alert>
-              )}
-              {finishSuccess && (
-                <Alert role="status" className="my-2">
-                  <AlertDescription>
-                    Registro finalizado. Os dados e o histórico serão
-                    atualizados automaticamente.
-                  </AlertDescription>
-                </Alert>
-              )}
-              <Tabs
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="my-4"
-              >
-                <div
-                  className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-2"
-                  aria-label="Seções do registro e ações"
-                >
-                  <TabsList
-                    className="h-9 w-auto"
-                    aria-label={'Seções do registro'}
-                  >
-                    <TabsTrigger
-                      id={'record-tab-details'}
-                      aria-controls={'record-panel-details'}
-                      value={'details'}
-                    >
-                      {'Detalhes'}
-                    </TabsTrigger>
-                    <TabsTrigger
-                      id={'record-tab-edit'}
-                      aria-controls={'record-panel-edit'}
-                      value={'edit'}
-                    >
-                      {'Editar'}
-                    </TabsTrigger>
-                    <TabsTrigger
-                      id={'record-tab-history'}
-                      aria-controls={'record-panel-history'}
-                      value={'history'}
-                    >
-                      {'Histórico'}
-                    </TabsTrigger>
-                  </TabsList>
-                  <div className="ml-auto flex shrink-0 items-center gap-2">
-                    {!finishSuccess && canFinishNow(record, uid) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={finishing || saving || removing}
-                        onClick={finishNow}
-                      >
-                        {finishing ? 'Finalizando…' : 'Finalizar agora'}
-                      </Button>
-                    )}
-                    {record.uid === uid && !isDeletedRecord(record) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-9 text-muted-foreground hover:text-destructive"
-                            aria-label="Remover registro"
-                            disabled={finishing || saving || removing}
-                            onClick={removeRecord}
-                          >
-                            <Trash2 className="size-4" aria-hidden="true" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Remover registro</TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                </div>
-                <div
-                  role={'tabpanel'}
-                  id={'record-panel-details'}
-                  aria-labelledby={'record-tab-details'}
-                  hidden={!detailsOpen}
-                >
-                  {detailsOpen && (
-                    <RecordDetails
-                      record={record}
-                      recordId={recordId}
-                      project={originProject}
-                      revealed={revealed}
-                    />
-                  )}
-                </div>
-                <div
-                  role={'tabpanel'}
-                  id={'record-panel-edit'}
-                  aria-labelledby={'record-tab-edit'}
-                  hidden={!editOpen}
-                >
-                  {editOpen && (
-                    <RecordEditorForm
-                      key={uid + String(revealed)}
-                      catalog={projects.rows}
-                      revealed={revealed}
-                      projectId={editedProject}
-                      topics={editedTopics}
-                      start={start}
-                      end={end}
-                      description={description}
-                      busy={saving || finishing || removing}
-                      focusEnd={focusEnd}
-                      sharing={!!requiresSharing}
-                      ack={sharingAck}
-                      onProject={(id) => {
-                        editorDirty.current = true;
-                        setEditedProject(id);
-                        setEditedTopics([]);
-                        setSharingAck(false);
-                      }}
-                      onTopics={(value) => {
-                        editorDirty.current = true;
-                        setEditedTopics(value);
-                      }}
-                      onStart={(value) => {
-                        editorDirty.current = true;
-                        setStart(value);
-                      }}
-                      onEnd={(value) => {
-                        editorDirty.current = true;
-                        setEnd(value);
-                      }}
-                      onDescription={(value) => {
-                        editorDirty.current = true;
-                        setDescription(value);
-                      }}
-                      onAck={setSharingAck}
-                      onSave={() => void save()}
-                    />
-                  )}
-                </div>
-                <div
-                  role={'tabpanel'}
-                  id={'record-panel-history'}
-                  aria-labelledby={'record-tab-history'}
-                  hidden={!(activeTab === 'history')}
-                >
-                  {!revealed ? (
-                    <Alert className="my-2">
-                      <AlertDescription>
-                        Auditoria oculta na apresentação atual, pois pode conter
-                        referências históricas confidenciais.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <>
-                      <h3 className="text-lg font-semibold">
-                        Histórico de auditoria
-                      </h3>
-                      <p className="text-sm">
-                        Até 20 eventos disponíveis; ordem não representa os mais
-                        recentes.
-                      </p>
-                      {audit.loading ? (
-                        <div
-                          aria-label={'Carregando auditoria'}
-                          role="status"
-                          className="my-4 animate-pulse text-sm text-muted-foreground"
-                        >
-                          Carregando…
-                        </div>
-                      ) : audit.error ? (
-                        <Alert variant="destructive" className="my-2">
-                          <AlertDescription>
-                            {audit.error}
-                            {
-                              <Button onClick={audit.retry}>
-                                Tentar novamente
-                              </Button>
-                            }
-                          </AlertDescription>
-                        </Alert>
-                      ) : audit.rows.length === 0 ? (
-                        <p className="text-sm leading-relaxed">
-                          Nenhuma alteração auditada disponível.
-                        </p>
-                      ) : (
-                        <div className="mt-4 space-y-3">
-                          {audit.rows.map((row) => (
-                            <RecordAuditEvent key={row.id} event={row.data} />
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </Tabs>
-            </>
-          )}
-      </div>
-      {editOpen &&
-        record &&
-        !isHidden(
-          projects.rows.find((item) => item.id === record.projectId)?.data,
-          revealed,
-        ) && (
-          <div className="flex shrink-0 justify-end border-t bg-background pt-3 pb-[var(--emulator-inset,0px)]">
-            <Button
-              type={'submit'}
-              form={'record-edit-form'}
-              disabled={
-                finishing ||
-                saving ||
-                removing ||
-                !editedTopics.length ||
-                (requiresSharing && !sharingAck)
-              }
-              variant="default"
-              className="min-h-11"
-            >
-              {saving ? 'Salvando…' : 'Salvar'}
-            </Button>
-          </div>
+        {record && isHidden(originProject, revealed) && (
+          <Alert className="my-2">
+            <AlertDescription>
+              Detalhes, edição e auditoria ocultos na apresentação com dados
+              ocultos. Revele dados no topo para continuar.
+            </AlertDescription>
+          </Alert>
         )}
+        {record && !isHidden(originProject, revealed) && (
+          <>
+            <p className="text-lg font-semibold">
+              {text(
+                object(record.projectSnapshot).title,
+                text(record.projectId),
+              )}
+            </p>
+            <p className="text-sm leading-relaxed">
+              {date(record.startedAt, 'America/Sao_Paulo')}—{' '}
+              {record.endedAt
+                ? date(record.endedAt, 'America/Sao_Paulo')
+                : 'Aberto'}
+            </p>
+            {removeError && (
+              <Alert variant="destructive" role="alert" className="my-2">
+                <AlertDescription>{removeError}</AlertDescription>
+              </Alert>
+            )}
+            {finishError && (
+              <Alert variant="destructive" className="my-2">
+                <AlertDescription>{finishError}</AlertDescription>
+              </Alert>
+            )}
+            {finishSuccess && (
+              <Alert role="status" className="my-2">
+                <AlertDescription>
+                  Registro finalizado. Os dados e o histórico serão atualizados
+                  automaticamente.
+                </AlertDescription>
+              </Alert>
+            )}
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="my-4"
+            >
+              <div
+                className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-2"
+                aria-label="Seções do registro e ações"
+              >
+                <TabsList
+                  className="h-9 w-auto"
+                  aria-label={'Seções do registro'}
+                >
+                  <TabsTrigger
+                    id={'record-tab-details'}
+                    aria-controls={'record-panel-details'}
+                    value={'details'}
+                  >
+                    {'Detalhes'}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    id={'record-tab-edit'}
+                    aria-controls={'record-panel-edit'}
+                    value={'edit'}
+                  >
+                    {'Editar'}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    id={'record-tab-history'}
+                    aria-controls={'record-panel-history'}
+                    value={'history'}
+                  >
+                    {'Histórico'}
+                  </TabsTrigger>
+                </TabsList>
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                  {!finishSuccess && canFinishNow(record, uid) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={finishing || saving || removing}
+                      onClick={finishNow}
+                    >
+                      {finishing ? 'Finalizando…' : 'Finalizar agora'}
+                    </Button>
+                  )}
+                  {record.uid === uid && !isDeletedRecord(record) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-9 text-muted-foreground hover:text-destructive"
+                          aria-label="Remover registro"
+                          disabled={finishing || saving || removing}
+                          onClick={removeRecord}
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Remover registro</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+              </div>
+              <div
+                role={'tabpanel'}
+                id={'record-panel-details'}
+                aria-labelledby={'record-tab-details'}
+                hidden={!detailsOpen}
+              >
+                {detailsOpen && (
+                  <RecordDetails
+                    record={record}
+                    recordId={recordId}
+                    project={originProject}
+                    revealed={revealed}
+                  />
+                )}
+              </div>
+              <div
+                role={'tabpanel'}
+                id={'record-panel-edit'}
+                aria-labelledby={'record-tab-edit'}
+                hidden={!editOpen}
+              >
+                {editOpen && (
+                  <RecordEditorForm
+                    key={uid + String(revealed)}
+                    catalog={projects.rows}
+                    db={db}
+                    uid={uid}
+                    revealed={revealed}
+                    projectId={editedProject}
+                    topics={editedTopics}
+                    start={start}
+                    end={end}
+                    description={description}
+                    busy={saving || finishing || removing}
+                    focusEnd={focusEnd}
+                    sharing={!!requiresSharing}
+                    ack={sharingAck}
+                    onProject={(id) => {
+                      editorDirty.current = true;
+                      setEditedProject(id);
+                      setEditedTopics([]);
+                      setSharingAck(false);
+                    }}
+                    onTopics={(value) => {
+                      editorDirty.current = true;
+                      setEditedTopics(value);
+                    }}
+                    onStart={(value) => {
+                      editorDirty.current = true;
+                      setStart(value);
+                    }}
+                    onEnd={(value) => {
+                      editorDirty.current = true;
+                      setEnd(value);
+                    }}
+                    onDescription={(value) => {
+                      editorDirty.current = true;
+                      setDescription(value);
+                    }}
+                    onAck={setSharingAck}
+                    onSave={() => void save()}
+                  />
+                )}
+              </div>
+              <div
+                role={'tabpanel'}
+                id={'record-panel-history'}
+                aria-labelledby={'record-tab-history'}
+                hidden={!(activeTab === 'history')}
+              >
+                {!revealed ? (
+                  <Alert className="my-2">
+                    <AlertDescription>
+                      Auditoria oculta na apresentação atual, pois pode conter
+                      referências históricas confidenciais.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold">
+                      Histórico de auditoria
+                    </h3>
+                    <p className="text-sm">
+                      Até 20 eventos disponíveis; ordem não representa os mais
+                      recentes.
+                    </p>
+                    {audit.loading ? (
+                      <div
+                        aria-label={'Carregando auditoria'}
+                        role="status"
+                        className="my-4 animate-pulse text-sm text-muted-foreground"
+                      >
+                        Carregando…
+                      </div>
+                    ) : audit.error ? (
+                      <Alert variant="destructive" className="my-2">
+                        <AlertDescription>
+                          {audit.error}
+                          {
+                            <Button onClick={audit.retry}>
+                              Tentar novamente
+                            </Button>
+                          }
+                        </AlertDescription>
+                      </Alert>
+                    ) : audit.rows.length === 0 ? (
+                      <p className="text-sm leading-relaxed">
+                        Nenhuma alteração auditada disponível.
+                      </p>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+                        {audit.rows.map((row) => (
+                          <RecordAuditEvent key={row.id} event={row.data} />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </Tabs>
+          </>
+        )}
+      </div>
+      {editOpen && record && !isHidden(originProject, revealed) && (
+        <div className="flex shrink-0 justify-end border-t bg-background pt-3 pb-[var(--emulator-inset,0px)]">
+          <Button
+            type={'submit'}
+            form={'record-edit-form'}
+            disabled={
+              finishing ||
+              saving ||
+              removing ||
+              !editedTopics.length ||
+              (requiresSharing && !sharingAck)
+            }
+            variant="default"
+            className="min-h-11"
+          >
+            {saving ? 'Salvando…' : 'Salvar'}
+          </Button>
+        </div>
+      )}
     </div>
   );
   if (presentation === 'page') return content;

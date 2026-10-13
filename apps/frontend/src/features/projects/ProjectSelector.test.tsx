@@ -72,7 +72,10 @@ it('keeps search independent of the selection and resets it only when the menu c
   expect(source).toContain(
     "const [searchQuery, setSearchQuery] = useState('')",
   );
-  expect(source).toContain('matchesProject(option, searchQuery)');
+  expect(source).toContain('repository.search(searchQuery)');
+  expect(source).not.toContain('options.filter(');
+  expect(source).not.toContain('projects.filter(');
+  expect(source).not.toContain('.find(');
   expect(source).toContain(
     'onChange={(event) => setSearchQuery(event.target.value)}',
   );

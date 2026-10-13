@@ -9,62 +9,24 @@ import { Button } from '../../components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { useProjects } from '../projects/hooks/useProjects';
-import {
-  isDeletedRecord,
-  useDeletionRevision,
-} from '../../data/cache/record-deletion';
-import { useEffect, useState } from 'react';
-import { isAlertOpen, isOpen } from './pending-utils';
 import { useClock } from '../../hooks/use-clock';
 
 import { type Firestore } from 'firebase/firestore';
-import { subscribeAuthorizedOwnRecords } from '../../data/sources/authorized-own-record-source';
+import { useOwnRecords } from '../records/hooks/useOwnRecords';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
-import { type Row } from '../../shared/data';
 import { usePrivacy } from '../../shared/ui/privacy';
 import { RecordDrawer } from '../records/RecordDrawer';
 import { RecordsList } from '../records/RecordsList';
-import { sortRecords } from '../records/record-filters';
 import type { Functions } from 'firebase/functions';
 export function PendingBell({ db, uid }: { db: Firestore; uid: string }) {
-  // Fetch only indexed open records, never a sample of the history.
-  const [bellError, setBellError] = useState(false);
-  const [snapshot, setSnapshot] = useState<{ uid: string; rows: Row[] }>({
-    uid: '',
-    rows: [],
-  });
-  useEffect(() => {
-    let active = true;
-    setBellError(false);
-    const stop = subscribeAuthorizedOwnRecords(
-      db,
-      uid,
-      (s) => {
-        if (active) {
-          setBellError(false);
-          setSnapshot({
-            uid,
-            rows: s.rows.filter((r) => !isDeletedRecord(r.data)),
-          });
-        }
-      },
-      () => {
-        if (active) {
-          setBellError(true);
-          setSnapshot({ uid, rows: [] });
-        }
-      },
-      { openOnly: true },
-    );
-    return () => {
-      active = false;
-      stop();
-    };
-  }, [db, uid]);
   const now = useClock();
-  const count = (snapshot.uid === uid ? snapshot.rows : []).filter((row) =>
-    isAlertOpen(row.data, now),
-  ).length;
+  const pending = useOwnRecords(db, uid, true, {
+    openOnly: true,
+    alertOnly: true,
+    now: now.getTime(),
+  });
+  const count = pending.total;
+  const bellError = Boolean(pending.error);
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -112,45 +74,11 @@ export function PendingPage({
   functions: Functions;
 }) {
   const [params, setParams] = useSearchParams();
-  const revision = useDeletionRevision(uid);
   const recordId = params.get('record');
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fromCache, setFromCache] = useState(true);
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
+  const pending = useOwnRecords(db, uid, true, { openOnly: true, page: 0 });
+  const { rows: open, loading, fromCache, error } = pending;
   const projects = useProjects(functions, uid);
   const { revealed } = usePrivacy();
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setFromCache(true);
-    setError('');
-    setRows([]);
-    const stop = subscribeAuthorizedOwnRecords(
-      db,
-      uid,
-      (page) => {
-        if (!active) return;
-        setRows(page.rows.filter((r) => !isDeletedRecord(r.data)));
-        setFromCache(page.fromCache);
-        setLoading(false);
-      },
-      () => {
-        if (active) {
-          setRows([]);
-          setError('Não foi possível consultar pendências.');
-          setLoading(false);
-        }
-      },
-      { openOnly: true },
-    );
-    return () => {
-      active = false;
-      stop();
-    };
-  }, [db, uid, attempt, revision]);
-  const open = rows.filter((row) => isOpen(row.data));
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -197,10 +125,10 @@ export function PendingPage({
       )}
       <RecordsList
         state={{
-          rows: sortRecords(open),
+          rows: open,
           loading,
           error,
-          retry: () => setAttempt((v) => v + 1),
+          retry: pending.retry,
         }}
         catalog={projects.rows}
         revealed={revealed}

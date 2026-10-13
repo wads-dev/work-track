@@ -21,6 +21,8 @@ export function clearProjectFilters(params: URLSearchParams): URLSearchParams {
   return next;
 }
 
+export type { ProjectReadOptions } from '../../data/repositories/browser-listing-repository';
+// Shared query parameter only; project dataset selection is repository-owned.
 export type ProjectScope = 'all' | 'personal' | 'work';
 export type ProjectPage = {
   projects: Record<string, unknown>[];

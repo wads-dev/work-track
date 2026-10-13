@@ -1,170 +1,146 @@
 import {
+  collection,
   collectionGroup,
+  documentId,
+  getDocsFromCache,
   query,
   where,
   type Firestore,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { reportRecordSchema } from '@work-track/data/codecs/report-record';
 import { decodeWebProjectSnapshot } from '../../infrastructure/firebase/web-read-adapter';
-import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
+import { canAccessProject } from '@work-track/core/registration/domain/project-access';
+import type { ReportProjectMetadata } from '@work-track/data/codecs/report-project-metadata';
 import {
   calendarQueryBounds,
   type CalendarQueryRange,
 } from './calendar-firestore-query';
-import { AuthorizedReportRepository } from '@work-track/data/repositories/snapshots/authorized-report-repository';
-import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
+import { FirestoreReportRepository } from '../repositories/firestore-report-repository';
 import { observeWorkspace } from '../sync/workspace-runtime';
 import { traceFirestore } from '../sync/firestore-diagnostics';
+import { stableDataKey } from '../repositories/stable-data-key';
 export interface AuthorizedReportSnapshot {
-  repository: AuthorizedReportRepository;
+  repository: FirestoreReportRepository;
   coherent: boolean;
   fromCache: boolean;
   hasPendingWrites: boolean;
 }
-// Query builder retained for compatibility/tests; no UI observer executes these queries.
 export function authorizedRecordQueries(
   db: Firestore,
   projectId: string,
   range?: CalendarQueryRange,
 ) {
-  const base = collectionGroup(db, 'records');
-  if (!range) return [query(base, where('projectId', '==', projectId))];
+  const base = collectionGroup(db, 'records'),
+    project = where('projectId', '==', projectId);
+  if (!range) return [query(base, project)];
   const { lower, upper } = calendarQueryBounds(range);
   return [
     query(
       base,
-      where('projectId', '==', projectId),
+      project,
       where('startedAt', '>=', lower),
       where('startedAt', '<', upper),
     ),
     query(
       base,
-      where('projectId', '==', projectId),
+      project,
       where('endedAt', '>=', lower),
       where('startedAt', '<', upper),
     ),
+    query(base, project, where('startedAt', '<', lower)),
   ];
 }
-// Compare report content, not runtime audits/completeness bookkeeping. Key order in
-// replayed documents is irrelevant; nested values still participate in the signature.
-function contentSignature(value: unknown): string {
-  return JSON.stringify(value, (_key, item: unknown) =>
-    item && typeof item === 'object' && !Array.isArray(item)
-      ? Object.fromEntries(
-          Object.entries(item).sort(([a], [b]) => a.localeCompare(b)),
-        )
-      : item,
-  );
-}
-const schema = reportRecordSchema('authorized-web');
+/** Session owns synchronization. This observer only constructs a query repository after readiness. */
 export function subscribeAuthorizedReport(
   db: Firestore,
   uid: string,
   next: (s: AuthorizedReportSnapshot) => void,
   fail: (e: Error) => void,
   _requiredProjectIds: readonly string[] = [],
-  range?: CalendarQueryRange,
+  _range?: CalendarQueryRange,
 ): Unsubscribe {
-  void _requiredProjectIds; // Global materialization owns completeness and authorization.
-  let signature: string | undefined;
-  let lastError: string | undefined;
-  const reportFailure = (error: Error) => {
-    // A successful identical replay must publish again after an error clears the UI.
-    signature = undefined;
-    if (lastError === error.message) return;
-    lastError = error.message;
-    fail(error);
-  };
-  return observeWorkspace(db, uid, (snapshot) => {
+  // Compatibility parameters do not select data; each repository method receives its own selection.
+  void _requiredProjectIds;
+  void _range;
+  let active = true,
+    serial = 0,
+    signature = '',
+    lastError = '';
+  const stop = observeWorkspace(db, uid, (snapshot) => {
+    const ticket = ++serial;
     if (snapshot.error) {
-      reportFailure(new Error(snapshot.error));
+      signature = '';
+      if (lastError !== snapshot.error) {
+        lastError = snapshot.error;
+        fail(new Error(snapshot.error));
+      }
       return;
     }
-    // This API has no loading state. Keep the last complete repository until the
-    // next atomic context; page project fences handle access while syncing.
     if (!snapshot.complete) return;
-    try {
-      const projects = new Map(
-        snapshot.projects.map((p) => [
-          p.id,
-          decodeWebProjectSnapshot(
-            { data: () => p.data },
-            p.id,
-            'authorized-web',
-          )!,
-        ]),
-      );
-      const records: ReportSourceRecord[] = snapshot.records.flatMap((row) => {
-        const parts = row.path.split('/');
-        if (
-          parts.length !== 4 ||
-          parts[0] !== 'users' ||
-          parts[2] !== 'records' ||
-          row.data.uid !== parts[1]
-        )
-          throw new Error('Registro canônico inválido.');
-        if (
-          !projects.has(String(row.data.projectId)) ||
-          isDeletedRecord(row.data)
-        )
-          return [];
-        return [
-          {
-            ...row.data,
-            ...schema.parse(row.data),
-            id: parts[3],
-          } as ReportSourceRecord,
-        ];
-      });
-      const bounds = range && calendarQueryBounds(range);
-      const selected = range
-        ? new Set(
-            records
-              .filter(
-                (r) =>
-                  (!range.projectId || r.projectId === range.projectId) &&
-                  (!bounds ||
-                    (r.startedAt < bounds.upper &&
-                      (r.startedAt >= bounds.lower ||
-                        (typeof r.endedAt === 'string' &&
-                          r.endedAt >= bounds.lower)))),
-              )
-              .map((r) => 'users/' + r.uid + '/records/' + r.id),
-          )
-        : undefined;
-      const nextSignature = contentSignature({
-        projects: [...projects].sort(([a], [b]) => a.localeCompare(b)),
-        records: [...records].sort((a, b) =>
-          (a.uid + '/' + a.id).localeCompare(b.uid + '/' + b.id),
-        ),
-        selected: selected && [...selected].sort(),
-      });
-      traceFirestore('local.report.read', {
-        source: 'authorized',
-        collections: 'projects,records',
-        count: records.length,
-        projects: projects.size,
-        selected: selected?.size ?? null,
-        cacheHit: signature === nextSignature,
-      });
-      if (signature === nextSignature) return;
-      const repository = new AuthorizedReportRepository(
-        uid,
-        structuredClone(records),
-        structuredClone(projects),
-        selected,
-      );
-      signature = nextSignature;
-      lastError = undefined;
-      next({
-        repository,
-        coherent: true,
-        fromCache: false,
-        hasPendingWrites: false,
-      });
-    } catch (error) {
-      reportFailure(error instanceof Error ? error : new Error(String(error)));
-    }
+    const nextSignature = stableDataKey({
+      projects: [...snapshot.projects].sort((a, b) =>
+        a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+      ),
+      records: [...snapshot.records].sort((a, b) =>
+        a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+      ),
+    });
+    if (signature === nextSignature) return;
+    void (async () => {
+      try {
+        const projects = new Map<string, ReportProjectMetadata>();
+        const ids = snapshot.projects.map((p) => p.id);
+        for (let i = 0; i < ids.length; i += 30) {
+          traceFirestore('cache.read', {
+            collection: 'projects',
+            operation: 'report.catalog',
+            source: 'persistent-local',
+          });
+          const result = await getDocsFromCache(
+            query(
+              collection(db, 'projects'),
+              where(documentId(), 'in', ids.slice(i, i + 30)),
+            ),
+          );
+          traceFirestore('cache.result', {
+            collection: 'projects',
+            operation: 'report.catalog',
+            source: 'persistent-local',
+            count: result.size,
+          });
+          for (const doc of result.docs) {
+            const p = decodeWebProjectSnapshot(doc, doc.id, 'authorized-web');
+            if (p && canAccessProject(p, uid)) projects.set(doc.id, p);
+          }
+        }
+        if (!active || ticket !== serial) return;
+        signature = nextSignature;
+        lastError = '';
+        traceFirestore('local.report.read', {
+          source: 'authorized-query-repository',
+          projects: projects.size,
+          cacheHit: false,
+        });
+        next({
+          repository: new FirestoreReportRepository(db, uid, projects),
+          coherent: true,
+          fromCache: false,
+          hasPendingWrites: false,
+        });
+      } catch (error) {
+        if (!active || ticket !== serial) return;
+        signature = '';
+        const e = error instanceof Error ? error : new Error(String(error));
+        if (lastError !== e.message) {
+          lastError = e.message;
+          fail(e);
+        }
+      }
+    })();
   });
+  return () => {
+    active = false;
+    serial++;
+    stop();
+  };
 }

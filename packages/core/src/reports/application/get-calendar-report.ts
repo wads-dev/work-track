@@ -1,14 +1,16 @@
 import type { CalendarResponse } from '../../contracts/report-responses.js';
-import { calendarTopics, topicMetadataMap } from '../domain/calendar-topics.js';
+import { topicMetadataMap } from '../domain/calendar-topics.js';
 import { resolveTopic } from '../domain/topic-breakdown.js';
-import { occupiedWeeks, calendarWeekAt } from '../domain/calendar-weeks.js';
+import { occupiedWeeks } from '../domain/calendar-weeks.js';
+import {
+  zeroDurationOpenOccurrences,
+  calendarOccurrenceCounts,
+  calendarIntervalMembership,
+  completeReportWarnings,
+} from '../domain/calendar-occurrences.js';
 import { buildCompanyReport } from '../domain/build-company-report.js';
 import { buildPersonalReport } from '../domain/build-personal-report.js';
-import {
-  ReportContextError,
-  globalEstimates,
-  recordKey,
-} from '../domain/global-estimates.js';
+import { ReportContextError } from '../domain/global-estimates.js';
 import type { PersonalReportRepository } from '../domain/personal-report.js';
 import type { CompanyReportRepository } from '../domain/company-report.js';
 import type { ReportSourceRecord } from '../domain/project-report.js';
@@ -67,49 +69,50 @@ export async function executeCalendarReport(
       'permission-denied',
       'Modo próprio não permite consultar outras pessoas. Escolha Global explicitamente.',
     );
+  const options = {
+    projectId: input.projectId,
+    includeArchived: input.includeArchived,
+    userIds: input.userIds,
+    from: input.from,
+    to: input.to,
+    topicId: input.topicId,
+  };
+  const directoryOptions = {
+    projectId: input.projectId,
+    includeArchived: input.includeArchived,
+  };
   const raw = await selection((cursor) =>
     input.mode === 'own'
-      ? repository.own.readPage(uid, 100, cursor)
-      : repository.company.readPage(100, cursor, input.projectId),
+      ? repository.own.readPage(uid, 100, cursor, options)
+      : repository.company.readPage(100, cursor, input.projectId, options),
   );
   const valid = await repository.revalidate(raw.records, uid, input.mode);
-  const archived = input.includeArchived
-    ? []
-    : await repository.company.archivedProjectIds([
-        ...new Set(valid.map((r) => r.projectId)),
-      ]);
-  const visible = valid.filter(
-    (r) =>
-      (!input.projectId || r.projectId === input.projectId) &&
-      (input.includeArchived || !archived.includes(r.projectId)),
-  );
+  const visible = valid;
   let participantsUnavailable = false;
-  let directoryRaw = raw;
-  if (input.mode === 'own') {
+  let directoryRaw: PersonalReportPage;
+  {
     try {
       directoryRaw = await selection((cursor) =>
-        repository.company.readPage(100, cursor, input.projectId),
+        repository.company.readPage(
+          100,
+          cursor,
+          input.projectId,
+          directoryOptions,
+        ),
       );
     } catch (error) {
-      if (!(error instanceof ReportContextError)) throw error;
+      if (input.mode !== 'own' || !(error instanceof ReportContextError))
+        throw error;
       participantsUnavailable = true;
       directoryRaw = { records: [], scannedCount: 0, nextCursor: null };
     }
   }
-  const directoryValid =
-    input.mode === 'own'
-      ? await repository.revalidate(directoryRaw.records, uid, 'global')
-      : valid;
-  const directoryArchived = input.includeArchived
-    ? []
-    : await repository.company.archivedProjectIds([
-        ...new Set(directoryValid.map((r) => r.projectId)),
-      ]);
-  const directory = directoryValid.filter(
-    (r) =>
-      (!input.projectId || r.projectId === input.projectId) &&
-      (input.includeArchived || !directoryArchived.includes(r.projectId)),
+  const directoryValid = await repository.revalidate(
+    directoryRaw.records,
+    uid,
+    'global',
   );
+  const directory = directoryValid;
   const participantUids = [
     ...new Set([
       ...(input.mode === 'own' ? [uid] : []),
@@ -117,9 +120,7 @@ export async function executeCalendarReport(
     ]),
   ];
   const labels = await repository.company.userLabels(participantUids);
-  const selected = visible.filter(
-      (r) => !input.userIds || input.userIds.includes(r.uid),
-    ),
+  const selected = visible,
     uids = [...new Set(selected.map((r) => r.uid))];
   const context =
     input.mode === 'own'
@@ -191,97 +192,26 @@ export async function executeCalendarReport(
     );
   const topicWarnings = new Set<string>();
   // Calendar-only points preserve open occurrences without adding hours to reports.
-  const estimates = globalEstimates(context, asOf);
   const calendarIntervals = [
     ...report.intervals,
-    ...selected
-      .filter((r) => {
-        const start = Date.parse(r.startedAt);
-        return (
-          r.endedAt === undefined &&
-          Number.isFinite(start) &&
-          estimates.ends.get(recordKey(r)) === start &&
-          (!input.from || start >= Date.parse(input.from)) &&
-          (!input.to || start < Date.parse(input.to)) &&
-          !report.intervals.some(
-            (i) =>
-              i.id === r.id &&
-              i.projectId === r.projectId &&
-              (!('uid' in i) || i.uid === r.uid),
-          )
-        );
-      })
-      .map((r) => ({
-        id: r.id,
-        uid: r.uid,
-        projectId: r.projectId,
-        startedAt: r.startedAt,
-        effectiveStartedAt: new Date(Date.parse(r.startedAt)).toISOString(),
-        effectiveEndedAt: new Date(Date.parse(r.startedAt)).toISOString(),
-        estimated: true,
-        minutes: 0,
-      })),
+    ...zeroDurationOpenOccurrences(
+      selected,
+      context,
+      asOf,
+      input,
+      report.intervals,
+    ),
   ];
-  const intervals = calendarIntervals
-    .map((r) => {
-      const authorUid = 'uid' in r ? r.uid : uid;
-      const source = selected.find(
-        (s) =>
-          s.id === r.id && s.uid === authorUid && s.projectId === r.projectId,
-      );
-      if (!source)
-        throw new CalendarReportError(
-          'failed-precondition',
-          'Fonte do intervalo indisponível.',
-        );
-      const membership = calendarTopics(
-        source,
-        r.minutes,
-        topics[r.projectId] ?? [],
-      );
-      for (const warning of membership.warnings) topicWarnings.add(warning);
-      const matched = membership.topics.find(
-        (t) => t.topicId === selectedTopic,
-      );
-      return {
-        ...r,
-        uid: authorUid,
-        readOnly: authorUid !== uid,
-        topics: membership.topics,
-        ...(matched?.assignedMinutes !== undefined
-          ? { subjectAssignedMinutes: matched.assignedMinutes }
-          : {}),
-      };
-    })
-    .filter(
-      (r) =>
-        !selectedTopic || r.topics.some((t) => t.topicId === selectedTopic),
+  const { intervals, warnings: membershipWarnings } =
+    calendarIntervalMembership(
+      calendarIntervals,
+      selected,
+      uid,
+      topics,
+      selectedTopic,
     );
-  const occurrenceCounts = new Map<string, number>();
-  for (const record of selected) {
-    const start = Date.parse(record.startedAt),
-      end =
-        record.endedAt === undefined ? undefined : Date.parse(record.endedAt);
-    if (
-      !Number.isFinite(start) ||
-      (end !== undefined && (!Number.isFinite(end) || end < start)) ||
-      (input.from && start < Date.parse(input.from)) ||
-      (input.to && start >= Date.parse(input.to))
-    )
-      continue;
-    const membership = calendarTopics(
-      record,
-      0,
-      topics[record.projectId] ?? [],
-    );
-    if (
-      selectedTopic &&
-      !membership.topics.some((t) => t.topicId === selectedTopic)
-    )
-      continue;
-    const week = calendarWeekAt(start, input.timeZone);
-    occurrenceCounts.set(week, (occurrenceCounts.get(week) ?? 0) + 1);
-  }
+  for (const warning of membershipWarnings) topicWarnings.add(warning);
+  const occurrenceCounts = calendarOccurrenceCounts(selected, input);
   const weeks = [
     ...new Set([
       ...occupiedWeeks(intervals, input.timeZone),
@@ -309,7 +239,10 @@ export async function executeCalendarReport(
     occupiedWeeks: weeks,
     weekOccurrences,
     totalMinutes: intervals.reduce((sum, r) => sum + r.minutes, 0),
-    estimatedCount: intervals.filter((r) => r.estimated).length,
+    estimatedCount: intervals.reduce(
+      (count, r) => count + Number(r.estimated),
+      0,
+    ),
     byUser: [...totals].map(([uid, minutes]) => ({
       uid,
       label: labels[uid] || 'Participante sem nome',
@@ -333,7 +266,7 @@ export async function executeCalendarReport(
             'Diretório Global indisponível por limite operacional; somente o próprio participante é apresentado. Horas próprias permanecem completas; selecione um projeto para reduzir a consulta do diretório.',
           ]
         : []),
-      ...report.warnings.filter((w) => !w.includes('página selecionada')),
+      ...completeReportWarnings(report.warnings),
       'Seleção completa dentro dos limites operacionais; Global significa compartilhado com pessoas autenticadas da organização, não publicação na Internet.',
       'Projetos pessoais de outras pessoas nunca integram o calendário Global.',
     ],

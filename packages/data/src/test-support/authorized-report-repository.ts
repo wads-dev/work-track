@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/require-await -- Test doubles preserve async repository rejection contracts without database I/O. */
 import type { CompanyReportRepository } from '@work-track/core/reports/domain/company-report';
+import type { ReportRecordSelection } from '@work-track/core/reports/domain/personal-report';
 import type { CalendarRepository } from '@work-track/core/reports/application/get-calendar-report';
 import type {
   ProjectReportRepository,
@@ -6,10 +8,12 @@ import type {
 } from '@work-track/core/reports/domain/project-report';
 import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
-import type { ReportProjectMetadata } from '../../codecs/report-project-metadata.js';
+import type { ReportProjectMetadata } from '../codecs/report-project-metadata.js';
 import { ClientPersonalReportRepository } from './personal-report-repository.js';
+import { matchesReportRecordSelection } from './report-record-selection.js';
 export const recordKey = (r: ReportSourceRecord) =>
   'users/' + r.uid + '/records/' + r.id;
+/** TEST DOUBLE ONLY. In-memory snapshot selection is forbidden in production. */
 export class AuthorizedReportRepository implements CompanyReportRepository {
   constructor(
     readonly viewer: string,
@@ -34,11 +38,17 @@ export class AuthorizedReportRepository implements CompanyReportRepository {
         );
     return rows;
   }
-  async readPage(limit: number, cursor?: string, projectId?: string) {
+  async readPage(
+    limit: number,
+    cursor?: string,
+    projectId?: string,
+    selection?: ReportRecordSelection,
+  ) {
     const rows = this.workRecords()
       .filter(
         (r) =>
           (!projectId || r.projectId === projectId) &&
+          matchesReportRecordSelection(r, this.projects, selection) &&
           (!this.selectedKeys || this.selectedKeys.has(recordKey(r))) &&
           (!cursor || recordKey(r) > cursor),
       )
@@ -108,7 +118,7 @@ export class AuthorizedReportRepository implements CompanyReportRepository {
             ).loadContext([owner])
           : this.loadContext(uids),
       userLabels: (uids) => this.userLabels(uids),
-      readPage: async (id, limit, cursor, viewer) => {
+      readPage: async (id, limit, cursor, viewer, selection) => {
         const p = this.projects.get(id);
         if (
           viewer !== this.viewer ||
@@ -124,7 +134,10 @@ export class AuthorizedReportRepository implements CompanyReportRepository {
               : this.workRecords()
           )
             .filter(
-              (r) => r.projectId === id && (!cursor || recordKey(r) > cursor),
+              (r) =>
+                r.projectId === id &&
+                matchesReportRecordSelection(r, this.projects, selection) &&
+                (!cursor || recordKey(r) > cursor),
             )
             .sort((a, b) => (recordKey(a) < recordKey(b) ? -1 : 1)),
           records = rows.slice(0, limit);

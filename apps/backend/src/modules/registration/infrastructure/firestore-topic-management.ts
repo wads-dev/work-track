@@ -86,6 +86,9 @@ export class FirestoreTopicManagementRepository implements TopicManagementReposi
       }
       const after: Topic[] = before.filter((t) => !removed.has(t.id));
       const target = after.find((t) => t.id === input.targetTopicId)!;
+      // Topic allocations/snapshots are arrays of variable-shaped objects and alias
+      // chains are embedded project metadata: Firestore has no nested array-member
+      // ID or recursive alias query. Query projectId; retain migration residual here.
       const scan = await tx.get(
         this.db
           .collectionGroup('records')

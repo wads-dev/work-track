@@ -28,9 +28,11 @@ function setup(authUid = 'alice') {
     resource: new URL('https://wadsworktrack.web.app/mcp'),
     extra: { uid: authUid },
   });
-  const loadOwnHistory = vi
-    .fn()
-    .mockResolvedValue({ records: [], projects: new Map() });
+  const loadOwnHistory = vi.fn().mockResolvedValue({
+    records: [],
+    selectedRecords: [],
+    projects: new Map(),
+  });
   const app = createApp(provider, undefined, undefined, undefined, undefined, {
     loadOwnHistory,
   });
@@ -81,7 +83,11 @@ describe('authenticated read-only get_daily_hours MCP', () => {
         estimatedMinutes: 0,
       },
     );
-    expect(loadOwnHistory).toHaveBeenCalledWith('alice', undefined);
+    expect(loadOwnHistory).toHaveBeenCalledWith('alice', undefined, {
+      startedAt: Date.parse('2026-10-09T03:00:00.000Z'),
+      endedAt: Date.parse('2026-10-10T03:00:00.000Z'),
+      includeArchived: true,
+    });
   });
   it('rejects UID substitution and malformed dates before repository reads', async () => {
     const { mcp, loadOwnHistory } = setup();

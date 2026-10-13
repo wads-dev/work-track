@@ -1,4 +1,6 @@
 import { expect, it, vi } from 'vitest';
+import type { Firestore } from 'firebase-admin/firestore';
+import { FirestoreWorkRepository } from '../infrastructure/firestore-work.js';
 import { listProjectsHandler } from './list-projects.js';
 import type {
   Project,
@@ -27,14 +29,42 @@ const catalog = [
   createdAt: '2026-10-01T00:00:00Z',
 })) as Project[];
 it('filters server authorized projects before pagination and rejects hidden or absent cursors identically', async () => {
-  const listProjects = vi
-    .fn<WorkRepository['listProjects']>()
-    .mockResolvedValue(catalog);
-  const repo = { listProjects };
+  const query = (rows: Project[]) => ({
+    where: (field: string, _operator: string, value: string): unknown =>
+      query(
+        rows.filter(
+          (row) => (row as unknown as Record<string, unknown>)[field] === value,
+        ),
+      ),
+    orderBy: (): unknown =>
+      query([...rows].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))),
+    startAfter: (id: string): unknown =>
+      query(rows.filter((row) => row.id > id)),
+    limit: (limit: number) => ({
+      get: () =>
+        Promise.resolve({
+          docs: rows
+            .slice(0, limit)
+            .map((row) => ({ id: row.id, data: () => row })),
+        }),
+    }),
+    doc: (id: string) => ({
+      get: () =>
+        Promise.resolve({
+          exists: rows.some((row) => row.id === id),
+          id,
+          data: () => rows.find((row) => row.id === id),
+        }),
+    }),
+  });
+  const repo = new FirestoreWorkRepository({
+    collection: () => query(catalog),
+  } as unknown as Firestore);
+  const listProjectsPage = vi.spyOn(repo, 'listProjectsPage');
   await expect(listProjectsHandler(repo, {})).rejects.toMatchObject({
     code: 'unauthenticated',
   });
-  expect(listProjects).not.toHaveBeenCalled();
+  expect(listProjectsPage).not.toHaveBeenCalled();
   const first = await listProjectsHandler(repo, { limit: 1 }, auth('alice'));
   expect(first.projects.map((p) => p.id)).toEqual(['a']);
   expect(first.nextCursor).toBe('a');
@@ -48,7 +78,10 @@ it('filters server authorized projects before pagination and rejects hidden or a
   expect(
     (
       await listProjectsHandler(
-        { listProjects: () => Promise.resolve([]) },
+        {
+          listProjectsPage: () =>
+            Promise.resolve({ projects: [], nextCursor: null }),
+        },
         {},
         auth('alice'),
       )
@@ -66,7 +99,11 @@ it('filters server authorized projects before pagination and rejects hidden or a
       code: 'invalid-argument',
       message: 'Cursor inválido.',
     });
-  expect(listProjects).toHaveBeenCalledWith('bob');
+  expect(listProjectsPage).toHaveBeenCalledWith('bob', {
+    scope: 'personal',
+    includeArchived: false,
+    limit: 50,
+  });
 });
 it('requires explicit human personal/work scope, does not accept owner from client', () => {
   const input = {
@@ -87,5 +124,9 @@ it('MCP search carries authenticated UID to repository discovery', async () => {
     listProjects,
   } as unknown as WorkRepository);
   await service.search('', 10, 'alice');
-  expect(listProjects).toHaveBeenCalledExactlyOnceWith('alice');
+  expect(listProjects).toHaveBeenCalledExactlyOnceWith('alice', {
+    query: '',
+    limit: 10,
+    includeArchived: false,
+  });
 });

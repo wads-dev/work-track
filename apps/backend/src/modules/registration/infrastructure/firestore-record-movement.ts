@@ -253,6 +253,9 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
             'resource-exhausted',
             'Contexto excede 2000 registros físicos; movimento indisponível.',
           );
+        // Firestore cannot match topics[].topicId inside array-of-object allocations
+        // with variable percentage/duration fields. Missing/null tombstones are active.
+        // projectId (and the personal owner collection path) are queried above.
         candidates = scan.docs.filter(
           (d) =>
             !isDeletedRecord(d.data()) &&

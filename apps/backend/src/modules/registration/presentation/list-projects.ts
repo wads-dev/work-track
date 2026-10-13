@@ -8,11 +8,14 @@ import {
   ProjectManagementError,
   safeId,
 } from '@work-track/core/registration/domain/project-management';
-import {
-  canAccessProject,
-  effectiveProjectType,
-} from '@work-track/core/registration/domain/project-access';
-import type { WorkRepository } from '@work-track/core/registration/domain/work-model';
+
+import type { Project } from '@work-track/core/registration/domain/work-model';
+export interface ProjectsPageRepository {
+  listProjectsPage(
+    uid: string,
+    input: z.infer<typeof listProjectsInput>,
+  ): Promise<{ projects: Project[]; nextCursor: string | null }>;
+}
 export const listProjectsInput = z
   .object({
     scope: z.enum(['all', 'personal', 'work']).default('all'),
@@ -22,7 +25,7 @@ export const listProjectsInput = z
   })
   .strict();
 export async function listProjectsHandler(
-  repository: Pick<WorkRepository, 'listProjects'>,
+  repository: ProjectsPageRepository,
   data: unknown,
   auth?: ReportAuth,
 ) {
@@ -31,26 +34,7 @@ export async function listProjectsHandler(
   if (!parsed.success)
     throw new HttpsError('invalid-argument', 'Consulta de projetos inválida.');
   try {
-    const input = parsed.data;
-    const visible = (await repository.listProjects(auth!.uid))
-      .filter(
-        (p) =>
-          canAccessProject(p, auth!.uid) &&
-          (input.scope === 'all' || effectiveProjectType(p) === input.scope) &&
-          (input.includeArchived || (!p.archived && !p.mergedInto)),
-      )
-      .sort((a, b) => a.id.localeCompare(b.id));
-    const offset = input.cursor
-      ? visible.findIndex((p) => p.id === input.cursor) + 1
-      : 0;
-    if (input.cursor && offset === 0)
-      throw new HttpsError('invalid-argument', 'Cursor inválido.');
-    const projects = visible.slice(offset, offset + input.limit);
-    return {
-      projects,
-      nextCursor:
-        offset + projects.length < visible.length ? projects.at(-1)!.id : null,
-    };
+    return await repository.listProjectsPage(auth!.uid, parsed.data);
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     if (error instanceof ProjectManagementError)

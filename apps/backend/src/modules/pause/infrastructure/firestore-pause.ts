@@ -88,7 +88,14 @@ export class FirestorePauseRepository implements PauseRepository {
       const speech = validateSpeech(input, now);
       let sourceRef = input.recordId ? records.doc(input.recordId) : undefined;
       if (!sourceRef) {
-        const scanned = await tx.get(records);
+        const scanned = await tx.get(
+          records.where('uid', '==', uid).limit(10001),
+        );
+        if (scanned.docs.length > 10000)
+          throw new PauseError(
+            'resource-exhausted',
+            'Varredura física excede limite; informe recordId explícito.',
+          );
         if (
           scanned.docs.filter((doc) => !isDeletedRecord(doc.data())).length >
           1000
@@ -97,6 +104,9 @@ export class FirestorePauseRepository implements PauseRepository {
             'resource-exhausted',
             'Contexto excede limite; informe recordId explícito.',
           );
+        // Repository residual: legacy endedAt/deletedAt may be missing or null,
+        // ISO-offset timestamps cannot use chronological lexical ranges, and project
+        // ACL/archive/locks live in another document (Firestore has no joins).
         const open = scanned.docs.filter((doc) => {
           const r = doc.data();
           const started =

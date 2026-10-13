@@ -5,6 +5,7 @@ import {
   dailyHoursInput,
   getDailyHours,
   type DailyHoursContext,
+  type DailyHoursInput,
 } from './daily-hours.js';
 import type { ReportSourceRecord } from '../../reports/domain/project-report.js';
 const uid = 'alice',
@@ -30,7 +31,22 @@ const context = (
     ['b', { type: 'work', archived: true }],
     ['personal', { type: 'personal', createdBy: uid }],
   ]),
-): DailyHoursContext => ({ records, projects });
+): DailyHoursContext => ({ records, selectedRecords: records, projects });
+// Test-only stand-in for repository selection. Production domain code does not
+// select projects/archive state from the global estimation context.
+const selectedContext = (
+  history: DailyHoursContext,
+  input: DailyHoursInput,
+) => ({
+  ...history,
+  selectedRecords: history.records.filter((record) => {
+    const project = history.projects.get(record.projectId);
+    return (
+      (!input.projectId || record.projectId === input.projectId) &&
+      (input.includeArchived || (!project?.archived && !project?.mergedInto))
+    );
+  }),
+});
 const input = (extra: object = {}) =>
   dailyHoursInput.parse({ date: '2026-10-09', ...extra });
 describe('daily-hours input and local-day boundaries', () => {
@@ -213,7 +229,10 @@ describe('daily-hours factual versus estimated totals', () => {
     expect(
       buildDailyHours(
         input({ projectId: 'a', includeArchived: false }),
-        history,
+        selectedContext(
+          history,
+          input({ projectId: 'a', includeArchived: false }),
+        ),
         uid,
         asOf,
       ),
@@ -229,7 +248,12 @@ describe('daily-hours factual versus estimated totals', () => {
       record('third', 'a', '2026-10-09T18:00:00-03:00'),
     ]);
     expect(
-      buildDailyHours(input({ projectId: 'a' }), opens, uid, asOf).totalMinutes,
+      buildDailyHours(
+        input({ projectId: 'a' }),
+        selectedContext(opens, input({ projectId: 'a' })),
+        uid,
+        asOf,
+      ).totalMinutes,
     ).toBe(300);
   });
   it('excludes foreign personal, malformed type and foreign UID before parsing', () => {
@@ -267,6 +291,59 @@ describe('daily-hours factual versus estimated totals', () => {
         buildDailyHours(input({ projectId }), history, uid, asOf),
       ).toThrow('Projeto não encontrado.');
   });
+  it('uses repository-selected records and keeps unselected next starts in global context', () => {
+    const open = record('open', 'a', '2026-10-09T09:00:00-03:00');
+    const next = record(
+      'next',
+      'a',
+      '2026-10-09T11:00:00-03:00',
+      '2026-10-09T12:00:00-03:00',
+    );
+    const archived = record(
+      'archived',
+      'b',
+      '2026-10-09T00:00:00-03:00',
+      '2026-10-09T20:00:00-03:00',
+    );
+    const history = context([open, next, archived]);
+    const report = buildDailyHours(
+      input({ projectId: 'a', includeArchived: false }),
+      { ...history, selectedRecords: [open] },
+      uid,
+      asOf,
+    );
+    expect(report).toMatchObject({
+      estimatedMinutes: 120,
+      closedMinutes: 0,
+      totalMinutes: 120,
+    });
+    expect(report.intervals.map((r) => r.id)).toEqual(['open']);
+    // Required selection cannot silently fall back to the complete context.
+    expect(
+      buildDailyHours(input(), { ...history, selectedRecords: [] }, uid, asOf)
+        .totalMinutes,
+    ).toBe(0);
+  });
+  it('rejects selected sources absent from or changed against authorized context', () => {
+    const fact = record(
+      'fact',
+      'a',
+      '2026-10-09T09:00:00-03:00',
+      '2026-10-09T10:00:00-03:00',
+    );
+    for (const selectedRecords of [
+      [{ ...fact, id: 'missing' }],
+      [{ ...fact, startedAt: '2026-10-09T08:00:00-03:00' }],
+    ])
+      expect(() =>
+        buildDailyHours(
+          input(),
+          { ...context([fact]), selectedRecords },
+          uid,
+          asOf,
+        ),
+      ).toThrow('contexto consistente');
+  });
   it('loads complete own context with authentication only and validates before reads', async () => {
     const loadOwnHistory = vi.fn().mockResolvedValue(context([]));
     const repo = { loadOwnHistory };
@@ -278,6 +355,21 @@ describe('daily-hours factual versus estimated totals', () => {
     ).rejects.toMatchObject({ code: 'unauthenticated' });
     expect(loadOwnHistory).not.toHaveBeenCalled();
     await getDailyHours(repo, { date: '2026-10-09' }, uid, asOf);
-    expect(loadOwnHistory).toHaveBeenCalledWith(uid, undefined);
+    expect(loadOwnHistory).toHaveBeenCalledWith(uid, undefined, {
+      startedAt: Date.parse('2026-10-09T03:00:00.000Z'),
+      endedAt: Date.parse('2026-10-10T03:00:00.000Z'),
+      includeArchived: true,
+    });
+    await getDailyHours(
+      repo,
+      { date: '2026-10-09', projectId: 'a', includeArchived: false },
+      uid,
+      asOf,
+    );
+    expect(loadOwnHistory).toHaveBeenLastCalledWith(uid, 'a', {
+      startedAt: Date.parse('2026-10-09T03:00:00.000Z'),
+      endedAt: Date.parse('2026-10-10T03:00:00.000Z'),
+      includeArchived: false,
+    });
   });
 });

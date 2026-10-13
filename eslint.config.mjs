@@ -99,11 +99,6 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/data/src/repositories/snapshots/**/*.ts'],
-    // Preserve async contracts and rejected-Promise errors in synchronous snapshot adapters.
-    rules: { '@typescript-eslint/require-await': 'off' },
-  },
-  {
     files: [
       'apps/backend/src/modules/**/domain/**/*.ts',
       'packages/core/src/**/domain/**/*.ts',

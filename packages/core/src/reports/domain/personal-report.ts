@@ -1,5 +1,17 @@
 import type { ReportSourceRecord } from './project-report.js';
 import type { TopicBreakdown } from './topic-breakdown.js';
+/** Repository-owned display selection; never apply to loadContext's global estimate facts.
+ * Omitted options preserve legacy include-all reads; supplied options default to active projects.
+ * Period selection is interval intersection, including spanning and open records.
+ */
+export interface ReportRecordSelection {
+  projectId?: string;
+  userIds?: string[];
+  includeArchived?: boolean;
+  from?: string;
+  to?: string;
+  topicId?: string;
+}
 export interface PersonalReportInput {
   includeArchived?: boolean;
   from?: string;
@@ -61,5 +73,6 @@ export interface PersonalReportRepository {
     uid: string,
     limit: number,
     cursor?: string,
+    selection?: ReportRecordSelection,
   ): Promise<PersonalReportPage>;
 }

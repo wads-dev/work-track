@@ -34,7 +34,17 @@ it('allhistory has no invented bounds, projectfilter preserves open estimates, o
   const repo: PersonalReportRepository = {
     readTopics: vi.fn().mockResolvedValue({}),
     loadContext: vi.fn().mockResolvedValue(records),
-    readPage: vi.fn(),
+    readPage: vi
+      .fn<PersonalReportRepository['readPage']>()
+      .mockImplementation((_uid, _limit, _cursor, options) =>
+        Promise.resolve({
+          records: records.filter(
+            (r) => !options?.projectId || r.projectId === options.projectId,
+          ),
+          scannedCount: records.length,
+          nextCursor: null,
+        }),
+      ),
     archivedProjectIds: vi.fn().mockResolvedValue([]),
   };
   const now = Date.parse('2026-10-09T00:00:00Z');

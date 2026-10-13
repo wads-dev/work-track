@@ -1,5 +1,6 @@
-import { expect, it } from 'vitest';
-import type { Firestore } from 'firebase-admin/firestore';
+import { expect, it, vi } from 'vitest';
+import { Firestore, Query, type QuerySnapshot } from 'firebase-admin/firestore';
+import type { Project } from '@work-track/core/registration/domain/work-model';
 import { FirestoreWorkRepository } from './firestore-work.js';
 it('persists default topics and isolates idempotent records by user', async () => {
   const data = new Map<string, Record<string, unknown>>();
@@ -132,4 +133,161 @@ it('persists default topics and isolates idempotent records by user', async () =
   expect(
     [...data.keys()].some((path) => path.startsWith('users/alice/records/')),
   ).toBe(true);
+});
+
+it('queries recent branches and compacts exact instants with one captured now and visible-ID pagination', async () => {
+  const at = new Date('2026-10-11T03:00:00Z');
+  vi.useFakeTimers();
+  vi.setSystemTime(at);
+  const project: Project = {
+    id: 'p',
+    title: 'Projeto',
+    description: 'Teste',
+    createdBy: 'alice',
+    createdAt: '2026-10-01T00:00:00Z',
+    type: 'personal',
+    archived: true,
+    topics: [],
+  };
+  const data = [
+    {
+      id: 'lexically-later',
+      startedAt: '2026-10-11T02:00:00+02:00',
+      endedAt: '2026-10-11T02:30:00+02:00',
+    },
+    { id: 'chronologically-later', startedAt: '2026-10-10T23:30:00-02:00' },
+    { id: 'legacy-open', startedAt: '2026-09-01T00:00:00Z' },
+    { id: 'null-open', startedAt: '2026-09-02T00:00:00Z', endedAt: null },
+    {
+      id: 'span',
+      startedAt: '2026-09-03T00:00:00Z',
+      endedAt: '2026-10-12T00:00:00Z',
+    },
+    {
+      id: 'lower-edge',
+      startedAt: '2026-10-09T03:01:00-23:59',
+      endedAt: '2026-10-10T04:00:00Z',
+    },
+    { id: 'padded-future', startedAt: '2026-10-11T04:00:00Z' },
+    { id: 'far-future', startedAt: '2026-12-01T00:00:00Z' },
+    {
+      id: 'old-closed',
+      startedAt: '2026-09-01T00:00:00Z',
+      endedAt: '2026-09-02T00:00:00Z',
+    },
+    {
+      id: 'deleted',
+      startedAt: '2026-10-11T00:00:00Z',
+      deletedAt: '2026-10-11T01:00:00Z',
+    },
+    {
+      id: 'unknown-project',
+      startedAt: '2026-10-11T00:00:00Z',
+      projectId: 'unknown',
+    },
+    { id: 'foreign-owner', startedAt: '2026-10-11T00:00:00Z', uid: 'bob' },
+  ].map((record) => ({ uid: 'alice', projectId: 'p', ...record }));
+  type NativeFilter = {
+    fieldFilter: {
+      field: { fieldPath: string };
+      op: string;
+      value: { stringValue: string };
+    };
+  };
+  const requests: Array<{ filters: NativeFilter[]; limit: number }> = [];
+  const get = vi.spyOn(Query.prototype, 'get').mockImplementation(function (
+    this: Query,
+  ) {
+    // Real SDK constructs/serializes every query. Only execution is replaced by
+    // synthetic data; all native predicates actually select this fixture.
+    const proto = (
+      this as Query & {
+        toProto(): {
+          structuredQuery: {
+            where: { compositeFilter: { filters: NativeFilter[] } };
+            limit: { value: number };
+          };
+        };
+      }
+    ).toProto().structuredQuery;
+    const filters = proto.where.compositeFilter.filters;
+    requests.push({ filters, limit: proto.limit.value });
+    const docs = data
+      .filter((record) =>
+        filters.every(({ fieldFilter }) => {
+          const value: unknown = (record as Record<string, unknown>)[
+            fieldFilter.field.fieldPath
+          ];
+          if (typeof value !== 'string') return false;
+          const selected = fieldFilter.value.stringValue;
+          if (fieldFilter.op === 'EQUAL') return value === selected;
+          if (fieldFilter.op === 'LESS_THAN') return value < selected;
+          if (fieldFilter.op === 'GREATER_THAN_OR_EQUAL')
+            return value >= selected;
+          throw new Error('Unexpected native predicate');
+        }),
+      )
+      .slice(0, proto.limit.value)
+      .map(({ id, ...record }) => ({ id, data: () => record }));
+    // Simulate query/catalog time elapsing across the request boundary.
+    vi.setSystemTime(new Date('2026-10-11T05:00:00Z'));
+    return Promise.resolve({ docs } as unknown as QuerySnapshot);
+  });
+  const repository = new FirestoreWorkRepository(
+    new Firestore({ projectId: 'demo-recent-repository' }),
+  );
+  const projects = vi
+    .spyOn(repository, 'listProjects')
+    .mockResolvedValue([project]);
+  try {
+    const first = await repository.listRecentRecords(
+      { hours: 24, limit: 2 },
+      'alice',
+    );
+    expect(first).toMatchObject({
+      queriedAt: at.toISOString(),
+      hasMore: true,
+      nextCursor: 'lexically-later',
+    });
+    expect(first.records.map((record) => record.id)).toEqual([
+      'chronologically-later',
+      'lexically-later',
+    ]);
+    vi.setSystemTime(at);
+    const rest = await repository.listRecentRecords(
+      { hours: 24, limit: 100, cursor: 'lexically-later' },
+      'alice',
+    );
+    expect(rest.records.map((record) => record.id)).toEqual([
+      'lower-edge',
+      'span',
+      'null-open',
+      'legacy-open',
+    ]);
+    expect(rest).toMatchObject({
+      queriedAt: at.toISOString(),
+      hasMore: false,
+      nextCursor: null,
+    });
+    expect(requests).toHaveLength(6);
+    for (const { filters } of requests) {
+      expect(
+        filters.map(({ fieldFilter }) => [
+          fieldFilter.field.fieldPath,
+          fieldFilter.op,
+          fieldFilter.value.stringValue,
+        ]),
+      ).toEqual(
+        expect.arrayContaining([
+          ['uid', 'EQUAL', 'alice'],
+          ['startedAt', 'LESS_THAN', '2026-10-13'],
+        ]),
+      );
+    }
+    expect(projects).toHaveBeenCalledWith('alice');
+  } finally {
+    projects.mockRestore();
+    get.mockRestore();
+    vi.useRealTimers();
+  }
 });

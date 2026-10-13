@@ -1,17 +1,5 @@
-import { objects, text } from '../../shared/data';
-import { isHidden } from '../../shared/ui/privacy';
 import { parseDay } from './calendar-utils';
-export function calendarTopics(
-  project: Record<string, unknown> | undefined,
-  revealed: boolean,
-  includeArchived: boolean,
-) {
-  if (!project || isHidden(project, revealed)) return [];
-  return objects(project.topics)
-    .filter((t) => !t.mergedIntoTopicId && (includeArchived || !t.archived))
-    .map((t) => ({ id: text(t.id, ''), label: text(t.title, 'Tópico') }))
-    .filter((t) => !!t.id);
-}
+export { selectCalendarTopics as calendarTopics } from '../../data/repositories/browser-detail-repository';
 export function updateCalendarFilters(
   params: URLSearchParams,
   key: string,

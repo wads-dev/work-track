@@ -27,16 +27,27 @@ describe('interactive charts', () => {
       'accessibilityLayer',
     ])
       expect(chart).toContain(token);
-    expect(chart).toContain(
-      'Number.isFinite(item.minutes) && item.minutes > 0',
-    );
+    expect(chart).toContain('chartPresentation(data, directory.name)');
+    expect(
+      source('../../data/repositories/metadata-presentation-repository.ts'),
+    ).toContain('Number.isFinite(item.minutes) && item.minutes > 0');
   });
-  it('does not navigate masked people or infer user IDs from topic row indexes', () => {
-    expect(source('../../features/reports/PersonalPage.tsx')).toMatch(
-      /href:\s*revealed && person\.uid/,
+  it('keeps company person identity/navigation independent of reveal without inferring topic row user IDs', () => {
+    const personal = source('../../features/reports/PersonalPage.tsx');
+    const peopleChart = personal.slice(
+      personal.indexOf('data={report.byUser.map'),
+      personal.indexOf('}))}', personal.indexOf('data={report.byUser.map')),
+    );
+    expect(peopleChart).toContain("kind: 'person' as const");
+    expect(peopleChart).toContain('uid: person.uid');
+    expect(peopleChart).toContain('companyPeople.name(person.uid)');
+    expect(peopleChart).toMatch(/href:\s*person\.uid/);
+    expect(peopleChart).not.toContain('revealed');
+    expect(source('../../features/reports/InteractiveChart.tsx')).not.toContain(
+      'usePrivacy',
     );
     expect(source('../../features/reports/ProjectReport.tsx')).toContain(
-      'uid: hidden ? undefined : person.uid',
+      'person.uid',
     );
     expect(source('../../features/reports/TopicReport.tsx')).toContain(
       'person.uid',
@@ -44,9 +55,12 @@ describe('interactive charts', () => {
     expect(source('../../features/reports/TopicReport.tsx')).not.toContain(
       'encodeURIComponent(person.key)',
     );
-    expect(source('../../features/reports/topic-report-model.ts')).toContain(
-      'revealed && !hidden',
+    const topicMetadata = source(
+      '../../data/repositories/derived-report-repository.ts',
     );
+    expect(topicMetadata).toContain('detailsAvailable: !hidden');
+    expect(topicMetadata).toContain("topicLabel: hidden ? 'Tópico reservado'");
+    expect(topicMetadata).toContain('uid: person.uid');
   });
   it('keeps profile target fixed while reusing authorized calendar and viewer identity', () => {
     const profile = source('../../features/people/PersonPage.tsx');

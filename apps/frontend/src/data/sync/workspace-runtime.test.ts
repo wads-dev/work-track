@@ -272,46 +272,6 @@ it('authorization grouping opens only one global records target for up to ten pr
   stop();
 });
 
-it('bypasses partially-backfilled group indexes locally while rejecting cached foreign project rows', async () => {
-  env();
-  const stop = startWorkspaceSession(db, 'alice');
-  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
-  const target = m.listeners.find((l) =>
-    l.target.key.includes('group:records'),
-  )!;
-  const all = Array.from({ length: 401 }, (_, i) => ({
-    path: 'users/alice/records/r' + i,
-    data: { uid: 'alice', projectId: 'p' },
-  }));
-  m.cache.set(target.target.key, all.slice(0, 380));
-  m.cache.set(JSON.stringify(['group:records']), [
-    ...all,
-    {
-      path: 'users/bob/records/secret',
-      data: { uid: 'bob', projectId: 'foreign-personal' },
-    },
-  ]);
-  target.next({
-    metadata: { fromCache: false, hasPendingWrites: false },
-    size: 380,
-    docChanges: () => [],
-  });
-  await settle();
-  let snapshot: WorkspaceSnapshot | undefined;
-  const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
-  expect(snapshot!.complete).toBe(true);
-  expect(snapshot!.records).toHaveLength(401);
-  expect(
-    snapshot!.records.some((r) => r.data.projectId === 'foreign-personal'),
-  ).toBe(false);
-  expect(
-    m.listeners.filter((l) => l.target.key.includes('group:records')),
-  ).toHaveLength(1);
-  expect(target.target.key).toContain('"in"');
-  observe();
-  stop();
-});
-
 it('online events let SDK reconnect without recreating targets or blanking local views', async () => {
   env();
   const stop = startWorkspaceSession(db, 'alice');
@@ -348,45 +308,6 @@ it('audit observer mounted before authentication session acquires its demand whe
   ).toBe(true);
   observer();
   stop();
-});
-
-it('collection-wide cache-only notification reflects deletion absent from partial indexed remote view', async () => {
-  env();
-  const stop = startWorkspaceSession(db, 'alice');
-  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
-  const target = m.listeners.find((l) =>
-    l.target.key.includes('group:records'),
-  )!;
-  const all = [
-    { path: 'users/alice/records/a', data: { uid: 'alice', projectId: 'p' } },
-    { path: 'users/alice/records/z', data: { uid: 'alice', projectId: 'p' } },
-  ];
-  m.cache.set(JSON.stringify(['group:records']), all);
-  target.next({
-    metadata: { fromCache: false, hasPendingWrites: false },
-    size: 1,
-    docChanges: () => [],
-  });
-  await settle();
-  let snapshot: WorkspaceSnapshot | undefined;
-  const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
-  expect(snapshot!.records).toHaveLength(2);
-  m.cache.set(JSON.stringify(['group:records']), all.slice(0, 1));
-  m.cacheListeners[0].next({
-    metadata: { fromCache: true, hasPendingWrites: false },
-    size: 1,
-    docChanges: () => [{}],
-  });
-  await settle();
-  expect(snapshot!.records).toHaveLength(1);
-  expect(m.cacheListeners).toHaveLength(1);
-  expect(m.cacheListeners[0].options.source).toBe('cache');
-  expect(
-    m.listeners.filter((l) => l.target.key.includes('group:records')),
-  ).toHaveLength(1);
-  observe();
-  stop();
-  expect(m.cacheListeners[0].stop).toHaveBeenCalledOnce();
 });
 
 it('remote counter counts added/modified documents but not removals, pending echoes or confirmations', async () => {

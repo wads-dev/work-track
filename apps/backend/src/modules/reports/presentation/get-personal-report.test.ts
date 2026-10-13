@@ -42,7 +42,12 @@ it('only reads authenticated own records and validates bounds/auth/cursor', asyn
     ).rejects.toMatchObject({ code: 'invalid-argument' });
   expect(readPage).not.toHaveBeenCalled();
   await getPersonalReportHandler(repo, input, auth);
-  expect(readPage).not.toHaveBeenCalled();
+  expect(readPage).toHaveBeenCalledExactlyOnceWith('alice', 100, undefined, {
+    from: input.from,
+    to: input.to,
+    projectId: undefined,
+    includeArchived: false,
+  });
   expect(repo.loadContext).toHaveBeenCalledExactlyOnceWith(['alice']);
 });
 it('accepts a62 civil day range spanning fall DST', async () => {

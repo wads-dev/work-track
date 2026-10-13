@@ -126,6 +126,9 @@ export function CalendarTimeline({
       Number(p.find((x) => x.type === 'minute')?.value)
     );
   };
+  // Rendering geometry only: clip authorized report intervals into day cells,
+  // lay out collisions/points and collapse empty axis gaps. No business query
+  // selection (person/project/topic/period/state) occurs in this view.
   const data = days.map((key) => {
     const start = Date.parse(midnight(key, zone)),
       end = Date.parse(midnight(addDays(key, 1), zone));

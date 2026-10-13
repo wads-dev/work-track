@@ -9,7 +9,7 @@ export function buildCompanyReport(
   context: ReportSourceRecord[],
   asOf: number,
   labels: Record<string, string>,
-  archived: string[],
+  _archived: string[], // Compatibility only: archive selection is repository-owned.
 ): CompanyReport {
   page = { ...page, records: activeRecords(page.records) };
   context = activeRecords(context);
@@ -39,8 +39,8 @@ export function buildCompanyReport(
     },
   };
   const projects = new Map<string, number>(),
-    warnings = new Set(output.warnings),
-    hidden = new Set(archived);
+    warnings = new Set(output.warnings);
+  // Partitioning all selected facts by author is aggregate math, not dataset selection.
   for (const uid of new Set(page.records.map((r) => r.uid))) {
     const own = page.records.filter((r) => r.uid === uid),
       personal = buildPersonalReport(
@@ -51,10 +51,7 @@ export function buildCompanyReport(
       );
     output.page.excludedCount += personal.page.excludedCount;
     for (const warning of personal.warnings) warnings.add(warning);
-    const selected = personal.intervals.filter(
-      (r) => input.includeArchived || !hidden.has(r.projectId),
-    );
-    output.page.excludedCount += personal.intervals.length - selected.length;
+    const selected = personal.intervals;
     let total = 0;
     for (const interval of selected) {
       output.intervals.push({ ...interval, uid });

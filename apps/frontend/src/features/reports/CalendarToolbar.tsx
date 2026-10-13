@@ -42,7 +42,9 @@ function CalendarSelect({
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
-  const selectedOption = options.find((option) => option.value === value);
+  const selectedOption = new Map(
+    options.map((option) => [option.value, option]),
+  ).get(value);
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger

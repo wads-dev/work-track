@@ -19,6 +19,7 @@ interface Collection {
   path: string;
   doc: (id: string) => Ref;
   limit: () => { query: string };
+  where: (field: string, operator: string, value: string) => Collection;
 }
 function fixture() {
   const data = new Map<string, Record<string, unknown>>();
@@ -59,6 +60,7 @@ function fixture() {
     path,
     doc: (id: string) => ref(path + '/' + id),
     limit: () => ({ query: path }),
+    where: () => collection(path),
   });
   let pending: (() => void)[] = [];
   const tx = {

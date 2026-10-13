@@ -11,4 +11,7 @@ export type {
   TopicInput,
   RegisterInput,
 } from '../../schemas/registration.js';
-export type { WorkRepository } from '../../contracts/work-repository.js';
+export type {
+  WorkRepository,
+  ProjectSelection,
+} from '../../contracts/work-repository.js';

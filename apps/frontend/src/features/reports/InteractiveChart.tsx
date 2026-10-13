@@ -14,9 +14,10 @@ import {
 import { hours, colors } from './report-chart';
 import { PersonIdentity } from '../people/PersonIdentity';
 import { useCompanyPeople } from '../people/CompanyPeopleContext';
-import { usePrivacy } from '../../shared/ui/privacy';
+import { chartPresentation } from '../../data/repositories/metadata-presentation-repository';
 export type ChartDatum = {
   key: string;
+  kind?: 'person' | 'project' | 'topic';
   color?: string;
   uid?: string;
   label: string;
@@ -35,22 +36,11 @@ export function InteractiveChart({
 }) {
   const navigate = useNavigate();
   const directory = useCompanyPeople();
-  const { revealed } = usePrivacy();
-  const values = data
-    .filter((item) => Number.isFinite(item.minutes) && item.minutes > 0)
-    .map((item) =>
-      item.uid
-        ? {
-            ...item,
-            label: revealed
-              ? directory.name(item.uid) || 'Pessoa da empresa'
-              : 'Pessoa',
-            uid: revealed ? item.uid : undefined,
-          }
-        : item,
-    );
+  const values = chartPresentation(data, directory.name);
+  const personUid = (item: ChartDatum) =>
+    !item.kind || item.kind === 'person' ? item.uid : undefined;
   const label = (item: ChartDatum) =>
-    item.uid ? <PersonIdentity uid={item.uid} /> : item.label;
+    personUid(item) ? <PersonIdentity uid={item.uid} /> : item.label;
   const activate = (item: ChartDatum) => {
     if (item.href) navigate(item.href);
     else item.onSelect?.();
@@ -136,9 +126,9 @@ export function InteractiveChart({
               <YAxis
                 type="category"
                 dataKey="label"
-                width={values.some((item) => item.uid) ? 44 : 120}
+                width={values.some((item) => personUid(item)) ? 44 : 120}
                 tick={
-                  values.some((item) => item.uid)
+                  values.some((item) => personUid(item))
                     ? ({
                         x,
                         y,
@@ -157,7 +147,7 @@ export function InteractiveChart({
                             height={32}
                           >
                             <div className="flex h-full items-center text-xs text-muted-foreground">
-                              {item?.uid ? (
+                              {item && personUid(item) ? (
                                 <PersonIdentity uid={item.uid} avatarOnly />
                               ) : null}
                             </div>

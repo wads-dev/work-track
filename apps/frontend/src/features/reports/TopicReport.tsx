@@ -17,19 +17,15 @@ import { Link as RouterLink } from 'react-router-dom';
 
 import { topicDetailsPath } from '../../app/routes';
 
-/** View model only: callers must supply server-calculated allocations and safe labels. */
-export type TopicReportBucket = {
-  projectId: string;
-  topicId: string | null;
-  projectLabel: string;
-  topicLabel: string;
-  minutes: number;
-  detailsAvailable?: boolean;
-  people: { key: string; label: string; minutes: number; uid?: string }[];
-};
-export const topicBucketKey = (
-  bucket: Pick<TopicReportBucket, 'projectId' | 'topicId'>,
-) => JSON.stringify([bucket.projectId, bucket.topicId]);
+import {
+  selectTopicReportBuckets,
+  topicBucketKey,
+  type TopicReportBucket,
+} from '../../data/repositories/derived-report-repository';
+export {
+  topicBucketKey,
+  type TopicReportBucket,
+} from '../../data/repositories/derived-report-repository';
 
 export function TopicReport({
   buckets,
@@ -56,7 +52,10 @@ export function TopicReport({
       hash: location.hash,
     });
   };
-  const active = buckets.find((bucket) => topicBucketKey(bucket) === selected);
+  const { active, visibleBuckets } = selectTopicReportBuckets(
+    buckets,
+    selected,
+  );
   return (
     <Card className="gap-0 py-0">
       <section
@@ -117,7 +116,7 @@ export function TopicReport({
               <InteractiveChart
                 title="Tempo por tópico"
                 variant="bar"
-                data={(active ? [active] : buckets).map((bucket) => ({
+                data={visibleBuckets.map((bucket) => ({
                   key: topicBucketKey(bucket),
                   label: bucket.projectLabel + ' · ' + bucket.topicLabel,
                   minutes: bucket.minutes,
@@ -134,7 +133,7 @@ export function TopicReport({
                 }))}
               />
               <ul className={cn('list-none p-0 m-0')}>
-                {(active ? [active] : buckets).map((bucket) => (
+                {visibleBuckets.map((bucket) => (
                   <li
                     key={topicBucketKey(bucket)}
                     className={cn('py-3 border-b')}
@@ -216,9 +215,9 @@ export function TopicReport({
                     variant="bar"
                     data={active.people.map((person) => ({
                       ...person,
-                      uid: active.detailsAvailable ? person.uid : undefined,
+                      uid: person.uid,
                       href:
-                        !personal && active.detailsAvailable && person.uid
+                        !personal && person.uid
                           ? '/people/' +
                             encodeURIComponent(person.uid) +
                             location.search
@@ -233,9 +232,7 @@ export function TopicReport({
                       >
                         <p className={cn('text-base [overflow-wrap:anywhere]')}>
                           <PersonIdentity
-                            uid={
-                              active.detailsAvailable ? person.uid : undefined
-                            }
+                            uid={person.uid}
                             fallback={person.label}
                           />
                         </p>

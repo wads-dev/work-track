@@ -1,7 +1,8 @@
 import type { Functions } from 'firebase/functions';
 import { ExternalLink } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
-import { objects, text } from '../../shared/data';
+import { text } from '../../shared/data';
+import { selectProjectTopics } from '../../data/repositories/editor-options-repository';
 import { githubUrl as githubSchema } from '@work-track/core/registration/domain/project-management';
 import { useLocation } from 'react-router-dom';
 import { topicDetailsPath } from '../../app/routes';
@@ -15,9 +16,7 @@ export function ProjectTopics({
   project: Record<string, unknown>;
 }) {
   const location = useLocation();
-  const topics = objects(project.topics).filter(
-    (topic) => !topic.mergedIntoTopicId,
-  );
+  const topics = selectProjectTopics(project);
   return (
     <section
       aria-label="Tópicos do projeto"

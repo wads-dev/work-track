@@ -6,6 +6,14 @@
 - A tela Pessoas, sua busca, contagem e estados de carregamento/erro/vazio devem continuar disponíveis em ambos os modos. Não condicione identidade ou diretório a `PrivacyContext`/`revealed`.
 - Confidencialidade é apresentação, não autorização: mantenha autenticação corporativa, isolamento de contas e ACLs de projetos/registros. Mostrar uma pessoa não concede acesso às suas atividades.
 
+## Arquitetura obrigatória: filtros na base de dados
+
+- Views, viewmodels, controllers e hooks não selecionam/filtram datasets. Recebem dados prontos e passam parâmetros de seleção para a camada de repository. Não aplicar filtro de negócio de listagem/período/pessoa/projeto/tópico/estado nessas camadas.
+- Repositories traduzem parâmetros em consultas na base de dados. Não substituir consultas suportadas por loops, filter, flatMap, find ou seleção manual em arrays. No Web, consultas de tela usam o cache persistente do Firestore, com índices locais, separadas dos listeners globais de sincronização; filtros de tela nunca criam novos listeners remotos.
+- Única exceção: predicado que a base Firebase realmente não suporta. Aplicar todos os predicados suportados na consulta, manter o residual dentro do repository e documentar a limitação concreta (sem exceções genéricas ou apenas de conveniência).
+- Distinguir seleção de datasets de validação de schema/ACL, transformação, ordenação de apresentação e cálculos de domínio (intervalos, sobreposições, agregação). Segurança/validações não podem ser removidas para satisfazer regra superficialmente.
+- Consultas de intervalo devem cobrir registros que atravessam o período inteiro e registros abertos; não usar somente início/fim dentro do intervalo. Não retornar totais parciais silenciosamente. Não ampliar ACLs, gerar leituras remotas por navegação ou desativar índices locais.
+
 ## Isolamento obrigatório
 
 - Correções de bugs e features devem ser feitas em uma **Git worktree separada**, com branch própria baseada no estado relevante de origin/main. Nunca misture alterações pendentes do checkout principal.

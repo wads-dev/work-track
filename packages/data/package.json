@@ -14,25 +14,25 @@
       "development": "./src/repositories/record-edit-plan.ts",
       "default": "./lib/repositories/record-edit-plan.js"
     },
-    "./repositories/snapshots/personal-report-repository": {
-      "types": "./lib/repositories/snapshots/personal-report-repository.d.ts",
-      "development": "./src/repositories/snapshots/personal-report-repository.ts",
-      "default": "./lib/repositories/snapshots/personal-report-repository.js"
+    "./test-support/personal-report-repository": {
+      "types": "./lib/test-support/personal-report-repository.d.ts",
+      "development": "./src/test-support/personal-report-repository.ts",
+      "default": "./lib/test-support/personal-report-repository.js"
     },
-    "./repositories/snapshots/authorized-report-repository": {
-      "types": "./lib/repositories/snapshots/authorized-report-repository.d.ts",
-      "development": "./src/repositories/snapshots/authorized-report-repository.ts",
-      "default": "./lib/repositories/snapshots/authorized-report-repository.js"
+    "./test-support/authorized-report-repository": {
+      "types": "./lib/test-support/authorized-report-repository.d.ts",
+      "development": "./src/test-support/authorized-report-repository.ts",
+      "default": "./lib/test-support/authorized-report-repository.js"
     },
-    "./repositories/snapshots/own-calendar-repository": {
-      "types": "./lib/repositories/snapshots/own-calendar-repository.d.ts",
-      "development": "./src/repositories/snapshots/own-calendar-repository.ts",
-      "default": "./lib/repositories/snapshots/own-calendar-repository.js"
+    "./test-support/own-calendar-repository": {
+      "types": "./lib/test-support/own-calendar-repository.d.ts",
+      "development": "./src/test-support/own-calendar-repository.ts",
+      "default": "./lib/test-support/own-calendar-repository.js"
     },
-    "./repositories/snapshots/personal-project-report-repository": {
-      "types": "./lib/repositories/snapshots/personal-project-report-repository.d.ts",
-      "development": "./src/repositories/snapshots/personal-project-report-repository.ts",
-      "default": "./lib/repositories/snapshots/personal-project-report-repository.js"
+    "./test-support/personal-project-report-repository": {
+      "types": "./lib/test-support/personal-project-report-repository.d.ts",
+      "development": "./src/test-support/personal-project-report-repository.ts",
+      "default": "./lib/test-support/personal-project-report-repository.js"
     },
     "./codecs/report-project-metadata": {
       "types": "./lib/codecs/report-project-metadata.d.ts",

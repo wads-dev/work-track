@@ -32,6 +32,11 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
   const app = createApp(
     provider,
     {
+      searchRepositoryContext: vi.fn().mockResolvedValue({
+        matches: [
+          { projectId: 'p', topicId: 't', matchType: 'exact_repository' },
+        ],
+      }),
       listProjects: vi.fn().mockResolvedValue([
         {
           id: 'p',
@@ -73,7 +78,11 @@ it('exposes movement over authenticated MCP HTTP, preserves daily wiring, reject
     undefined,
     {
       loadOwnHistory: () =>
-        Promise.resolve({ records: [], projects: new Map() }),
+        Promise.resolve({
+          records: [],
+          selectedRecords: [],
+          projects: new Map(),
+        }),
     },
     undefined,
     undefined,

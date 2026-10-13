@@ -75,6 +75,7 @@ export interface RecordEditingRepository {
   listOpenRecords(
     uid: string,
     limit: number,
+    excludeRecordId?: string,
   ): Promise<{ records: OpenRecord[]; partial: boolean }>;
 }
 export class RecordEditError extends Error {

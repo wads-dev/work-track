@@ -1,6 +1,5 @@
 import { CompactListToolbar } from '../../shared/ui/CompactListToolbar';
 import { useOwnRecords } from '../records/hooks/useOwnRecords';
-import { filterRecords, recordPage } from '../records/record-filters';
 import { useProjects } from '../projects/hooks/useProjects';
 import { MetadataLink } from '../../shared/ui/MetadataLink';
 import { ProjectCreate } from '../projects/ProjectCreate';
@@ -8,7 +7,6 @@ import { ProjectList } from '../projects/ProjectList';
 import { clearProjectFilters } from '../projects/project-list';
 import { writeUrlTab } from '../../app/url-tabs';
 import { useEffect, useState } from 'react';
-import { isOpen } from '../pending/pending-utils';
 import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
 import { AlertTriangle, Info } from 'lucide-react';
 import { RecordsList } from '../records/RecordsList';
@@ -36,7 +34,7 @@ import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
 import { ProjectReport } from '../reports/ProjectReport';
 import { RecordDrawer } from '../records/RecordDrawer';
-import { date, object, objects, text } from '../../shared/data';
+import { date, text } from '../../shared/data';
 import {
   Link as RouterLink,
   useLocation,
@@ -44,7 +42,7 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
-import { detailPath, matchesFilter } from '../../app/routes';
+import { detailPath } from '../../app/routes';
 import { UiIcon } from '../../shared/ui/UiIcons';
 import {
   usePrivacy,
@@ -56,28 +54,7 @@ import { ProjectEditor } from '../projects/ProjectEditor';
 import { ProjectAccess } from '../projects/ProjectAccess';
 import { ProjectHeader } from '../projects/ProjectHeader';
 import { ProjectArchive } from '../projects/ProjectArchive';
-import { matchesArchive } from '../projects/project-archive';
 
-function topicLabels(data: Record<string, unknown>) {
-  const snapshots = objects(data.topicSnapshots);
-  return (
-    objects(data.topics)
-      .map((topic) => {
-        const snapshot = snapshots.find((item) => item.id === topic.topicId);
-        const title = text(snapshot?.title, text(topic.topicId));
-        const allocation =
-          typeof topic.percentage === 'number'
-            ? ' · ' + topic.percentage + '%'
-            : '';
-        const duration =
-          typeof topic.durationMinutes === 'number'
-            ? ' · ' + topic.durationMinutes + ' min'
-            : '';
-        return title + allocation + duration;
-      })
-      .join('\n') || 'Não informado'
-  );
-}
 export function Dashboard({
   db,
   functions,
@@ -93,29 +70,6 @@ export function Dashboard({
   const [reportRefresh, setReportRefresh] = useState(0);
   const [reportSummaryTarget, setReportSummaryTarget] =
     useState<HTMLDivElement | null>(null);
-  const rawProjects = useProjects(functions, uid);
-  const rawRecords = useOwnRecords(db, uid, mode !== 'projects');
-  const rawProjectsById = new Map(rawProjects.rows.map((row) => [row.id, row]));
-  const projects = {
-    ...rawProjects,
-    rows: rawProjects.rows.map((row) => ({
-      ...row,
-      data: safeProject(row.data, revealed),
-    })),
-  };
-  const records = {
-    ...rawRecords,
-    rows: rawRecords.rows.map((row) => ({
-      ...row,
-      data: safeRecord(
-        row.data,
-        isHidden(
-          rawProjectsById.get(text(row.data.projectId, ''))?.data,
-          revealed,
-        ),
-      ),
-    })),
-  };
   const { projectId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -169,6 +123,53 @@ export function Dashboard({
   const projectFilter = params.get('project') ?? '';
   const archiveFilter = params.get('status') ?? 'active';
   const projectScope = params.get('scope') === 'personal' ? 'personal' : 'work';
+  const rawProjects = useProjects(functions, uid);
+  const projectDetail = useProjects(functions, uid, {
+    id: projectId ?? '__no-detail__',
+  });
+  const selectedProject = projectDetail.rows[0];
+  const selectedProjects = useProjects(functions, uid, {
+    scope: projectScope,
+    archive: archiveFilter,
+    query: filter,
+    revealed,
+  });
+  const rawRecords = useOwnRecords(db, uid, mode !== 'projects' && !projectId, {
+    project: projectFilter,
+    topic: topicFilter,
+    query: filter,
+    fromDate,
+    toDate,
+    zone,
+    status: 'all',
+    revealed,
+    ...(mode === 'records' ? { page: activePage, size: pageSize } : {}),
+  });
+  const rawProjectsById = new Map(rawProjects.rows.map((row) => [row.id, row]));
+  const records = {
+    ...rawRecords,
+    rows: rawRecords.rows.map((row) => ({
+      ...row,
+      data: safeRecord(
+        row.data,
+        isHidden(
+          rawProjectsById.get(text(row.data.projectId, ''))?.data,
+          revealed,
+        ),
+      ),
+    })),
+  };
+
+  const filteredProjects = {
+    ...selectedProjects,
+    rows: selectedProjects.rows.map((row) => ({
+      ...row,
+      data: safeProject(row.data, revealed),
+    })),
+  };
+  const filteredRecords = records;
+  const page = rawRecords.page;
+  const openRows = rawRecords.openRows;
   useEffect(() => {
     if (
       params.has('q') ||
@@ -201,7 +202,7 @@ export function Dashboard({
         <Tabs value={projectTab} onValueChange={setProjectTab}>
           <ProjectHeader
             projectId={projectId}
-            project={rawProjectsById.get(projectId)?.data}
+            project={selectedProject?.data}
             catalog={rawProjects.rows}
             revealed={revealed}
             loading={rawProjects.loading}
@@ -213,13 +214,13 @@ export function Dashboard({
             }
             actions={
               <>
-                {rawProjectsById.get(projectId)?.data &&
-                  !isHidden(rawProjectsById.get(projectId)?.data, revealed) && (
+                {selectedProject?.data &&
+                  !isHidden(selectedProject?.data, revealed) && (
                     <ProjectArchive
                       key={projectId + String(revealed)}
                       functions={functions}
                       projectId={projectId}
-                      project={rawProjectsById.get(projectId)!.data}
+                      project={selectedProject!.data}
                     />
                   )}
                 {projectTab === 'overview' && (
@@ -275,22 +276,16 @@ export function Dashboard({
                     functions={functions}
                     uid={uid}
                     projectId={projectId}
-                    project={rawProjectsById.get(projectId)?.data}
-                    hidden={isHidden(
-                      rawProjectsById.get(projectId)?.data,
-                      revealed,
-                    )}
+                    project={selectedProject?.data}
+                    hidden={isHidden(selectedProject?.data, revealed)}
                   />
                 }
                 uid={uid}
                 onDeleted={() => navigate('/projects', { replace: true })}
                 functions={functions}
                 projectId={projectId}
-                project={rawProjectsById.get(projectId)?.data}
-                hidden={isHidden(
-                  rawProjectsById.get(projectId)?.data,
-                  revealed,
-                )}
+                project={selectedProject?.data}
+                hidden={isHidden(selectedProject?.data, revealed)}
               />
             </div>
           </TabsContent>
@@ -306,25 +301,20 @@ export function Dashboard({
                 refreshKey={reportRefresh}
                 summaryTarget={reportSummaryTarget}
                 projectLabel={text(
-                  projects.rows.find((row) => row.id === projectId)?.data.title,
+                  safeProject(selectedProject?.data, revealed).title,
                   'Projeto reservado',
                 )}
                 key={
                   projectId +
-                  String(rawProjectsById.get(projectId)?.data.type) +
-                  String(rawProjectsById.get(projectId)?.data.updatedAt) +
-                  String(rawProjectsById.has(projectId))
+                  String(selectedProject?.data.type) +
+                  String(selectedProject?.data.updatedAt) +
+                  String(Boolean(selectedProject))
                 }
                 projectId={projectId}
                 functions={functions}
                 db={db}
-                personal={
-                  rawProjectsById.get(projectId)?.data.type === 'personal'
-                }
-                hidden={isHidden(
-                  rawProjectsById.get(projectId)?.data,
-                  revealed,
-                )}
+                personal={selectedProject?.data.type === 'personal'}
+                hidden={isHidden(selectedProject?.data, revealed)}
                 search={location.search}
                 uid={uid}
               />
@@ -333,76 +323,6 @@ export function Dashboard({
         </Tabs>
       </section>
     );
-  const filteredProjects = {
-    ...projects,
-    rows: projects.rows.filter(
-      (row) =>
-        (rawProjectsById.get(row.id)?.data.type === 'personal'
-          ? 'personal'
-          : 'work') === projectScope &&
-        matchesArchive(rawProjectsById.get(row.id)?.data, archiveFilter) &&
-        matchesFilter(
-          [
-            row.id,
-            rawProjectsById.get(row.id)?.data.title,
-            rawProjectsById.get(row.id)?.data.description,
-            ...objects(rawProjectsById.get(row.id)?.data.topics).map(
-              (topic) => topic.title,
-            ),
-          ],
-          filter,
-        ),
-    ),
-  };
-  let recordFilterError = '';
-  let matchingRecords: typeof rawRecords.rows;
-  try {
-    matchingRecords = filterRecords(
-      rawRecords.rows,
-      {
-        project: projectFilter,
-        topic: topicFilter,
-        query: '',
-        fromDate,
-        toDate,
-        zone,
-        status: 'all',
-      },
-      objects(rawProjectsById.get(projectFilter)?.data.topics),
-    );
-  } catch (error) {
-    recordFilterError =
-      error instanceof Error ? error.message : 'Período inválido';
-    matchingRecords = [];
-  }
-  const safeRecordsById = new Map(records.rows.map((row) => [row.id, row]));
-  const matchingSafeRecords = matchingRecords
-    .map((row) => safeRecordsById.get(row.id))
-    .filter((row): row is (typeof records.rows)[number] => row !== undefined)
-    .filter((row) =>
-      matchesFilter(
-        [
-          row.id,
-          row.data.originalText,
-          row.data.interpretation,
-          object(row.data.projectSnapshot).title,
-          topicLabels(row.data),
-        ],
-        filter,
-      ),
-    );
-  const page = Math.min(
-    activePage,
-    Math.max(0, Math.ceil(matchingSafeRecords.length / pageSize) - 1),
-  );
-  const filteredRecords = {
-    ...records,
-    error: recordFilterError || records.error,
-    rows:
-      mode === 'records'
-        ? recordPage(matchingSafeRecords, page, pageSize)
-        : matchingSafeRecords,
-  };
   return (
     <div
       className={
@@ -515,7 +435,7 @@ export function Dashboard({
           }}
         />
       )}
-      {mode !== 'projects' && records.rows.some((row) => isOpen(row.data)) && (
+      {mode !== 'projects' && rawRecords.openCount > 0 && (
         <Alert className="mb-4">
           <AlertTriangle aria-hidden="true" />
           <AlertTitle>Registros em aberto</AlertTitle>
@@ -523,29 +443,24 @@ export function Dashboard({
             Há registros abertos entre os itens carregados. Confira detalhes
             antes de encerrar; nada será encerrado automaticamente.
             <ul className="my-2 space-y-1">
-              {records.rows
-                .filter((row) => isOpen(row.data))
-                .slice(0, 5)
-                .map((row) => (
-                  <li key={row.id}>
-                    <MetadataLink
-                      projectId={text(row.data.projectId, '')}
-                      project={
-                        rawProjects.rows.find(
-                          (p) => p.id === row.data.projectId,
-                        )?.data
-                      }
-                      revealed={revealed}
-                    />
-                    {' · '}
-                    <RouterLink
-                      to={detailPath('records', row.id, location.search)}
-                    >
-                      Registro iniciado{' '}
-                      {date(row.data.startedAt, row.data.timeZone)}
-                    </RouterLink>
-                  </li>
-                ))}
+              {openRows.map((row) => (
+                <li key={row.id}>
+                  <MetadataLink
+                    projectId={text(row.data.projectId, '')}
+                    project={
+                      rawProjectsById.get(text(row.data.projectId, ''))?.data
+                    }
+                    revealed={revealed}
+                  />
+                  {' · '}
+                  <RouterLink
+                    to={detailPath('records', row.id, location.search)}
+                  >
+                    Registro iniciado{' '}
+                    {date(row.data.startedAt, row.data.timeZone)}
+                  </RouterLink>
+                </li>
+              ))}
             </ul>
             Até 5 registros abertos exibidos neste resumo.
           </AlertDescription>
@@ -588,8 +503,8 @@ export function Dashboard({
           <details className="mt-4 text-xs text-muted-foreground">
             <summary className="cursor-pointer">Sobre o período</summary>
             <p className="mt-2">
-              Encerrados são incluídos quando sobrepõem o período; abertos, pela
-              data de início. Nenhuma hora é estimada nesta lista.
+              Encerrados e abertos são incluídos quando atravessam o período.
+              Nenhuma hora é estimada nesta lista.
             </p>
           </details>
           <div className="flex flex-wrap justify-between gap-3 mt-4 items-center">
@@ -602,11 +517,11 @@ export function Dashboard({
             <p role="status">
               Página {page + 1}·{' '}
               {rawRecords.complete
-                ? matchingSafeRecords.length + ' registros encontrados'
+                ? rawRecords.total + ' registros encontrados'
                 : 'resultado parcial'}
             </p>
             <Button
-              disabled={(page + 1) * pageSize >= matchingSafeRecords.length}
+              disabled={(page + 1) * pageSize >= rawRecords.total}
               onClick={() => setPageState({ key: pageKey, page: page + 1 })}
             >
               Próxima

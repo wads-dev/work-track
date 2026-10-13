@@ -1,139 +1,147 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
 import type { WorkspaceSnapshot } from '../sync/workspace-sync';
 const mocks = vi.hoisted(() => ({
-  observers: [] as {
-    uid: string;
-    next: (value: WorkspaceSnapshot) => void;
-    stop: ReturnType<typeof vi.fn>;
-    active: boolean;
-  }[],
   observe: vi.fn(),
-  onSnapshot: vi.fn(),
-  getDocs: vi.fn(),
-  callable: vi.fn(),
+  read: vi.fn(),
+  stop: vi.fn(),
+  next: null as null | ((snapshot: WorkspaceSnapshot) => void),
 }));
 vi.mock('../sync/workspace-runtime', () => ({
   observeWorkspace: mocks.observe,
 }));
-vi.mock('firebase/firestore', () => ({
-  onSnapshot: mocks.onSnapshot,
-  getDocs: mocks.getDocs,
-}));
-vi.mock('firebase/functions', () => ({ httpsCallable: mocks.callable }));
+vi.mock(
+  '../repositories/browser-listing-repository',
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import('../repositories/browser-listing-repository')
+      >();
+    return { ...actual, readProjectListing: mocks.read };
+  },
+);
+import { subscribeAuthorizedProjects as subscribe } from './authorized-project-source';
+import { emptyListing } from '../repositories/browser-listing-repository';
 const db = {} as Firestore;
-const state = (patch: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot => ({
-  projects: [],
+const snapshot = (
+  patch: Partial<WorkspaceSnapshot> = {},
+): WorkspaceSnapshot => ({
+  projects: [{ id: 'p', data: {} }],
   records: [],
-  completedProjects: [],
+  completedProjects: ['p'],
   complete: true,
   syncing: false,
   error: '',
   ...patch,
 });
-const emit = (value: WorkspaceSnapshot, index = 0) => {
-  const observer = mocks.observers[index];
-  if (observer.active) observer.next(value);
-};
+const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.observers.splice(0);
   mocks.observe.mockImplementation(
-    (_db: Firestore, uid: string, next: (value: WorkspaceSnapshot) => void) => {
-      const observer = {
-        uid,
-        next,
-        active: true,
-        stop: vi.fn(() => {
-          observer.active = false;
-        }),
-      };
-      mocks.observers.push(observer);
-      return observer.stop;
+    (_db: Firestore, _uid: string, next: typeof mocks.next) => {
+      mocks.next = next;
+      return mocks.stop;
     },
   );
-});
-afterEach(() => {
-  expect(mocks.onSnapshot).not.toHaveBeenCalled();
-  expect(mocks.getDocs).not.toHaveBeenCalled();
-  expect(mocks.callable).not.toHaveBeenCalled();
-});
-
-import { subscribeAuthorizedProjects } from './authorized-project-source';
-it('observes the account materialization without reconnecting or reading Firebase', () => {
-  const next = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  expect(mocks.observe).toHaveBeenCalledWith(db, 'alice', expect.any(Function));
-  const projects = [
-    { id: 'legacy', data: { title: 'Legacy' } },
-    { id: 'own', data: { type: 'personal', createdBy: 'alice' } },
-  ];
-  emit(state({ projects }));
-  expect(next).toHaveBeenLastCalledWith({
-    rows: projects,
-    complete: true,
-    fromCache: false,
-    hasPendingWrites: false,
+  mocks.read.mockResolvedValue({
+    ...emptyListing,
+    rows: [{ id: 'queried', data: {} }],
+    total: 1,
   });
-  emit(state({ projects, syncing: true }));
-  expect(next.mock.lastCall?.[0].rows).toEqual(projects);
+});
+it('uses workspace readiness only to trigger native repository selection and forwards parameters', async () => {
+  const next = vi.fn();
+  subscribe(db, 'alice', next, vi.fn(), {
+    scope: 'personal',
+    query: 'display',
+  });
+  mocks.next!(snapshot());
+  await flush();
+  expect(mocks.read).toHaveBeenCalledWith(db, 'alice', new Set(['p']), {
+    scope: 'personal',
+    query: 'display',
+  });
+  expect(next.mock.lastCall?.[0]).toMatchObject({
+    rows: [{ id: 'queried' }],
+    fromCache: false,
+    total: 1,
+  });
   expect(mocks.observe).toHaveBeenCalledOnce();
 });
-it('does not confirm cold or incomplete materializations as an empty catalog', () => {
+it('fences incomplete readiness instead of exposing global memory arrays', async () => {
   const next = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  emit(state({ complete: false, projects: [{ id: 'stale', data: {} }] }));
-  expect(next).toHaveBeenLastCalledWith({
-    rows: [],
-    complete: false,
-    fromCache: true,
-    hasPendingWrites: false,
-  });
-  emit(state());
-  expect(next.mock.lastCall?.[0].complete).toBe(true);
-});
-it('replaces create/update/delete and revoked catalog rows atomically', () => {
-  const next = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, vi.fn());
-  emit(state({ projects: [{ id: 'p', data: { title: 'Before' } }] }));
-  emit(
-    state({
-      projects: [
-        { id: 'p', data: { title: 'After' } },
-        { id: 'new', data: {} },
-      ],
-    }),
-  );
-  expect(next.mock.lastCall?.[0].rows).toHaveLength(2);
-  expect(next.mock.lastCall?.[0].rows[0].data.title).toBe('After');
-  // The session synchronizer owns ACL evaluation and removes revoked parents.
-  emit(state());
-  expect(next.mock.lastCall?.[0].rows).toEqual([]);
-});
-it('reports local authorization/storage errors without publishing stale rows and can recover', () => {
-  const next = vi.fn(),
-    fail = vi.fn();
-  subscribeAuthorizedProjects(db, 'alice', next, fail);
-  emit(
-    state({
-      error: 'permission-denied',
+  subscribe(db, 'alice', next, vi.fn());
+  mocks.next!(
+    snapshot({
+      complete: false,
+      records: [{ path: 'users/alice/records/secret', data: {} }],
       projects: [{ id: 'stale', data: {} }],
     }),
   );
-  expect(fail).toHaveBeenCalledOnce();
-  expect(next).not.toHaveBeenCalled();
-  emit(state());
-  expect(next.mock.lastCall?.[0].rows).toEqual([]);
+  expect(mocks.read).not.toHaveBeenCalled();
+  expect(next.mock.lastCall?.[0]).toMatchObject({
+    rows: [],
+    fromCache: true,
+    total: 0,
+  });
 });
-it('disposes only its local observer and keeps accounts independent', () => {
-  const alice = vi.fn(),
-    bob = vi.fn();
-  const stop = subscribeAuthorizedProjects(db, 'alice', alice, vi.fn());
-  subscribeAuthorizedProjects(db, 'bob', bob, vi.fn());
+it('drops cache query results superseded by ACL/account content changes or disposal', async () => {
+  let resolve!: (value: typeof emptyListing) => void;
+  mocks.read.mockImplementationOnce(
+    () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  );
+  const next = vi.fn();
+  const stop = subscribe(db, 'alice', next, vi.fn());
+  mocks.next!(snapshot());
+  mocks.next!(snapshot({ complete: false, projects: [] }));
+  resolve({ ...emptyListing, rows: [{ id: 'revoked', data: {} }] });
+  await flush();
+  expect(next.mock.lastCall?.[0].rows).toEqual([]);
+  mocks.read.mockImplementationOnce(
+    () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  );
+  mocks.next!(snapshot());
   stop();
-  emit(state());
-  emit(state(), 1);
-  expect(mocks.observers[0].stop).toHaveBeenCalledOnce();
-  expect(alice).not.toHaveBeenCalled();
-  expect(bob).toHaveBeenCalledOnce();
+  resolve({ ...emptyListing, rows: [{ id: 'late', data: {} }] });
+  await flush();
+  expect(next.mock.lastCall?.[0].rows).toEqual([]);
+  expect(mocks.stop).toHaveBeenCalledOnce();
+});
+it('fails without publishing stale results and recovers on the next local content notification', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribe(db, 'alice', next, fail);
+  mocks.next!(snapshot({ error: 'denied' }));
+  expect(fail).toHaveBeenCalledOnce();
+  expect(mocks.read).not.toHaveBeenCalled();
+  mocks.read.mockRejectedValueOnce(new Error('storage'));
+  mocks.next!(snapshot());
+  await flush();
+  expect(fail).toHaveBeenCalledTimes(2);
+  mocks.next!(snapshot());
+  await flush();
+  expect(next.mock.lastCall?.[0].rows).toHaveLength(1);
+});
+
+it('preserves queried data and avoids duplicate local reads on transport-only and audit notifications', async () => {
+  const next = vi.fn();
+  subscribe(db, 'alice', next, vi.fn());
+  mocks.next!(snapshot());
+  await flush();
+  const before = next.mock.calls.length;
+  mocks.next!(
+    snapshot({
+      syncing: true,
+      audits: [{ path: 'users/alice/records/a/audit/x', data: {} }],
+    }),
+  );
+  await flush();
+  expect(mocks.read).toHaveBeenCalledTimes(1);
+  expect(next).toHaveBeenCalledTimes(before);
 });

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { ArrowLeft, LockKeyhole, Users } from 'lucide-react';
-import { ProjectAppearance } from '@work-track/core/registration/domain/project-color';
+import { projectColors } from '../../shared/ui/project-colors';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -33,13 +33,7 @@ export function ProjectHeader({
   const params = new URLSearchParams(search);
   const hidden = isHidden(project, revealed);
   const data = safeProject(project, revealed);
-  const colorCatalog = catalog.map((row) => ({
-    id: row.id,
-    color: safeProject(row.data, revealed).color,
-  }));
-  const color = new ProjectAppearance(
-    colorCatalog.find((row) => row.id === projectId) ?? { id: projectId },
-  ).getColor(colorCatalog);
+  const color = projectColors(catalog, revealed)(projectId);
   const personal = data.type === 'personal';
   const ScopeIcon = personal ? LockKeyhole : Users;
   return (

@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import { objects, text, type Row } from '../../shared/data';
+import { text, type Row } from '../../shared/data';
+import { createMetadataPresentationRepository } from '../../data/repositories/metadata-presentation-repository';
 import { safeProject } from '../../shared/ui/privacy';
 export function RecordsToolbar({
   catalog,
@@ -30,10 +31,9 @@ export function RecordsToolbar({
   onClear: () => void;
 }) {
   const project = params.get('project') ?? '';
-  const topics = objects(
-    safeProject(catalog.find((row) => row.id === project)?.data, revealed)
-      .topics,
-  );
+  const topics =
+    createMetadataPresentationRepository(catalog, revealed).project(project)
+      ?.topics ?? [];
   return (
     <CompactListToolbar
       label="Filtros de registros"

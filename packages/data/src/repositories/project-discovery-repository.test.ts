@@ -15,6 +15,68 @@ it('shares legacy and personal authorization independently of SDK', async () => 
     ).map((d) => d.id),
   ).toEqual(['legacy', 'mine', 'work']);
 });
+it('forwards repository selection and keeps legacy active work while excluding archive/merge/private before search limit', async () => {
+  const docs = [
+    {
+      id: 'legacy',
+      data: { title: 'Project', description: 'Synthetic', topics: [] },
+    },
+    {
+      id: 'archive',
+      data: {
+        title: 'Project',
+        description: 'Synthetic',
+        topics: [],
+        archived: true,
+      },
+    },
+    {
+      id: 'merged',
+      data: {
+        title: 'Project',
+        description: 'Synthetic',
+        topics: [],
+        mergedInto: 'legacy',
+      },
+    },
+    {
+      id: 'private',
+      data: {
+        type: 'personal',
+        createdBy: 'bob',
+        title: 'Project',
+        description: 'Synthetic',
+        topics: [],
+      },
+    },
+  ];
+  let passed: unknown;
+  const repository = new ProjectDiscoveryRepository({
+    scanProjects: (_limit, options) => {
+      passed = options;
+      return Promise.resolve(docs);
+    },
+  });
+  const options = {
+    scope: 'work' as const,
+    includeArchived: false,
+    query: 'project',
+    limit: 1,
+  };
+  expect(
+    (await repository.list('alice', options)).map((doc) => doc.id),
+  ).toEqual(['legacy']);
+  expect(passed).toEqual(options);
+  expect(
+    (
+      await repository.list('alice', {
+        ...options,
+        includeArchived: true,
+        limit: 10,
+      })
+    ).map((doc) => doc.id),
+  ).toEqual(['archive', 'legacy', 'merged']);
+});
 it('never returns silently truncated catalog', async () => {
   await expect(
     new ProjectDiscoveryRepository({

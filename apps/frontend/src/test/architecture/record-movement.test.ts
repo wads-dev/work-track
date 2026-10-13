@@ -148,11 +148,10 @@ describe('audited record movement', () => {
     expect(source).toContain('acknowledgeSharedDestination');
     expect(source).toContain('<RecordAuditEvent');
     expect(source).toContain('record.uid === uid');
-    expect(source).toContain('observeWorkspace(db, uid');
-    expect(source).toContain(
-      "r.path === 'users/' + uid + '/records/' + recordId",
-    );
-    expect(source).toContain('if (!snapshot.complete)');
+    expect(source).toContain('observeRecordDetail(db, uid, recordId');
+    expect(source).toContain('detail.record');
+    expect(source).not.toContain('snapshot.records');
+    expect(source).toContain('setLoading(detail.loading)');
     expect(source).toContain('activeRecord && !editorDirty.current');
     expect(source).toContain('expectedUpdatedAt: editorVersion.current');
     for (const remote of ['onSnapshot', 'getDoc(', 'getDocs', 'httpsCallable'])

@@ -31,16 +31,15 @@ describe('privacy query lifetime regressions', () => {
     expect(selector).toContain(
       "const [searchQuery, setSearchQuery] = useState('');",
     );
-    expect(selector).toContain('matchesProject(option, searchQuery)');
+    expect(selector).toContain('repository.search(searchQuery)');
+    expect(selector).not.toContain('matchesProject(');
     expect(selector).toContain('<SelectTrigger');
     expect(selector).toContain('<SelectContent');
     expect(selector).not.toContain('matchesProject(option, selected.label)');
   });
   it('never clears selection due to typing or resetting the search', () => {
     const selector = source('../../features/projects/ProjectSelector.tsx');
-    expect(selector).toContain(
-      'options.find((option) => option.id === projectId)',
-    );
+    expect(selector).toContain('repository.read(projectId)');
     expect(selector).toContain(
       "onChange(value === allValue ? '' : value.slice('project:'.length))",
     );
@@ -64,9 +63,9 @@ it('project catalog observes complete local materialization with zero remote rea
   expect(hook).not.toContain('loadAllProjects');
   expect(hook).not.toContain('listProjects');
   expect(source).toContain('observeWorkspace(db, uid');
-  expect(source).toContain('snapshot.complete ? snapshot.projects : []');
-  expect(source).toContain('fromCache: !snapshot.complete');
-  expect(source).toContain('complete: snapshot.complete');
+  expect(source).toContain('readProjectListing(db, uid, ids, options)');
+  expect(source).toContain('if (!snapshot.complete) return;');
+  expect(source).not.toContain('snapshot.projects.filter');
   for (const remote of ['onSnapshot', 'getDocs', 'getDoc(', 'httpsCallable']) {
     expect(source).not.toContain(remote);
     expect(hook).not.toContain(remote);
@@ -85,11 +84,11 @@ it('topic detail runs the local usecase only on coherent authorized state', () =
   expect(details).toContain('version === revision');
   expect(details).toContain('validateTopicReport(');
   const repository = source('../../data/sources/local-topic-report.ts');
-  expect(repository).toContain('!isDeletedRecord(record)');
+  expect(repository).toContain('FirestoreReportRepository');
+  expect(repository).not.toContain('.filter(');
   expect(repository).toContain(
-    "project.type !== 'personal' || record.uid === snapshot.viewer",
+    'this.source.revalidate(rows, viewer, personal, false)',
   );
-  expect(repository).toContain('personalOwnerUid !== this.source.viewer');
   expect(repository).toContain('this.projectRepository.readPage(');
   for (const text of [details, repository])
     for (const remote of ['onSnapshot', 'getDoc(', 'getDocs', 'httpsCallable'])

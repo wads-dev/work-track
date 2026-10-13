@@ -7,45 +7,41 @@ import {
 } from '../../../data/sources/authorized-project-source';
 import { projectRepository } from '../../../data/cache/project-repository';
 import type { ProjectScope } from '../project-list';
+import {
+  emptyListing,
+  listingKey,
+  type ProjectReadOptions,
+} from '../../../data/repositories/browser-listing-repository';
 import { workspaceRetry } from '../../../data/sync/workspace-runtime';
-
-/** Query results are projected from the SDK cache/live listeners, never cached Callable payloads. */
+const initial = {
+  ...emptyListing,
+  fromCache: true,
+  hasPendingWrites: false,
+  complete: false,
+  loading: true,
+  error: '',
+};
 export function useProjects(
   functions: Functions,
   uid: string,
-  scope: ProjectScope = 'all',
+  scope: ProjectScope | ProjectReadOptions = 'all',
 ) {
   const db = useMemo(() => getFirestore(functions.app), [functions]);
   const [attempt, setAttempt] = useState(0);
+  const key = listingKey(typeof scope === 'string' ? { scope } : scope);
+  const selection = useMemo(() => JSON.parse(key) as ProjectReadOptions, [key]);
   const [state, setState] = useState<
     ProjectSnapshot & {
       uid: string;
       db: typeof db;
+      key: string;
       loading: boolean;
       error: string;
     }
-  >({
-    uid,
-    db,
-    rows: [],
-    fromCache: true,
-    hasPendingWrites: false,
-    complete: false,
-    loading: true,
-    error: '',
-  });
+  >({ ...initial, uid, db, key });
   useEffect(() => {
     let active = true;
-    setState({
-      uid,
-      db,
-      rows: [],
-      fromCache: true,
-      hasPendingWrites: false,
-      complete: false,
-      loading: true,
-      error: '',
-    });
+    setState({ ...initial, uid, db, key });
     if (!uid)
       return () => {
         active = false;
@@ -54,54 +50,40 @@ export function useProjects(
       db,
       uid,
       (snapshot) => {
-        if (active) {
+        if (active)
           setState({
             ...snapshot,
             uid,
             db,
+            key,
             loading: !snapshot.complete,
             error: '',
           });
-        }
       },
       () => {
         if (active)
           setState({
+            ...initial,
             uid,
             db,
-            rows: [],
-            fromCache: true,
-            hasPendingWrites: false,
-            complete: false,
+            key,
             loading: false,
             error:
               'Não foi possível carregar os projetos autorizados. Nenhuma consulta alternativa foi feita.',
           });
       },
+      selection,
     );
     return () => {
       active = false;
       stop();
     };
-  }, [db, uid, attempt]);
+    // The initial state is a constant shape; selection identity is its serialized key.
+  }, [db, uid, attempt, key, selection]);
   const current =
-    state.uid === uid && state.db === db
-      ? state
-      : {
-          rows: [],
-          loading: true,
-          error: '',
-          fromCache: true,
-          hasPendingWrites: false,
-          complete: false,
-        };
+    state.uid === uid && state.db === db && state.key === key ? state : initial;
   return {
     ...current,
-    rows: current.rows.filter(
-      (row) =>
-        scope === 'all' ||
-        (row.data.type === 'personal' ? 'personal' : 'work') === scope,
-    ),
     retry: () => {
       workspaceRetry(db, uid);
       projectRepository.invalidate();

@@ -24,6 +24,8 @@ export class FirestoreCalendarReportRepository implements CalendarRepository {
       this.db,
       records.map((r) => r.projectId),
     );
+    // Revalidation is ACL validation of previously selected rows, not a new
+    // dataset query: never let stale owner/project metadata widen authorization.
     return selectReportRecords(
       mode === 'own' ? records.filter((r) => r.uid === viewerUid) : records,
       catalog,

@@ -19,36 +19,33 @@ describe('shared query toolbar', () => {
     expect(dashboard).toContain(
       'pageState.key === pageKey ? pageState.page : 0',
     );
-    expect(dashboard).toContain(
-      'recordPage(matchingSafeRecords, page, pageSize)',
-    );
+    expect(dashboard).toContain('page: activePage, size: pageSize');
+    expect(dashboard).not.toContain('recordPage(');
+    expect(dashboard).not.toContain('filterRecords(');
     const hook = source('../../features/records/hooks/useOwnRecords.ts');
     expect(hook).toContain('subscribeAuthorizedOwnRecords(');
-    expect(hook).toContain(
-      '(snapshot) => next(snapshot.rows, snapshot.fromCache)',
-    );
+    expect(hook).toContain('selection,');
     const recordSource = source(
       '../../data/sources/authorized-own-record-source.ts',
     );
-    expect(recordSource).toContain('observeWorkspace(db, uid');
-    expect(recordSource).toContain('fromCache: !snapshot.complete');
-    expect(recordSource).toContain('snapshot.complete ? snapshot.records : []');
-    // Only paginated callers slice the complete local owner history.
     expect(recordSource).toContain(
-      'options.size ? all.slice(0, options.size) : all',
+      'readOwnRecordListing(db, uid, ids, options)',
     );
-    expect(recordSource).toContain('r.data.uid === uid');
-    for (const remote of [
-      'onSnapshot',
-      'getDocs',
-      'getDoc(',
-      'httpsCallable',
-      'limit(',
-    ])
-      expect(recordSource).not.toContain(remote);
-    expect(hook).not.toContain('size:');
-    expect(hook).not.toContain('limit(');
-    expect(hook).not.toContain('httpsCallable');
+    expect(recordSource).toContain('if (!snapshot.complete) return;');
+    // Snapshot content may invalidate native queries, never select/publish rows.
+    expect(recordSource).not.toContain('snapshot.records.filter');
+    expect(recordSource).not.toContain('rows: snapshot.records');
+    for (const text of [recordSource, hook]) {
+      for (const remote of [
+        'onSnapshot',
+        'getDocs(',
+        'getDoc(',
+        'httpsCallable',
+      ])
+        expect(text).not.toContain(remote);
+      expect(text).not.toContain('.filter(');
+      expect(text).not.toContain('.slice(');
+    }
   });
   it('shares the responsive labeled surface across calendar, reports and records', () => {
     for (const name of [

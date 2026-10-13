@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { readFileSync } from 'node:fs';
 import { ProjectHeader } from './ProjectHeader';
+import { projectColors } from '../../shared/ui/project-colors';
+import type { Row } from '../../shared/data';
 
 const project = {
   title: 'Laboratório Horizonte',
@@ -15,13 +17,14 @@ function render(
   revealed = false,
   search = '?returnTo=%2Fcalendar%3Fview%3Dweek',
   loading = false,
+  catalog: Row[] = data ? [{ id: 'demo', data }] : [],
 ) {
   return renderToStaticMarkup(
     <MemoryRouter>
       <ProjectHeader
         projectId="demo"
         project={data ?? undefined}
-        catalog={data ? [{ id: 'demo', data }] : []}
+        catalog={catalog}
         revealed={revealed}
         loading={loading}
         search={search}
@@ -47,6 +50,20 @@ describe('project detail header', () => {
       html.indexOf('aria-label="Atualizar relatório"'),
     );
     expect(html).toContain('[overflow-wrap:anywhere]');
+  });
+  it('uses the repository color join with the complete catalog independent of catalog ordering', () => {
+    const data = { ...project, color: undefined };
+    const catalog = [
+      { id: 'other', data: { color: '#f97316' } },
+      { id: 'demo', data },
+      { id: 'hidden', data: { confidential: true, color: '#123abc' } },
+    ];
+    const html = render(data, false, '', false, catalog);
+    expect(html).toContain(
+      'border-left-color:' + projectColors(catalog, false)('demo'),
+    );
+    expect(render(data, false, '', false, [...catalog].reverse())).toBe(html);
+    expect(html).not.toContain('#123abc');
   });
   it('preserves project-list and contextual return routes', () => {
     const html = render();

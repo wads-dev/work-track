@@ -1,46 +1,61 @@
 import type { Firestore, Unsubscribe } from 'firebase/firestore';
 import { observeWorkspace } from '../sync/workspace-runtime';
-import { traceFirestore } from '../sync/firestore-diagnostics';
-import type { Row } from '../../shared/data';
-export interface OwnRecordPage {
-  rows: Row[];
+import { stableDataKey } from '../repositories/stable-data-key';
+import {
+  readOwnRecordListing,
+  emptyListing,
+  type ListingResult,
+  type OwnRecordReadOptions,
+} from '../repositories/browser-listing-repository';
+export interface OwnRecordPage extends ListingResult {
   fromCache: boolean;
-  hasMore: boolean;
-  cursor: string;
 }
-/** Selection and pagination happen entirely on the complete materialization. */
+/** UI parameters select from native persistent cache after session readiness.
+ * Generation guards discard queries superseded by a content/ACL/account change. */
 export function subscribeAuthorizedOwnRecords(
   db: Firestore,
   uid: string,
   next: (page: OwnRecordPage) => void,
-  fail: () => void,
-  options: { size?: number; after?: string; openOnly?: boolean } = {},
+  fail: (message?: string) => void,
+  options: OwnRecordReadOptions = {},
 ): Unsubscribe {
-  return observeWorkspace(db, uid, (snapshot) => {
+  let alive = true,
+    generation = 0,
+    signature = '';
+  const stop = observeWorkspace(db, uid, (snapshot) => {
+    const epoch = generation + 1;
     if (snapshot.error) {
+      signature = '';
+      generation++;
       fail();
       return;
     }
-    const all = (snapshot.complete ? snapshot.records : [])
-      .filter(
-        (r) =>
-          r.data.uid === uid && (!options.openOnly || r.data.endedAt === null),
-      )
-      .map((r) => ({ id: r.path.split('/').at(-1)!, data: r.data }))
-      .filter((r) => !options.after || r.id > options.after)
-      .sort((a, b) => a.id.localeCompare(b.id));
-    const rows = options.size ? all.slice(0, options.size) : all;
-    traceFirestore('local.record.read', {
-      collections: 'records',
-      count: rows.length,
+    const key = stableDataKey({
       complete: snapshot.complete,
-      openOnly: Boolean(options.openOnly),
+      projects: snapshot.projects,
+      records: snapshot.records,
     });
-    next({
-      rows,
-      fromCache: !snapshot.complete,
-      hasMore: Boolean(options.size && all.length > options.size),
-      cursor: rows.at(-1)?.id ?? options.after ?? '',
-    });
+    if (signature === key) return;
+    signature = key;
+    generation = epoch;
+    next({ ...emptyListing, cursor: options.after ?? '', fromCache: true });
+    if (!snapshot.complete) return;
+    const ids = new Set(snapshot.projects.map((project) => project.id));
+    void readOwnRecordListing(db, uid, ids, options)
+      .then((result) => {
+        if (alive && epoch === generation)
+          next({ ...result, fromCache: false });
+      })
+      .catch((error) => {
+        if (alive && epoch === generation) {
+          signature = '';
+          fail(error instanceof Error ? error.message : undefined);
+        }
+      });
   });
+  return () => {
+    alive = false;
+    generation++;
+    stop();
+  };
 }

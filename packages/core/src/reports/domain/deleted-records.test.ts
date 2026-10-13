@@ -83,6 +83,7 @@ it.each(['now', 0, false, {}, []])(
       },
       {
         records,
+        selectedRecords: records,
         projects: new Map([
           ['p', { type: 'work' }],
           ['other', { type: 'work' }],

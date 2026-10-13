@@ -10,18 +10,30 @@ export interface CalendarQueryRange {
  * Never compare arbitrary offset ISO strings to a UTC timestamp as chronological keys.
  * Context includes all projects: project filtering BEFORE budget would change personal-v3.
  */
+/** Lexical sentinel beyond valid four-digit ISO writer dates; no wrap at year9999. */
+export function isoDateCandidatePrefix(instant: number, direction: -1 | 1) {
+  const value = instant + direction * 2 * 86400000;
+  const date = new Date(value);
+  const year = date.getUTCFullYear();
+  if (!Number.isFinite(value) || !Number.isFinite(year))
+    throw new Error('Limite temporal inválido.');
+  if (year > 9999) return '\uf8ff';
+  if (year < 0) return '';
+  return date.toISOString().slice(0, 10);
+}
 export function calendarQueryBounds(range: CalendarQueryRange) {
   const from = Date.parse(range.from),
     to = Date.parse(range.to);
   if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from)
     throw new Error('Intervalo de calendário inválido.');
-  const pad = 2 * 86400000;
   return {
-    lower: new Date(from - pad).toISOString().slice(0, 10),
-    upper: new Date(to + pad).toISOString().slice(0, 10),
+    lower: isoDateCandidatePrefix(from, -1),
+    upper: isoDateCandidatePrefix(to, 1),
   };
 }
-/** Separate listeners are mandatory: OR adds implicit endedAt ordering and drops opens. */
+/** Local candidate branches, not listeners. Missing legacy endedAt requires an
+ * old-start branch and an open-only residual in the repository; OR/range support
+ * does not provide an IS MISSING predicate. */
 export function calendarRecordQueries(
   db: Firestore,
   uid: string,
@@ -49,5 +61,6 @@ export function calendarRecordQueries(
       where('endedAt', '>=', lower),
       where('startedAt', '<', upper),
     ),
+    query(base, ...project, where('startedAt', '<', lower)),
   ];
 }

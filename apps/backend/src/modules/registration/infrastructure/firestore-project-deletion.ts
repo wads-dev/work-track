@@ -132,6 +132,10 @@ export class FirestoreProjectDeletionRepository {
         'permission-denied',
         'Somente o proprietário/criador pode exportar para exclusão e excluir permanentemente, inclusive projetos corporativos e registros de outros autores.',
       );
+    // Deletion must inventory arbitrary historical nested before/after snapshots,
+    // references and descendant paths, not just present-day projectId. Firestore
+    // cannot query unknown-depth object/array references or ancestor membership;
+    // bounded per-group scans fail rather than claiming an incomplete export.
     const inventory: DocumentSnapshot[] = [];
     for (const name of ROOTS) {
       const result = await tx.get(

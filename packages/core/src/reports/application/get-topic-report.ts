@@ -53,7 +53,13 @@ export async function getTopicReport(
     let initial: Awaited<ReturnType<ProjectReportRepository['readPage']>> =
       null;
     for (let pages = 0; pages < 20; pages++) {
-      const page = await repository.readPage(input.projectId, 100, cursor, uid);
+      const page = await repository.readPage(
+        input.projectId,
+        100,
+        cursor,
+        uid,
+        { topicId: input.topicId, includeArchived: true },
+      );
       if (!page)
         throw new TopicReportError('not-found', 'Projeto não encontrado.');
       if (!initial) initial = page;

@@ -5,6 +5,7 @@ services:
     init: true
     command: >-
       sh -c "npm ci --ignore-scripts --no-audit --no-fund &&
+      HUSKY=0 npm run prepare &&
       npm run build:packages &&
       npm run dev --workspace @work-track/frontend --
       --config /workspace/docker/firebase/vite.config.mjs"

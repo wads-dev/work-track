@@ -57,6 +57,7 @@ export interface ProjectReportRepository {
     limit: number,
     cursor?: string,
     viewerUid?: string,
+    selection?: import('./personal-report.js').ReportRecordSelection,
   ): Promise<ReportPage | null>;
   userLabels(uids: string[]): Promise<Record<string, string>>;
 }
