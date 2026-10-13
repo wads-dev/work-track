@@ -1,6 +1,7 @@
-import { doc, runTransaction, type Firestore } from 'firebase/firestore';
+import { doc, type Firestore } from 'firebase/firestore';
 import { hash, canonical } from './web-transaction-adapter';
 import { readTransaction } from './transaction-read';
+import { runMeasuredTransaction } from './transaction-write';
 import {
   assertProjectAccess,
   effectiveProjectType,
@@ -62,8 +63,8 @@ export class WebRecordMovementRepository implements MovementRepository {
       operationId = hash([uid, 'move_record', input.requestId]);
     const ref = doc(this.db, 'users', uid, 'records', input.recordId);
     const audit = doc(this.db, 'users', uid, 'records', input.recordId, 'audit', 'movement_' + operationId);
-    return runTransaction(this.db, async (tx) => {
-      const operation = 'web-record-movement.move-record';
+    const operation = 'web-record-movement.move-record';
+    return runMeasuredTransaction(this.db, operation, async (tx) => {
       const [snapshot, prior] = await Promise.all([
         readTransaction(tx, ref, operation),
         readTransaction(tx, audit, operation),

@@ -249,6 +249,17 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
           fromCache: s.metadata.fromCache,
           pending: s.metadata.hasPendingWrites,
           changed: s.docChanges().length,
+          // Removed docs and local-write echoes are not documents read remotely.
+          // Warm metadata-only confirmations must never add the entire result size.
+          documentsRead: s.metadata.fromCache
+            ? 0
+            : s
+                .docChanges()
+                .filter(
+                  (change) =>
+                    change.type !== 'removed' &&
+                    !change.doc.metadata.hasPendingWrites,
+                ).length,
           source: s.metadata.fromCache ? 'local' : 'remote',
         });
         if (!s.metadata.fromCache && !s.metadata.hasPendingWrites) {

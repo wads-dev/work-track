@@ -1,6 +1,7 @@
-import { doc, runTransaction, type Firestore } from 'firebase/firestore';
+import { doc, type Firestore } from 'firebase/firestore';
 import { hash, canonical } from './web-transaction-adapter';
 import { readTransaction } from './transaction-read';
+import { runMeasuredTransaction } from './transaction-write';
 import {
   canAccessProject,
   effectiveProjectType,
@@ -43,8 +44,8 @@ export class WebProjectScopeRepository implements ProjectScopeRepository {
       'audit',
       'scope_' + operationId,
     );
-    return runTransaction(this.db, async (tx) => {
-      const operation = 'web-project-scope.change-scope';
+    const operation = 'web-project-scope.change-scope';
+    return runMeasuredTransaction(this.db, operation, async (tx) => {
       const [snapshot, prior] = await Promise.all([
         readTransaction(tx, ref, operation),
         readTransaction(tx, audit, operation),

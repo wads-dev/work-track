@@ -9,7 +9,6 @@ import {
   limit,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   startAfter,
   type Firestore,
@@ -38,6 +37,7 @@ import {
 import { normalize } from '@work-track/core/shared/text/normalize';
 import { traceFirestore } from '../../data/sync/firestore-diagnostics';
 import { readTransaction } from './transaction-read';
+import { runMeasuredTransaction } from './transaction-write';
 export class WebWorkRepository {
   constructor(private readonly db: Firestore) {}
   async createProject(raw: unknown, uid: string): Promise<Project> {
@@ -62,7 +62,8 @@ export class WebWorkRepository {
       byte.toString(16).padStart(2, '0'),
     ).join('');
     const ref = doc(this.db, 'projects', key);
-    return runTransaction(this.db, async (tx) => {
+    const operation = 'web-work.create-project';
+    return runMeasuredTransaction(this.db, operation, async (tx) => {
       const existing = await readTransaction(
         tx,
         ref,
@@ -192,8 +193,8 @@ export class WebWorkRepository {
   ) {
     const ref = doc(this.db, 'projects', input.projectId),
       audit = doc(ref, 'audit', auditId);
-    return runTransaction(this.db, async (tx) => {
-      const operation = 'web-work.' + (action ?? 'update-project');
+    const operation = 'web-work.' + (action ?? 'update-project');
+    return runMeasuredTransaction(this.db, operation, async (tx) => {
       const snapshot = await readTransaction(tx, ref, operation),
         prior = await readTransaction(tx, audit, operation);
       const before = snapshot.data();
@@ -252,8 +253,8 @@ export class WebWorkRepository {
     const audit = input.requestId
       ? doc(ref, 'audit', input.requestId)
       : doc(collection(ref, 'audit'));
-    return runTransaction(this.db, async (tx) => {
-      const operation = 'web-work.update-record';
+    const operation = 'web-work.update-record';
+    return runMeasuredTransaction(this.db, operation, async (tx) => {
       const snapshot = await readTransaction(tx, ref, operation),
         prior = await readTransaction(tx, audit, operation),
         before = snapshot.data();

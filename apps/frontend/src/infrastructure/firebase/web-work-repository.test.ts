@@ -108,6 +108,26 @@ it('allows authenticated noncreator work/legacy writes and atomic actor audit, r
   expect(state.writes).toHaveLength(2);
   expect(await repo.updateProject(input, 'bob')).toEqual(result);
   expect(state.writes).toHaveLength(2);
+  expect(
+    trace.mock.calls.filter(([event]) => event === 'transaction.commit'),
+  ).toEqual([
+    [
+      'transaction.commit',
+      {
+        operation: 'web-work.update-project',
+        count: 2,
+        source: 'remote-confirmed',
+      },
+    ],
+    [
+      'transaction.commit',
+      {
+        operation: 'web-work.update-project',
+        count: 0,
+        source: 'remote-confirmed',
+      },
+    ],
+  ]);
   await expect(
     repo.updateProject({ ...input, title: 'Outra intenção' }, 'bob'),
   ).rejects.toThrow('requestId');
@@ -207,6 +227,26 @@ it('edits record end atomically preserving all original evidence and replay with
   expect(state.writes).toHaveLength(2);
   expect(await repo.updateRecord(input, 'alice')).toEqual(result);
   expect(state.writes).toHaveLength(2);
+  expect(
+    trace.mock.calls.filter(([event]) => event === 'transaction.commit'),
+  ).toEqual([
+    [
+      'transaction.commit',
+      {
+        operation: 'web-work.update-record',
+        count: 2,
+        source: 'remote-confirmed',
+      },
+    ],
+    [
+      'transaction.commit',
+      {
+        operation: 'web-work.update-record',
+        count: 0,
+        source: 'remote-confirmed',
+      },
+    ],
+  ]);
 });
 it('rejects cursor outside project and paginates without partial silent history', async () => {
   await expect(
@@ -432,6 +472,9 @@ it('propagates transaction failure atomically and allows deterministic retry aft
     false,
   );
   expect(state.writes).toHaveLength(0);
+  expect(
+    trace.mock.calls.filter(([event]) => event === 'transaction.commit'),
+  ).toEqual([]);
   state.failCommit = false;
   expect((await repo.createProject(createInput, 'alice')).id).toBe(
     backendKey(createInput.title),
@@ -442,10 +485,11 @@ it('propagates transaction failure atomically and allows deterministic retry aft
 function expectTransactionTrace(
   operation: string,
   reads: Array<[string, number]>,
+  writes: number,
 ) {
   expect(state.reads).toEqual(reads.map(([path]) => path));
-  expect(trace.mock.calls).toEqual(
-    reads.flatMap(([path, count]) => {
+  expect(trace.mock.calls).toEqual([
+    ...reads.flatMap(([path, count]) => {
       const detail = {
         operation,
         collection: path.slice(0, path.lastIndexOf('/')),
@@ -457,20 +501,28 @@ function expectTransactionTrace(
         ['transaction.result', { ...detail, count }],
       ];
     }),
-  );
+    [
+      'transaction.commit',
+      { operation, count: writes, source: 'remote-confirmed' },
+    ],
+  ]);
 }
 
 it('traces project uniqueness reads including absent and existing results without payloads', async () => {
   const result = await repo.createProject(createInput, 'alice');
-  expectTransactionTrace('web-work.create-project', [
-    ['projects/' + result.id, 0],
-  ]);
+  expectTransactionTrace(
+    'web-work.create-project',
+    [['projects/' + result.id, 0]],
+    2,
+  );
   trace.mockClear();
   state.reads.length = 0;
   await repo.createProject(createInput, 'alice');
-  expectTransactionTrace('web-work.create-project', [
-    ['projects/' + result.id, 1],
-  ]);
+  expectTransactionTrace(
+    'web-work.create-project',
+    [['projects/' + result.id, 1]],
+    0,
+  );
   expect(state.writes).toHaveLength(2);
 });
 
@@ -522,10 +574,14 @@ it.each([
   'traces %s document and audit in their original sequential order',
   async (operation, auditId, execute) => {
     await execute();
-    expectTransactionTrace('web-work.' + operation, [
-      ['projects/p', 1],
-      ['projects/p/audit/' + auditId, 0],
-    ]);
+    expectTransactionTrace(
+      'web-work.' + operation,
+      [
+        ['projects/p', 1],
+        ['projects/p/audit/' + auditId, 0],
+      ],
+      2,
+    );
     expect(state.writes).toHaveLength(2);
   },
 );
@@ -545,12 +601,16 @@ it.each([false, true])(
       },
       'alice',
     );
-    expectTransactionTrace('web-work.update-record', [
-      ['users/alice/records/r', 1],
-      ['users/alice/records/r/audit/trace-record', 0],
-      ['projects/p', 1],
-      ...(explicitTarget ? [['projects/q', 1] as [string, number]] : []),
-    ]);
+    expectTransactionTrace(
+      'web-work.update-record',
+      [
+        ['users/alice/records/r', 1],
+        ['users/alice/records/r/audit/trace-record', 0],
+        ['projects/p', 1],
+        ...(explicitTarget ? [['projects/q', 1] as [string, number]] : []),
+      ],
+      2,
+    );
     expect(state.writes).toHaveLength(2);
   },
 );

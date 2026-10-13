@@ -1,8 +1,23 @@
+import { accumulateDocumentMetrics } from './firestore-document-metrics';
 type Detail = Record<string, string | number | boolean | null>;
 type Entry = { at: number; event: string; detail: Detail };
 const events: Entry[] = [];
 const counts: Record<string, number> = {};
 export function traceFirestore(event: string, detail: Detail = {}) {
+  // Lifetime totals must not depend on debug output or the bounded log ring.
+  accumulateDocumentMetrics({
+    localReads: event === 'cache.result' ? Number(detail.count ?? 0) : 0,
+    remoteReads:
+      event === 'server.result' || event === 'transaction.result'
+        ? Number(detail.count ?? 0)
+        : event === 'listen.event' && detail.source === 'remote'
+          ? Number(detail.documentsRead ?? 0)
+          : 0,
+    writes:
+      event === 'transaction.commit' || event === 'write.confirmed'
+        ? Number(detail.count ?? 0)
+        : 0,
+  });
   if (typeof window === 'undefined' || typeof localStorage === 'undefined')
     return;
   try {

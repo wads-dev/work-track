@@ -388,3 +388,38 @@ it('collection-wide cache-only notification reflects deletion absent from partia
   stop();
   expect(m.cacheListeners[0].stop).toHaveBeenCalledOnce();
 });
+
+it('remote counter counts added/modified documents but not removals, pending echoes or confirmations', async () => {
+  env();
+  const store = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => store.set(key, value),
+  });
+  vi.stubGlobal('navigator', {});
+  const stop = startWorkspaceSession(db, 'alice');
+  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  const target = m.listeners.find((l) =>
+    l.target.key.includes('group:records'),
+  )!;
+  target.next({
+    metadata: { fromCache: false, hasPendingWrites: false },
+    size: 400,
+    docChanges: () => [
+      { type: 'added', doc: { metadata: { hasPendingWrites: false } } },
+      { type: 'modified', doc: { metadata: { hasPendingWrites: false } } },
+      { type: 'removed', doc: { metadata: { hasPendingWrites: false } } },
+      { type: 'added', doc: { metadata: { hasPendingWrites: true } } },
+    ],
+  });
+  await settle();
+  expect(store.get('work-track:firestore:remote-doc-reads')).toBe('2');
+  target.next({
+    metadata: { fromCache: false, hasPendingWrites: false },
+    size: 400,
+    docChanges: () => [],
+  });
+  await settle();
+  expect(store.get('work-track:firestore:remote-doc-reads')).toBe('2');
+  stop();
+});
