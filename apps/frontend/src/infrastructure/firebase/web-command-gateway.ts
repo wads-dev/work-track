@@ -5,10 +5,10 @@ import type { Functions } from 'firebase/functions';
 import { WebWorkRepository } from './web-work-repository';
 import { WebProjectScopeRepository } from './web-project-scope';
 import { WebRecordMovementRepository } from './web-record-movement';
-import { CallableCommandGateway } from './callable-command-gateway';
 import { projectScopeInput } from '@work-track/core/registration/domain/project-scope';
 import { moveRecordInput } from '@work-track/core/registration/domain/record-movement';
 export const webCommandNames = new Set([
+  'createProject',
   'archiveProject',
   'updateProject',
   'updateTopic',
@@ -24,16 +24,15 @@ export class WebCommandGateway implements CommandGateway {
     input: Request,
   ): Promise<Response> {
     if (!webCommandNames.has(name))
-      return new CallableCommandGateway(this.functions).execute<
-        Request,
-        Response
-      >(name, input);
+      throw new Error(`Comando Web desconhecido ou não suportado: ${name}.`);
     const uid = getAuth(this.functions.app).currentUser?.uid;
     if (!uid) throw new Error('Autenticação necessária.');
     const db = getFirestore(this.functions.app),
       repository = new WebWorkRepository(db);
     try {
       switch (name) {
+        case 'createProject':
+          return (await repository.createProject(input, uid)) as Response;
         case 'archiveProject':
           return (await repository.archiveProject(input, uid)) as Response;
         case 'updateProject':

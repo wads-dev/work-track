@@ -1,15 +1,7 @@
 import { initializeApp } from 'firebase-admin/app';
-import { onDocumentWritten } from 'firebase-functions/v2/firestore';
-import {
-  appendSyncEvent,
-  FirestoreSyncStore,
-} from './modules/sync/infrastructure/firestore-sync.js';
-import { syncWorkspaceHandler } from './modules/sync/application/sync-workspace.js';
 import { FirebaseCompanyPeopleRepository } from './modules/people/infrastructure/firebase-company-people.js';
 import { listCompanyPeopleHandler } from './modules/people/presentation/list-company-people.js';
 import { FirestoreMergeRepository } from './modules/merge/infrastructure/firestore-merge.js';
-import { FirestoreTopicReportRepository } from './modules/reports/infrastructure/firestore-topic-report.js';
-import { getTopicReportHandler } from './modules/reports/presentation/get-topic-report.js';
 import { FirestoreRecordMovementRepository } from './modules/registration/infrastructure/firestore-record-movement.js';
 import { movementHandler } from './modules/registration/presentation/record-movement.js';
 import { FirestoreRemovalRepository } from './modules/removal/infrastructure/firestore-removal.js';
@@ -25,7 +17,6 @@ import { getAuth } from 'firebase-admin/auth';
 import { FirestorePauseRepository } from './modules/pause/infrastructure/firestore-pause.js';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onCall, onRequest } from 'firebase-functions/v2/https';
-import { authorizeReport } from './modules/reports/presentation/get-project-report.js';
 import { createApp } from './core/http/app.js';
 import { WorkTrackOAuth } from './core/auth/application/oauth-provider.js';
 import { FirebaseIdentityService } from './core/auth/infrastructure/firebase-identity.js';
@@ -36,75 +27,6 @@ import { FirestoreProjectDeletionRepository } from './modules/registration/infra
 import { projectDeletionHandler } from './modules/registration/presentation/project-deletion.js';
 
 initializeApp();
-
-// Web cache transport only; never exposed as MCP tools.
-export const syncWorkspace = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    syncWorkspaceHandler(
-      new FirestoreSyncStore(getFirestore()),
-      request.data,
-      request.auth,
-    ),
-);
-export const journalProjectForWebSync = onDocumentWritten(
-  {
-    document: 'projects/{projectId}',
-    region: 'southamerica-east1',
-    retry: true,
-  },
-  (event) =>
-    appendSyncEvent(
-      getFirestore(),
-      event.id,
-      'projects/' + event.params.projectId,
-      undefined,
-      event.data?.before.data()?.type !== event.data?.after.data()?.type ||
-        event.data?.before.data()?.createdBy !==
-          event.data?.after.data()?.createdBy,
-    ),
-);
-export const journalRecordForWebSync = onDocumentWritten(
-  {
-    document: 'users/{uid}/records/{recordId}',
-    region: 'southamerica-east1',
-    retry: true,
-  },
-  (event) => {
-    const previousProjectId: unknown = event.data?.before.data()?.projectId;
-    return appendSyncEvent(
-      getFirestore(),
-      event.id,
-      'users/' + event.params.uid + '/records/' + event.params.recordId,
-      typeof previousProjectId === 'string' ? previousProjectId : undefined,
-    );
-  },
-);
-
-export const journalAuditForWebSync = onDocumentWritten(
-  {
-    document: 'users/{uid}/records/{recordId}/audit/{auditId}',
-    region: 'southamerica-east1',
-    retry: true,
-  },
-  (event) =>
-    appendSyncEvent(
-      getFirestore(),
-      event.id,
-      'users/' +
-        event.params.uid +
-        '/records/' +
-        event.params.recordId +
-        '/audit/' +
-        event.params.auditId,
-    ),
-);
 
 export const listCompanyPeople = onCall(
   {
@@ -151,21 +73,6 @@ export const deleteProjectPermanently = onCall(
       new FirestoreProjectDeletionRepository(getFirestore()),
       'delete',
       request.data,
-      request.auth,
-    ),
-);
-export const getTopicReport = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    getTopicReportHandler(
-      new FirestoreTopicReportRepository(getFirestore(), getAuth()),
-      request.data as unknown,
       request.auth,
     ),
 );
@@ -227,20 +134,6 @@ export const mcp = onRequest(
     new FirestoreRecordMovementRepository(getFirestore()),
     new FirestoreMergeRepository(getFirestore()),
   ),
-);
-export const discoverLegacyProjectIds = onCall(
-  { region: 'southamerica-east1', invoker: 'public', maxInstances: 3 },
-  async (request) => {
-    authorizeReport(request.auth);
-    const projects = await new FirestoreWorkRepository(
-      getFirestore(),
-    ).listProjects(request.auth!.uid);
-    return {
-      ids: projects
-        .filter((project) => project.type === undefined)
-        .map((project) => project.id),
-    };
-  },
 );
 export const createProject = onCall(
   {

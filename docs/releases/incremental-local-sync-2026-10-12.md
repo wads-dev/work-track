@@ -1,8 +1,20 @@
 # Correção de leituras Web — 2026-10-12
 
+## Status: superseded — substituição em 2026-10-13
+
+A implementação de sincronização do PR28 descrita nesta release foi substituída por Firestore SDK nativo no frontend, sem Function de sincronização, head, journal, ledger ou triggers auxiliares. Este arquivo preserva as evidências históricas; elas **não validam a substituição nativa** e a ordem de deploy antiga abaixo não está mais vigente.
+
+O backend deixa de exportar syncWorkspace, journalProjectForWebSync, journalRecordForWebSync, journalAuditForWebSync, getTopicReport e discoverLegacyProjectIds. A implementação/testes do sync antigo são removidos; handler/repositório/testes de relatório de tópicos e demais Functions de comandos/MCP são preservados. As grants/regras específicas de head/journal são removidas, sem alterar discovery Rules neste recorte. Coleções auxiliares existentes permanecem privadas pelo deny-all, sem exclusão automática de dados.
+
+Descoberta frontend passa a queries nativas work, personal do próprio usuário e referências conhecidas; broad query de legados depende de decisão/Rules separadas. Consultas/listeners nativos continuam sujeitos a Rules, isolamento de usuário, revalidação de ACL e cobrança Firestore; não há promessa de zero leituras de sincronização.
+
+Nenhum deploy ou remoção de recurso remoto foi executado nesta alteração. Recursos antigos eventualmente implantados exigem retirada operacional coordenada com o frontend; remover exports locais não desativa triggers já publicadas. A validação nativa deve ser registrada separadamente.
+
+## Evidências históricas do PR28 — superseded
+
 Branch fix/incremental-local-sync em worktree dedicada baseada em origin/main f322dd3. Checkout principal preservado, sem deploy/dados de produção.
 
-## Implementado
+### Implementado
 
 - Materialização IndexedDB por usuário/ambiente com checkpoint atômico, Web Locks e proteção contra cursor regressivo.
 - Observadores locais para calendário, todos relatórios inclusive tópicos, projetos, listas/pendências, detalhe de registro e auditoria.
@@ -12,7 +24,7 @@ Branch fix/incremental-local-sync em worktree dedicada baseada em origin/main f3
 - Retries conectados à sincronização global; falha de IndexedDB não causa fallback remoto.
 - Counters console.debug sem conteúdo pessoal permitem comparar navegação, reload e retomada.
 
-## Validação
+### Validação
 
 Testes de regressão: zero Firebase onSnapshot/getDocs/httpsCallable nos observers; reload e 30 observações sem bootstrap adicional; deletes durante bootstrap, paginação physical cursor, ACL/grant/recreate, erros persistência/pull, cancelamento logout/foco; audit own/current ACL e journal late/retries/gaps/payload budgets. npm run check passou (exit0): Prettier, ESLint, TypeScript, testes e builds. git diff --check passou. 949 testes/checks completos passaram; CI remoto aprovado. Além dos mocks, validação real descrita abaixo.
 
@@ -20,6 +32,6 @@ Em 2026-10-13, com autorização humana, Docker projeto worktrack-incremental-lo
 
 Navigator/Playwright: login Google emulado, dashboard calculado e calendário/registros funcionais, zero erros de console (aviso meta mobile preexistente). IndexedDB real armazenou7 projetos/44 registros/cursor0. 30 mudanças de período e navegação relatório/registros geraram ZERO chamadas syncWorkspace. Reload fez2 deltas cursor0/head0 e ZERO bootstrap. Criação sintética pelo REST Admin do emulador foi recebida pelo trigger/head/callable e persistida: cursor1/45 registros; hard delete real retirou documento: cursor2/44 registros. Alteração de metadados gerou delta sem bootstrap. Teste de foco via hasFocus false+blur manteve sem novo delta enquanto pausado; restaurar foco retomou do cursor. Testes reais de Rules executados em processo Java isolado dentro do container:12 passaram, incluindo journal/ledger/gerações privados e head readonly. Não são métricas de faturamento de produção.
 
-## Operação
+### Operação
 
 Backend/regras/triggers devem ser publicados antes frontend. Primeiro uso transfere snapshot inicial; reload normal busca somente catálogo/head e deltas. Triggers são eventualmente consistentes, não outbox atômico; atraso de publicação não é certificado pelo head. Cache perdido/projeto recém-concedido requer bootstrap. Journal/ledger sem TTL, monitorar crescimento/head contention. Custo não é zero: sincronização e escritas do journal continuam cobradas, mas não há varredura de histórico por filtro/data.

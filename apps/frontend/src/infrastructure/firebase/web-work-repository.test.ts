@@ -1,8 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
+import { createHash } from 'node:crypto';
+import { normalize } from '@work-track/core/shared/text/normalize';
 const state = vi.hoisted(() => ({
   data: new Map<string, Record<string, unknown>>(),
   writes: [] as unknown[],
+  reads: [] as string[],
+  failCommit: false,
   queries: vi.fn(),
 }));
 vi.mock('firebase/firestore', () => {
@@ -37,12 +41,16 @@ vi.mock('firebase/firestore', () => {
         merge: boolean;
       }> = [];
       const result = await fn({
-        get: async (r: { path: string }) => snapshot(r),
+        get: async (r: { path: string }) => {
+          state.reads.push(r.path);
+          return snapshot(r);
+        },
         update: (r: { path: string }, data: Record<string, unknown>) =>
           pending.push({ path: r.path, data, merge: true }),
         set: (r: { path: string }, data: Record<string, unknown>) =>
           pending.push({ path: r.path, data, merge: false }),
       });
+      if (state.failCommit) throw new Error('permission-denied');
       for (const w of pending) {
         state.data.set(w.path, {
           ...(w.merge ? state.data.get(w.path) : {}),
@@ -76,6 +84,8 @@ const record = {
 beforeEach(() => {
   state.data.clear();
   state.writes.length = 0;
+  state.reads.length = 0;
+  state.failCommit = false;
   state.queries.mockReset();
   state.data.set('projects/p', project);
   state.data.set('users/alice/records/r', record);
@@ -253,5 +263,173 @@ it('requires explicit personal publication acknowledgement and atomically audits
   });
   expect(audit.updatedAt).toBe(result.updatedAt);
   expect(await repo.updateRecord(command, 'alice')).toEqual(result);
+  expect(state.writes).toHaveLength(2);
+});
+
+const createInput = {
+  title: '  Ação: Projeto!  ',
+  description: '  Descrição generosa do escopo e atividades do projeto.  ',
+  type: 'work' as const,
+  requestId: 'create-1',
+};
+const backendKey = (title: string, uid?: string) =>
+  createHash('sha256')
+    .update(uid ? 'personal:' + uid + ':' + normalize(title) : normalize(title))
+    .digest('hex');
+it('creates backend-compatible work IDs and atomically audits the current creator with default Geral', async () => {
+  const result = await repo.createProject(
+    { ...createInput, createdBy: 'spoof' },
+    'alice',
+  );
+  const id = backendKey(createInput.title);
+  expect(result).toEqual({
+    id,
+    title: createInput.title.trim(),
+    description: createInput.description.trim(),
+    type: 'work',
+    archived: false,
+    confidential: false,
+    publicAlias: 'Projeto reservado',
+    createdBy: 'alice',
+    createdAt: expect.any(String),
+    topics: [
+      {
+        id: 'general',
+        title: 'Geral',
+        description: 'Atividade geral ou tópico ainda não identificado.',
+      },
+    ],
+  });
+  expect(state.data.get('projects/' + id)).toEqual({
+    ...result,
+    recordedAt: 'SERVER_TIMESTAMP',
+  });
+  expect(state.data.get('projects/' + id + '/audit/created')).toEqual({
+    authorUid: 'alice',
+    action: 'create',
+    after: result,
+    requestId: 'create-1',
+    recordedAt: 'SERVER_TIMESTAMP',
+  });
+  expect(state.writes).toHaveLength(2);
+  expect(state.reads).toEqual(['projects/' + id]);
+  expect(state.queries).not.toHaveBeenCalled();
+});
+it('reuses normalized global work titles across actors without overwriting metadata or audit', async () => {
+  const result = await repo.createProject(createInput, 'alice');
+  const before = state.data.get('projects/' + result.id)!;
+  expect(
+    await repo.createProject(
+      {
+        ...createInput,
+        title: 'acao projeto',
+        description: 'Outra descrição generosa que não deve sobrescrever.',
+        requestId: 'another',
+      },
+      'bob',
+    ),
+  ).toEqual(before);
+  expect(await repo.createProject(createInput, 'alice')).toEqual(before);
+  expect(state.writes).toHaveLength(2);
+  expect(
+    state.data.get('projects/' + result.id + '/audit/created')?.authorUid,
+  ).toBe('alice');
+});
+it('keeps personal uniqueness per owner separate from work using the backend raw SHA256 prefix', async () => {
+  const alice = await repo.createProject(
+    { ...createInput, type: 'personal' },
+    'alice',
+  );
+  const bob = await repo.createProject(
+    { ...createInput, type: 'personal' },
+    'bob',
+  );
+  const work = await repo.createProject(createInput, 'alice');
+  expect(alice.id).toBe(backendKey(createInput.title, 'alice'));
+  expect(bob.id).toBe(backendKey(createInput.title, 'bob'));
+  expect(new Set([alice.id, bob.id, work.id]).size).toBe(3);
+  expect(
+    (await repo.createProject({ ...createInput, type: 'personal' }, 'alice'))
+      .id,
+  ).toBe(alice.id);
+  expect(state.writes).toHaveLength(6);
+});
+it('preserves explicit optional metadata and supports old creation APIs without requestId', async () => {
+  const { requestId, ...input } = createInput;
+  void requestId;
+  const result = await repo.createProject(
+    {
+      ...input,
+      confidential: true,
+      publicAlias: 'Projeto reservado 2',
+      color: '#dc2626',
+      githubUrl: 'https://github.com/owner/repo',
+    },
+    'alice',
+  );
+  expect(result).toMatchObject({
+    confidential: true,
+    publicAlias: 'Projeto reservado 2',
+    color: '#dc2626',
+    githubUrl: 'https://github.com/owner/repo',
+  });
+  expect(result).not.toHaveProperty('requestId');
+  expect(
+    state.data.get('projects/' + result.id + '/audit/created'),
+  ).not.toHaveProperty('requestId');
+});
+it('requires explicit valid scope, core title/description constraints, safe requestId and authentication', async () => {
+  const { type, ...withoutScope } = createInput;
+  void type;
+  for (const input of [
+    withoutScope,
+    { ...createInput, type: 'invalid' },
+    { ...createInput, title: 'a' },
+    { ...createInput, description: 'short' },
+    { ...createInput, requestId: '../bad' },
+  ])
+    await expect(repo.createProject(input, 'alice')).rejects.toThrow();
+  await expect(repo.createProject(createInput, '')).rejects.toThrow(
+    'Autenticação',
+  );
+  expect(state.writes).toHaveLength(0);
+  expect(state.reads).toHaveLength(0);
+});
+it('rejects inaccessible or scope-changed projects and archived or merged reuse without mutation', async () => {
+  const id = backendKey(createInput.title);
+  for (const metadata of [
+    { type: 'personal', createdBy: 'bob' },
+    { type: 'personal', createdBy: 'alice' },
+    { type: 'work', archived: true },
+    { type: 'work', mergeLock: 'job' },
+    { type: 'work', mergedInto: 'target' },
+  ]) {
+    state.data.set('projects/' + id, { ...project, id, ...metadata });
+    await expect(repo.createProject(createInput, 'alice')).rejects.toThrow();
+  }
+  expect(state.writes).toHaveLength(0);
+});
+it('reuses readable legacy work projects without changing their scope or evidence', async () => {
+  const id = backendKey(createInput.title);
+  state.data.set('projects/' + id, { ...project, id });
+  expect(await repo.createProject(createInput, 'bob')).toEqual({
+    ...project,
+    id,
+  });
+  expect(state.writes).toHaveLength(0);
+});
+it('propagates transaction failure atomically and allows deterministic retry after failure', async () => {
+  state.failCommit = true;
+  await expect(repo.createProject(createInput, 'alice')).rejects.toThrow(
+    'permission-denied',
+  );
+  expect(state.data.has('projects/' + backendKey(createInput.title))).toBe(
+    false,
+  );
+  expect(state.writes).toHaveLength(0);
+  state.failCommit = false;
+  expect((await repo.createProject(createInput, 'alice')).id).toBe(
+    backendKey(createInput.title),
+  );
   expect(state.writes).toHaveLength(2);
 });

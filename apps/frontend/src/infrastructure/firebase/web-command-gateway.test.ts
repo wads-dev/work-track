@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { Functions } from 'firebase/functions';
+import type { CommandGateway } from '@work-track/core/contracts/command-gateway';
 const mocks = vi.hoisted(() => ({
   uid: 'alice' as string | null,
   callable: vi.fn(),
@@ -12,6 +13,7 @@ vi.mock('firebase/auth', () => ({
 vi.mock('firebase/firestore', () => ({ getFirestore: () => ({}) }));
 vi.mock('./web-work-repository', () => ({
   WebWorkRepository: class {
+    createProject = mocks.web;
     archiveProject = mocks.web;
     updateProject = mocks.web;
     updateTopic = mocks.web;
@@ -42,11 +44,12 @@ beforeEach(() => {
   mocks.web.mockResolvedValue({ ok: true });
   mocks.callable.mockResolvedValue({ data: { backend: true } });
 });
-it('dispatches exactly six Web names, preserves data envelope, never invokes their callable', async () => {
+it('dispatches exactly eight Web names, preserves data envelope, never invokes their callable', async () => {
   expect([...webCommandNames].sort()).toEqual(
     [
       'archiveProject',
       'changeProjectScope',
+      'createProject',
       'listTopicMerges',
       'moveRecord',
       'updateProject',
@@ -70,20 +73,47 @@ it('dispatches exactly six Web names, preserves data envelope, never invokes the
       data: { ok: true },
     });
   }
-  expect(mocks.web).toHaveBeenCalledTimes(7);
+  expect(mocks.web).toHaveBeenCalledTimes(8);
   expect(mocks.callable).not.toHaveBeenCalled();
 });
-it('leaves moveTopic and remaining backend commands on callable transport', async () => {
-  const gateway = new WebCommandGateway(functions);
-  for (const name of ['moveTopic', 'register', 'mergeTopics', 'removeRecord'])
-    expect(await gateway.execute(name, {})).toEqual({ backend: true });
-  expect(mocks.callable).toHaveBeenCalledTimes(4);
+it('rejects unknown and server-only names asynchronously without callable fallback', async () => {
+  const gateway: CommandGateway = new WebCommandGateway(functions);
+  for (const name of [
+    'typo',
+    'moveTopic',
+    'register',
+    'mergeTopics',
+    'removeRecord',
+    'deleteProject',
+    'listCompanyPeople',
+  ]) {
+    const response = gateway.execute(name, {});
+    expect(response).toBeInstanceOf(Promise);
+    await expect(response).rejects.toThrow(
+      'Comando Web desconhecido ou não suportado: ' + name,
+    );
+  }
+  expect(mocks.callable).not.toHaveBeenCalled();
   expect(mocks.web).not.toHaveBeenCalled();
+});
+it('forwards creation payload and current uid preserving the legacy data envelope', async () => {
+  const input = {
+    title: 'Projeto',
+    description: 'Descrição generosa para o projeto.',
+    type: 'personal',
+    requestId: 'create-1',
+  };
+  mocks.web.mockResolvedValue({ id: 'created-id' });
+  expect(await createWebCommand(functions, 'createProject')(input)).toEqual({
+    data: { id: 'created-id' },
+  });
+  expect(mocks.web).toHaveBeenCalledWith(input, 'alice');
+  expect(mocks.callable).not.toHaveBeenCalled();
 });
 it('requires current authenticated user before Web access and keeps UI error codes', async () => {
   mocks.uid = null;
   await expect(
-    new WebCommandGateway(functions).execute('archiveProject', {}),
+    new WebCommandGateway(functions).execute('createProject', {}),
   ).rejects.toThrow('Autenticação');
   expect(mocks.web).not.toHaveBeenCalled();
   mocks.uid = 'alice';

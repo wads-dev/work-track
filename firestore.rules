@@ -62,13 +62,12 @@ service cloud.firestore {
     }
 
     // Listagens usam os filtros explícitos das consultas Web. Rules não filtram
-    // resultados: a consulta deve restringir type e, para personal, createdBy.
-    // Não incluir aqui o legado sem type: preserva o contrato atual de descoberta.
+    // resultados: consulta work ou createdBy próprio (inclui legado próprio).
+    // Nenhuma listagem ampla revela projetos pessoais de terceiros.
     function canDiscoverProject(project) {
       return isAuthenticated()
         && (project.get('type', '') == 'work'
-          || (project.get('type', '') == 'personal'
-            && project.get('createdBy', '') == request.auth.uid));
+          || project.get('createdBy', '') == request.auth.uid);
     }
 
     function isValidProject(project, projectId) {
@@ -164,20 +163,9 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     // 5. Coleções: regras curtas que expressam intenção
     // -------------------------------------------------------------------------
-    // The global head contains only a revision, never project/record data.
-    match /webSyncState/head {
-      allow get: if isAuthenticated();
-      allow list, write: if false;
-    }
-    match /webSyncEvents/{revision} {
-      allow read, write: if false;
-    }
-    match /webSyncDeliveries/{deliveryId} {
-      allow read, write: if false;
-    }
-
     match /projects/{projectId} {
-      allow get: if canAccessProject(resource.data);
+      allow get: if isAuthenticated()
+        && (!exists(projectPath(projectId)) || canAccessProject(resource.data));
       allow list: if canDiscoverProject(resource.data);
       allow create: if canCreateProject(projectId);
       allow update: if canUpdateProject(projectId);

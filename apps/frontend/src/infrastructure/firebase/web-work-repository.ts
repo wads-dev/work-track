@@ -21,6 +21,7 @@ import {
   assertArchiveAllowed,
   assertProjectWritable,
   ProjectManagementError,
+  safeId,
 } from '@work-track/core/registration/domain/project-management';
 import {
   assertProjectAccess,
@@ -29,10 +30,78 @@ import {
 import { updateRecordInput } from '@work-track/core/registration/domain/record-edit';
 import { listTopicMergesInput } from '@work-track/core/registration/domain/topic-management';
 
-import { updateTopicInput } from '@work-track/core/registration/domain/work-model';
+import {
+  projectInput,
+  updateTopicInput,
+  type Project,
+} from '@work-track/core/registration/domain/work-model';
 import { normalize } from '@work-track/core/shared/text/normalize';
 export class WebWorkRepository {
   constructor(private readonly db: Firestore) {}
+  async createProject(raw: unknown, uid: string): Promise<Project> {
+    if (!uid)
+      throw new ProjectManagementError(
+        'permission-denied',
+        'Autenticação necessária.',
+      );
+    const { requestId, ...input } = projectInput
+      .extend({ requestId: safeId.optional() })
+      .parse(raw);
+    // Backend project IDs hash raw normalized text, not canonical JSON fingerprints.
+    const keyText =
+      input.type === 'personal'
+        ? 'personal:' + uid + ':' + normalize(input.title)
+        : normalize(input.title);
+    const digest = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(keyText),
+    );
+    const key = Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+    const ref = doc(this.db, 'projects', key);
+    return runTransaction(this.db, async (tx) => {
+      const existing = await tx.get(ref);
+      if (existing.exists()) {
+        const project = existing.data() as Project;
+        assertProjectAccess(project, uid);
+        if (effectiveProjectType(project) !== input.type)
+          throw new ProjectManagementError(
+            'failed-precondition',
+            'Escopo existente não pode ser alterado.',
+          );
+        assertProjectWritable(project);
+        return project;
+      }
+      const project: Project = {
+        ...input,
+        archived: false,
+        confidential: input.confidential ?? false,
+        publicAlias: input.publicAlias ?? 'Projeto reservado',
+        id: key,
+        topics: [
+          {
+            id: 'general',
+            title: 'Geral',
+            description: 'Atividade geral ou tópico ainda não identificado.',
+          },
+        ],
+        createdBy: uid,
+        createdAt: new Date().toISOString(),
+      };
+      // Like the backend, deterministic title/scope uniqueness is the receipt.
+      // Do not read audit on a missing project: Rules require existing project access.
+      tx.set(ref, { ...project, recordedAt: serverTimestamp() });
+      tx.set(doc(ref, 'audit', 'created'), {
+        authorUid: uid,
+        action: 'create',
+        after: project,
+        ...(requestId !== undefined ? { requestId } : {}),
+        recordedAt: serverTimestamp(),
+      });
+      return project;
+    });
+  }
   async updateTopic(raw: unknown, uid: string) {
     const input = updateTopicInput.parse(raw);
     return this.projectWrite(

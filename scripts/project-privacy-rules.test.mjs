@@ -894,35 +894,31 @@ test('project authorization: public authenticated and own personal', async (t) =
   );
 });
 
-test('sync head is read-only and journal/delivery/generation payloads stay private', async () => {
-  await allowed(write('webSyncState/head', { revision: 1 }, 'owner'));
-  await allowed(get('webSyncState/head', aliceToken));
-  await denied(get('webSyncState/head', null));
-  await denied(
-    get(
-      'webSyncState/head',
-      jwt(alice, { firebase: { sign_in_provider: 'anonymous' } }),
+test('native project creation can read a missing key without granting private project data', async () => {
+  assert.equal((await get('projects/native-new', aliceToken)).status, 404);
+  await denied(get('projects/personal-bob', aliceToken));
+  await allowed(
+    query('', 'projects', aliceToken, { where: equal('createdBy', alice) }),
+  );
+  await allowed(
+    batch(
+      [
+        [
+          'projects/native-new',
+          {
+            id: 'native-new',
+            type: 'personal',
+            createdBy: alice,
+            title: 'Native',
+            topics: [],
+          },
+        ],
+        [
+          'projects/native-new/audit/created',
+          { authorUid: alice, action: 'create' },
+        ],
+      ],
+      aliceToken,
     ),
   );
-  await denied(list('webSyncState', aliceToken));
-  await denied(write('webSyncState/head', { revision: 999 }, aliceToken));
-  for (const [collection, id] of [
-    ['webSyncEvents', '0000000000000001'],
-    ['webSyncDeliveries', 'delivery'],
-    ['webSyncProjectGenerations', 'work'],
-  ]) {
-    await allowed(
-      write(
-        collection + '/' + id,
-        { revision: 1, secret: 'synthetic-private' },
-        'owner',
-      ),
-    );
-    await denied(get(collection + '/' + id, aliceToken));
-    await denied(get(collection + '/' + id, bobToken));
-    await denied(list(collection, aliceToken));
-    await denied(
-      write(collection + '/client-write', { revision: 2 }, aliceToken),
-    );
-  }
 });

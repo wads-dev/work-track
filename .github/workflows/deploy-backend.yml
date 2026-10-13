@@ -34,4 +34,6 @@ jobs:
         with:
           workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
           service_account: github-deploy@wadsworktrack.iam.gserviceaccount.com
+      # Explicitly retire only Web read endpoints replaced by native SDK/cache.
+      - run: npx -y firebase-tools@latest functions:delete getTopicReport discoverLegacyProjectIds --region southamerica-east1 --project wadsworktrack --force
       - run: npx -y firebase-tools@latest deploy --only functions --project wadsworktrack --non-interactive
