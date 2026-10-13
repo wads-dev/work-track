@@ -10,10 +10,14 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'firebase.json'
+      - 'firestore.indexes.json'
+      - 'scripts/wait-firestore-indexes*.mjs'
+      - 'scripts/wait-firestore-deploy*.mjs'
       - '.nvmrc'
       - '.github/workflows/deploy-backend.yml'
 permissions:
   contents: read
+  actions: read
   id-token: write
 concurrency:
   group: deploy-backend
@@ -34,6 +38,16 @@ jobs:
         with:
           workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
           service_account: github-deploy@wadsworktrack.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Wait for required Firestore indexes before publishing Functions
+        timeout-minutes: 22
+        run: node scripts/wait-firestore-indexes.mjs wadsworktrack
+      - name: Wait for same-push Firestore deployment before publishing Functions
+        timeout-minutes: 21
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: node scripts/wait-firestore-deploy.mjs
       - name: Retire unused Web callables
         # functions:delete fails when every target is absent; list first, never mask real errors.
         run: |

@@ -71,7 +71,7 @@ Referências oficiais: [consultas compostas](https://firebase.google.com/docs/fi
 
 ## Validação desta implementação
 
-- Check integral:162 core +54 data +374 backend +555 frontend +31 tooling =1176 testes; Prettier/ESLint/TypeScript/builds aprovados.
+- Check integral:162 core +54 data +374 backend +555 frontend +32 tooling =1177 testes (incluindo a barreira de publicação Functions); Prettier/ESLint/TypeScript/builds aprovados.
 - Rules reais:12/12, processo Java exclusivo do harness dentro do Docker, somente projeto demo sintético.
 - Admin real no Firestore Emulator: branches recentes retornam span fechado, aberto ausente/null antigo e offset +23:59; excluem candidato futuro/fechado antigo. Cursor composto avança duas páginas físicas sem repetir o último documento.
 - Navegador autenticado (dados reais, somente leitura): mudança de período, registros, projetos/busca, relatório de projeto, tópico, pessoas/busca, confidencialidade e pendências. Cache global completo403+29=432 fatos; quatro targets globais; contagem remota de registros permaneceu igual na navegação testada; zero escritas.

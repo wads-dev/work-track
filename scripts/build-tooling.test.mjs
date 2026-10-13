@@ -416,3 +416,20 @@ test('Docker and Firebase use explicit shared mounts and standalone Functions', 
     );
   }
 });
+
+test('Functions waits for same-push Firestore and READY indexes before publishing dated queries', async () => {
+  const workflow = await source('.github/workflows/deploy-backend.yml');
+  assert(workflow.includes('actions: read'));
+  assert(workflow.includes("'firestore.indexes.json'"));
+  assert(workflow.includes('google-github-actions/setup-gcloud@v3'));
+  const indexes = workflow.indexOf(
+    'run: node scripts/wait-firestore-indexes.mjs wadsworktrack',
+  );
+  const firestore = workflow.indexOf(
+    'run: node scripts/wait-firestore-deploy.mjs',
+  );
+  const publish = workflow.indexOf('deploy --only functions:default:mcp');
+  assert(indexes > 0 && firestore > indexes && publish > firestore);
+  assert(workflow.includes('GH_TOKEN: ${{ github.token }}'));
+  assert(workflow.includes('PUSH_BEFORE: ${{ github.event.before }}'));
+});
