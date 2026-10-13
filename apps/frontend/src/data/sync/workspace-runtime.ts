@@ -175,6 +175,8 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     target: Query<DocumentData>,
     key: string,
     receive: (rows: LocalDocument[]) => void,
+    localTarget: Query<DocumentData> = target,
+    filterLocal: (row: LocalDocument) => boolean = () => true,
   ) => {
     const collectionName = key.startsWith('catalog:')
       ? 'projects'
@@ -199,7 +201,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
           collection: collectionName,
           source: 'persistent-local',
         });
-        const s = await getDocsFromCache(target);
+        const s = await getDocsFromCache(localTarget);
         traceFirestore('cache.result', {
           key,
           collection: collectionName,
@@ -208,7 +210,16 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
         });
         if (!current() || turn !== serial) return;
         if (confirmed) ready.add(key);
-        receive(s.docs.map((d) => ({ path: d.ref.path, data: d.data() })));
+        const rows = s.docs
+          .map((d) => ({ path: d.ref.path, data: d.data() }))
+          .filter(filterLocal);
+        traceFirestore('cache.filtered', {
+          key,
+          count: rows.length,
+          scanned: s.size,
+          local: true,
+        });
+        receive(rows);
         publish();
       } catch (error) {
         if (current()) fail(error);
@@ -322,6 +333,13 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
               records.set(key, rows);
               reconcileAudits();
             },
+            // The SDK's partially-backfilled collection-group index can omit
+            // documents across parent prefixes at the same readTime. A cache-only
+            // full scan bypasses that index; remote authorization remains scoped.
+            query(collectionGroup(db, 'records')),
+            (row) =>
+              typeof row.data.projectId === 'string' &&
+              ids.includes(row.data.projectId),
           ),
         );
       }

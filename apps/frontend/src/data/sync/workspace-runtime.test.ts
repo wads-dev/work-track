@@ -81,6 +81,8 @@ async function send(path: string, rows: LocalDocument[]) {
   );
   for (const l of targets) {
     m.cache.set(l.target.key, rows);
+    if (l.target.key.includes('group:records'))
+      m.cache.set(JSON.stringify(['group:records']), rows);
     l.next({
       metadata: { fromCache: false, hasPendingWrites: false },
       size: rows.length,
@@ -255,5 +257,45 @@ it('authorization grouping opens only one global records target for up to ten pr
   );
   expect(targets).toHaveLength(3);
   expect(targets.every((l) => l.target.key.includes('"in"'))).toBe(true);
+  stop();
+});
+
+it('bypasses partially-backfilled group indexes locally while rejecting cached foreign project rows', async () => {
+  env();
+  const stop = startWorkspaceSession(db, 'alice');
+  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  const target = m.listeners.find((l) =>
+    l.target.key.includes('group:records'),
+  )!;
+  const all = Array.from({ length: 401 }, (_, i) => ({
+    path: 'users/alice/records/r' + i,
+    data: { uid: 'alice', projectId: 'p' },
+  }));
+  m.cache.set(target.target.key, all.slice(0, 380));
+  m.cache.set(JSON.stringify(['group:records']), [
+    ...all,
+    {
+      path: 'users/bob/records/secret',
+      data: { uid: 'bob', projectId: 'foreign-personal' },
+    },
+  ]);
+  target.next({
+    metadata: { fromCache: false, hasPendingWrites: false },
+    size: 380,
+    docChanges: () => [],
+  });
+  await settle();
+  let snapshot: WorkspaceSnapshot | undefined;
+  const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
+  expect(snapshot!.complete).toBe(true);
+  expect(snapshot!.records).toHaveLength(401);
+  expect(
+    snapshot!.records.some((r) => r.data.projectId === 'foreign-personal'),
+  ).toBe(false);
+  expect(
+    m.listeners.filter((l) => l.target.key.includes('group:records')),
+  ).toHaveLength(1);
+  expect(target.target.key).toContain('"in"');
+  observe();
   stop();
 });
