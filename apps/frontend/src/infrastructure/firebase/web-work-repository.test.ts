@@ -2,6 +2,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
 import { createHash } from 'node:crypto';
 import { normalize } from '@work-track/core/shared/text/normalize';
+const trace = vi.hoisted(() => vi.fn());
+vi.mock('../../data/sync/firestore-diagnostics', () => ({
+  traceFirestore: trace,
+}));
 const state = vi.hoisted(() => ({
   data: new Map<string, Record<string, unknown>>(),
   writes: [] as unknown[],
@@ -82,6 +86,7 @@ const record = {
   timeZone: 'America/Sao_Paulo',
 };
 beforeEach(() => {
+  trace.mockReset();
   state.data.clear();
   state.writes.length = 0;
   state.reads.length = 0;
@@ -433,3 +438,119 @@ it('propagates transaction failure atomically and allows deterministic retry aft
   );
   expect(state.writes).toHaveLength(2);
 });
+
+function expectTransactionTrace(
+  operation: string,
+  reads: Array<[string, number]>,
+) {
+  expect(state.reads).toEqual(reads.map(([path]) => path));
+  expect(trace.mock.calls).toEqual(
+    reads.flatMap(([path, count]) => {
+      const detail = {
+        operation,
+        collection: path.slice(0, path.lastIndexOf('/')),
+        path,
+        source: 'remote-transaction',
+      };
+      return [
+        ['transaction.read', detail],
+        ['transaction.result', { ...detail, count }],
+      ];
+    }),
+  );
+}
+
+it('traces project uniqueness reads including absent and existing results without payloads', async () => {
+  const result = await repo.createProject(createInput, 'alice');
+  expectTransactionTrace('web-work.create-project', [
+    ['projects/' + result.id, 0],
+  ]);
+  trace.mockClear();
+  state.reads.length = 0;
+  await repo.createProject(createInput, 'alice');
+  expectTransactionTrace('web-work.create-project', [
+    ['projects/' + result.id, 1],
+  ]);
+  expect(state.writes).toHaveLength(2);
+});
+
+it.each([
+  [
+    'update-project',
+    'trace-project',
+    () =>
+      repo.updateProject(
+        {
+          projectId: 'p',
+          title: 'Edited',
+          requestId: 'trace-project',
+          reason: 'Private reason',
+        },
+        'alice',
+      ),
+  ],
+  [
+    'archive',
+    'archive_trace-archive',
+    () =>
+      repo.archiveProject(
+        {
+          projectId: 'p',
+          archived: true,
+          requestId: 'trace-archive',
+          reason: 'Private reason',
+        },
+        'alice',
+      ),
+  ],
+  [
+    'update-topic',
+    'topic_alice_trace-topic',
+    () =>
+      repo.updateTopic(
+        {
+          projectId: 'p',
+          topicId: 'general',
+          title: 'Edited',
+          requestId: 'trace-topic',
+          reason: 'Private reason',
+        },
+        'alice',
+      ),
+  ],
+] as const)(
+  'traces %s document and audit in their original sequential order',
+  async (operation, auditId, execute) => {
+    await execute();
+    expectTransactionTrace('web-work.' + operation, [
+      ['projects/p', 1],
+      ['projects/p/audit/' + auditId, 0],
+    ]);
+    expect(state.writes).toHaveLength(2);
+  },
+);
+
+it.each([false, true])(
+  'traces record edit reads without extra reads when destination is explicit: %s',
+  async (explicitTarget) => {
+    state.data.set('projects/q', { ...project, title: 'Private target' });
+    await repo.updateRecord(
+      {
+        recordId: 'r',
+        requestId: 'trace-record',
+        reason: 'Private reason',
+        ...(explicitTarget
+          ? { projectId: 'q', topics: [{ topicId: 'general' }] }
+          : { endedAt: null }),
+      },
+      'alice',
+    );
+    expectTransactionTrace('web-work.update-record', [
+      ['users/alice/records/r', 1],
+      ['users/alice/records/r/audit/trace-record', 0],
+      ['projects/p', 1],
+      ...(explicitTarget ? [['projects/q', 1] as [string, number]] : []),
+    ]);
+    expect(state.writes).toHaveLength(2);
+  },
+);

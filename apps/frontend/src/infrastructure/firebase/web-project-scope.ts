@@ -1,5 +1,6 @@
 import { doc, runTransaction, type Firestore } from 'firebase/firestore';
 import { hash, canonical } from './web-transaction-adapter';
+import { readTransaction } from './transaction-read';
 import {
   canAccessProject,
   effectiveProjectType,
@@ -43,7 +44,11 @@ export class WebProjectScopeRepository implements ProjectScopeRepository {
       'scope_' + operationId,
     );
     return runTransaction(this.db, async (tx) => {
-      const [snapshot, prior] = await Promise.all([tx.get(ref), tx.get(audit)]);
+      const operation = 'web-project-scope.change-scope';
+      const [snapshot, prior] = await Promise.all([
+        readTransaction(tx, ref, operation),
+        readTransaction(tx, audit, operation),
+      ]);
       const before = snapshot.data();
       if (!snapshot.exists() || !canAccessProject(before, uid))
         throw new ProjectManagementError(

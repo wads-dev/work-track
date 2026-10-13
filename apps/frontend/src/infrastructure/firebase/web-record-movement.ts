@@ -1,5 +1,6 @@
 import { doc, runTransaction, type Firestore } from 'firebase/firestore';
 import { hash, canonical } from './web-transaction-adapter';
+import { readTransaction } from './transaction-read';
 import {
   assertProjectAccess,
   effectiveProjectType,
@@ -62,7 +63,11 @@ export class WebRecordMovementRepository implements MovementRepository {
     const ref = doc(this.db, 'users', uid, 'records', input.recordId);
     const audit = doc(this.db, 'users', uid, 'records', input.recordId, 'audit', 'movement_' + operationId);
     return runTransaction(this.db, async (tx) => {
-      const [snapshot, prior] = await Promise.all([tx.get(ref), tx.get(audit)]);
+      const operation = 'web-record-movement.move-record';
+      const [snapshot, prior] = await Promise.all([
+        readTransaction(tx, ref, operation),
+        readTransaction(tx, audit, operation),
+      ]);
       const before = snapshot.data();
       if (!snapshot.exists() || before!.uid !== uid || isDeletedRecord(before!) || typeof before!.projectId !== 'string')
         throw new ProjectManagementError('not-found', 'Registro autorizado ativo não encontrado.');
@@ -71,7 +76,10 @@ export class WebRecordMovementRepository implements MovementRepository {
       if (typeof originId !== 'string') fail('Projeto de origem inválido.');
       const sourceRef = doc(this.db, 'projects', originId),
         targetRef = doc(this.db, 'projects', input.project_target);
-      const [sourceSnap, targetSnap] = await Promise.all([tx.get(sourceRef), tx.get(targetRef)]);
+      const [sourceSnap, targetSnap] = await Promise.all([
+        readTransaction(tx, sourceRef, operation),
+        readTransaction(tx, targetRef, operation),
+      ]);
       assertProjectAccess(sourceSnap.data(), uid);
       assertProjectAccess(targetSnap.data(), uid);
       const source = sourceSnap.data()! as Record<string, unknown>,

@@ -64,9 +64,17 @@ export function observeWorkspaceAudit(
   parentPath: string,
   next: (snapshot: WorkspaceSnapshot) => void,
 ) {
-  const entry = entries.get(db);
-  const release = entry?.uid === uid ? entry.audit(parentPath) : () => {};
-  const stop = observeWorkspace(db, uid, next);
+  let currentEntry: ReturnType<typeof entries.get>;
+  let release = () => {};
+  const stop = observeWorkspace(db, uid, (snapshot) => {
+    const entry = entries.get(db);
+    if (entry?.uid === uid && entry !== currentEntry) {
+      release();
+      currentEntry = entry;
+      release = entry.audit(parentPath);
+    }
+    next(snapshot);
+  });
   return () => {
     stop();
     release();
@@ -412,7 +420,9 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
   document.addEventListener('visibilitychange', focus);
   window.addEventListener('focus', focus);
   window.addEventListener('blur', focus);
-  window.addEventListener('online', entry.retry);
+  const online = () => traceFirestore('network.online', { focused });
+  // SDK owns reconnect; online must never rebootstrap targets or blank views.
+  window.addEventListener('online', online);
   focus();
   return () => {
     disposed = true;
@@ -423,7 +433,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     document.removeEventListener('visibilitychange', focus);
     window.removeEventListener('focus', focus);
     window.removeEventListener('blur', focus);
-    window.removeEventListener('online', entry.retry);
+    window.removeEventListener('online', online);
     if (entries.get(db) === entry) entries.delete(db);
     observers.get(db)?.forEach((fn) => fn(initialSnapshot()));
   };

@@ -299,3 +299,41 @@ it('bypasses partially-backfilled group indexes locally while rejecting cached f
   observe();
   stop();
 });
+
+it('online events let SDK reconnect without recreating targets or blanking local views', async () => {
+  env();
+  const stop = startWorkspaceSession(db, 'alice');
+  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  await send('group:records', []);
+  const next = vi.fn();
+  const observe = observeWorkspace(db, 'alice', next);
+  const listeners = m.listeners.length;
+  window.dispatchEvent(new Event('online'));
+  await settle();
+  expect(m.listeners).toHaveLength(listeners);
+  expect(next).toHaveBeenCalledOnce();
+  expect(next.mock.calls[0][0].complete).toBe(true);
+  observe();
+  stop();
+});
+it('audit observer mounted before authentication session acquires its demand when session begins', async () => {
+  env();
+  const observer = observeWorkspaceAudit(
+    db,
+    'alice',
+    'users/alice/records/r',
+    () => {},
+  );
+  const stop = startWorkspaceSession(db, 'alice');
+  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  await send('group:records', [
+    { path: 'users/alice/records/r', data: { uid: 'alice', projectId: 'p' } },
+  ]);
+  expect(
+    m.listeners.some((l) =>
+      l.target.key.includes('users/alice/records/r/audit'),
+    ),
+  ).toBe(true);
+  observer();
+  stop();
+});

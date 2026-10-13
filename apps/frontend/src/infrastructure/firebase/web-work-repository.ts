@@ -37,6 +37,7 @@ import {
 } from '@work-track/core/registration/domain/work-model';
 import { normalize } from '@work-track/core/shared/text/normalize';
 import { traceFirestore } from '../../data/sync/firestore-diagnostics';
+import { readTransaction } from './transaction-read';
 export class WebWorkRepository {
   constructor(private readonly db: Firestore) {}
   async createProject(raw: unknown, uid: string): Promise<Project> {
@@ -62,7 +63,11 @@ export class WebWorkRepository {
     ).join('');
     const ref = doc(this.db, 'projects', key);
     return runTransaction(this.db, async (tx) => {
-      const existing = await tx.get(ref);
+      const existing = await readTransaction(
+        tx,
+        ref,
+        'web-work.create-project',
+      );
       if (existing.exists()) {
         const project = existing.data() as Project;
         assertProjectAccess(project, uid);
@@ -188,8 +193,9 @@ export class WebWorkRepository {
     const ref = doc(this.db, 'projects', input.projectId),
       audit = doc(ref, 'audit', auditId);
     return runTransaction(this.db, async (tx) => {
-      const snapshot = await tx.get(ref),
-        prior = await tx.get(audit);
+      const operation = 'web-work.' + (action ?? 'update-project');
+      const snapshot = await readTransaction(tx, ref, operation),
+        prior = await readTransaction(tx, audit, operation);
       const before = snapshot.data();
       assertProjectAccess(before, uid);
       if (prior.exists()) {
@@ -247,18 +253,27 @@ export class WebWorkRepository {
       ? doc(ref, 'audit', input.requestId)
       : doc(collection(ref, 'audit'));
     return runTransaction(this.db, async (tx) => {
-      const snapshot = await tx.get(ref),
-        prior = await tx.get(audit),
+      const operation = 'web-work.update-record';
+      const snapshot = await readTransaction(tx, ref, operation),
+        prior = await readTransaction(tx, audit, operation),
         before = snapshot.data();
       if (!before || before.uid !== uid)
         throw new ProjectManagementError(
           'not-found',
           'Registro próprio não encontrado.',
         );
-      const origin = await tx.get(doc(this.db, 'projects', before.projectId));
+      const origin = await readTransaction(
+        tx,
+        doc(this.db, 'projects', before.projectId),
+        operation,
+      );
       assertProjectAccess(origin.data(), uid);
       const target = input.projectId
-        ? await tx.get(doc(this.db, 'projects', input.projectId))
+        ? await readTransaction(
+            tx,
+            doc(this.db, 'projects', input.projectId),
+            operation,
+          )
         : origin;
       assertProjectAccess(target.data(), uid);
       if (
