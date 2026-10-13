@@ -416,6 +416,25 @@ test('Docker and Firebase use explicit shared mounts and standalone Functions', 
   }
 });
 
+test('every deployment verifies project types after authentication and before publishing', async () => {
+  for (const application of ['backend', 'frontend', 'firestore']) {
+    const workflow = await source(
+      '.github/workflows/deploy-' + application + '.yml',
+    );
+    const auth = workflow.indexOf('google-github-actions/auth@');
+    const verify = workflow.indexOf(
+      'node scripts/backfill-project-type.mjs --project wadsworktrack --verify',
+    );
+    const publish = workflow.indexOf('firebase-tools@latest deploy');
+    assert(auth > 0 && verify > auth && publish > verify);
+    assert(
+      !workflow.includes(
+        'backfill-project-type.mjs --project wadsworktrack --apply',
+      ),
+    );
+  }
+});
+
 test('Functions waits for same-push Firestore and READY indexes before publishing dated queries', async () => {
   const workflow = await source('.github/workflows/deploy-backend.yml');
   assert(workflow.includes('actions: read'));
