@@ -113,6 +113,17 @@ it('connects isolated demo emulators only after configuring persistent cache', a
     'localhost',
     8095,
   );
+  // Retrieving the index manager starts the SDK client and freezes settings.
+  expect(
+    mocks.connectFirestoreEmulator.mock.invocationCallOrder[0]!,
+  ).toBeLessThan(
+    mocks.getPersistentCacheIndexManager.mock.invocationCallOrder[0]!,
+  );
+  expect(
+    mocks.connectFirestoreEmulator.mock.invocationCallOrder[0]!,
+  ).toBeLessThan(
+    mocks.enablePersistentCacheIndexAutoCreation.mock.invocationCallOrder[0]!,
+  );
   expect(mocks.connectAuthEmulator).toHaveBeenCalledWith(
     mocks.auth,
     'http://localhost:9115',
