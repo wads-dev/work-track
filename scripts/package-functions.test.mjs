@@ -153,10 +153,19 @@ test(
       );
       assert.equal(imported.status, 0, imported.stdout + imported.stderr);
       const exportedNames = JSON.parse(imported.stdout.trim());
-      assert(exportedNames.includes('mcp'));
-      assert(!exportedNames.includes('api'));
-      assert(!exportedNames.includes('health'));
+      assert.deepEqual(exportedNames, [
+        'deleteProjectPermanently',
+        'exportProjectForDeletion',
+        'listCompanyPeople',
+        'mcp',
+      ]);
       const retiredCallables = [
+        'createProject',
+        'mergeProjects',
+        'mergeTopics',
+        'moveTopic',
+        'getTopicReport',
+        'discoverLegacyProjectIds',
         'getCalendarReport',
         'getCompanyReport',
         'getPersonalReport',

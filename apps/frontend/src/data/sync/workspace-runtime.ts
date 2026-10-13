@@ -14,6 +14,7 @@ import {
 import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { invalidateProjectAccess } from '../cache/project-access-revision';
+import { traceFirestore } from './firestore-diagnostics';
 import {
   initialSnapshot,
   type WorkspaceSnapshot,
@@ -21,7 +22,12 @@ import {
 } from './workspace-sync';
 const entries = new WeakMap<
   Firestore,
-  { uid: string; snapshot: WorkspaceSnapshot; retry: () => void }
+  {
+    uid: string;
+    snapshot: WorkspaceSnapshot;
+    retry: () => void;
+    audit: (path: string) => () => void;
+  }
 >();
 const observers = new WeakMap<
   Firestore,
@@ -37,12 +43,33 @@ export function observeWorkspace(
     set = new Set();
     observers.set(db, set);
   }
-  const guarded = (s: WorkspaceSnapshot) =>
+  const guarded = (s: WorkspaceSnapshot) => {
+    traceFirestore('local.workspace.read', {
+      collection: 'projects,records',
+      projects: s.projects.length,
+      records: s.records.length,
+      complete: s.complete,
+    });
     next(entries.get(db)?.uid === uid ? s : initialSnapshot());
+  };
   set.add(guarded);
   guarded(entries.get(db)?.snapshot ?? initialSnapshot());
   return () => {
     set.delete(guarded);
+  };
+}
+export function observeWorkspaceAudit(
+  db: Firestore,
+  uid: string,
+  parentPath: string,
+  next: (snapshot: WorkspaceSnapshot) => void,
+) {
+  const entry = entries.get(db);
+  const release = entry?.uid === uid ? entry.audit(parentPath) : () => {};
+  const stop = observeWorkspace(db, uid, next);
+  return () => {
+    stop();
+    release();
   };
 }
 export function workspaceRetry(db: Firestore, uid: string) {
@@ -53,9 +80,19 @@ export function workspaceRetry(db: Firestore, uid: string) {
 export function startWorkspaceSession(db: Firestore, uid: string) {
   let disposed = false,
     epoch = 0,
-    focused = false,
+    focused = document.visibilityState === 'visible' && document.hasFocus(),
     authorized = false;
-  const entry = { uid, snapshot: initialSnapshot(), retry: () => {} };
+  const entry = {
+    uid,
+    snapshot: initialSnapshot(),
+    retry: () => {},
+    audit: (path: string): (() => void) => {
+      void path;
+      return () => {};
+    },
+  };
+  const requestedAudits = new Map<string, number>();
+  let publishedKey = '';
   entries.set(db, entry);
   const emit = () => {
     if (!disposed) observers.get(db)?.forEach((fn) => fn(entry.snapshot));
@@ -69,6 +106,17 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
   let catalogStops: (() => void)[] = [];
   const fail = (error: unknown) => {
     if (disposed) return;
+    epoch++;
+    catalogStops.forEach((stop) => stop());
+    projectStops.forEach((stop) => stop());
+    auditStops.forEach((stop) => stop());
+    catalogStops = [];
+    projectStops.clear();
+    auditStops.clear();
+    ready.clear();
+    traceFirestore('error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     entry.snapshot = {
       ...initialSnapshot(),
       syncing: false,
@@ -78,6 +126,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
           : 'Falha na sincronização Firestore.',
     };
     authorized = false;
+    publishedKey = '';
     emit();
   };
   const publish = () => {
@@ -96,25 +145,47 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     const complete =
       ready.has('catalog:0') &&
       ready.has('catalog:1') &&
-      projects.every((p) => ready.has('records:' + p.id)) &&
-      [...auditStops.keys()].every((path) => ready.has('audit:' + path));
-    entry.snapshot = {
+      [...projectStops.keys()].every((key) => ready.has(key));
+    const nextSnapshot: WorkspaceSnapshot = {
       projects: complete ? projects : [],
       records: complete ? [...records.values()].flat() : [],
       audits: complete ? [...audits.values()].flat() : [],
+      auditReady: [...auditStops.keys()].filter((path) =>
+        ready.has('audit:' + path),
+      ),
       completedProjects: complete ? projects.map((p) => p.id) : [],
       complete,
       syncing: !complete,
       error: '',
     };
+    const key = JSON.stringify(nextSnapshot);
+    if (key === publishedKey) return;
+    publishedKey = key;
+    entry.snapshot = nextSnapshot;
+    traceFirestore('workspace.return', {
+      projects: nextSnapshot.projects.length,
+      records: nextSnapshot.records.length,
+      complete,
+      local: true,
+    });
     emit();
   };
-  // Local listener supplies all data. Default listener exists ONLY for SDK synchronization.
+  // One SDK listener signals changes. Every document materialization is cache-only.
   const watch = (
     target: Query<DocumentData>,
     key: string,
     receive: (rows: LocalDocument[]) => void,
   ) => {
+    const collectionName = key.startsWith('catalog:')
+      ? 'projects'
+      : key.startsWith('records:')
+        ? 'records'
+        : 'audit';
+    traceFirestore('listen.attach', {
+      key,
+      collection: collectionName,
+      remote: true,
+    });
     const token = epoch;
     let live = true,
       confirmed = false,
@@ -123,7 +194,18 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     const readLocal = async () => {
       const turn = ++serial;
       try {
+        traceFirestore('cache.read', {
+          key,
+          collection: collectionName,
+          source: 'persistent-local',
+        });
         const s = await getDocsFromCache(target);
+        traceFirestore('cache.result', {
+          key,
+          collection: collectionName,
+          count: s.size,
+          source: 'persistent-local',
+        });
         if (!current() || turn !== serial) return;
         if (confirmed) ready.add(key);
         receive(s.docs.map((d) => ({ path: d.ref.path, data: d.data() })));
@@ -132,35 +214,40 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
         if (current()) fail(error);
       }
     };
-    const local = onSnapshot(
-      target,
-      { source: 'cache', includeMetadataChanges: true },
-      () => {
-        if (current()) void readLocal();
-      },
-      (error) => {
-        if (current()) fail(error);
-      },
-    );
     const remote = onSnapshot(
       target,
       { includeMetadataChanges: true },
       (s) => {
         if (!current()) return;
+        traceFirestore('listen.event', {
+          key,
+          collection: collectionName,
+          count: s.size,
+          fromCache: s.metadata.fromCache,
+          pending: s.metadata.hasPendingWrites,
+          changed: s.docChanges().length,
+          source: s.metadata.fromCache ? 'local' : 'remote',
+        });
         if (!s.metadata.fromCache && !s.metadata.hasPendingWrites) {
           confirmed = true;
-          authorized = focused;
-          void readLocal();
+          authorized = true;
         }
+        void readLocal();
+        traceFirestore('listen.return', {
+          key,
+          collection: collectionName,
+          notifiedLocal: true,
+        });
       },
       (error) => {
+        traceFirestore('listen.error', { key, message: error.message });
         if (current()) fail(error);
       },
     );
     return () => {
+      traceFirestore('listen.detach', { key });
       live = false;
       serial++;
-      local();
       remote();
       ready.delete(key);
     };
@@ -168,7 +255,12 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
   const reconcileAudits = () => {
     const parents = [...records.values()]
       .flat()
-      .filter((r) => r.data.uid === uid && !isDeletedRecord(r.data));
+      .filter(
+        (r) =>
+          requestedAudits.has(r.path) &&
+          r.data.uid === uid &&
+          !isDeletedRecord(r.data),
+      );
     const paths = new Set(parents.map((r) => r.path));
     for (const [path, stop] of auditStops)
       if (!paths.has(path)) {
@@ -200,28 +292,39 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
           .map((p) => [p.path.split('/').at(-1)!, p]),
       ).values(),
     ];
-    const ids = new Set(projects.map((p) => p.path.split('/').at(-1)!));
-    for (const [id, stop] of projectStops)
-      if (!ids.has(id)) {
+    const ids = projects.map((p) => p.path.split('/').at(-1)!).sort();
+    // Rules permit only authorized project IDs, and allow at most ten distinct
+    // parent get() calls per query. These global groups do not depend on views.
+    const groups = new Map<string, string[]>();
+    for (let offset = 0; offset < ids.length; offset += 10) {
+      const group = ids.slice(offset, offset + 10);
+      groups.set('records:' + group.join(','), group);
+    }
+    for (const [key, stop] of projectStops) {
+      if (!groups.has(key)) {
         stop();
-        projectStops.delete(id);
-        records.delete(id);
+        projectStops.delete(key);
+        records.delete(key);
         invalidateProjectAccess();
       }
-    for (const id of ids)
-      if (!projectStops.has(id))
+    }
+    for (const [key, ids] of groups)
+      if (!projectStops.has(key)) {
         projectStops.set(
-          id,
+          key,
           watch(
-            query(collectionGroup(db, 'records'), where('projectId', '==', id)),
-            'records:' + id,
+            query(
+              collectionGroup(db, 'records'),
+              where('projectId', 'in', ids),
+            ),
+            key,
             (rows) => {
-              records.set(id, rows);
+              records.set(key, rows);
               reconcileAudits();
-              publish();
             },
           ),
         );
+      }
     reconcileAudits();
     publish();
   };
@@ -239,6 +342,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     ready.clear();
     authorized = false;
     entry.snapshot = initialSnapshot();
+    publishedKey = '';
     emit();
     [
       query(collection(db, 'projects'), where('type', '==', 'work')),
@@ -256,20 +360,36 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     const next = document.visibilityState === 'visible' && document.hasFocus();
     if (next === focused || disposed) return;
     focused = next;
+    traceFirestore('network.focus', { focused });
     // Keep query targets/resume tokens alive; SDK handles IndexedDB and multi-tab synchronization.
-    if (next) void enableNetwork(db).catch(fail);
-    else {
-      authorized = false;
-      entry.snapshot = initialSnapshot();
-      emit();
+    if (next) {
+      void enableNetwork(db).catch(fail);
+    } else {
+      // Transport suspension must not blank already-authorized local views.
       void disableNetwork(db).catch(fail);
     }
+  };
+  entry.audit = (path) => {
+    if (
+      !path.startsWith('users/' + uid + '/records/') ||
+      path.split('/').length !== 4
+    )
+      return () => {};
+    requestedAudits.set(path, (requestedAudits.get(path) ?? 0) + 1);
+    reconcileAudits();
+    return () => {
+      const count = (requestedAudits.get(path) ?? 1) - 1;
+      if (count > 0) requestedAudits.set(path, count);
+      else requestedAudits.delete(path);
+      reconcileAudits();
+      publish();
+    };
   };
   entry.retry = () => {
     if (disposed) return;
     start();
-    if (focused) void enableNetwork(db).catch(fail);
   };
+  if (!focused) void disableNetwork(db).catch(fail);
   start();
   document.addEventListener('visibilitychange', focus);
   window.addEventListener('focus', focus);

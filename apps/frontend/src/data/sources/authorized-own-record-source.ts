@@ -1,5 +1,6 @@
 import type { Firestore, Unsubscribe } from 'firebase/firestore';
 import { observeWorkspace } from '../sync/workspace-runtime';
+import { traceFirestore } from '../sync/firestore-diagnostics';
 import type { Row } from '../../shared/data';
 export interface OwnRecordPage {
   rows: Row[];
@@ -29,6 +30,12 @@ export function subscribeAuthorizedOwnRecords(
       .filter((r) => !options.after || r.id > options.after)
       .sort((a, b) => a.id.localeCompare(b.id));
     const rows = options.size ? all.slice(0, options.size) : all;
+    traceFirestore('local.record.read', {
+      collections: 'records',
+      count: rows.length,
+      complete: snapshot.complete,
+      openOnly: Boolean(options.openOnly),
+    });
     next({
       rows,
       fromCache: !snapshot.complete,

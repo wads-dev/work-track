@@ -36,6 +36,7 @@ import {
   type Project,
 } from '@work-track/core/registration/domain/work-model';
 import { normalize } from '@work-track/core/shared/text/normalize';
+import { traceFirestore } from '../../data/sync/firestore-diagnostics';
 export class WebWorkRepository {
   constructor(private readonly db: Firestore) {}
   async createProject(raw: unknown, uid: string): Promise<Project> {
@@ -310,14 +311,26 @@ export class WebWorkRepository {
   async listTopicMerges(raw: unknown, uid: string) {
     const input = listTopicMergesInput.parse(raw),
       ref = doc(this.db, 'projects', input.projectId);
-    assertProjectAccess((await getDocFromServer(ref)).data(), uid);
+    traceFirestore('server.read', { key: ref.path });
+    const project = await getDocFromServer(ref);
+    traceFirestore('server.result', {
+      key: ref.path,
+      count: project.exists() ? 1 : 0,
+    });
+    assertProjectAccess(project.data(), uid);
     const merges = collection(ref, 'topicMerges');
     const constraints: QueryConstraint[] = [
       orderBy(documentId()),
       limit(input.limit + 1),
     ];
     if (input.cursor) {
-      const cursor = await getDocFromServer(doc(merges, input.cursor));
+      const cursorRef = doc(merges, input.cursor);
+      traceFirestore('server.read', { key: cursorRef.path });
+      const cursor = await getDocFromServer(cursorRef);
+      traceFirestore('server.result', {
+        key: cursorRef.path,
+        count: cursor.exists() ? 1 : 0,
+      });
       if (!cursor.exists())
         throw new ProjectManagementError(
           'invalid-argument',
@@ -325,8 +338,10 @@ export class WebWorkRepository {
         );
       constraints.push(startAfter(cursor));
     }
+    traceFirestore('server.read', { key: merges.path });
     const snapshot = await getDocsFromServer(query(merges, ...constraints)),
       selected = snapshot.docs.slice(0, input.limit);
+    traceFirestore('server.result', { key: merges.path, count: snapshot.size });
     return {
       items: selected.map((d) => {
         const a = d.data();

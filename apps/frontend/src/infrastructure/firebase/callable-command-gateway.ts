@@ -1,5 +1,6 @@
 import { httpsCallable, type Functions } from 'firebase/functions';
 import type { CommandGateway } from '@work-track/core/contracts/command-gateway';
+import { traceFirestore } from '../../data/sync/firestore-diagnostics';
 
 /** Never translates server commands into direct Firestore writes. */
 export class CallableCommandGateway implements CommandGateway {
@@ -8,8 +9,16 @@ export class CallableCommandGateway implements CommandGateway {
     name: string,
     input: Request,
   ): Promise<Response> {
-    return (await httpsCallable<Request, Response>(this.functions, name)(input))
-      .data;
+    traceFirestore('callable.start', { name });
+    const result = await httpsCallable<Request, Response>(
+      this.functions,
+      name,
+    )(input);
+    traceFirestore('callable.result', {
+      name,
+      ...(Array.isArray(result.data) ? { count: result.data.length } : {}),
+    });
+    return result.data;
   }
 }
 

@@ -34,6 +34,46 @@ jobs:
         with:
           workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
           service_account: github-deploy@wadsworktrack.iam.gserviceaccount.com
-      # Explicitly retire only Web read endpoints replaced by native SDK/cache.
-      - run: npx -y firebase-tools@latest functions:delete getTopicReport discoverLegacyProjectIds --region southamerica-east1 --project wadsworktrack --force
-      - run: npx -y firebase-tools@latest deploy --only functions --project wadsworktrack --non-interactive
+      - name: Retire unused Web callables
+        # functions:delete fails when every target is absent; list first, never mask real errors.
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+
+          const cli = ['-y', 'firebase-tools@latest'];
+          const project = 'wadsworktrack';
+          const region = 'southamerica-east1';
+          const codebase = 'default';
+          const retired = [
+            'createProject',
+            'mergeProjects',
+            'mergeTopics',
+            'moveTopic',
+            'getTopicReport',
+            'discoverLegacyProjectIds',
+          ];
+          const listed = JSON.parse(execFileSync('npx', [
+            ...cli, 'functions:list', '--project', project, '--json', '--non-interactive',
+          ], { encoding: 'utf8' }));
+          if (listed.status !== 'success' || !Array.isArray(listed.result)) {
+            throw new Error('Unexpected Firebase functions:list response');
+          }
+          const endpoints = listed.result.filter((endpoint) =>
+            endpoint.region === region && (endpoint.codebase || 'default') === codebase,
+          );
+          const existing = new Set(endpoints.map((endpoint) => endpoint.id));
+          const targets = retired.filter((name) => existing.has(name));
+          // CLI names also match function groups; refuse any broader prefix deletion.
+          if (endpoints.some((endpoint) => targets.some((name) => endpoint.id.startsWith(name + '-')))) {
+            throw new Error('Retired callable name also matches a function group; refusing broader deletion');
+          }
+          if (targets.length === 0) {
+            console.log('Retired Web callables are already absent.');
+          } else {
+            execFileSync('npx', [
+              ...cli, 'functions:delete', ...targets.map((name) => codebase + ':' + name),
+              '--region', region, '--project', project, '--force', '--non-interactive',
+            ], { stdio: 'inherit' });
+          }
+          NODE
+      - run: npx -y firebase-tools@latest deploy --only functions:default:mcp,functions:default:listCompanyPeople,functions:default:exportProjectForDeletion,functions:default:deleteProjectPermanently --project wadsworktrack --non-interactive

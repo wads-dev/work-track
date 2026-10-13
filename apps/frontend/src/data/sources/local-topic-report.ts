@@ -6,6 +6,7 @@ import {
   AuthorizedReportRepository,
   recordKey,
 } from '@work-track/data/repositories/snapshots/authorized-report-repository';
+import { traceFirestore } from '../sync/firestore-diagnostics';
 
 /** One immutable, complete authorized snapshot for all pages and global context.
  * Labels are stable UID fallbacks; the UI people provider resolves identities.
@@ -32,6 +33,12 @@ export class LocalTopicReportRepository implements TopicReportRepository {
         !isDeletedRecord(record) &&
         (project.type !== 'personal' || record.uid === snapshot.viewer)
       );
+    });
+    traceFirestore('local.report.read', {
+      source: 'topic',
+      collections: 'projects,records',
+      count: records.length,
+      projects: projects.size,
     });
     // Deliberately ignore selectedKeys: topic history and estimates require global context.
     this.source = new AuthorizedReportRepository(

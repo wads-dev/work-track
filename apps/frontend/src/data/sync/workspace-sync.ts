@@ -3,6 +3,7 @@ export type WorkspaceSnapshot = {
   projects: { id: string; data: Record<string, unknown> }[];
   records: LocalDocument[];
   audits?: LocalDocument[];
+  auditReady?: string[];
   completedProjects: string[];
   complete: boolean;
   syncing: boolean;

@@ -10,8 +10,11 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  getPersistentCacheIndexManager,
+  enablePersistentCacheIndexAutoCreation,
 } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
+import { traceFirestore } from '../../data/sync/firestore-diagnostics';
 
 export function emulatorMode(projectId: string, hostname: string): boolean {
   if (projectId !== 'demo-work-track') return false;
@@ -57,6 +60,12 @@ export async function initializeServices() {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
     }),
+  });
+  const indexManager = getPersistentCacheIndexManager(db);
+  if (indexManager) enablePersistentCacheIndexAutoCreation(indexManager);
+  traceFirestore('cache.indexes', {
+    persistent: true,
+    autoCreation: Boolean(indexManager),
   });
   const functions = getFunctions(app, 'southamerica-east1');
   if (emulator) {

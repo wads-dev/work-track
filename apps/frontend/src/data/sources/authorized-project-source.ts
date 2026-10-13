@@ -1,5 +1,6 @@
 import type { Firestore, Unsubscribe } from 'firebase/firestore';
 import { observeWorkspace } from '../sync/workspace-runtime';
+import { traceFirestore } from '../sync/firestore-diagnostics';
 import type { Row } from '../../shared/data';
 export interface ProjectSnapshot {
   rows: Row[];
@@ -19,6 +20,11 @@ export function subscribeAuthorizedProjects(
       fail();
       return;
     }
+    traceFirestore('local.project.read', {
+      collections: 'projects',
+      count: snapshot.complete ? snapshot.projects.length : 0,
+      complete: snapshot.complete,
+    });
     next({
       rows: snapshot.complete ? snapshot.projects : [],
       fromCache: !snapshot.complete,

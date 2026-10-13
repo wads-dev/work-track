@@ -150,7 +150,7 @@ it('record editor hides deleted parent, audit is not filtered; reports guard rev
     'data && !isDeletedRecord(data) ? data : null',
   );
   const audit = source('../../shared/data.ts');
-  expect(audit).toContain('observeWorkspace(db, uid');
+  expect(audit).toContain('observeWorkspaceAudit(db, uid');
   expect(audit).toContain('snapshot.complete && visible');
   expect(audit).toContain('!isDeletedRecord(parent.data)');
   expect(audit).toContain('(snapshot.audits ?? [])');

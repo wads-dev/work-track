@@ -4,6 +4,9 @@ const mocks = vi.hoisted(() => ({
   auth: { authStateReady: vi.fn() },
   db: {},
   functions: {},
+  indexManager: { kind: 'local-index' },
+  getPersistentCacheIndexManager: vi.fn(),
+  enablePersistentCacheIndexAutoCreation: vi.fn(),
   manager: { kind: 'multi-tab' },
   cache: { kind: 'persistent' },
   initializeApp: vi.fn(),
@@ -26,6 +29,9 @@ vi.mock('firebase/auth', () => ({
   connectAuthEmulator: mocks.connectAuthEmulator,
 }));
 vi.mock('firebase/firestore', () => ({
+  getPersistentCacheIndexManager: mocks.getPersistentCacheIndexManager,
+  enablePersistentCacheIndexAutoCreation:
+    mocks.enablePersistentCacheIndexAutoCreation,
   initializeFirestore: mocks.initializeFirestore,
   persistentLocalCache: mocks.persistentLocalCache,
   persistentMultipleTabManager: mocks.persistentMultipleTabManager,
@@ -45,6 +51,7 @@ beforeEach(() => {
   mocks.persistentMultipleTabManager.mockReturnValue(mocks.manager);
   mocks.persistentLocalCache.mockReturnValue(mocks.cache);
   mocks.initializeFirestore.mockReturnValue(mocks.db);
+  mocks.getPersistentCacheIndexManager.mockReturnValue(mocks.indexManager);
   mocks.auth.authStateReady.mockResolvedValue(undefined);
   mocks.fetch.mockResolvedValue({
     ok: true,
@@ -80,6 +87,9 @@ it('initializes Firestore once with persistent multi-tab cache, separately from 
   });
   expect(mocks.auth.authStateReady).toHaveBeenCalledExactlyOnceWith();
   expect(mocks.connectFirestoreEmulator).not.toHaveBeenCalled();
+  expect(mocks.enablePersistentCacheIndexAutoCreation).toHaveBeenCalledWith(
+    mocks.indexManager,
+  );
 });
 it('connects isolated demo emulators only after configuring persistent cache', async () => {
   mocks.fetch.mockResolvedValue({

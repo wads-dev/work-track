@@ -1,5 +1,6 @@
 import type { Firestore, Unsubscribe } from 'firebase/firestore';
 import { observeWorkspace } from '../sync/workspace-runtime';
+import { traceFirestore } from '../sync/firestore-diagnostics';
 import {
   calendarQueryBounds,
   type CalendarQueryRange,
@@ -15,6 +16,17 @@ export interface PersonalReportSnapshot {
   hasPendingWrites: boolean;
   coherent: boolean;
 }
+// Compare report content, not runtime audits/completeness bookkeeping. Key order in
+// replayed documents is irrelevant; nested values still participate in the signature.
+function contentSignature(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item && typeof item === 'object' && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : item,
+  );
+}
 export function subscribePersonalReport(
   db: Firestore,
   uid: string,
@@ -24,11 +36,22 @@ export function subscribePersonalReport(
   calendarRange?: CalendarQueryRange,
 ): Unsubscribe {
   void _requiredProjectIds; // Global materialization owns completeness and authorization.
+  let signature: string | undefined;
+  let lastError: string | undefined;
+  const reportFailure = (error: Error) => {
+    // A successful identical replay must publish again after an error clears the UI.
+    signature = undefined;
+    if (lastError === error.message) return;
+    lastError = error.message;
+    fail(error);
+  };
   return observeWorkspace(db, uid, (snapshot) => {
     if (snapshot.error) {
-      fail(new Error(snapshot.error));
+      reportFailure(new Error(snapshot.error));
       return;
     }
+    // This API has no loading state. Keep the last complete repository until the
+    // next atomic context; page project fences handle access while syncing.
     if (!snapshot.complete) return;
     try {
       const projects = new Map(
@@ -74,19 +97,38 @@ export function subscribePersonalReport(
               .map((r) => r.id),
           )
         : undefined;
-      next({
-        repository: new ClientPersonalReportRepository(
-          uid,
-          records,
-          projects,
-          selected,
+      const nextSignature = contentSignature({
+        projects: [...projects].sort(([a], [b]) => a.localeCompare(b)),
+        records: [...records].sort((a, b) =>
+          (a.uid + '/' + a.id).localeCompare(b.uid + '/' + b.id),
         ),
+        selected: selected && [...selected].sort(),
+      });
+      traceFirestore('local.report.read', {
+        source: 'personal',
+        collections: 'projects,records',
+        count: records.length,
+        projects: projects.size,
+        selected: selected?.size ?? null,
+        cacheHit: signature === nextSignature,
+      });
+      if (signature === nextSignature) return;
+      const repository = new ClientPersonalReportRepository(
+        uid,
+        structuredClone(records),
+        structuredClone(projects),
+        selected,
+      );
+      signature = nextSignature;
+      lastError = undefined;
+      next({
+        repository,
         coherent: true,
         fromCache: false,
         hasPendingWrites: false,
       });
     } catch (error) {
-      fail(error instanceof Error ? error : new Error(String(error)));
+      reportFailure(error instanceof Error ? error : new Error(String(error)));
     }
   });
 }

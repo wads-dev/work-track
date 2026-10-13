@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isDeletedRecord } from '../data/cache/record-deletion';
 import {
-  observeWorkspace,
+  observeWorkspaceAudit,
   workspaceRetry,
 } from '../data/sync/workspace-runtime';
 import { Timestamp, type Firestore } from 'firebase/firestore';
@@ -45,9 +45,9 @@ export function useRows(db: Firestore, path: string, maxRows = 100) {
   const uid = path.split('/')[1] ?? '';
   useEffect(() => {
     setState({ rows: [], loading: true, error: '' });
-    return observeWorkspace(db, uid, (snapshot) => {
+    const parentPath = path.split('/').slice(0, 4).join('/');
+    return observeWorkspaceAudit(db, uid, parentPath, (snapshot) => {
       const prefix = path + '/';
-      const parentPath = path.split('/').slice(0, 4).join('/');
       const parent = snapshot.records.find((row) => row.path === parentPath);
       const visible =
         parent &&
@@ -73,7 +73,10 @@ export function useRows(db: Firestore, path: string, maxRows = 100) {
                   data: row.data,
                 }))
             : [],
-        loading: !snapshot.complete && !snapshot.error,
+        loading:
+          (!snapshot.complete ||
+            (Boolean(visible) && !snapshot.auditReady?.includes(parentPath))) &&
+          !snapshot.error,
         error: snapshot.error,
       });
     });

@@ -2,7 +2,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { WorkspaceSnapshot, LocalDocument } from './workspace-sync';
 type Target = { key: string };
 type Options = { source?: string; includeMetadataChanges: boolean };
-type Snapshot = { metadata: { fromCache: boolean; hasPendingWrites: boolean } };
+type Snapshot = {
+  metadata: { fromCache: boolean; hasPendingWrites: boolean };
+  size: number;
+  docChanges: () => unknown[];
+};
 const m = vi.hoisted(() => ({
   listeners: [] as {
     target: Target;
@@ -34,6 +38,7 @@ vi.mock('firebase/firestore', () => ({
     return stop;
   },
   getDocsFromCache: async (t: Target) => ({
+    size: (m.cache.get(t.key) ?? []).length,
     docs: (m.cache.get(t.key) ?? []).map((r) => ({
       ref: { path: r.path },
       data: () => r.data,
@@ -45,6 +50,7 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('firebase/functions', () => ({ httpsCallable: m.call }));
 import {
   observeWorkspace,
+  observeWorkspaceAudit,
   startWorkspaceSession,
   workspaceRetry,
 } from './workspace-runtime';
@@ -75,7 +81,11 @@ async function send(path: string, rows: LocalDocument[]) {
   );
   for (const l of targets) {
     m.cache.set(l.target.key, rows);
-    l.next({ metadata: { fromCache: false, hasPendingWrites: false } });
+    l.next({
+      metadata: { fromCache: false, hasPendingWrites: false },
+      size: rows.length,
+      docChanges: () => [],
+    });
   }
   await settle();
 }
@@ -121,7 +131,7 @@ it('focus disables SDK network without destroying query resume targets, resume e
   expect(m.listeners.every((l) => l.stop.mock.calls.length === 0)).toBe(true);
   e.setFocus(true);
   await settle();
-  expect(m.enable).toHaveBeenCalledTimes(2);
+  expect(m.enable).toHaveBeenCalledOnce();
   expect(m.listeners).toHaveLength(count);
   stop();
 });
@@ -139,7 +149,11 @@ it('revocation removes project rows and late callbacks cannot restore account da
   const old = m.listeners.slice();
   stop();
   old.forEach((l) =>
-    l.next({ metadata: { fromCache: false, hasPendingWrites: false } }),
+    l.next({
+      metadata: { fromCache: false, hasPendingWrites: false },
+      size: 0,
+      docChanges: () => [],
+    }),
   );
   await settle();
   expect(snapshot!.complete).toBe(false);
@@ -157,5 +171,89 @@ it('retry reopens failed native subscriptions but is scoped to the current user'
   expect(
     m.listeners.slice(0, count).every((l) => l.stop.mock.calls.length),
   ).toBe(true);
+  stop();
+});
+
+it('never re-enables an already-enabled SDK at initial focus and opens one listener per target', () => {
+  env();
+  const stop = startWorkspaceSession(db, 'alice');
+  expect(m.enable).not.toHaveBeenCalled();
+  expect(m.listeners).toHaveLength(2);
+  expect(new Set(m.listeners.map((l) => l.target.key)).size).toBe(2);
+  expect(m.listeners.every((l) => !l.options.source)).toBe(true);
+  stop();
+});
+it('hundreds of records do not open hundreds of audit listeners; audit loading cannot block reports', async () => {
+  env();
+  const stop = startWorkspaceSession(db, 'alice');
+  await send('projects', [
+    { path: 'projects/p', data: { type: 'work', createdBy: 'alice' } },
+  ]);
+  await send(
+    'group:records',
+    Array.from({ length: 500 }, (_, i) => ({
+      path: 'users/alice/records/r' + i,
+      data: { uid: 'alice', projectId: 'p' },
+    })),
+  );
+  let snapshot: WorkspaceSnapshot | undefined;
+  const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
+  expect(snapshot!.complete).toBe(true);
+  expect(m.listeners).toHaveLength(3);
+  const audit = observeWorkspaceAudit(
+    db,
+    'alice',
+    'users/alice/records/r0',
+    (s) => (snapshot = s),
+  );
+  expect(m.listeners).toHaveLength(4);
+  expect(snapshot!.complete).toBe(true);
+  await send('users/alice/records/r0/audit', []);
+  expect(snapshot!.auditReady).toContain('users/alice/records/r0');
+  audit();
+  observe();
+  stop();
+});
+it('metadata replays and blur preserve complete local views without notifications or target churn', async () => {
+  const e = env();
+  const stop = startWorkspaceSession(db, 'alice');
+  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  await send('group:records', [
+    { path: 'users/bob/records/r', data: { uid: 'bob', projectId: 'p' } },
+  ]);
+  const next = vi.fn();
+  const observe = observeWorkspace(db, 'alice', next);
+  const before = next.mock.calls.at(-1)![0];
+  await send('group:records', [
+    { path: 'users/bob/records/r', data: { uid: 'bob', projectId: 'p' } },
+  ]);
+  expect(next).toHaveBeenCalledOnce();
+  e.setFocus(false);
+  await settle();
+  expect(next).toHaveBeenCalledOnce();
+  expect(before.complete).toBe(true);
+  e.setFocus(true);
+  e.setFocus(true);
+  await settle();
+  expect(m.enable).toHaveBeenCalledOnce();
+  observe();
+  stop();
+});
+it('authorization grouping opens only one global records target for up to ten projects', async () => {
+  env();
+  const stop = startWorkspaceSession(db, 'alice');
+  await send(
+    'projects',
+    Array.from({ length: 21 }, (_, i) => ({
+      path: 'projects/p' + i,
+      data: { type: 'work' },
+    })),
+  );
+  expect(m.listeners).toHaveLength(5);
+  const targets = m.listeners.filter((l) =>
+    l.target.key.includes('group:records'),
+  );
+  expect(targets).toHaveLength(3);
+  expect(targets.every((l) => l.target.key.includes('"in"'))).toBe(true);
   stop();
 });

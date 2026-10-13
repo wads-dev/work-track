@@ -1,4 +1,5 @@
 import { createCallable } from '../../infrastructure/firebase/callable-command-gateway';
+import { traceFirestore } from '../../data/sync/firestore-diagnostics';
 import {
   createContext,
   useContext,
@@ -55,11 +56,22 @@ export function CompanyPeopleProvider({
       { pageSize: number; pageToken?: string },
       CompanyPeoplePage
     >(functions, 'listCompanyPeople');
+    traceFirestore('people.remote.start', { name: 'listCompanyPeople' });
     void loadCompanyPeople(
-      async (input) => (await call(input)).data,
+      async (input) => {
+        const result = await call(input);
+        traceFirestore('people.remote.page', {
+          count: result.data.people.length,
+        });
+        return result.data;
+      },
       () => !active,
     )
       .then((people) => {
+        traceFirestore('people.remote.result', {
+          count: people.length,
+          active,
+        });
         if (active) setState({ owner: uid, people, loading: false, error: '' });
       })
       .catch(() => {
@@ -77,6 +89,11 @@ export function CompanyPeopleProvider({
   }, [functions, uid, attempt]);
   const current =
     state.owner === uid ? state : { people: [], loading: true, error: '' };
+  traceFirestore('people.memory.read', {
+    count: current.people.length,
+    loading: current.loading,
+    ownerMatches: state.owner === uid,
+  });
   const byUid = new Map(current.people.map((person) => [person.uid, person]));
   return (
     <Context.Provider

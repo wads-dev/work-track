@@ -347,3 +347,149 @@ it('disposes a local observer without affecting concurrent subscriptions', () =>
   expect(other).toHaveBeenCalledOnce();
   expect(mocks.observers[0].stop).toHaveBeenCalledOnce();
 });
+it('does not publish duplicate content, audit-only changes or incomplete refreshes', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedReport(db, 'viewer', next, fail);
+  const complete = state({ projects: [project()], records: [row()] });
+  emit(complete);
+  const repository = next.mock.lastCall![0].repository;
+  emit(structuredClone(complete));
+  emit(
+    state({
+      ...complete,
+      projects: [{ id: 'p', data: { topics: [], type: 'work' } }],
+      records: [
+        {
+          path: row().path,
+          data: Object.fromEntries(Object.entries(row().data).reverse()),
+        },
+      ],
+      audits: [
+        { path: 'projects/p/auditEvents/a', data: { action: 'updated' } },
+      ],
+      syncing: true,
+      completedProjects: ['p'],
+    }),
+  );
+  emit(state({ complete: false, syncing: true }));
+  emit(structuredClone(complete));
+  expect(next).toHaveBeenCalledOnce();
+  expect(next.mock.lastCall![0].repository).toBe(repository);
+  expect(await repository.loadContext(['alice'])).toHaveLength(1);
+  expect(fail).not.toHaveBeenCalled();
+});
+it('fails once per repeated error and publishes identical recovery content', () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedReport(db, 'viewer', next, fail);
+  const complete = state({ projects: [project()], records: [row()] });
+  emit(complete);
+  const repository = next.mock.lastCall![0].repository;
+  emit(state({ error: 'permission-denied' }));
+  emit(state({ error: 'permission-denied', audits: [] }));
+  emit(state({ complete: false }));
+  emit(state({ error: 'permission-denied' }));
+  expect(fail).toHaveBeenCalledOnce();
+  emit(structuredClone(complete));
+  expect(next).toHaveBeenCalledTimes(2);
+  expect(next.mock.lastCall![0].repository).not.toBe(repository);
+  emit(structuredClone(complete));
+  expect(next).toHaveBeenCalledTimes(2);
+  emit(state({ error: 'permission-denied' }));
+  expect(fail).toHaveBeenCalledTimes(2);
+});
+it('deduplicates invalid content errors and recovers even when valid data is unchanged', () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedReport(db, 'viewer', next, fail);
+  const complete = state({ projects: [project()], records: [row()] });
+  emit(complete);
+  const invalid = state({
+    projects: [project()],
+    records: [row('r', { startedAt: 42 })],
+  });
+  emit(invalid);
+  emit(structuredClone(invalid));
+  expect(fail).toHaveBeenCalledOnce();
+  emit(structuredClone(complete));
+  expect(next).toHaveBeenCalledTimes(2);
+});
+it('publishes nested mutations with new immutable repositories, including unselected global context', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedReport(db, 'viewer', next, fail, [], {
+    from: '2026-10-08T00:00:00Z',
+    to: '2026-10-09T00:00:00Z',
+    projectId: 'p',
+  });
+  const complete = state({
+    projects: [
+      project('p', { topics: [{ id: 't', title: 'Before' }] }),
+      project('q'),
+    ],
+    records: [
+      row('r', { topics: [{ topicId: 't', percentage: 50 }] }),
+      row('budget', { projectId: 'q' }),
+    ],
+  });
+  emit(complete);
+  const old = next.mock.lastCall![0].repository;
+  (complete.projects[0].data.topics as { title: string }[])[0].title = 'After';
+  (complete.records[0].data.topics as { percentage: number }[])[0].percentage =
+    75;
+  Object.assign(complete.records[1].data, { endedAt: '2026-10-08T14:00:00Z' });
+  emit(complete);
+  const updated = next.mock.lastCall![0].repository;
+  expect(next).toHaveBeenCalledTimes(2);
+  expect(updated).not.toBe(old);
+  expect((await old.loadContext(['alice']))[0].topics[0].percentage).toBe(50);
+  expect((await updated.loadContext(['alice']))[0].topics[0].percentage).toBe(
+    75,
+  );
+  expect((await old.readTopics(['p'])).p[0].title).toBe('Before');
+  expect((await updated.readTopics(['p'])).p[0].title).toBe('After');
+  expect((await updated.loadContext(['alice']))[1].endedAt).toBe(
+    '2026-10-08T14:00:00Z',
+  );
+  expect(fail).not.toHaveBeenCalled();
+});
+
+it('does not memoize over owner, tombstone or project access changes', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedReport(db, 'viewer', next, fail);
+  emit(state({ projects: [project()], records: [row('same')] }));
+  emit(state({ projects: [project()], records: [row('same', {}, 'bob')] }));
+  expect(next).toHaveBeenCalledTimes(2);
+  expect(
+    await next.mock.lastCall![0].repository.loadContext(['alice']),
+  ).toEqual([]);
+  expect(
+    await next.mock.lastCall![0].repository.loadContext(['bob']),
+  ).toHaveLength(1);
+  emit(
+    state({
+      projects: [project()],
+      records: [row('same', { deletedAt: 'removed' }, 'bob')],
+    }),
+  );
+  expect(next).toHaveBeenCalledTimes(3);
+  expect(await next.mock.lastCall![0].repository.loadContext(['bob'])).toEqual(
+    [],
+  );
+  emit(state({ projects: [project()], records: [row('same', {}, 'bob')] }));
+  emit(
+    state({
+      projects: [project('p', { type: 'personal', createdBy: 'bob' })],
+      records: [row('same', {}, 'bob')],
+    }),
+  );
+  expect(next).toHaveBeenCalledTimes(5);
+  expect(await next.mock.lastCall![0].repository.loadContext(['bob'])).toEqual(
+    [],
+  );
+  emit(state({ records: [row('same', {}, 'bob')] }));
+  expect(next).toHaveBeenCalledTimes(6);
+  expect(fail).not.toHaveBeenCalled();
+});

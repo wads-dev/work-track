@@ -3,14 +3,10 @@ import { FirebaseCompanyPeopleRepository } from './modules/people/infrastructure
 import { listCompanyPeopleHandler } from './modules/people/presentation/list-company-people.js';
 import { FirestoreMergeRepository } from './modules/merge/infrastructure/firestore-merge.js';
 import { FirestoreRecordMovementRepository } from './modules/registration/infrastructure/firestore-record-movement.js';
-import { movementHandler } from './modules/registration/presentation/record-movement.js';
 import { FirestoreRemovalRepository } from './modules/removal/infrastructure/firestore-removal.js';
 import { FirestoreSplitRepository } from './modules/split/infrastructure/firestore-split.js';
 import { FirestoreDailyHoursRepository } from './modules/daily-hours/infrastructure/firestore-daily-hours.js';
-import { manageProjectHandler } from './modules/registration/presentation/manage-projects.js';
 import { FirestoreTopicManagementRepository } from './modules/registration/infrastructure/firestore-topic-management.js';
-import { manageTopicsHandler } from './modules/registration/presentation/manage-topics.js';
-import { createProjectHandler } from './modules/registration/presentation/create-project.js';
 import { FirestoreProjectManagementRepository } from './modules/registration/infrastructure/firestore-project-management.js';
 import { FirestoreRecordEditingRepository } from './modules/registration/infrastructure/firestore-record-editing.js';
 import { getAuth } from 'firebase-admin/auth';
@@ -76,38 +72,6 @@ export const deleteProjectPermanently = onCall(
       request.auth,
     ),
 );
-export const moveTopic = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    movementHandler(
-      new FirestoreRecordMovementRepository(getFirestore()),
-      'move_topic',
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const mergeProjects = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    manageProjectHandler(
-      new FirestoreProjectManagementRepository(getFirestore()),
-      'merge',
-      request.data as unknown,
-      request.auth,
-    ),
-);
 const provider = new WorkTrackOAuth(
   new FirestoreOAuthStore(getFirestore()),
   new FirebaseIdentityService(getAuth()),
@@ -134,35 +98,4 @@ export const mcp = onRequest(
     new FirestoreRecordMovementRepository(getFirestore()),
     new FirestoreMergeRepository(getFirestore()),
   ),
-);
-export const createProject = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    createProjectHandler(
-      new FirestoreWorkRepository(getFirestore()),
-      request.data as unknown,
-      request.auth,
-    ),
-);
-export const mergeTopics = onCall(
-  {
-    region: 'southamerica-east1',
-    invoker: 'public',
-    maxInstances: 3,
-    timeoutSeconds: 60,
-    memory: '256MiB',
-  },
-  (request) =>
-    manageTopicsHandler(
-      new FirestoreTopicManagementRepository(getFirestore()),
-      'merge',
-      request.data as unknown,
-      request.auth,
-    ),
 );
