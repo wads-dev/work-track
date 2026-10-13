@@ -420,6 +420,12 @@ test('Docker and Firebase use explicit shared mounts and standalone Functions', 
 test('Functions waits for same-push Firestore and READY indexes before publishing dated queries', async () => {
   const workflow = await source('.github/workflows/deploy-backend.yml');
   assert(workflow.includes('actions: read'));
+  assert(
+    workflow.includes(
+      'uses: actions/checkout@v4\n        with:\n          fetch-depth: 0',
+    ),
+    'Gate must compare the entire push, not a shallow checkout missing PUSH_BEFORE',
+  );
   assert(workflow.includes("'firestore.indexes.json'"));
   assert(workflow.includes('google-github-actions/setup-gcloud@v3'));
   const indexes = workflow.indexOf(
