@@ -12,9 +12,24 @@ import { useMediaQuery } from '../shared/ui/theme';
 import { UiIcon } from '../shared/ui/UiIcons';
 import { layoutTokens } from '../shared/ui/layout-tokens';
 
+const desktopMenuStorageKey = 'work-track:desktop-menu-open';
+
 export function useNavigationMenu() {
   const desktop = useMediaQuery('(min-width: 1024px)');
-  const [desktopOpen, setDesktopOpen] = useState(true);
+  const [desktopOpen, setDesktopOpen] = useState(() => {
+    try {
+      return localStorage.getItem(desktopMenuStorageKey) !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(desktopMenuStorageKey, String(desktopOpen));
+    } catch {
+      // Storage may be blocked; the current session still honors the choice.
+    }
+  }, [desktopOpen]);
   const [mobileOpen, setMobileOpen] = useState(false);
   // Never carry a modal overlay across the desktop breakpoint. Keep the
   // desktop choice separate so a resize does not undo a collapsed sidebar.
