@@ -1,6 +1,7 @@
 import { ownRecordsRepository } from './data/cache/own-records-repository';
 import { deletionAccount } from './data/cache/record-deletion';
 import { useEffect, useState } from 'react';
+import { LogOut } from 'lucide-react';
 import { startWorkspaceSession } from './data/sync/workspace-runtime';
 import { projectRepository } from './data/cache/project-repository';
 import { TopicDetails } from './features/reports/TopicDetails';
@@ -232,23 +233,42 @@ function App() {
   }
   if (!loading && authorized && location.pathname === '/')
     return <Navigate replace to={returnTo} />;
-  const navigation = (onNavigate: () => void) => (
+  const navigation = (onNavigate: () => void, compact: boolean) => (
     <nav
       id="menu-principal"
       aria-label="Menu principal"
       className="flex h-full flex-col gap-2 p-5"
     >
       <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <img src="/brand.svg" alt="" className="size-10" />
-          <h2 className="text-xl font-semibold tracking-tight">Work Track</h2>
+        <div className="flex items-center gap-3" title="Work Track">
+          <img src="/brand.svg" alt="" className="size-10 shrink-0" />
+          <h2
+            className={cn(
+              'whitespace-nowrap text-xl font-semibold tracking-tight',
+              compact && 'hidden',
+            )}
+          >
+            Work Track
+          </h2>
         </div>
-        <PwaControls />
-        <p className="mt-1 text-sm text-muted-foreground">
+        <div className={cn(compact && 'hidden')}>
+          <PwaControls />
+        </div>
+        <p
+          className={cn(
+            'mt-1 whitespace-nowrap text-sm text-muted-foreground',
+            compact && 'hidden',
+          )}
+        >
           Projetos, tempo e contexto
         </p>
       </div>
-      <p className="px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <p
+        className={cn(
+          'whitespace-nowrap px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground',
+          compact && 'invisible',
+        )}
+      >
         Trabalho e gestão
       </p>
       <div className="flex flex-1 flex-col gap-1">
@@ -272,22 +292,38 @@ function App() {
               to={to}
               aria-current={active ? 'page' : undefined}
               onClick={onNavigate}
+              aria-label={label}
+              title={compact ? label : undefined}
               className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground',
+                'flex items-center gap-3 rounded-md py-2.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground [&>svg]:shrink-0',
+                compact ? 'justify-center px-2.5' : 'px-3',
                 active && 'bg-accent text-accent-foreground',
               )}
             >
               <UiIcon kind={kind} />
-              {label}
+              <span className={cn('whitespace-nowrap', compact && 'hidden')}>
+                {label}
+              </span>
             </RouterLink>
           );
         })}
       </div>
-      <p className="break-all px-3 text-xs text-muted-foreground">
+      <p
+        className={cn(
+          'break-all px-3 text-xs text-muted-foreground',
+          compact && 'hidden',
+        )}
+      >
         {user?.email}
       </p>
-      <Button variant="outline" disabled={busy} onClick={() => void logout()}>
-        Sair
+      <Button
+        variant="outline"
+        disabled={busy}
+        onClick={() => void logout()}
+        aria-label="Sair"
+        title={compact ? 'Sair' : undefined}
+      >
+        {compact ? <LogOut aria-hidden="true" /> : 'Sair'}
       </Button>
     </nav>
   );

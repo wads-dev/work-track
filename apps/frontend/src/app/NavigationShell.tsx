@@ -37,7 +37,7 @@ export function NavigationShell({
   desktop: boolean;
   open: boolean;
   setOpen: (open: boolean) => void;
-  navigation: (onNavigate: () => void) => ReactNode;
+  navigation: (onNavigate: () => void, compact: boolean) => ReactNode;
   header: ReactNode;
   children: ReactNode;
 }) {
@@ -55,12 +55,22 @@ export function NavigationShell({
       <UiIcon kind="menu" />
     </Button>
   );
-  const inset = desktop && open && 'lg:ml-64';
+  const inset =
+    desktop &&
+    cn(
+      'transition-[margin-left] duration-200 ease-in-out motion-reduce:transition-none',
+      open ? 'lg:ml-64' : 'lg:ml-20',
+    );
   return (
     <>
-      {desktop && open && (
-        <aside className="fixed inset-y-0 left-0 z-30 w-64 overflow-y-auto border-r bg-sidebar text-sidebar-foreground">
-          {navigation(() => {})}
+      {desktop && (
+        <aside
+          className={cn(
+            'fixed inset-y-0 left-0 z-30 overflow-x-hidden overflow-y-auto border-r bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-in-out motion-reduce:transition-none',
+            open ? 'w-64' : 'w-20',
+          )}
+        >
+          {navigation(() => {}, !open)}
         </aside>
       )}
       <Sheet open={!desktop && open} onOpenChange={setOpen}>
@@ -70,7 +80,7 @@ export function NavigationShell({
             <SheetDescription className="sr-only">
               Menu principal do Work Track
             </SheetDescription>
-            {navigation(() => setOpen(false))}
+            {navigation(() => setOpen(false), false)}
           </SheetContent>
         )}
         <header
