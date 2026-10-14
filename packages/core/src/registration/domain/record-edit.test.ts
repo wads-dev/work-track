@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import { applyRecordPatch, updateRecordInput } from './record-edit.js';
 const before = {
+  deletedAt: null,
+  endedAt: null,
   id: 'record',
   uid: 'alice',
   projectId: 'project',
@@ -13,7 +15,7 @@ const before = {
   recordedAt: 'immutable',
   topics: [{ topicId: 'general' }],
 };
-const project = { topics: [{ id: 'general' }] };
+const project = { topics: [{ id: 'general', archived: false }] };
 it('edits business fields while preserving identity and original registration intent', () => {
   const input = updateRecordInput.parse({
     recordId: 'record',
@@ -26,6 +28,7 @@ it('edits business fields while preserving identity and original registration in
   });
   const after = applyRecordPatch(before, input, 'alice', project);
   expect(after).toMatchObject({
+    deletedAt: null,
     startedAt: input.startedAt,
     timeZone: input.timeZone,
     originalText: input.originalText,
@@ -54,7 +57,7 @@ it('edits only the allowed facts, preserving original evidence', () => {
   });
   const after = applyRecordPatch(before, input, 'alice', project);
   expect(after).toMatchObject({ ...before, endedAt: '2026-10-08T11:00:00Z' });
-  expect(before).not.toHaveProperty('endedAt');
+  expect(before.endedAt).toBeNull();
   expect(
     applyRecordPatch(
       after,
@@ -123,4 +126,18 @@ it('rejects extraneous immutable fields and invalid input', () => {
     updateRecordInput.safeParse({ recordId: 'record', reason: 'no patch' })
       .success,
   ).toBe(false);
+});
+it('rejects absent storage state before an edit can repair it', () => {
+  for (const field of ['endedAt', 'deletedAt', 'topics']) {
+    const missing: Record<string, unknown> = { ...before };
+    delete missing[field];
+    expect(() =>
+      applyRecordPatch(
+        missing,
+        { recordId: 'record', reason: 'correction', endedAt: null },
+        'alice',
+        project,
+      ),
+    ).toThrow();
+  }
 });

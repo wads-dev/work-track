@@ -5,7 +5,7 @@ Monorepo npm com duas aplicações e dois pacotes internos. As aplicações não
 ## Pacotes
 
 - `packages/core` (`@work-track/core`): modelos, schemas, contratos de leitura/comandos e regras/casos de uso puros. Os contextos registration, reports, daily-hours, pause, removal, merge, split e people mantêm suas fronteiras. Os modelos canônicos de projeto/tópico e pessoa ficam em models; schemas de registro ficam em schemas; contratos e DTOs de transporte ficam em contracts. Subpaths de contexto reexportam definições canônicas quando necessário.
-- `packages/data` (`@work-track/data`): codecs de documentos, portas de leitura, base de repositório, catálogo de projetos e implementações sobre snapshots imutáveis. Depende de core e Zod, nunca de Firebase, React ou transporte. Perfis explícitos de codec preservam as tolerâncias históricas de cada leitor.
+- `packages/data` (`@work-track/data`): codecs de documentos, portas de leitura, base de repositório, catálogo de projetos e implementações sobre snapshots imutáveis. Depende de core e Zod, nunca de Firebase, React ou transporte. Perfis explícitos de codec validam o storage canônico de cada leitor.
 
 O fluxo é `apps -> data -> core`, com `apps -> core` também permitido. Não há porta transacional universal Web/Admin nem cache singleton multiusuário no pacote.
 
@@ -35,7 +35,7 @@ O navegador calcula relatórios com os mesmos casos de uso do core e repositóri
 
 Nomes, schemas públicos, URLs MCP/OAuth, coleções, documentos e algoritmos existentes são preservados. A extração não muda permissões Firestore nem a política de exclusão. Adaptadores mantêm paginação física e transações Admin onde são necessárias; listeners Web não simulam transação remota. Leitura completa não significa atomicidade conjunta de facts e catálogo: o loader Admin atual transaciona facts, mas lê parents separadamente.
 
-Os decoders de leitura toleram representações históricas de registros conforme o perfil; schemas de escrita continuam mais restritos. Projetos exigem `type` explícito `work` ou `personal`; ausência ou tipo inválido nega acesso, sem fallback. Autorização precede decodificação de conteúdo privado nos caminhos que já exigiam essa ordem. Diretório completo de pessoas e labels de relatório são capacidades distintas.
+Leitores e escritores exigem storage canônico: registros com `endedAt: string | null`, `deletedAt` presente (somente `null` ativo) e `topics` array; projetos com `type` explícito `work` ou `personal`, `archived` e `confidential` boolean; tópicos com `archived` boolean. Ausência de campos não recebe fallback de compatibilidade; ausência ou tipo de projeto inválido nega acesso. A [migração de produção](project-type-migration.md) foi concluída em 14/10/2026 (13 projetos, 446 registros, zero campos canônicos ausentes); auditorias e comprovantes históricos não foram reescritos. Autorização precede decodificação de conteúdo privado nos caminhos que já exigiam essa ordem. Diretório completo de pessoas e labels de relatório são capacidades distintas.
 
 ## Validação
 

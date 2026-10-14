@@ -97,8 +97,7 @@ export class FirestoreReportRepository implements CompanyReportRepository {
       )
         throw new Error('Registro canônico inválido.');
       const project = projects.get(String(data.projectId));
-      // Firestore has no join with current project ACL and no missing-field predicate.
-      // Existing tombstones/open fields remain absent: neither ==null nor != filters are equivalent.
+      // Firestore has no join with current project ACL; revalidate before decoding.
       if (
         !project ||
         !canAccessProject(project, this.viewer) ||
@@ -117,7 +116,11 @@ export class FirestoreReportRepository implements CompanyReportRepository {
       ];
     });
   }
-  private async readCatalog(ids: readonly string[], personal = false) {
+  private async readCatalog(
+    ids: readonly string[],
+    personal = false,
+    activeOnly = false,
+  ) {
     const candidates = new Map<string, ReportProjectMetadata>();
     for (let i = 0; i < ids.length; i += 30) {
       const allowed = ids
@@ -133,6 +136,7 @@ export class FirestoreReportRepository implements CompanyReportRepository {
         query(
           collection(this.db, 'projects'),
           where(documentId(), 'in', allowed),
+          ...(activeOnly ? [where('archived', '==', false)] : []),
         ),
       );
       traceFirestore('cache.result', {
@@ -158,7 +162,11 @@ export class FirestoreReportRepository implements CompanyReportRepository {
         ? [selection.projectId]
         : []
       : [...this.projects.keys()];
-    const candidates = await this.readCatalog(allowed);
+    const candidates = await this.readCatalog(
+      allowed,
+      false,
+      Boolean(selection && !selection.includeArchived),
+    );
     return {
       projects: candidates,
       ids: [...candidates]
@@ -196,7 +204,10 @@ export class FirestoreReportRepository implements CompanyReportRepository {
         const base = own
           ? collection(this.db, 'users', this.viewer, 'records')
           : collectionGroup(this.db, 'records');
-        const filters: QueryConstraint[] = [where('projectId', 'in', projects)];
+        const filters: QueryConstraint[] = [
+          where('projectId', 'in', projects),
+          where('deletedAt', '==', null),
+        ];
         if (!own && batch?.length) filters.push(where('uid', 'in', batch));
         if (cursor)
           filters.push(
@@ -212,8 +223,10 @@ export class FirestoreReportRepository implements CompanyReportRepository {
                 where('endedAt', '>=', bounds.lower),
                 where('startedAt', '<', bounds.upper),
               ],
-              // Missing endedAt cannot be queried: push startedAt maximum, then retain only opens.
-              [where('startedAt', '<', bounds.lower)],
+              [
+                where('endedAt', '==', null),
+                where('startedAt', '<', bounds.upper),
+              ],
             ]
           : selection?.to
             ? [
@@ -240,7 +253,6 @@ export class FirestoreReportRepository implements CompanyReportRepository {
             personalCodec,
           );
           for (const row of rows) {
-            if (bounds && branch === 2 && row.endedAt !== undefined) continue;
             // Arbitrary ISO offsets are not sortable instants, and topic arrays contain objects
             // with optional weights. Exact overlap/alias matching cannot be expressed against
             // these existing fields: all supported owner/project/date guards above run in DB.

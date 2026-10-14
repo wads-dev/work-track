@@ -17,7 +17,7 @@ const selection = {
   revealed: false,
   selectedTopics: [
     { topicId: 'old', percentage: 75 },
-    { topicId: 'alias', durationMinutes: 15 },
+    { topicId: 'active', durationMinutes: 15 },
   ],
 };
 beforeEach(() => nativeCache.reset());
@@ -31,42 +31,97 @@ it('queries current authorized project IDs natively and preserves existing activ
     {
       path: 'projects/p',
       data: {
+        archived: false,
+        confidential: false,
         type: 'work',
+        createdBy: 'me',
         title: 'Project',
         topics: [
-          { id: 'active', title: 'Active' },
+          { archived: false, id: 'active', title: 'Active' },
           { id: 'old', title: 'Old', archived: true },
-          { id: 'alias', title: 'Alias', mergedIntoTopicId: 'active' },
           { id: 'unused', title: 'Unavailable', archived: true },
         ],
       },
     },
     {
       path: 'projects/hidden',
-      data: { type: 'work', title: 'Secret', confidential: true },
+      data: {
+        archived: false,
+        type: 'work',
+        createdBy: 'me',
+        topics: [],
+        title: 'Secret',
+        confidential: true,
+      },
     },
     {
       path: 'projects/archived',
-      data: { type: 'work', title: 'Archive', archived: true },
+      data: {
+        confidential: false,
+        type: 'work',
+        createdBy: 'me',
+        topics: [],
+        title: 'Archive',
+        archived: true,
+      },
     },
     {
       path: 'projects/merged',
-      data: { type: 'work', title: 'Merged', mergedInto: 'p' },
+      data: {
+        archived: false,
+        confidential: false,
+        type: 'work',
+        createdBy: 'me',
+        topics: [],
+        title: 'Merged',
+        mergedInto: 'p',
+      },
     },
     {
       path: 'projects/locked',
       data: {
+        archived: false,
+        confidential: false,
         type: 'work',
+        createdBy: 'me',
+        topics: [],
         title: 'Locked',
         mergeLock: { requestId: 'merge' },
       },
     },
     {
       path: 'projects/foreign',
-      data: { title: 'Foreign', type: 'personal', createdBy: 'other' },
+      data: {
+        archived: false,
+        confidential: false,
+        title: 'Foreign',
+        type: 'personal',
+        createdBy: 'other',
+        topics: [],
+      },
     },
-    { path: 'projects/invalid', data: { title: 'Invalid', type: 'invalid' } },
-    { path: 'projects/revoked', data: { type: 'work', title: 'Revoked' } },
+    {
+      path: 'projects/invalid',
+      data: {
+        archived: false,
+        confidential: false,
+        title: 'Invalid',
+        type: 'invalid',
+        createdBy: 'me',
+        topics: [],
+      },
+    },
+    {
+      path: 'projects/revoked',
+      data: {
+        archived: false,
+        confidential: false,
+        type: 'work',
+        createdBy: 'me',
+        topics: [],
+        title: 'Revoked',
+      },
+    },
   ]);
   const ids = [
     'p',
@@ -85,7 +140,11 @@ it('queries current authorized project IDs natively and preserves existing activ
   const result = await repository.read(selection);
   expect(nativeCache.getDocsFromCache).toHaveBeenCalledWith({
     base: 'projects',
-    constraints: [{ field: '__name__', op: 'in', value: ids }],
+    constraints: [
+      { field: '__name__', op: 'in', value: ids },
+      { field: 'archived', op: '==', value: false },
+      { field: 'confidential', op: '==', value: false },
+    ],
   });
   expect(nativeCache.getDocsFromCache).toHaveBeenCalledWith({
     base: 'projects',
@@ -94,13 +153,9 @@ it('queries current authorized project IDs natively and preserves existing activ
   expect(result.projects).toEqual([
     { id: 'p', label: 'Project', searchText: 'Project' },
   ]);
-  expect(result.topics.map((topic) => topic.id)).toEqual([
-    'active',
-    'old',
-    'alias',
-  ]);
+  expect(result.topics.map((topic) => topic.id)).toEqual(['active', 'old']);
   expect(result.topics[1].selected).toEqual(selection.selectedTopics[0]);
-  expect(result.topics[2].selected).toEqual(selection.selectedTopics[1]);
+  expect(result.topics[0].selected).toEqual(selection.selectedTopics[1]);
   expect(result.hidden).toBe(false);
 });
 it('retains current archived/locked project and selected retired topics without exposing confidential text', async () => {
@@ -109,6 +164,7 @@ it('retains current archived/locked project and selected retired topics without 
       path: 'projects/p',
       data: {
         type: 'work',
+        createdBy: 'me',
         title: 'Secret',
         confidential: true,
         archived: true,
@@ -138,9 +194,26 @@ it('retention never bypasses current ACL, allowlist, uid isolation or malformed 
   nativeCache.seed([
     {
       path: 'projects/foreign',
-      data: { title: 'Foreign', type: 'personal', createdBy: 'other' },
+      data: {
+        archived: false,
+        confidential: false,
+        title: 'Foreign',
+        type: 'personal',
+        createdBy: 'other',
+        topics: [],
+      },
     },
-    { path: 'projects/revoked', data: { type: 'work', title: 'Revoked' } },
+    {
+      path: 'projects/revoked',
+      data: {
+        archived: false,
+        confidential: false,
+        type: 'work',
+        createdBy: 'me',
+        topics: [],
+        title: 'Revoked',
+      },
+    },
   ]);
   const repo = new EditorOptionsRepository(
     nativeCache.db,
@@ -179,7 +252,14 @@ it('batches native in queries at Firestore limit without truncating options', as
   nativeCache.seed(
     ids.map((id) => ({
       path: 'projects/' + id,
-      data: { type: 'work', title: id },
+      data: {
+        archived: false,
+        confidential: false,
+        type: 'work',
+        createdBy: 'me',
+        topics: [],
+        title: id,
+      },
     })),
   );
   const result = await new EditorOptionsRepository(
@@ -194,6 +274,75 @@ it('batches native in queries at Firestore limit without truncating options', as
     ),
   ).toEqual([30, 30, 5]);
 });
+it.each([
+  {
+    topics: [
+      {
+        id: 'alias',
+        title: 'Alias',
+        archived: false,
+        mergedIntoTopicId: 'active',
+      },
+    ],
+  },
+  {
+    topics: [
+      {
+        id: 'alias',
+        title: 'Alias',
+        archived: false,
+        mergedIntoTopicId: undefined,
+      },
+    ],
+  },
+  { topics: [{ id: 'missing', title: 'Missing archive flag' }] },
+  {
+    topics: [
+      { id: 'invalid', title: 'Invalid archive flag', archived: 'false' },
+    ],
+  },
+])('never retains noncanonical selected project topics: %s', async (patch) => {
+  const data = {
+    type: 'work',
+    createdBy: 'me',
+    archived: false,
+    confidential: false,
+    title: 'Project',
+    ...patch,
+  };
+  nativeCache.seed([{ path: 'projects/p', data }]);
+  expect(
+    await new EditorOptionsRepository(
+      nativeCache.db,
+      'me',
+      new Set(['p']),
+    ).read(selection),
+  ).toEqual(emptyEditorOptions);
+  expect(data).toMatchObject(patch);
+});
+it.each(['type', 'createdBy', 'archived', 'confidential', 'topics'])(
+  'never retains selected project missing explicit %s',
+  async (field) => {
+    const data: Record<string, unknown> = {
+      type: 'work',
+      createdBy: 'me',
+      archived: false,
+      confidential: false,
+      topics: [],
+      title: 'Project',
+    };
+    delete data[field];
+    nativeCache.seed([{ path: 'projects/p', data }]);
+    expect(
+      await new EditorOptionsRepository(
+        nativeCache.db,
+        'me',
+        new Set(['p']),
+      ).read(selection),
+    ).toEqual(emptyEditorOptions);
+    expect(data).not.toHaveProperty(field);
+  },
+);
 it('propagates cache failures instead of falling back to stale arrays or remote reads', async () => {
   nativeCache.getDocsFromCache.mockRejectedValueOnce(new Error('cache failed'));
   await expect(
@@ -206,9 +355,9 @@ it('embedded topic residual keeps archived metadata and excludes merged aliases'
   expect(
     selectProjectTopics({
       topics: [
-        { id: 'active' },
+        { archived: false, id: 'active' },
         { id: 'archive', archived: true },
-        { id: 'merged', mergedIntoTopicId: 'active' },
+        { archived: false, id: 'merged', mergedIntoTopicId: 'active' },
       ],
     }).map((topic) => topic.id),
   ).toEqual(['active', 'archive']);
@@ -223,16 +372,29 @@ it('prepared options and checkbox commands preserve allocations without mutating
       {
         id: 'p',
         data: {
+          archived: false,
+          confidential: false,
           type: 'work',
+          createdBy: 'me',
           title: 'Project',
-          topics: [{ id: 'old', archived: true }, { id: 'active' }],
+          topics: [
+            { id: 'old', archived: true },
+            { archived: false, id: 'active' },
+          ],
         },
       },
     ],
     { ...selection, selectedTopics: topics },
     {
+      type: 'work',
+      createdBy: 'me',
+      archived: false,
+      confidential: false,
       title: 'Project',
-      topics: [{ id: 'old', archived: true }, { id: 'active' }],
+      topics: [
+        { id: 'old', archived: true },
+        { archived: false, id: 'active' },
+      ],
     },
   );
   expect(result.topics[0].selected).toEqual(topics[0]);

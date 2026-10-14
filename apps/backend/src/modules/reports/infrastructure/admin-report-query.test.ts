@@ -36,7 +36,11 @@ it.each(['collection', 'collectionGroup'] as const)(
     const doc = {
       id: 'a',
       ref: db.doc('users/alice/records/a'),
-      data: () => ({ startedAt: '2026-10-08T12:00:00+23:00' }),
+      data: () => ({
+        deletedAt: null,
+        endedAt: null,
+        startedAt: '2026-10-08T12:00:00+23:00',
+      }),
     } as unknown as QueryDocumentSnapshot;
     const cursor = nextReportCursor(doc, upper, scope === 'collectionGroup')!;
     const resumed = resumeReportQuery(
@@ -181,7 +185,11 @@ it('merges equal date keys in Firestore path-segment order, not concatenated pat
   const make = (path: string) =>
     ({
       ref: { path },
-      data: () => ({ startedAt: '2026-10-08T10:00:00Z' }),
+      data: () => ({
+        deletedAt: null,
+        endedAt: null,
+        startedAt: '2026-10-08T10:00:00Z',
+      }),
     }) as unknown as QueryDocumentSnapshot;
   const a = make('users/u/records/a');
   const b = make('users/u-/records/a');

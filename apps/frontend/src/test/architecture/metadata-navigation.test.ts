@@ -11,9 +11,12 @@ describe('privacy-aware current catalog navigation', () => {
   });
   it('reserved project/topic have no href until reveal', () => {
     const p = {
+      type: 'work',
+      createdBy: 'alice',
+      archived: false,
       title: 'Confidential Name',
       confidential: true,
-      topics: [{ id: 't', title: 'Secret Topic' }],
+      topics: [{ id: 't', title: 'Secret Topic', archived: false }],
     };
     expect(metadataNavigation('p', p, false)).toEqual({
       label: 'Projeto reservado',
@@ -26,15 +29,27 @@ describe('privacy-aware current catalog navigation', () => {
       path: '/projects/p/topics/t',
     });
   });
-  it('merged uses canonical catalog name identity not record snapshot', () => {
+  it('rejects removed aliases and uses only canonical catalog identities', () => {
     const p = {
+      type: 'work',
+      createdBy: 'alice',
+      archived: false,
+      confidential: false,
       title: 'Current',
       topics: [
-        { id: 'old', title: 'Obsolete', mergedIntoTopicId: 'new' },
-        { id: 'new', title: 'Canonical' },
+        {
+          id: 'old',
+          title: 'Obsolete',
+          archived: false,
+          mergedIntoTopicId: 'new',
+        },
+        { id: 'new', title: 'Canonical', archived: false },
       ],
     };
     expect(metadataNavigation('p', p, true, 'old')).toEqual({
+      label: 'Tópico indisponível',
+    });
+    expect(metadataNavigation('p', p, true, 'new')).toEqual({
       label: 'Canonical',
       path: '/projects/p/topics/new',
     });

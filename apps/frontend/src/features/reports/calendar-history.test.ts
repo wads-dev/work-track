@@ -119,10 +119,14 @@ describe('calendar actual historical weeks and subjects', () => {
     expect(
       calendarTopics(
         {
+          type: 'work',
+          createdBy: 'me',
+          archived: false,
+          confidential: false,
           topics: [
-            { id: 'a', title: 'A' },
-            { id: 'b', archived: true },
-            { id: 'c', mergedIntoTopicId: 'a' },
+            { id: 'a', title: 'A', archived: false },
+            { id: 'b', title: 'B', archived: true },
+            { id: 'c', title: 'C', archived: false, mergedIntoTopicId: 'a' },
           ],
         },
         false,

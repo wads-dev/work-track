@@ -3,140 +3,81 @@ import {
   decodePersonalReportRecord,
   reportRecordSchema,
 } from './report-record.js';
-
 const fact = {
   uid: 'payload',
   projectId: 'project',
-  startedAt: 'historical-not-an-iso-date',
-  timeZone: 'historical-zone',
-  originalText: 'private',
+  startedAt: '2026-10-08T09:00:00-03:00',
+  endedAt: null,
+  deletedAt: null,
+  timeZone: 'America/Sao_Paulo',
+  topics: [],
 };
-describe('explicit report record reader modes', () => {
-  it.each([undefined, null, 'historical-ended'])(
-    'keeps nullish end normalization without validating historical timestamps %s',
-    (endedAt) => {
-      const raw = { ...fact, endedAt };
-      const schemas = [
-        reportRecordSchema('admin-owned'),
-        reportRecordSchema('admin-company'),
-        reportRecordSchema('admin-project'),
-        reportRecordSchema('authorized-web'),
-        reportRecordSchema('personal-web'),
-      ];
-      for (const schema of schemas) {
-        const parsed = schema.parse(raw);
-        expect(parsed.endedAt).toBe(endedAt ?? undefined);
-        expect(parsed.topics).toEqual([]);
-        expect(parsed).not.toHaveProperty('originalText');
+const schemas = [
+  reportRecordSchema('admin-owned'),
+  reportRecordSchema('admin-company'),
+  reportRecordSchema('admin-project'),
+  reportRecordSchema('authorized-web'),
+  reportRecordSchema('personal-web'),
+];
+describe('canonical storage records', () => {
+  it('normalizes only explicit null ends and preserves tombstones', () => {
+    for (const schema of schemas) {
+      expect(schema.parse(fact).endedAt).toBeUndefined();
+      for (const deletedAt of [null, false, 0, '', {}, [], 'removed']) {
+        expect(schema.parse({ ...fact, deletedAt }).deletedAt).toEqual(
+          deletedAt,
+        );
       }
-      expect(raw.endedAt).toBe(endedAt);
-    },
-  );
-
-  it('keeps nonnegative Admin/company/personal and permissive negative project/authorized modes distinct', () => {
-    for (const field of ['percentage', 'durationMinutes']) {
-      const raw = { ...fact, topics: [{ topicId: '', [field]: -1 }] };
-      expect(reportRecordSchema('admin-owned').safeParse(raw).success).toBe(
-        false,
-      );
-      expect(reportRecordSchema('admin-company').safeParse(raw).success).toBe(
-        false,
-      );
-      expect(reportRecordSchema('personal-web').safeParse(raw).success).toBe(
-        false,
-      );
-      expect(reportRecordSchema('admin-project').parse(raw).topics).toEqual(
-        raw.topics,
-      );
-      expect(reportRecordSchema('authorized-web').parse(raw).topics).toEqual(
-        raw.topics,
-      );
-      for (const number of [0, 1]) {
-        const nonnegative = {
-          ...raw,
-          topics: [{ topicId: '', [field]: number }],
-        };
-        expect(
-          reportRecordSchema('admin-owned').safeParse(nonnegative).success,
-        ).toBe(true);
-        expect(
-          reportRecordSchema('admin-company').safeParse(nonnegative).success,
-        ).toBe(true);
-        expect(
-          reportRecordSchema('personal-web').safeParse(nonnegative).success,
-        ).toBe(true);
-      }
-      for (const number of [NaN, Infinity, -Infinity, null, '1']) {
-        const invalid = { ...raw, topics: [{ topicId: 't', [field]: number }] };
-        for (const schema of [
-          reportRecordSchema('admin-owned'),
-          reportRecordSchema('admin-company'),
-          reportRecordSchema('admin-project'),
-          reportRecordSchema('authorized-web'),
-          reportRecordSchema('personal-web'),
-        ]) {
-          expect(schema.safeParse(invalid).success).toBe(false);
-        }
-      }
+      const endedAt = '2026-10-08T10:00:00Z';
+      expect(schema.parse({ ...fact, endedAt }).endedAt).toBe(endedAt);
     }
   });
-
-  it('defaults null topics only in personal Web, retaining its raw topic extras', () => {
-    const raw = { ...fact, topics: null };
-    expect(reportRecordSchema('personal-web').parse(raw).topics).toEqual([]);
-    for (const schema of [
-      reportRecordSchema('admin-owned'),
-      reportRecordSchema('admin-company'),
-      reportRecordSchema('admin-project'),
-      reportRecordSchema('authorized-web'),
+  it('rejects absent required storage fields instead of defaulting', () => {
+    for (const field of [
+      'endedAt',
+      'deletedAt',
+      'topics',
+      'startedAt',
+      'timeZone',
     ]) {
-      expect(schema.safeParse(raw).success).toBe(false);
+      const raw: Record<string, unknown> = { ...fact };
+      delete raw[field];
+      for (const schema of schemas)
+        expect(schema.safeParse(raw).success).toBe(false);
+      expect(() => decodePersonalReportRecord(raw, 'r', 'alice')).toThrow();
     }
-    const topics = [{ topicId: 't', percentage: 0, extra: 'retained' }];
-    expect(
-      decodePersonalReportRecord({ ...fact, topics }, 'r', 'alice'),
-    ).toMatchObject({ uid: 'alice', id: 'r', topics });
-    expect(
-      decodePersonalReportRecord({ ...fact, topics }, 'r', 'alice').topics,
-    ).toBe(topics);
-    expect(
-      reportRecordSchema('admin-owned').parse({ ...fact, topics }).topics,
-    ).toEqual([{ topicId: 't', percentage: 0 }]);
   });
-
-  it('requires payload UID only in company/project/authorized and preserves own path-ID checks', () => {
-    const own: Partial<typeof fact> = { ...fact };
-    delete own.uid;
-    expect(reportRecordSchema('admin-owned').safeParse(own).success).toBe(true);
-    expect(reportRecordSchema('personal-web').safeParse(own).success).toBe(
-      true,
-    );
-    for (const schema of [
-      reportRecordSchema('admin-company'),
-      reportRecordSchema('admin-project'),
-      reportRecordSchema('authorized-web'),
-    ]) {
-      expect(schema.safeParse(own).success).toBe(false);
-    }
-    for (const projectId of ['', 'nested/project']) {
-      expect(
-        reportRecordSchema('personal-web').safeParse({ ...own, projectId })
-          .success,
-      ).toBe(false);
-      expect(
-        reportRecordSchema('admin-owned').safeParse({ ...own, projectId })
-          .success,
-      ).toBe(true);
-    }
-    expect(() =>
+  it('rejects malformed timestamps zones and topic allocations in every mode', () => {
+    for (const patch of [
+      { endedAt: undefined },
+      { endedAt: 'bad' },
+      { endedAt: '2026-10-08T10:00:00' },
+      { startedAt: '2026-02-30T10:00:00Z' },
+      { startedAt: 'bad' },
+      { timeZone: 'bad' },
+      { timeZone: '+03:00' },
+      { topics: null },
+      { topics: undefined },
+      { topics: [{ topicId: 't', percentage: -1 }] },
+      { topics: [{ topicId: 't', durationMinutes: Infinity }] },
+    ])
+      for (const schema of schemas)
+        expect(schema.safeParse({ ...fact, ...patch }).success).toBe(false);
+  });
+  it('takes owner identity from the scope and strips private extras', () => {
+    expect(
       decodePersonalReportRecord(
-        { ...own, projectId: 'bad/path', topics: 'bad' },
+        { ...fact, originalText: 'private' },
         'r',
         'alice',
       ),
-    ).toThrow('registro inválido');
-    expect(() =>
-      decodePersonalReportRecord({ ...own, topics: 'bad' }, 'r', 'alice'),
-    ).toThrow('tópicos inválidos');
+    ).toMatchObject({ id: 'r', uid: 'alice', deletedAt: null });
+    expect(
+      decodePersonalReportRecord(
+        { ...fact, originalText: 'private' },
+        'r',
+        'alice',
+      ),
+    ).not.toHaveProperty('originalText');
   });
 });

@@ -58,11 +58,15 @@ it('requires an explicit valid type for project creation', () => {
 });
 describe('project matching', () => {
   const project: Project = {
+    archived: false,
+    confidential: false,
     type: 'work',
     id: 'p',
     title: 'Wads Work Track',
     description: 'Organização pessoal de atividades e rotina',
-    topics: [{ id: 'general', title: 'Geral', description: 'Geral' }],
+    topics: [
+      { archived: false, id: 'general', title: 'Geral', description: 'Geral' },
+    ],
     createdBy: 'user',
     createdAt: '',
   };

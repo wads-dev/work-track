@@ -16,6 +16,7 @@ const record = (
   startedAt: string,
   endedAt?: string,
 ): ReportSourceRecord => ({
+  deletedAt: null,
   id,
   projectId,
   uid,

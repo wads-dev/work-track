@@ -192,6 +192,7 @@ export function planSplit(
       'projectId',
       'startedAt',
       'endedAt',
+      'deletedAt',
       'timeZone',
       'originalText',
       'interpretation',

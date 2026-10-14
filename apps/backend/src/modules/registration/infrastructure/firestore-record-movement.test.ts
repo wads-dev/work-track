@@ -51,6 +51,7 @@ function fixture() {
     value?: unknown,
     cap = Infinity,
     group = false,
+    predicates: Array<[string, unknown]> = [],
   ) {
     return {
       path,
@@ -59,10 +60,12 @@ function fixture() {
       value,
       cap,
       group,
+      predicates,
       doc: (id: string) => ref(path + '/' + id),
       where: (f: string, _op: string, v: unknown) =>
-        collection(path, f, v, cap, group),
-      limit: (n: number) => collection(path, field, value, n, group),
+        collection(path, f, v, cap, group, [...predicates, [f, v]]),
+      limit: (n: number) =>
+        collection(path, field, value, n, group, predicates),
     };
   }
   const db = {
@@ -80,6 +83,7 @@ function fixture() {
           value?: unknown;
           cap?: number;
           group?: boolean;
+          predicates?: Array<[string, unknown]>;
         }) =>
           Promise.resolve(
             r.query
@@ -91,7 +95,9 @@ function fixture() {
                           ? p.split('/').at(-2) === r.path
                           : p.startsWith(r.path + '/') &&
                             !p.slice(r.path.length + 1).includes('/')) &&
-                        (!r.field || data.get(p)![r.field] === r.value),
+                        (r.predicates ?? []).every(
+                          ([field, value]) => data.get(p)![field] === value,
+                        ),
                     )
                     .slice(0, r.cap)
                     .map(snap);
@@ -120,6 +126,8 @@ function fixture() {
     data.set('users/alice/records/' + id, {
       id,
       uid: 'alice',
+      deletedAt: null,
+      timeZone: 'UTC',
       projectId: 'a',
       topics: [{ topicId: 's', percentage: 35, durationMinutes: 17 }],
       originalText: 'immutable',
@@ -162,6 +170,8 @@ it('preview0writes defaults originalname create audit EACH record preservesfacts
   f.add('deleted', { deletedAt: false });
   f.data.set('users/bob/records/foreign', {
     uid: 'bob',
+    deletedAt: null,
+    endedAt: null,
     projectId: 'a',
     topics: [{ topicId: 's' }],
   });
@@ -190,7 +200,12 @@ it('preview0writes defaults originalname create audit EACH record preservesfacts
     projectSnapshot: { title: 'B', description: 'target' },
   });
   expect(after.topicSnapshots).toEqual([
-    { id: p.topic_target, title: 'Análise', description: 'original' },
+    {
+      id: p.topic_target,
+      archived: false,
+      title: 'Análise',
+      description: 'original',
+    },
   ]);
   expect(f.data.get('users/alice/records/deleted')!.projectId).toBe('a');
   expect(f.data.get('users/bob/records/foreign')!.projectId).toBe('b');
@@ -380,7 +395,7 @@ it('100 succeeds 101 capfail 2001physical capfail oversized audit abort allatomi
   await expect(preview(g)).rejects.toThrow('100');
   expect(g.writes).not.toHaveBeenCalled();
   const h = fixture();
-  for (let i = 1; i < 2001; i++) h.add('r' + i, { deletedAt: 'deleted' });
+  for (let i = 1; i < 2001; i++) h.add('r' + i);
   await expect(preview(h)).rejects.toThrow('2000');
   const huge = fixture();
   huge.add('r', { originalText: 'x'.repeat(400000) });
@@ -482,6 +497,8 @@ it('personal access stays owner-only, including recordOwnerUid and replay access
   expect(f.writes).not.toHaveBeenCalled();
   f.data.set('users/bob/records/private', {
     uid: 'bob',
+    deletedAt: null,
+    endedAt: null,
     projectId: 'a',
     topics: [{ topicId: 's' }],
   });

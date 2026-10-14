@@ -75,7 +75,11 @@ it('persists default topics and isolates idempotent records by user', async () =
   };
   const saved = await repo.register(input, 'alice');
   expect(saved.topics).toEqual([{ topicId: 'general' }]);
-  expect(saved.endedAt).toBeUndefined();
+  expect(saved.endedAt).toBeNull();
+  expect(saved.deletedAt).toBeNull();
+  expect(saved).not.toHaveProperty('topicResolution');
+  expect(saved).not.toHaveProperty('warnings');
+  expect(project.topics[0]?.archived).toBe(false);
   expect(
     data.get('users/alice/records/' + String(saved.id))?.endedAt,
   ).toBeNull();
@@ -133,6 +137,53 @@ it('persists default topics and isolates idempotent records by user', async () =
   expect(
     [...data.keys()].some((path) => path.startsWith('users/alice/records/')),
   ).toBe(true);
+
+  const open = await repo.register(
+    { ...input, requestId: 'canonical-open' },
+    'alice',
+  );
+  expect(open).not.toHaveProperty('topicResolution');
+  expect(open).not.toHaveProperty('warnings');
+  data.set('projects/' + project.id, {
+    ...data.get('projects/' + project.id),
+    topics: [
+      ...project.topics,
+      {
+        id: 'old',
+        title: 'Historical alias',
+        description: 'Unsupported historical catalog entry',
+        archived: true,
+        mergedIntoTopicId: 'general',
+      },
+    ],
+  });
+  const initial = structuredClone(data);
+  const create = vi.spyOn(tx, 'create');
+  const update = vi.spyOn(tx, 'update');
+  try {
+    for (const topicId of ['old', 'general']) {
+      await expect(
+        repo.register(
+          {
+            ...confirmed,
+            requestId: 'historical-alias-' + topicId,
+            closedPreviousRecordId: open.id as string,
+            topics: [{ topicId }],
+          },
+          'alice',
+        ),
+      ).rejects.toMatchObject({
+        code: 'failed-precondition',
+        message: 'Catálogo de tópicos contém aliases não suportados.',
+      });
+      expect(create).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+      expect(data).toEqual(initial);
+    }
+  } finally {
+    create.mockRestore();
+    update.mockRestore();
+  }
 });
 
 it('queries recent branches and compacts exact instants with one captured now and visible-ID pagination', async () => {
@@ -147,6 +198,7 @@ it('queries recent branches and compacts exact instants with one captured now an
     createdAt: '2026-10-01T00:00:00Z',
     type: 'personal',
     archived: true,
+    confidential: false,
     topics: [],
   };
   const data = [
@@ -156,7 +208,7 @@ it('queries recent branches and compacts exact instants with one captured now an
       endedAt: '2026-10-11T02:30:00+02:00',
     },
     { id: 'chronologically-later', startedAt: '2026-10-10T23:30:00-02:00' },
-    { id: 'historical-open', startedAt: '2026-09-01T00:00:00Z' },
+    { id: 'old-open', startedAt: '2026-09-01T00:00:00Z', endedAt: null },
     { id: 'null-open', startedAt: '2026-09-02T00:00:00Z', endedAt: null },
     {
       id: 'span',
@@ -186,8 +238,17 @@ it('queries recent branches and compacts exact instants with one captured now an
       projectId: 'unknown',
     },
     { id: 'foreign-owner', startedAt: '2026-10-11T00:00:00Z', uid: 'bob' },
-  ].map((record) => ({ uid: 'alice', projectId: 'p', ...record }));
+  ].map((record) => ({
+    uid: 'alice',
+    projectId: 'p',
+    endedAt: null,
+    deletedAt: null,
+    topics: [],
+    timeZone: 'UTC',
+    ...record,
+  }));
   type NativeFilter = {
+    unaryFilter?: { field: { fieldPath: string }; op: string };
     fieldFilter: {
       field: { fieldPath: string };
       op: string;
@@ -214,7 +275,13 @@ it('queries recent branches and compacts exact instants with one captured now an
     requests.push({ filters, limit: proto.limit.value });
     const docs = data
       .filter((record) =>
-        filters.every(({ fieldFilter }) => {
+        filters.every(({ fieldFilter, unaryFilter }) => {
+          if (unaryFilter)
+            return (
+              (record as Record<string, unknown>)[
+                unaryFilter.field.fieldPath
+              ] === null
+            );
           const value: unknown = (record as Record<string, unknown>)[
             fieldFilter.field.fieldPath
           ];
@@ -262,7 +329,7 @@ it('queries recent branches and compacts exact instants with one captured now an
       'lower-edge',
       'span',
       'null-open',
-      'historical-open',
+      'old-open',
     ]);
     expect(rest).toMatchObject({
       queriedAt: at.toISOString(),
@@ -272,11 +339,13 @@ it('queries recent branches and compacts exact instants with one captured now an
     expect(requests).toHaveLength(6);
     for (const { filters } of requests) {
       expect(
-        filters.map(({ fieldFilter }) => [
-          fieldFilter.field.fieldPath,
-          fieldFilter.op,
-          fieldFilter.value.stringValue,
-        ]),
+        filters
+          .filter((f) => f.fieldFilter)
+          .map(({ fieldFilter }) => [
+            fieldFilter.field.fieldPath,
+            fieldFilter.op,
+            fieldFilter.value.stringValue,
+          ]),
       ).toEqual(
         expect.arrayContaining([
           ['uid', 'EQUAL', 'alice'],

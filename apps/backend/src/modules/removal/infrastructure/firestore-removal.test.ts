@@ -21,6 +21,8 @@ function fixture() {
   const data = new Map<string, Record<string, unknown>>();
   const source: Record<string, unknown> = {
     uid: 'alice',
+    deletedAt: null,
+    endedAt: null,
     projectId: 'orphan',
     startedAt: '2026-10-09T12:00:00Z',
     timeZone: 'UTC',
@@ -82,14 +84,14 @@ function fixture() {
     },
   };
 }
-it.each([undefined, '2026-10-09T15:00:00Z'])(
+it.each([null, '2026-10-09T15:00:00Z'])(
   'previews no writes and confirms open/closed own orphan with full audit and stable replay (%s)',
   async (endedAt) => {
     const f = fixture();
     if (endedAt) f.source.endedAt = endedAt;
     const p = await f.repo.removeRecord(input, 'alice', now);
     expect(f.writes()).toBe(0);
-    expect(p.record.deletedAt).toBeUndefined();
+    expect(p.record.deletedAt).toBeNull();
     const confirm = { ...input, confirmed: true, previewToken: p.previewToken };
     const result = await f.repo.removeRecord(confirm, 'alice', now);
     expect(f.writes()).toBe(3);
@@ -165,7 +167,7 @@ it('rejects stale/missing token, already deleted and oversized audits with zero 
   await expect(f.repo.removeRecord(input, 'alice', now)).rejects.toThrow(
     'já removido',
   );
-  delete f.source.deletedAt;
+  f.source.deletedAt = null;
   f.source.originalText = 'x'.repeat(710000);
   await expect(f.repo.removeRecord(input, 'alice', now)).rejects.toThrow(
     'tamanho',

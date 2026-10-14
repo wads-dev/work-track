@@ -2,17 +2,20 @@ import { expect, it } from 'vitest';
 import { compactRecentRecords, recentRecordsInput } from './recent-records.js';
 import type { Project } from './work-model.js';
 const project: Project = {
+  archived: false,
+  confidential: false,
   id: 'p',
   title: 'Projeto',
   description: 'Teste',
   createdBy: 'alice',
   createdAt: '2026-10-11',
   type: 'personal',
-  topics: [{ id: 't', title: 'Tópico', description: 'Teste' }],
+  topics: [{ archived: false, id: 't', title: 'Tópico', description: 'Teste' }],
 };
 it('includes old open records and recent overlapping records without full texts', () => {
   const records = [
     {
+      deletedAt: null,
       id: 'old',
       uid: 'alice',
       projectId: 'p',
@@ -21,6 +24,7 @@ it('includes old open records and recent overlapping records without full texts'
       topics: [{ topicId: 't' }],
     },
     {
+      deletedAt: null,
       id: 'recent',
       uid: 'alice',
       projectId: 'p',
@@ -28,6 +32,7 @@ it('includes old open records and recent overlapping records without full texts'
       endedAt: '2026-10-11T00:00:00Z',
     },
     {
+      deletedAt: null,
       id: 'closed',
       uid: 'alice',
       projectId: 'p',
@@ -56,7 +61,12 @@ it('sorts offset dates by instant and ties by stable ASCII document ID across pa
     { id: 'z', startedAt: '2026-10-10T23:30:00-02:00' },
     { id: 'Z', startedAt: '2026-10-11T01:30:00Z' },
     { id: 'a', startedAt: '2026-10-11T01:30:00Z' },
-  ].map((record) => ({ ...record, uid: 'alice', projectId: 'p' }));
+  ].map((record) => ({
+    ...record,
+    deletedAt: null,
+    uid: 'alice',
+    projectId: 'p',
+  }));
   const now = new Date('2026-10-11T03:00:00Z');
   const first = compactRecentRecords(
     records,
@@ -82,6 +92,7 @@ it('sorts offset dates by instant and ties by stable ASCII document ID across pa
 });
 it('orders equal-instant Unicode historical IDs by UTF-8, not UTF-16 or locale', () => {
   const records = ['𐀀', '', 'a', 'Z'].map((id) => ({
+    deletedAt: null,
     id,
     uid: 'alice',
     projectId: 'p',
@@ -100,12 +111,14 @@ it('orders equal-instant Unicode historical IDs by UTF-8, not UTF-16 or locale',
 it('paginates explicitly and isolates owners', () => {
   const records = [
     {
+      deletedAt: null,
       id: 'a',
       uid: 'alice',
       projectId: 'p',
       startedAt: '2026-10-11T00:00:00Z',
     },
     {
+      deletedAt: null,
       id: 'b',
       uid: 'alice',
       projectId: 'p',

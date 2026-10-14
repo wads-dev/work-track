@@ -9,7 +9,16 @@ it('deduplicates projects, reads sequential100 batches and omits missing documen
       Promise.resolve(
         ids.map((id) => ({
           id,
-          data: id === 'p100' ? undefined : { type: 'work' },
+          data:
+            id === 'p100'
+              ? undefined
+              : {
+                  archived: false,
+                  confidential: false,
+                  createdBy: 'alice',
+                  topics: [],
+                  type: 'work',
+                },
         })),
       ),
     );
@@ -24,7 +33,13 @@ it('deduplicates projects, reads sequential100 batches and omits missing documen
     ['projects', 5],
   ]);
   expect([...catalog.keys()]).toEqual(ids.filter((id) => id !== 'p100'));
-  expect(catalog.get('p0')).toMatchObject({ type: 'work', topics: [] });
+  expect(catalog.get('p0')).toMatchObject({
+    archived: false,
+    confidential: false,
+    createdBy: 'alice',
+    type: 'work',
+    topics: [],
+  });
   getMany.mockClear();
   expect(await repo.readCatalog([])).toEqual(new Map());
   expect(getMany).not.toHaveBeenCalled();
@@ -34,8 +49,11 @@ it('uses the exact same mode decoder for synchronous snapshots without invoking 
   const document = {
     id: 'p',
     data: {
-      type: null,
-      topics: [{ id: 't', title: 'Title', extra: true }, null],
+      archived: false,
+      confidential: false,
+      createdBy: 'alice',
+      type: 'work',
+      topics: [{ archived: false, id: 't', title: 'Title', extra: true }],
     },
   };
   const getMany = vi
@@ -48,7 +66,7 @@ it('uses the exact same mode decoder for synchronous snapshots without invoking 
         await new ProjectCatalogRepository({ getMany }, mode).readCatalog(['p'])
       ).get('p'),
     ).toEqual(expected);
-    expect(expected?.type).toBe('__invalid__');
+    expect(expected?.type).toBe('work');
   }
   getMany.mockClear();
   expect(
@@ -63,7 +81,18 @@ it('uses the exact same mode decoder for synchronous snapshots without invoking 
 it('does not return a partial catalog when a later SDK batch fails', async () => {
   const getMany = vi
     .fn<DocumentReadPort['getMany']>()
-    .mockResolvedValueOnce([{ id: 'p0', data: {} }])
+    .mockResolvedValueOnce([
+      {
+        id: 'p0',
+        data: {
+          type: 'work',
+          createdBy: 'alice',
+          archived: false,
+          confidential: false,
+          topics: [],
+        },
+      },
+    ])
     .mockRejectedValueOnce(new Error('permission-denied'));
   const repo = new ProjectCatalogRepository({ getMany }, 'admin');
   await expect(

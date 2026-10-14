@@ -123,6 +123,7 @@ export class WebRecordMovementRepository implements MovementRepository {
           const id = 'moved_' + hash([input.project_target, normalize(sourceTopic.title)]).slice(0, 32);
           if (targetTopics.some((t) => t.id === id)) fail('ID de destino em conflito; selecione tópico explícito.');
           destination = {
+            archived: false,
             id,
             title: sourceTopic.title,
             description: sourceTopic.description,

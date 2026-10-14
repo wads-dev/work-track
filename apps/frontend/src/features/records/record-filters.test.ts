@@ -9,6 +9,9 @@ import {
 } from './record-filters';
 it('safe projection text search cannot act as secret oracle', () => {
   const raw = {
+    endedAt: null,
+    deletedAt: null,
+    topics: [],
     originalText: 'Secret original',
     interpretation: 'Secret interpretation',
     projectSnapshot: { title: 'Secret title' },
@@ -46,6 +49,9 @@ it('filters beyond100 and paginates only filtered history', () => {
   const rows = Array.from({ length: 150 }, (_, i) => ({
     id: String(i),
     data: {
+      endedAt: null,
+      deletedAt: null,
+      topics: [],
       projectId: i === 149 ? 'selected' : 'other',
       originalText: 'Revisão',
     },
@@ -60,12 +66,27 @@ it('compares offset instants with civil exclusive end and open startpoint', () =
   const rows = [
     {
       id: 'offset',
-      data: { startedAt: '2026-10-09T01:00:00-03:00', endedAt: null },
+      data: {
+        startedAt: '2026-10-09T01:00:00-03:00',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
     },
-    { id: 'next', data: { startedAt: '2026-10-10T00:00:00-03:00' } },
+    {
+      id: 'next',
+      data: {
+        startedAt: '2026-10-10T00:00:00-03:00',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
+    },
     {
       id: 'overlap',
       data: {
+        deletedAt: null,
+        topics: [],
         startedAt: '2026-10-08T22:00:00-03:00',
         endedAt: '2026-10-09T05:00:00Z',
       },
@@ -81,8 +102,14 @@ it('compares offset instants with civil exclusive end and open startpoint', () =
 });
 it('filters topic/status and rejects incomplete/reversed periods', () => {
   const rows = [
-    { id: 'a', data: { topics: [{ topicId: 't' }], endedAt: null } },
-    { id: 'b', data: { endedAt: '2026-10-09T00:00:00Z' } },
+    {
+      id: 'a',
+      data: { topics: [{ topicId: 't' }], endedAt: null, deletedAt: null },
+    },
+    {
+      id: 'b',
+      data: { endedAt: '2026-10-09T00:00:00Z', deletedAt: null, topics: [] },
+    },
   ];
   expect(
     filterRecords(rows, { ...filters, topic: 't', status: 'open' }).map(
@@ -100,6 +127,20 @@ it('filters topic/status and rejects incomplete/reversed periods', () => {
     }),
   ).toThrow();
 });
+it('rejects missing lifecycle fields instead of inferring active open records', () => {
+  const data = { endedAt: null, deletedAt: null, topics: [] };
+  const rows = [
+    { id: 'canonical', data },
+    { id: 'missing-end', data: { deletedAt: null, topics: [] } },
+    { id: 'missing-deletion', data: { endedAt: null, topics: [] } },
+    { id: 'undefined-end', data: { ...data, endedAt: undefined } },
+    { id: 'undefined-deletion', data: { ...data, deletedAt: undefined } },
+    { id: 'tombstone', data: { ...data, deletedAt: '2026-10-09T00:00:00Z' } },
+  ];
+  expect(
+    filterRecords(rows, { ...filters, status: 'open' }).map((row) => row.id),
+  ).toEqual(['canonical']);
+});
 it('sorts valid instants descending ties by id invalid at end', () => {
   expect(
     sortRecords([
@@ -110,19 +151,32 @@ it('sorts valid instants descending ties by id invalid at end', () => {
     ]).map((r) => r.id),
   ).toEqual(['a', 'b', 'old', 'invalid']);
 });
-it('resolves merged chains without accepting cycles missing targets duplicates', () => {
+it('rejects catalog aliases including chains cycles missing targets and duplicates', () => {
   const catalog = [
-    { id: 'old', mergedIntoTopicId: 'mid' },
-    { id: 'mid', mergedIntoTopicId: 'new' },
-    { id: 'new' },
+    { id: 'old', mergedIntoTopicId: 'mid', archived: true },
+    { id: 'mid', mergedIntoTopicId: 'new', archived: true },
+    { id: 'new', archived: false },
   ];
   expect(
     filterRecords(
-      [{ id: 'r', data: { projectId: 'p', topics: [{ topicId: 'old' }] } }],
+      [
+        {
+          id: 'r',
+          data: {
+            projectId: 'p',
+            topics: [{ topicId: 'old' }],
+            endedAt: null,
+            deletedAt: null,
+          },
+        },
+      ],
       { ...filters, project: 'p', topic: 'new' },
       catalog,
     ),
-  ).toHaveLength(1);
+  ).toHaveLength(0);
+  expect(resolveRecordTopic(catalog, 'old')).toBeUndefined();
+  expect(resolveRecordTopic(catalog, 'mid')).toBeUndefined();
+  expect(resolveRecordTopic(catalog, 'new')).toBe('new');
   expect(
     resolveRecordTopic([{ id: 'x', mergedIntoTopicId: 'x' }], 'x'),
   ).toBeUndefined();

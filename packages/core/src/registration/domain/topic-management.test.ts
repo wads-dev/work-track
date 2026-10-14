@@ -7,11 +7,14 @@ import {
   canonicalizeTopics,
 } from './topic-management.js';
 const topics = ['general', 'a', 'b', 'c'].map((id) => ({
+  archived: false,
   id,
   title: id,
   description: 'Synthetic topic',
 }));
 const project: Project = {
+  archived: false,
+  confidential: false,
   type: 'work',
   id: 'p',
   title: 'Project',
@@ -31,7 +34,7 @@ it('preview is explicit, no count fabricated and original catalog unchanged', ()
     preservesRecords: true,
     recordImpact: { scope: 'not-scanned', count: null },
   });
-  expect(topics[1]).not.toHaveProperty('archived');
+  expect(topics[1]?.archived).toBe(false);
 });
 it('rejects confirmation without reason/request, duplicate/self/general/cross-project origins and locked projects', () => {
   expect(
@@ -54,31 +57,54 @@ it('rejects confirmation without reason/request, duplicate/self/general/cross-pr
     previewTopicMerge(project, { ...input, targetTopicId: 'a' }),
   ).toThrow();
 });
-it('resolves bounded alias chains, rejects cycles/missing/archived endpoints and ambiguous allocations without invented split', () => {
-  const merged = topics.map((t) =>
-    t.id === 'a' ? { ...t, archived: true, mergedIntoTopicId: 'b' } : t,
+it('rejects alias catalogs without following chains, cycles or missing destinations', () => {
+  for (const destination of ['b', 'a', 'missing', '']) {
+    const merged = topics.map((t) =>
+      t.id === 'a'
+        ? { ...t, archived: true, mergedIntoTopicId: destination }
+        : t,
+    );
+    expect(() => resolveTopicId(merged, 'a')).toThrow('aliases não suportados');
+    expect(() => resolveTopicId(merged, 'b')).toThrow('aliases não suportados');
+    expect(() => canonicalizeTopics(merged, [])).toThrow(
+      'aliases não suportados',
+    );
+    expect(() =>
+      canonicalizeTopics(merged, [{ topicId: 'a', percentage: 25 }]),
+    ).toThrow('aliases não suportados');
+    expect(() =>
+      previewTopicMerge({ ...project, topics: merged }, input),
+    ).toThrow('aliases não suportados');
+  }
+  const chain = topics.map((t) =>
+    t.id === 'a' || t.id === 'b' ? { ...t, mergedIntoTopicId: 'c' } : t,
   );
-  expect(resolveTopicId(merged, 'a')).toBe('b');
-  expect(
-    canonicalizeTopics(merged, [{ topicId: 'a', percentage: 25 }]),
-  ).toEqual([{ topicId: 'b', percentage: 25 }]);
+  expect(() => resolveTopicId(chain, 'a')).toThrow('aliases não suportados');
+});
+it('validates current IDs and explicit allocations without mapping or collapsing them', () => {
+  const allocations = [
+    { topicId: 'a', percentage: 25 },
+    { topicId: 'b', durationMinutes: 10 },
+  ];
+  expect(resolveTopicId(topics, 'a')).toBe('a');
+  expect(canonicalizeTopics(topics, allocations)).toEqual(allocations);
   expect(() =>
-    canonicalizeTopics(merged, [{ topicId: 'a' }, { topicId: 'b' }]),
-  ).toThrow('convergem');
+    canonicalizeTopics(topics, [{ topicId: 'a' }, { topicId: 'a' }]),
+  ).toThrow('duplicados');
+  expect(() => resolveTopicId(topics, 'old')).toThrow('não existe');
+  expect(() =>
+    resolveTopicId([{ ...topics[0]!, archived: true }], 'general'),
+  ).toThrow('arquivado');
+  expect(() => resolveTopicId([topics[0]!, topics[0]!], 'general')).toThrow(
+    'inválido',
+  );
   expect(() =>
     resolveTopicId(
-      [
-        { id: 'a', mergedIntoTopicId: 'b' },
-        { id: 'b', mergedIntoTopicId: 'a' },
-      ],
-      'a',
+      Array.from({ length: 201 }, (_, i) => ({
+        id: String(i),
+        archived: false,
+      })),
+      '0',
     ),
-  ).toThrow('Ciclo');
-  expect(() =>
-    resolveTopicId([{ id: 'a', mergedIntoTopicId: 'missing' }], 'a'),
-  ).toThrow();
-  expect(
-    previewTopicMerge({ ...project, topics: merged }, input).sourceTopics[0]!
-      .id,
-  ).toBe('a');
+  ).toThrow('inválido');
 });

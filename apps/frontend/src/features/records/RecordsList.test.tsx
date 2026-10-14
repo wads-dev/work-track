@@ -12,12 +12,25 @@ const catalog: Row[] = [
     id: 'p',
     data: {
       title: 'Privado',
+      createdBy: 'alice',
+      type: 'work',
+      archived: false,
       confidential: true,
       color: '#123abc',
-      topics: [{ id: 't', title: 'Tópico secreto' }],
+      topics: [{ id: 't', title: 'Tópico secreto', archived: false }],
     },
   },
-  { id: 'public', data: { title: 'Público' } },
+  {
+    id: 'public',
+    data: {
+      title: 'Público',
+      createdBy: 'alice',
+      type: 'work',
+      archived: false,
+      confidential: false,
+      topics: [],
+    },
+  },
 ];
 const row: Row = {
   id: 'r',

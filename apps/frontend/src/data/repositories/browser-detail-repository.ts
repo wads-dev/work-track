@@ -1,3 +1,4 @@
+import { canonicalProject, canonicalRecord } from '../cache/canonical-storage';
 import {
   collection,
   doc,
@@ -96,7 +97,9 @@ export class BrowserDetailRepository {
     )
       return undefined;
     const data = await this.readDocument('projects/' + projectId);
-    return data && canAccessProject(data, this.viewer) ? data : undefined;
+    return data && canonicalProject(data) && canAccessProject(data, this.viewer)
+      ? data
+      : undefined;
   }
   async readRecordDetail(
     ownerUid: string,
@@ -107,7 +110,7 @@ export class BrowserDetailRepository {
     const data = await this.readDocument(
       'users/' + ownerUid + '/records/' + recordId,
     );
-    if (!data || data.uid !== ownerUid) return null;
+    if (!data || !canonicalRecord(data) || data.uid !== ownerUid) return null;
     const projectId = text(data.projectId);
     if (expectedProjectId && expectedProjectId !== projectId) return null;
     const project = await this.readProject(projectId);
@@ -175,20 +178,28 @@ export class BrowserDetailRepository {
         query(
           collection(this.db, 'projects'),
           where(documentId(), 'in', ids.slice(start, start + 30)),
+          ...(options.global
+            ? [
+                where('type', '==', 'work'),
+                ...(!options.revealed
+                  ? [where('confidential', '==', false)]
+                  : []),
+              ]
+            : []),
         ),
       );
       for (const item of result.docs) {
         const data = item.data();
         if (
           this.authorizedIds.has(item.id) &&
+          canonicalProject(data) &&
           canAccessProject(data, this.viewer)
         )
           rows.push({ id: item.id, data });
       }
     }
     const byId = new Map(rows.map((row) => [row.id, row.data]));
-    // Firebase cannot test absent confidentiality fields; the presentation
-    // default is public. The supported ID allowlist is queried above.
+    // Supported type/confidential predicates execute in the cache query above.
     const available = options.global
       ? rows.filter(
           (row) =>
@@ -245,7 +256,7 @@ export class BrowserDetailRepository {
 }
 
 /** Embedded topics are array objects, not a Firestore subcollection. Firestore
- * cannot query object properties/state or traverse mergedIntoTopicId aliases.
+ * cannot query object properties/state; aliases are rejected, never traversed.
  * Their parent is queried by ID/ACL before this exact residual is evaluated. */
 export function selectCalendarTopics(
   project: Record<string, unknown> | undefined,
@@ -256,8 +267,9 @@ export function selectCalendarTopics(
   return objects(project.topics)
     .filter(
       (topic) =>
-        !topic.mergedIntoTopicId &&
-        (includeArchived || !topic.archived) &&
+        typeof topic.archived === 'boolean' &&
+        topic.mergedIntoTopicId === undefined &&
+        (includeArchived || topic.archived === false) &&
         Boolean(text(topic.id)),
     )
     .map((topic) => ({
@@ -271,18 +283,12 @@ export function canonicalCatalogTopic(
 ): string | null {
   const catalog = new Map(topics.map((topic) => [text(topic.id), topic]));
   if (catalog.size !== topics.length) return null;
-  let id = requested;
-  const seen = new Set<string>();
-  for (let n = 0; n < 200; n++) {
-    if (seen.has(id)) return null;
-    seen.add(id);
-    const topic = catalog.get(id);
-    if (!topic) return null;
-    if (!topic.mergedIntoTopicId) return id;
-    if (typeof topic.mergedIntoTopicId !== 'string') return null;
-    id = topic.mergedIntoTopicId;
-  }
-  return null;
+  const topic = catalog.get(requested);
+  return topic &&
+    typeof topic.archived === 'boolean' &&
+    !Object.hasOwn(topic, 'mergedIntoTopicId')
+    ? requested
+    : null;
 }
 
 /** Workspace notifications invalidate local reads, but do not select records.

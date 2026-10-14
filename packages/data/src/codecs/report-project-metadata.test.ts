@@ -1,97 +1,98 @@
 import { describe, expect, it } from 'vitest';
-import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 import {
   decodeReportProjectMetadata,
   type ReportProjectMetadataMode,
 } from './report-project-metadata.js';
-
 const modes: ReportProjectMetadataMode[] = [
   'admin',
   'personal-web',
   'authorized-web',
 ];
-describe('report project metadata reader modes', () => {
-  it.each(modes)(
-    'fails closed for missing and malformed types in %s',
-    (mode) => {
-      expect(
-        canAccessProject(decodeReportProjectMetadata({}, mode), 'alice'),
-      ).toBe(false);
-      for (const type of [undefined, null, false, 0, {}, [], 'unknown']) {
-        const metadata = decodeReportProjectMetadata(
-          { type, createdBy: 'alice' },
+const fact = {
+  type: 'work',
+  createdBy: 'alice',
+  archived: false,
+  confidential: false,
+  topics: [{ id: 't', title: 'Topic', archived: false }],
+};
+describe('canonical project metadata', () => {
+  it.each(modes)('accepts explicit state in %s', (mode) => {
+    expect(decodeReportProjectMetadata(fact, mode)).toEqual(fact);
+  });
+  it.each(modes)('rejects topic alias chains in %s', (mode) => {
+    for (const mergedIntoTopicId of ['target', '', null]) {
+      expect(() =>
+        decodeReportProjectMetadata(
+          {
+            ...fact,
+            topics: [
+              { id: 'old', title: 'Old', archived: false, mergedIntoTopicId },
+              { id: 'target', title: 'Target', archived: false },
+            ],
+          },
           mode,
-        );
-        expect(metadata.type).not.toBeUndefined();
-        expect(canAccessProject(metadata, 'alice')).toBe(false);
+        ),
+      ).toThrow();
+    }
+    expect(() =>
+      decodeReportProjectMetadata(
+        {
+          ...fact,
+          topics: [
+            {
+              id: 'old',
+              title: 'Old',
+              archived: false,
+              mergedIntoTopicId: 'middle',
+            },
+            {
+              id: 'middle',
+              title: 'Middle',
+              archived: false,
+              mergedIntoTopicId: 'target',
+            },
+            { id: 'target', title: 'Target', archived: false },
+          ],
+        },
+        mode,
+      ),
+    ).toThrow();
+  });
+  it.each(modes)('rejects missing storage state in %s', (mode) => {
+    for (const field of [
+      'type',
+      'createdBy',
+      'archived',
+      'confidential',
+      'topics',
+    ]) {
+      const raw: Record<string, unknown> = { ...fact };
+      delete raw[field];
+      expect(() => decodeReportProjectMetadata(raw, mode)).toThrow();
+    }
+    expect(() =>
+      decodeReportProjectMetadata(
+        { ...fact, topics: [{ id: 't', title: 'Topic' }] },
+        mode,
+      ),
+    ).toThrow();
+  });
+  it.each(modes)(
+    'rejects malformed fields without dropping topics in %s',
+    (mode) => {
+      for (const patch of [
+        { type: null },
+        { type: 'unknown' },
+        { archived: 0 },
+        { confidential: 'false' },
+        { topics: null },
+        { topics: [null] },
+        { topics: [{ id: 't', title: 'Topic', archived: 'false' }] },
+      ]) {
+        expect(() =>
+          decodeReportProjectMetadata({ ...fact, ...patch }, mode),
+        ).toThrow();
       }
-      expect(
-        canAccessProject(
-          decodeReportProjectMetadata(
-            { type: 'personal', createdBy: 'alice' },
-            mode,
-          ),
-          'alice',
-        ),
-      ).toBe(true);
-      expect(
-        canAccessProject(
-          decodeReportProjectMetadata(
-            { type: 'personal', createdBy: 'bob' },
-            mode,
-          ),
-          'alice',
-        ),
-      ).toBe(false);
     },
   );
-
-  it('preserves all-or-none Admin vs personal filtering vs authorized raw topics', () => {
-    const topic = {
-      id: 'code',
-      title: 'Code',
-      mergedIntoTopicId: 42,
-      extra: 'historical',
-    };
-    const topics = [topic, null, { id: 'bad' }];
-    const raw = {
-      type: 'work',
-      topics,
-      custom: { retained: true },
-      archived: 'historical',
-      mergedInto: 42,
-    };
-    expect(decodeReportProjectMetadata(raw, 'admin')).toMatchObject({
-      topics: [],
-      archived: true,
-      mergedInto: undefined,
-    });
-    const own = decodeReportProjectMetadata(raw, 'personal-web');
-    expect(own.topics).toEqual([topic]);
-    expect(own.topics[0]).toBe(topic);
-    expect(own).not.toHaveProperty('custom');
-    const authorized = decodeReportProjectMetadata(raw, 'authorized-web');
-    expect(authorized).toMatchObject(raw);
-    expect(authorized.topics).toBe(topics);
-    expect(raw.topics).toBe(topics);
-  });
-
-  it('Admin strips topic extras only when every entry is valid', () => {
-    const topic = {
-      id: 'code',
-      title: 'Code',
-      mergedIntoTopicId: 'canonical',
-      extra: 'raw',
-    };
-    expect(
-      decodeReportProjectMetadata({ topics: [topic] }, 'admin').topics,
-    ).toEqual([{ id: 'code', title: 'Code', mergedIntoTopicId: 'canonical' }]);
-    for (const mode of modes) {
-      for (const topics of [undefined, null, 'bad', {}]) {
-        expect(decodeReportProjectMetadata({ topics }, mode).topics).toEqual(
-          [],
-        );
-      }
-    }
-  });
 });

@@ -1,9 +1,6 @@
 import { isDeletedRecord } from '../../data/cache/record-deletion';
 export function isOpen(record: Record<string, unknown>) {
-  return (
-    !isDeletedRecord(record) &&
-    (record.endedAt === null || record.endedAt === undefined)
-  );
+  return !isDeletedRecord(record) && record.endedAt === null;
 }
 export function isAlertOpen(record: Record<string, unknown>, now = new Date()) {
   if (!isOpen(record) || typeof record.startedAt !== 'string') return false;

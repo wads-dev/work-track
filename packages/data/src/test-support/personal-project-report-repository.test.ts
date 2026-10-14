@@ -7,6 +7,7 @@ it('reuses the project use case with full personal budget context before selecti
     'alice',
     [
       {
+        deletedAt: null,
         id: 'a',
         uid: 'alice',
         projectId: 'work',
@@ -16,6 +17,7 @@ it('reuses the project use case with full personal budget context before selecti
         topics: [],
       },
       {
+        deletedAt: null,
         id: 'b',
         uid: 'alice',
         projectId: 'personal',
@@ -25,8 +27,26 @@ it('reuses the project use case with full personal budget context before selecti
       },
     ],
     new Map([
-      ['work', { type: 'work', topics: [] }],
-      ['personal', { type: 'personal', createdBy: 'alice', topics: [] }],
+      [
+        'work',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics: [],
+        },
+      ],
+      [
+        'personal',
+        {
+          archived: false,
+          confidential: false,
+          type: 'personal',
+          createdBy: 'alice',
+          topics: [],
+        },
+      ],
     ]),
   );
   const repo = personalProjectReportRepository(own, 'alice');
@@ -51,7 +71,18 @@ it('keeps empty personal projects reportable without company queries', async () 
   const own = new ClientPersonalReportRepository(
     'alice',
     [],
-    new Map([['p', { type: 'personal', createdBy: 'alice', topics: [] }]]),
+    new Map([
+      [
+        'p',
+        {
+          archived: false,
+          confidential: false,
+          type: 'personal',
+          createdBy: 'alice',
+          topics: [],
+        },
+      ],
+    ]),
   );
   const report = await getProjectReport(
     personalProjectReportRepository(own, 'alice'),

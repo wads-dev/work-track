@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
 import type { Firestore } from 'firebase-admin/firestore';
 import { assertProjectAccess } from '@work-track/core/registration/domain/project-access';
 import {
@@ -100,6 +101,13 @@ export class FirestoreMergeRepository implements MergeRepository {
       if (isDeletedRecord(source) || isDeletedRecord(target))
         reject('Registro removido não pode ser mesclado.');
       if (
+        ![source, target].every(
+          (record) =>
+            reportRecordSchema('admin-owned').safeParse(record).success,
+        )
+      )
+        reject('Schema de storage inválido; nenhuma alteração.');
+      if (
         source.projectId !== target.projectId ||
         source.timeZone !== target.timeZone
       )
@@ -194,6 +202,7 @@ export class FirestoreMergeRepository implements MergeRepository {
       const updatedAt = new Date(now).toISOString();
       const afterTarget = {
         ...target,
+        deletedAt: target.deletedAt,
         startedAt,
         endedAt,
         originalText,

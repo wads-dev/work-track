@@ -1,32 +1,41 @@
 import { expect, it, vi } from 'vitest';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { FirestorePersonalReportRepository } from './firestore-personal-report.js';
-it('pushes project selection into the owner query while preserving nullable/missing tombstones and spanning offset intervals', async () => {
+it('pushes project selection into the owner query while preserving canonical null tombstones and spanning offset intervals', async () => {
   const values = [
     {
       id: 'span',
+      deletedAt: null,
+
       startedAt: '2026-10-01T22:00:00-03:00',
       endedAt: '2026-10-10T01:00:00+02:00',
     },
     {
       id: 'open',
+
       startedAt: '2026-09-01T10:00:00Z',
       endedAt: null,
       deletedAt: null,
     },
     {
       id: 'old',
+      deletedAt: null,
+
       startedAt: '2026-10-01T10:00:00Z',
       endedAt: '2026-10-01T11:00:00Z',
     },
-    { id: 'removed', startedAt: 'bad', deletedAt: false },
+    { id: 'removed', endedAt: null, startedAt: 'bad', deletedAt: false },
     {
       id: 'east-offset',
+      deletedAt: null,
+
       startedAt: '2026-10-09T23:58:00+23:59',
       endedAt: null,
     },
     {
       id: 'west-offset',
+      deletedAt: null,
+
       startedAt: '2026-10-07T00:01:00-23:59',
       endedAt: '2026-10-08T01:00:00Z',
     },
@@ -56,7 +65,17 @@ it('pushes project selection into the owner query while preserving nullable/miss
         : { doc: (id: string) => ({ id }) },
     getAll: () =>
       Promise.resolve([
-        { id: 'p', exists: true, data: () => ({ type: 'work' }) },
+        {
+          id: 'p',
+          exists: true,
+          data: () => ({
+            createdBy: 'alice',
+            topics: [],
+            type: 'work',
+            archived: false,
+            confidential: false,
+          }),
+        },
       ]),
   } as unknown as Firestore);
   const page = await repo.readPage('alice', 100, undefined, {
@@ -65,6 +84,7 @@ it('pushes project selection into the owner query while preserving nullable/miss
     to: '2026-10-09T00:00:00Z',
   });
   expect(where.mock.calls).toEqual([
+    ['deletedAt', '==', null],
     ['projectId', '==', 'p'],
     ['startedAt', '<', '2026-10-11'],
   ]);
@@ -79,11 +99,14 @@ it('pushes project selection into the owner query while preserving nullable/miss
     'west-offset',
   ]);
 });
-it.each([undefined, null, '2026-10-08T11:00:00Z'])(
+it.each([null, '2026-10-08T11:00:00Z'])(
   'scans only the auth UID path, bounds pages and omits transcripts',
   async (endedAt) => {
     const data = {
+      topics: [],
       projectId: 'project',
+      deletedAt: null,
+
       startedAt: '2026-10-08T10:00:00Z',
       endedAt,
       timeZone: 'UTC',
@@ -100,14 +123,26 @@ it.each([undefined, null, '2026-10-08T11:00:00Z'])(
     const limit = vi.fn().mockReturnValue({ get }),
       startAfter = vi.fn().mockReturnValue({ limit }),
       orderBy = vi.fn().mockReturnValue({ limit, startAfter });
-    const records = vi.fn().mockReturnValue({ orderBy }),
+    const records = vi
+        .fn()
+        .mockReturnValue({ where: () => ({ orderBy }), orderBy }),
       doc = vi.fn().mockReturnValue({ collection: records }),
       collection = vi.fn().mockReturnValue({ doc });
     const repo = new FirestorePersonalReportRepository({
       collection,
       getAll: () =>
         Promise.resolve([
-          { id: 'project', exists: true, data: () => ({ type: 'work' }) },
+          {
+            id: 'project',
+            exists: true,
+            data: () => ({
+              createdBy: 'alice',
+              topics: [],
+              type: 'work',
+              archived: false,
+              confidential: false,
+            }),
+          },
         ]),
     } as unknown as Firestore);
     const page = await repo.readPage('alice', 1, 'previous');
@@ -130,6 +165,8 @@ it('resumes a dated page after both native order fields, including empty residua
     id,
     data: () => ({
       projectId: 'p',
+      deletedAt: null,
+
       startedAt: '2026-09-01T10:00:00Z',
       endedAt: '2026-09-01T11:00:00Z',
       timeZone: 'UTC',
@@ -154,7 +191,17 @@ it('resumes a dated page after both native order fields, including empty residua
         : { doc: (id: string) => ({ id }) },
     getAll: () =>
       Promise.resolve([
-        { id: 'p', exists: true, data: () => ({ type: 'work' }) },
+        {
+          id: 'p',
+          exists: true,
+          data: () => ({
+            createdBy: 'alice',
+            topics: [],
+            type: 'work',
+            archived: false,
+            confidential: false,
+          }),
+        },
       ]),
   } as unknown as Firestore);
   const selection = {

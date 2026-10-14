@@ -69,17 +69,27 @@ vi.mock('firebase/firestore', () => {
 import { WebWorkRepository } from './web-work-repository';
 const repo = new WebWorkRepository({} as Firestore);
 const project = {
+  archived: false,
+  confidential: false,
   type: 'work' as const,
   title: 'Projeto',
   description: 'Descrição generosa suficiente para validar metadados.',
   createdBy: 'alice',
-  topics: [{ id: 'general', title: 'Geral', description: 'Contexto geral' }],
+  topics: [
+    {
+      id: 'general',
+      archived: false,
+      title: 'Geral',
+      description: 'Contexto geral',
+    },
+  ],
 };
 const record = {
   uid: 'alice',
   requestId: 'original',
   projectId: 'p',
   startedAt: '2026-10-10T09:00:00-03:00',
+  deletedAt: null,
   endedAt: null,
   topics: [{ topicId: 'general' }],
   originalText: 'comecei',
@@ -305,6 +315,7 @@ it('requires explicit personal publication acknowledgement and atomically audits
   expect(audit.after).toMatchObject({
     projectId: 'q',
     interpretation: 'Novo contexto',
+    deletedAt: null,
     endedAt: null,
   });
   expect(audit.updatedAt).toBe(result.updatedAt);
@@ -341,6 +352,7 @@ it('creates backend-compatible work IDs and atomically audits the current creato
     topics: [
       {
         id: 'general',
+        archived: false,
         title: 'Geral',
         description: 'Atividade geral ou tópico ainda não identificado.',
       },

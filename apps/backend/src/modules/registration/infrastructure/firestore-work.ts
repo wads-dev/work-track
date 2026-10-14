@@ -51,13 +51,13 @@ export class FirestoreWorkRepository implements WorkRepository {
     );
     const projects = await this.listProjects(uid);
     // Pure selection/compaction helper for repository-only residuals: exact ISO
-    // instant comparison, missing/null tombstones and current project ACL joins
+    // instant comparison and current project ACL joins
     // are not supported native predicates. Supported owner/padded-period guards
     // already ran in Firestore; this is not an unrestricted collection scan.
     return compactRecentRecords(records, projects, uid, input, now);
   }
   async searchRepositoryContext(term: string, uid: string, limit: number) {
-    // Firebase has no GitHub URL normalization, substring/fuzzy search or nested topic alias traversal.
+    // Firebase has no GitHub URL normalization or substring/fuzzy search.
     return searchRepositoryContext(
       await this.listProjects(uid),
       term,
@@ -79,6 +79,8 @@ export class FirestoreWorkRepository implements WorkRepository {
         else if (options?.scope === 'work')
           query = query.where('type', '==', 'work');
         else query = query.where('type', 'in', ['work', 'personal']);
+        if (options?.includeArchived === false)
+          query = query.where('archived', '==', false);
         const snapshot = await query.limit(limit).get();
         return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
       },
@@ -131,6 +133,7 @@ export class FirestoreWorkRepository implements WorkRepository {
       else if (input.scope === 'work')
         query = query.where('type', '==', 'work');
       else query = query.where('type', 'in', ['work', 'personal']);
+      if (!input.includeArchived) query = query.where('archived', '==', false);
       query = query.orderBy(FieldPath.documentId());
       if (after) query = query.startAfter(after);
       const batchLimit = Math.min(101, 1001 - scanned);
@@ -195,6 +198,7 @@ export class FirestoreWorkRepository implements WorkRepository {
         topics: [
           {
             id: 'general',
+            archived: false,
             title: 'Geral',
             description: 'Atividade geral ou tópico ainda não identificado.',
           },
@@ -298,6 +302,7 @@ export class FirestoreWorkRepository implements WorkRepository {
           .digest('hex')
           .slice(0, 32),
         title: input.title,
+        archived: false,
         description: input.description,
         ...(input.githubUrl !== undefined
           ? { githubUrl: input.githubUrl }
@@ -383,22 +388,20 @@ export class FirestoreWorkRepository implements WorkRepository {
           );
           previous = { ref: candidateRef, data };
         } else {
-          // Missing/null open and tombstone fields plus ISO-offset comparison
-          // require a residual; project and payload owner are supported natively.
+          // Exact ISO-offset instant comparison requires a domain residual.
           const snapshot = await tx.get(
             collection
               .where('projectId', '==', input.projectId)
               .where('uid', '==', uid)
+              .where('endedAt', '==', null)
+              .where('deletedAt', '==', null)
               .limit(10001),
           );
           if (snapshot.docs.length > 10000)
             throw new Error(
               'Varredura física de anteriores excede limite; informe closedPreviousRecordId explícito.',
             );
-          if (
-            snapshot.docs.filter((doc) => !isDeletedRecord(doc.data())).length >
-            2000
-          )
+          if (snapshot.docs.length > 2000)
             throw new Error(
               'Contexto de anteriores excede limite; informe closedPreviousRecordId explícito.',
             );
@@ -420,18 +423,9 @@ export class FirestoreWorkRepository implements WorkRepository {
       const record = JSON.parse(
         JSON.stringify({
           ...input,
+          endedAt: input.endedAt ?? null,
+          deletedAt: null,
           topics,
-          ...(topics.some((t, i) => t.topicId !== suppliedTopics[i]?.topicId)
-            ? {
-                topicResolution: suppliedTopics.map((t, i) => ({
-                  sourceTopicId: t.topicId,
-                  targetTopicId: topics[i]!.topicId,
-                })),
-                warnings: [
-                  'Tópicos unificados foram resolvidos para os destinos canônicos.',
-                ],
-              }
-            : {}),
           id: key,
           uid,
           receivedAt: new Date().toISOString(),

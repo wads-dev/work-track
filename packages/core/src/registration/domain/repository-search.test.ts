@@ -5,6 +5,8 @@ import {
 } from './repository-search.js';
 import type { Project } from './work-model.js';
 const project: Project = {
+  archived: false,
+  confidential: false,
   id: 'sh',
   title: 'SH',
   description: 'Projeto',
@@ -13,6 +15,7 @@ const project: Project = {
   type: 'work',
   topics: [
     {
+      archived: false,
       id: 'wt',
       title: 'Work Track',
       description: 'Registro',

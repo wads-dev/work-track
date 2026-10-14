@@ -33,23 +33,23 @@ afterEach(() => {
 import { subscribePersonalReport } from './personal-report-source';
 import { decodePersonalReportRecord } from '@work-track/data/codecs/report-record';
 
-it('uses personal codecs: null topics default, record extras stripped, topic extras retained individually', async () => {
+it('uses canonical personal codecs without mutating storage and strips extras', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribePersonalReport(db, 'alice', next, fail);
   const topic = {
     id: 't',
     title: 'Title',
-    mergedIntoTopicId: 42,
+    archived: false,
     custom: 'retained',
   };
-  const fact = row('r', { topics: null, originalText: 'private' });
+  const fact = row('r', { topics: [], originalText: 'private' });
   await emit(
     state({
       projects: [
         project('p', {
-          archived: 'existing',
-          topics: [topic, null, { id: 'bad' }],
+          archived: true,
+          topics: [topic],
           custom: 'strip',
         }),
       ],
@@ -64,12 +64,21 @@ it('uses personal codecs: null topics default, record extras stripped, topic ext
   expect((await repository.loadContext(['alice']))[0]).not.toHaveProperty(
     'originalText',
   );
-  expect(await repository.readTopics(['p'], 'alice')).toEqual({ p: [topic] });
+  expect(await repository.readTopics(['p'], 'alice')).toEqual({
+    p: [{ id: 't', title: 'Title', archived: false }],
+  });
   expect(await repository.archivedProjectIds(['p'])).toEqual(['p']);
-  expect(fact.data.topics).toBeNull();
+  expect(fact.data.topics).toEqual([]);
+  expect(topic).toEqual({
+    id: 't',
+    title: 'Title',
+    archived: false,
+    custom: 'retained',
+  });
   expect(fail).not.toHaveBeenCalled();
 });
 it.each([
+  { topics: null },
   { topics: [{ topicId: 't', percentage: -1 }] },
   { topics: [{ topicId: 't', durationMinutes: Infinity }] },
   { topics: [{ topicId: 't', percentage: NaN }] },
@@ -93,17 +102,34 @@ it.each([
     expect(fact.data).toMatchObject(patch);
   },
 );
-it.each([null, false, 0, {}, 'invalid'])(
+it.each([
+  { id: 't', title: 'Title' },
+  { id: 't', title: 'Title', archived: null },
+  { id: 't', title: 'Title', archived: 'false' },
+  { id: 't', title: 'Title', archived: false, mergedIntoTopicId: 'new' },
+  { id: 't', title: 'Title', archived: false, mergedIntoTopicId: undefined },
+])(
+  'rejects noncanonical personal topic metadata without publishing partial state: %s',
+  async (topic) => {
+    const next = vi.fn(),
+      fail = vi.fn();
+    const parent = project('p', { topics: [topic] });
+    subscribePersonalReport(db, 'alice', next, fail);
+    await emit(state({ projects: [parent], records: [row()] }));
+    expect(next).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledOnce();
+    expect(parent.data.topics).toEqual([topic]);
+  },
+);
+it.each([undefined, null, false, 0, {}, 'invalid'])(
   'invalid personal metadata type %s remains inaccessible',
   async (type) => {
     const next = vi.fn(),
       fail = vi.fn();
     subscribePersonalReport(db, 'alice', next, fail);
     await emit(state({ projects: [project('p', { type })], records: [row()] }));
-    expect(
-      await next.mock.lastCall![0].repository.loadContext(['alice']),
-    ).toEqual([]);
-    expect(fail).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledOnce();
   },
 );
 it('excludes tombstones before validation and isolates personal ownership and authenticated reader', async () => {
@@ -255,7 +281,7 @@ it('does not publish duplicate content, audit-only changes or incomplete refresh
   await emit(
     state({
       ...complete,
-      projects: [{ id: 'p', data: { topics: [], type: 'work' } }],
+      projects: [project()],
       records: [
         {
           path: row().path,
@@ -318,7 +344,7 @@ it('publishes nested mutations with new repositories and immutable computed snap
   });
   const complete = state({
     projects: [
-      project('p', { topics: [{ id: 't', title: 'Before' }] }),
+      project('p', { topics: [{ id: 't', title: 'Before', archived: false }] }),
       project('q'),
     ],
     records: [
@@ -411,3 +437,27 @@ it('rejects path-injected personal project identities without repairing persiste
   );
   expect(fact.data.projectId).toBe('nested/project');
 });
+
+it.each(['endedAt', 'deletedAt', 'topics'])(
+  'rejects missing personal storage %s without defaults or mutation',
+  (field) => {
+    const fact = row();
+    delete fact.data[field];
+    expect(() => decodePersonalReportRecord(fact.data, 'r', 'alice')).toThrow();
+    expect(fact.data).not.toHaveProperty(field);
+  },
+);
+it.each(['type', 'createdBy', 'archived', 'confidential', 'topics'])(
+  'rejects missing personal project %s without publishing partial metadata',
+  async (field) => {
+    const next = vi.fn(),
+      fail = vi.fn();
+    const parent = project();
+    delete (parent.data as Record<string, unknown>)[field];
+    subscribePersonalReport(db, 'alice', next, fail);
+    await emit(state({ projects: [parent], records: [row()] }));
+    expect(next).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledOnce();
+    expect(parent.data).not.toHaveProperty(field);
+  },
+);

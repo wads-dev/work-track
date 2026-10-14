@@ -246,7 +246,10 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
       if (!('recordId' in input)) {
         const query = corporate ? this.db.collectionGroup('records') : own;
         const scan = await tx.get(
-          query.where('projectId', '==', originId).limit(2001),
+          query
+            .where('projectId', '==', originId)
+            .where('deletedAt', '==', null)
+            .limit(2001),
         );
         if (scan.docs.length > 2000)
           throw new ProjectManagementError(
@@ -254,8 +257,8 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
             'Contexto excede 2000 registros físicos; movimento indisponível.',
           );
         // Firestore cannot match topics[].topicId inside array-of-object allocations
-        // with variable percentage/duration fields. Missing/null tombstones are active.
-        // projectId (and the personal owner collection path) are queried above.
+        // with variable percentage/duration fields. Active state and projectId
+        // (and the personal owner collection path) are queried above.
         candidates = scan.docs.filter(
           (d) =>
             !isDeletedRecord(d.data()) &&
@@ -317,6 +320,7 @@ export class FirestoreRecordMovementRepository implements MovementRepository {
             fail('ID de destino em conflito; selecione tópico explícito.');
           dest = {
             id,
+            archived: false,
             title: sourceTopic.title,
             description: sourceTopic.description,
           };

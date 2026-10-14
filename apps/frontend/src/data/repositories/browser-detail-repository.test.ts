@@ -51,8 +51,17 @@ import {
   observeRecordDetail,
 } from './browser-detail-repository';
 const db = {} as Firestore;
-const work = { type: 'work', title: 'Public', topics: [] };
+const work = {
+  createdBy: 'me',
+  archived: false,
+  confidential: false,
+  type: 'work',
+  title: 'Public',
+  topics: [],
+};
 const record = {
+  endedAt: null,
+  deletedAt: null,
   uid: 'me',
   projectId: 'p',
   interpretation: 'Current description',
@@ -112,7 +121,11 @@ it('reads native uid/id detail and rechecks current project ACL, not a record sn
     'users/me/records/r',
     'projects/p',
   ]);
-  mocks.documents.set('projects/p', { type: 'personal', createdBy: 'other' });
+  mocks.documents.set('projects/p', {
+    ...work,
+    type: 'personal',
+    createdBy: 'other',
+  });
   expect(await repository().readRecordDetail('me', 'r')).toBeNull();
   expect(mocks.remote).not.toHaveBeenCalled();
 });
@@ -127,7 +140,11 @@ it('rejects owner mismatch, wrong project, tombstones and foreign private record
   mocks.documents.set('users/me/records/r', record);
   expect(await repository().readRecordDetail('me', 'r', 'another')).toBeNull();
   mocks.documents.set('users/other/records/r', { ...record, uid: 'other' });
-  mocks.documents.set('projects/p', { type: 'personal', createdBy: 'me' });
+  mocks.documents.set('projects/p', {
+    ...work,
+    type: 'personal',
+    createdBy: 'me',
+  });
   expect(await repository().readRecordDetail('other', 'r')).toBeNull();
   expect(await repository([]).readRecordDetail('me', 'r')).toBeNull();
   expect(await repository().readRecordDetail('me', '../r')).toBeNull();
@@ -256,17 +273,19 @@ it('fails closed on incomplete/revoked workspace and suppresses pending detail a
 });
 it('selects report options natively by authorized document IDs and searches safe projections only', async () => {
   mocks.documents.set('projects/secret', {
+    createdBy: 'me',
+    archived: false,
     type: 'work',
     confidential: true,
     title: 'Secret title',
     description: 'Hidden words',
+    topics: [],
   });
   mocks.documents.set('projects/p', {
     ...work,
     topics: [
-      { id: 'active', title: 'Active' },
+      { archived: false, id: 'active', title: 'Active' },
       { id: 'old', archived: true },
-      { id: 'alias', mergedIntoTopicId: 'active' },
     ],
   });
   const repo = repository(['p', 'secret']);
@@ -293,8 +312,36 @@ it('selects report options natively by authorized document IDs and searches safe
   expect(global.projectOptions.map((option) => option.id)).toEqual(['p']);
   expect(global.selectionAvailable).toBe(false);
   const detail = await repo.readProjectTopic('p', 'alias');
-  expect(detail.canonical).toBe('active');
-  expect(detail.topic?.title).toBe('Active');
+  expect(detail.canonical).toBeNull();
+  expect(detail.topic).toBeUndefined();
+  const active = await repo.readProjectTopic('p', 'active');
+  expect(active.canonical).toBe('active');
+  expect(active.topic?.title).toBe('Active');
+  const removed = await repo.readProjectTopic('p', 'removed');
+  expect(removed.canonical).toBeNull();
+  expect(removed.topic).toBeUndefined();
+  mocks.documents.set('projects/p', {
+    ...work,
+    topics: [
+      { id: 'alias', archived: true, mergedIntoTopicId: 'active' },
+      { id: 'active', archived: false },
+    ],
+  });
+  const rejected = await repo.readProjectTopic('p', 'alias');
+  expect(rejected.project).toBeUndefined();
+  expect(rejected.canonical).toBeNull();
+  expect(rejected.topic).toBeUndefined();
+});
+it('fails closed for absent lifecycle or project state on direct reads', async () => {
+  for (const patch of [{ endedAt: undefined }, { deletedAt: undefined }]) {
+    mocks.documents.set('users/me/records/r', { ...record, ...patch });
+    expect(await repository().readRecordDetail('me', 'r')).toBeNull();
+  }
+  mocks.documents.set('users/me/records/r', record);
+  for (const patch of [{ archived: undefined }, { confidential: undefined }]) {
+    mocks.documents.set('projects/p', { ...work, ...patch });
+    expect(await repository().readRecordDetail('me', 'r')).toBeNull();
+  }
 });
 it('uncached ID reads never trigger a remote fallback', async () => {
   mocks.reads.mockRejectedValue({ code: 'unavailable' });

@@ -160,8 +160,26 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('firebase/functions', () => ({ httpsCallable: workspace.callable }));
 const materialization = (rows: Row[], complete = true): WorkspaceSnapshot => ({
   projects: [
-    { id: 'p', data: { type: 'work' } },
-    { id: 'q', data: { type: 'work' } },
+    {
+      id: 'p',
+      data: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+        topics: [],
+      },
+    },
+    {
+      id: 'q',
+      data: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+        topics: [],
+      },
+    },
   ],
   records: rows.map((row) => ({
     path: 'users/alice/records/' + row.id,
@@ -265,10 +283,11 @@ it('native fixture executes document ID, owner, project and date predicates befo
   ).toBe(false);
   expectNoRemoteReads();
 });
-it('existing undefined/null active, all nonnull malformed tombstones excluded', () => {
+it('only explicit null is active, missing and malformed tombstones excluded', () => {
   for (const value of ['2026-10-09T00:00:00Z', '', false, 0, {}, []])
     expect(isDeletedRecord({ deletedAt: value })).toBe(true);
-  expect(isDeletedRecord({})).toBe(false);
+  expect(isDeletedRecord({})).toBe(true);
+  expect(isDeletedRecord({ deletedAt: undefined })).toBe(true);
   expect(isDeletedRecord({ deletedAt: null })).toBe(false);
   expect(isOpen({ deletedAt: '', endedAt: null })).toBe(false);
   expect(
@@ -280,9 +299,11 @@ it('native active pagination excludes tombstones before filling pages and preser
     id: String(i).padStart(3, '0'),
     data: {
       projectId: 'p',
+      endedAt: null,
+      topics: [],
       ...(i < 101
         ? { deletedAt: 'deleted', originalText: 'Audit preserved' }
-        : { endedAt: null }),
+        : { deletedAt: null }),
     },
   }));
   const snapshot = materialization(rows);
@@ -331,7 +352,7 @@ it('observed active-to-deleted transition increments only its UID once, initial 
   const initial = deletionRevision('observer-test');
   observe([
     { id: 'already', data: { deletedAt: 'old' } },
-    { id: 'active', data: {} },
+    { id: 'active', data: { endedAt: null, deletedAt: null, topics: [] } },
   ]);
   expect(deletionRevision('observer-test')).toBe(initial);
   observe([
@@ -390,8 +411,10 @@ it('caps native raw pages and advances past tombstones without skipping live row
   const facts = Array.from({ length: 103 }, (_, i) => ({
     id: String(i).padStart(3, '0'),
     data: {
+      endedAt: null,
+      topics: [],
       projectId: i % 2 ? 'q' : 'p',
-      ...(i < 100 ? { deletedAt: 'gone' } : { endedAt: null }),
+      ...(i < 100 ? { deletedAt: 'gone' } : { deletedAt: null }),
     },
   }));
   let cursor = '';
@@ -449,7 +472,7 @@ it('caps native raw pages and advances past tombstones without skipping live row
   expect(workspace.listeners).toHaveLength(2);
   expectNoRemoteReads();
 });
-it('pending selects native open history including existing missing endings without truncation beyond 100 opens', async () => {
+it('pending selects only explicit null endings without truncation beyond 100 opens', async () => {
   workspace.listeners.splice(0);
   const next = vi.fn();
   const stop = subscribeAuthorizedOwnRecords(
@@ -461,37 +484,64 @@ it('pending selects native open history including existing missing endings witho
   );
   const rows = Array.from({ length: 151 }, (_, i) => ({
     id: String(i),
-    data: { projectId: 'p', endedAt: null },
+    data: { projectId: 'p', endedAt: null, deletedAt: null, topics: [] },
   }));
   const excluded: Row[] = [
-    { id: 'closed', data: { projectId: 'p', endedAt: '2026-10-08' } },
-    { id: 'other-owner', data: { uid: 'bob', projectId: 'p', endedAt: null } },
+    {
+      id: 'closed',
+      data: {
+        projectId: 'p',
+        endedAt: '2026-10-08T00:00:00Z',
+        deletedAt: null,
+        topics: [],
+      },
+    },
+    {
+      id: 'other-owner',
+      data: {
+        uid: 'bob',
+        projectId: 'p',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
+    },
     ...['', false, 0, {}, []].map((endedAt, i) => ({
       id: 'malformed-' + i,
-      data: { projectId: 'p', endedAt },
+      data: { projectId: 'p', endedAt, deletedAt: null, topics: [] },
     })),
   ];
-  const existing: Row = { id: 'missing', data: { projectId: 'p' } };
+  const missing: Row[] = [
+    {
+      id: 'missing-end',
+      data: { projectId: 'p', deletedAt: null, topics: [] },
+    },
+    {
+      id: 'missing-deletion',
+      data: { projectId: 'p', endedAt: null, topics: [] },
+    },
+  ];
   const tombstones: Row[] = ['', false, 0, {}, []].map((deletedAt, i) => ({
     id: 'deleted-' + i,
     data: { projectId: 'p', endedAt: null, deletedAt },
   }));
-  emit(materialization([...rows, existing, ...excluded, ...tombstones]));
+  emit(materialization([...rows, ...missing, ...excluded, ...tombstones]));
   await vi.waitFor(() => expect(next.mock.lastCall![0].fromCache).toBe(false));
-  expect(next.mock.lastCall![0].rows).toHaveLength(152);
+  expect(next.mock.lastCall![0].rows).toHaveLength(151);
   expect(
     next.mock.lastCall![0].rows.every(
       (row: Row) =>
-        (row.data.endedAt === null || row.data.endedAt === undefined) &&
+        row.data.endedAt === null &&
+        row.data.deletedAt === null &&
         row.data.uid === 'alice',
     ),
   ).toBe(true);
   expect(next.mock.lastCall![0].hasMore).toBe(false);
   emit(
-    materialization([...rows.slice(1), existing, ...excluded, ...tombstones]),
+    materialization([...rows.slice(1), ...missing, ...excluded, ...tombstones]),
   );
   await vi.waitFor(() => expect(next.mock.lastCall![0].fromCache).toBe(false));
-  expect(next.mock.lastCall![0].rows).toHaveLength(151);
+  expect(next.mock.lastCall![0].rows).toHaveLength(150);
   // Revocation/removal replaces local state rather than retaining an old open row.
   emit(materialization([]));
   await vi.waitFor(() => expect(next.mock.lastCall![0].fromCache).toBe(false));
@@ -521,11 +571,19 @@ it('never publishes an older cache query after a new readiness generation or sto
       }),
   );
   emit(
-    materialization([{ id: 'old', data: { projectId: 'p', endedAt: null } }]),
+    materialization([
+      {
+        id: 'old',
+        data: { projectId: 'p', endedAt: null, deletedAt: null, topics: [] },
+      },
+    ]),
   );
   emit(
     materialization([
-      { id: 'current', data: { projectId: 'p', endedAt: null } },
+      {
+        id: 'current',
+        data: { projectId: 'p', endedAt: null, deletedAt: null, topics: [] },
+      },
     ]),
   );
   await vi.waitFor(() =>
@@ -539,7 +597,13 @@ it('never publishes an older cache query after a new readiness generation or sto
     docs: [
       {
         id: 'old',
-        data: () => ({ uid: 'alice', projectId: 'p', endedAt: null }),
+        data: () => ({
+          uid: 'alice',
+          projectId: 'p',
+          endedAt: null,
+          deletedAt: null,
+          topics: [],
+        }),
       },
     ],
   });
@@ -557,7 +621,12 @@ it('never publishes an older cache query after a new readiness generation or sto
       }),
   );
   emit(
-    materialization([{ id: 'late', data: { projectId: 'p', endedAt: null } }]),
+    materialization([
+      {
+        id: 'late',
+        data: { projectId: 'p', endedAt: null, deletedAt: null, topics: [] },
+      },
+    ]),
   );
   stop();
   const stoppedCalls = next.mock.calls.length;
@@ -565,7 +634,13 @@ it('never publishes an older cache query after a new readiness generation or sto
     docs: [
       {
         id: 'late',
-        data: () => ({ uid: 'alice', projectId: 'p', endedAt: null }),
+        data: () => ({
+          uid: 'alice',
+          projectId: 'p',
+          endedAt: null,
+          deletedAt: null,
+          topics: [],
+        }),
       },
     ],
   });
@@ -604,14 +679,16 @@ it('observed deletion invalidates two project subscribers and purge fences old o
   const stop2 = projectRepository.subscribe(() => second++);
   deletionAccount('purge-a');
   const observer = createDeletionObserver('purge-a');
-  observer([{ id: 'a', data: {} }]);
+  observer([{ id: 'a', data: { endedAt: null, deletedAt: null, topics: [] } }]);
   observer([{ id: 'a', data: { deletedAt: 'now' } }]);
   expect(first).toBe(1);
   expect(second).toBe(1);
   expect(deletionRevision('purge-a')).toBe(1);
   deletionAccount('purge-b');
   expect(deletionRevision('purge-a')).toBe(0);
-  observer([{ id: 'later', data: {} }]);
+  observer([
+    { id: 'later', data: { endedAt: null, deletedAt: null, topics: [] } },
+  ]);
   observer([{ id: 'later', data: { deletedAt: 'now' } }]);
   expect(first).toBe(1);
   expect(second).toBe(1);

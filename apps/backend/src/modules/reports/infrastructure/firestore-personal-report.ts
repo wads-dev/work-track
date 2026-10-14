@@ -6,6 +6,7 @@ import {
   reportUpperDatePrefix,
   resumeReportQuery,
 } from './admin-report-query.js';
+import { decodeReportProjectMetadata } from '@work-track/data/codecs/report-project-metadata';
 import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 import { loadGlobalContext } from './firestore-global-context.js';
 import { reportRecordSchema } from '@work-track/data/codecs/report-record';
@@ -25,9 +26,14 @@ export class FirestorePersonalReportRepository implements PersonalReportReposito
           .slice(i, i + 100)
           .map((id) => this.db.collection('projects').doc(id)),
       );
-      for (const doc of docs)
-        if (!doc.exists || doc.data()?.archived || doc.data()?.mergedInto)
+      for (const doc of docs) {
+        if (!doc.exists) {
           archived.push(doc.id);
+          continue;
+        }
+        const metadata = decodeReportProjectMetadata(doc.data()!, 'admin');
+        if (metadata.archived || metadata.mergedInto) archived.push(doc.id);
+      }
     }
     return archived;
   }
@@ -63,7 +69,8 @@ export class FirestorePersonalReportRepository implements PersonalReportReposito
     let query: FirebaseFirestore.Query = this.db
       .collection('users')
       .doc(uid)
-      .collection('records');
+      .collection('records')
+      .where('deletedAt', '==', null);
     if (selection?.projectId)
       query = query.where('projectId', '==', selection.projectId);
     query = resumeReportQuery(orderReportQuery(query, upper), cursor, upper);

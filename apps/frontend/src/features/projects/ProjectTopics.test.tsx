@@ -13,11 +13,16 @@ describe('project topics are read-only metadata', () => {
           functions={{} as Functions}
           projectId="p"
           project={{
+            type: 'work',
+            createdBy: 'me',
+            archived: false,
+            confidential: false,
             topics: [
               { id: 'archived', title: 'Archived history', archived: true },
               {
                 id: 'alias',
                 title: 'Alias hidden',
+                archived: false,
                 mergedIntoTopicId: 'archived',
               },
             ],
@@ -41,14 +46,29 @@ describe('project topics are read-only metadata', () => {
           functions={{} as Functions}
           projectId="p"
           project={{
+            type: 'work',
+            createdBy: 'me',
+            archived: false,
+            confidential: false,
             topics: [
               {
                 id: 'a',
                 title: 'Arquitetura',
+                archived: false,
                 githubUrl: 'https://github.com/demo/architecture',
               },
-              { id: 'b', title: 'Entrega', githubUrl: 'javascript:alert(1)' },
-              { id: 'c', title: 'Mesclado', mergedIntoTopicId: 'a' },
+              {
+                id: 'b',
+                title: 'Entrega',
+                archived: false,
+                githubUrl: 'javascript:alert(1)',
+              },
+              {
+                id: 'c',
+                title: 'Mesclado',
+                archived: false,
+                mergedIntoTopicId: 'a',
+              },
             ],
           }}
         />

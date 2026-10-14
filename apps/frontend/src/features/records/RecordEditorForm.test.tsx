@@ -12,11 +12,25 @@ const initialProps = {
   catalog: [
     {
       id: 'p',
-      data: { title: 'Projeto', topics: [{ id: 't', title: 'Entrega' }] },
+      data: {
+        type: 'work',
+        createdBy: 'me',
+        archived: false,
+        confidential: false,
+        title: 'Projeto',
+        topics: [{ id: 't', title: 'Entrega', archived: false }],
+      },
     },
     {
       id: 'hidden',
-      data: { title: 'Segredo', confidential: true, topics: [] },
+      data: {
+        type: 'work',
+        createdBy: 'me',
+        archived: false,
+        title: 'Segredo',
+        confidential: true,
+        topics: [],
+      },
     },
   ],
   revealed: false,
@@ -60,14 +74,18 @@ describe('compact shared record editor', () => {
         {
           id: 'p',
           data: {
+            type: 'work',
+            createdBy: 'me',
+            confidential: false,
             title: 'Project',
             archived: true,
             topics: [
-              { id: 'active', title: 'Active' },
+              { id: 'active', title: 'Active', archived: false },
               { id: 'old', title: 'Retired selected', archived: true },
               {
                 id: 'alias',
                 title: 'Merged selected',
+                archived: false,
                 mergedIntoTopicId: 'active',
               },
               { id: 'retired', title: 'Retired unused', archived: true },
@@ -77,14 +95,18 @@ describe('compact shared record editor', () => {
       ],
       { projectId: 'p', revealed: true, selectedTopics: selection },
       {
+        type: 'work',
+        createdBy: 'me',
+        confidential: false,
         title: 'Project',
         archived: true,
         topics: [
-          { id: 'active', title: 'Active' },
+          { id: 'active', title: 'Active', archived: false },
           { id: 'old', title: 'Retired selected', archived: true },
           {
             id: 'alias',
             title: 'Merged selected',
+            archived: false,
             mergedIntoTopicId: 'active',
           },
           { id: 'retired', title: 'Retired unused', archived: true },
@@ -142,8 +164,12 @@ describe('compact shared record editor', () => {
           {
             id: 'q',
             data: {
+              type: 'work',
+              createdBy: 'me',
+              archived: false,
+              confidential: false,
               title: 'Outro',
-              topics: [{ id: 'q-topic', title: 'Destino' }],
+              topics: [{ id: 'q-topic', title: 'Destino', archived: false }],
             },
           },
         ]}
@@ -152,13 +178,24 @@ describe('compact shared record editor', () => {
             {
               id: 'q',
               data: {
+                type: 'work',
+                createdBy: 'me',
+                archived: false,
+                confidential: false,
                 title: 'Outro',
-                topics: [{ id: 'q-topic', title: 'Destino' }],
+                topics: [{ id: 'q-topic', title: 'Destino', archived: false }],
               },
             },
           ],
           { projectId: 'q', revealed: false, selectedTopics: [] },
-          { title: 'Outro', topics: [{ id: 'q-topic', title: 'Destino' }] },
+          {
+            type: 'work',
+            createdBy: 'me',
+            archived: false,
+            confidential: false,
+            title: 'Outro',
+            topics: [{ id: 'q-topic', title: 'Destino', archived: false }],
+          },
         )}
         sharing
       />,

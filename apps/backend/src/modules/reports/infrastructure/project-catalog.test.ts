@@ -39,17 +39,42 @@ it('Admin catalog uses100-document batches, preserves archive metadata and rejec
     [
       'historical',
       {
+        createdBy: 'alice',
         type: 'work',
-        archived: 'historical',
+        confidential: false,
+        archived: true,
         mergedInto: 'target',
-        topics: [{ id: 't', title: 'Title', extra: 'strip' }],
+        topics: [
+          {
+            id: 't',
+            title: 'Title',
+            archived: false,
+            confidential: false,
+            extra: 'strip',
+          },
+        ],
       },
     ],
     [
       'invalid',
-      { type: null, topics: [{ id: 't', title: 'Title' }, { id: 'invalid' }] },
+      {
+        type: null,
+        topics: [
+          { id: 't', title: 'Title', archived: false, confidential: false },
+          { id: 'invalid' },
+        ],
+      },
     ],
-    ['private', { type: 'personal', createdBy: 'bob' }],
+    [
+      'private',
+      {
+        topics: [],
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: 'bob',
+      },
+    ],
   ]);
   const getAll = vi.fn((...refs: { id: string }[]) =>
     Promise.resolve(
@@ -66,26 +91,24 @@ it('Admin catalog uses100-document batches, preserves archive metadata and rejec
   } as unknown as Firestore;
   const ids = [
     'historical',
-    'invalid',
     'private',
     ...Array.from({ length: 101 }, (_, i) => 'missing' + i),
   ];
   const catalog = await readProjectCatalog(db, [...ids, 'historical']);
-  expect(getAll.mock.calls.map((batch) => batch.length)).toEqual([100, 4]);
-  expect(catalog.size).toBe(3);
+  expect(getAll.mock.calls.map((batch) => batch.length)).toEqual([100, 3]);
+  expect(catalog.size).toBe(2);
+  await expect(readProjectCatalog(db, ['invalid'])).rejects.toThrow();
   expect(catalog.get('historical')).toMatchObject({
     archived: true,
     mergedInto: 'target',
-    topics: [{ id: 't', title: 'Title' }],
+    topics: [{ id: 't', title: 'Title', archived: false }],
   });
-  expect(catalog.get('invalid')).toMatchObject({
-    type: '__invalid__',
-    topics: [],
-  });
+
   const records = ['historical', 'invalid', 'private'].map((projectId) => ({
     id: projectId,
     uid: 'alice',
     projectId,
+    deletedAt: null,
     startedAt: 'historical',
     timeZone: 'UTC',
     topics: [],

@@ -4,10 +4,19 @@ import { MemoryRouter } from 'react-router-dom';
 import { MetadataLink, metadataNavigation } from './MetadataLink';
 
 const project = {
+  createdBy: 'me',
+  type: 'work',
+  archived: false,
+  confidential: false,
   title: 'Current project',
   topics: [
-    { id: 'existing', title: 'Obsolete topic', mergedIntoTopicId: 'current' },
-    { id: 'current', title: 'Canonical topic' },
+    {
+      id: 'existing',
+      title: 'Obsolete topic',
+      archived: true,
+      mergedIntoTopicId: 'current',
+    },
+    { id: 'current', title: 'Canonical topic', archived: false },
   ],
 };
 const render = (
@@ -28,7 +37,7 @@ const render = (
 
 describe('metadata presentation links', () => {
   it('renders canonical topic links with design-system classes and full return context', () => {
-    const html = render(project, false, 'existing');
+    const html = render(project, false, 'current');
     expect(html).toContain('Canonical topic');
     expect(html).not.toContain('Obsolete topic');
     expect(html).toContain(
@@ -50,12 +59,17 @@ describe('metadata presentation links', () => {
       expect(html).not.toContain('Canonical topic');
       expect(html).not.toContain('existing');
     }
-    expect(render(hidden, true, 'existing')).toContain('Canonical topic');
+    expect(render(hidden, true, 'current')).toContain('Canonical topic');
+    expect(render(hidden, true, 'existing')).toContain('Tópico indisponível');
   });
 
-  it('stays neutral when the selected parent disappears or merge target is unavailable', () => {
+  it('stays neutral for missing parents or topics and rejects aliases even with an available target', () => {
     for (const revealed of [false, true]) {
       expect(render(undefined, revealed, 'existing')).not.toContain('href=');
+      const alias = render(project, revealed, 'existing');
+      expect(alias).toContain('Tópico indisponível');
+      expect(alias).not.toContain('href=');
+      expect(alias).not.toContain('Canonical topic');
       expect(metadataNavigation('p', project, revealed, 'missing')).toEqual({
         label: 'Tópico indisponível',
       });
@@ -63,7 +77,12 @@ describe('metadata presentation links', () => {
     expect(
       metadataNavigation(
         'p',
-        { topics: [{ id: 'existing', mergedIntoTopicId: 'missing' }] },
+        {
+          ...project,
+          topics: [
+            { id: 'existing', archived: true, mergedIntoTopicId: 'missing' },
+          ],
+        },
         true,
         'existing',
       ),

@@ -31,7 +31,6 @@ type Resolution =
 
 const UNKNOWN_TOPIC = 'Tópico sem identificação';
 const UNKNOWN_USER = 'Participante sem nome';
-const MAX_ALIAS_CHAIN = 200;
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const sourceKey = (record: Pick<TopicInterval, 'id' | 'uid' | 'projectId'>) =>
   JSON.stringify([record.projectId, record.uid, record.id]);
@@ -43,32 +42,20 @@ export function resolveTopic(
   originalId: string,
 ): Resolution {
   if (!originalId.trim()) return { error: 'ID de tópico vazio' };
-  const visited = new Set<string>();
-  let current = originalId;
-  while (visited.size < MAX_ALIAS_CHAIN) {
-    if (visited.has(current)) return { error: 'Ciclo de aliases de tópicos' };
-    visited.add(current);
-    const topic = topics.get(current);
-    if (topic === null) return { error: 'Metadados de tópico duplicados' };
-    if (topic === undefined) {
-      // A missing historical original is still a stable technical identity.
-      // A missing alias target is not evidence of a canonical identity.
-      return current === originalId
-        ? {
-            topicId: originalId,
-            label: UNKNOWN_TOPIC,
-            warning: 'Tópico histórico ausente dos metadados',
-          }
-        : { error: 'Destino de alias ausente dos metadados' };
-    }
-    if (topic.mergedIntoTopicId === undefined)
-      return {
-        topicId: current,
-        label: topic.title.trim() ? topic.title : UNKNOWN_TOPIC,
-      };
-    current = topic.mergedIntoTopicId;
-  }
-  return { error: 'Cadeia de aliases excede o limite de 200 tópicos' };
+  const topic = topics.get(originalId);
+  if (topic === null) return { error: 'Metadados de tópico duplicados' };
+  if (topic === undefined)
+    return {
+      topicId: originalId,
+      label: UNKNOWN_TOPIC,
+      warning: 'Tópico histórico ausente dos metadados',
+    };
+  if (topic.mergedIntoTopicId !== undefined)
+    throw new Error('Catálogo de tópicos contém aliases não suportados.');
+  return {
+    topicId: originalId,
+    label: topic.title.trim() ? topic.title : UNKNOWN_TOPIC,
+  };
 }
 
 /** Attribute only supplied intervals; no estimates or source mutations occur here. */
@@ -80,8 +67,12 @@ export function buildTopicBreakdown(
 ): TopicBreakdown {
   const deletedKeys = new Set(records.filter(isDeletedRecord).map(sourceKey));
   records = activeRecords(records);
-  intervals = activeRecords(intervals).filter(
-    (interval) => !deletedKeys.has(sourceKey(interval)),
+  // Intervals are calculated DTOs, not storage records. Source lifecycle is
+  // authoritative; an explicit interval tombstone still fails closed.
+  intervals = intervals.filter(
+    (interval) =>
+      !deletedKeys.has(sourceKey(interval)) &&
+      (!('deletedAt' in interval) || !isDeletedRecord(interval)),
   );
   const warnings = new Set<string>();
   const sources = new Map<string, ReportSourceRecord | null>();
@@ -92,8 +83,11 @@ export function buildTopicBreakdown(
   const metadata = new Map<string, Map<string, TopicMetadata | null>>();
   for (const [projectId, project] of catalog) {
     const topics = new Map<string, TopicMetadata | null>();
-    for (const topic of project.topics)
+    for (const topic of project.topics) {
+      if (topic.mergedIntoTopicId !== undefined)
+        throw new Error('Catálogo de tópicos contém aliases não suportados.');
       topics.set(topic.id, topics.has(topic.id) ? null : topic);
+    }
     metadata.set(projectId, topics);
   }
   const totals = new Map<
@@ -188,7 +182,15 @@ export function buildTopicBreakdown(
       continue;
     }
     const resolved: { topicId: string; label: string; minutes: number }[] = [];
-    const originals = new Map<string, string[]>();
+    if (
+      new Set(allocations.map((a) => a.originalId)).size !== allocations.length
+    ) {
+      unassignedMinutes += interval.minutes;
+      warn(
+        'Alocações de tópicos duplicados; intervalo inteiro sem distribuição',
+      );
+      continue;
+    }
     for (const allocation of allocations) {
       const resolution = resolveTopic(topics, allocation.originalId);
       if ('error' in resolution) {
@@ -209,27 +211,12 @@ export function buildTopicBreakdown(
             resolution.warning +
             '; identidade original preservada',
         );
-      const ids = originals.get(resolution.topicId) ?? [];
-      ids.push(allocation.originalId);
-      originals.set(resolution.topicId, ids);
+
       resolved.push({
         topicId: resolution.topicId,
         label: resolution.label,
         minutes: allocation.minutes,
       });
-    }
-    const collisions = [...originals].filter(([, ids]) => ids.length > 1);
-    if (collisions.length > 0) {
-      unassignedMinutes += interval.minutes;
-      for (const [topicId, ids] of collisions)
-        warn(
-          'Alocações dos tópicos originais ' +
-            JSON.stringify([...ids].sort(compare)) +
-            ' convergem para ' +
-            JSON.stringify(topicId) +
-            '; intervalo inteiro sem distribuição, sem combinar originais',
-        );
-      continue;
     }
     if (allocations.length === 0 && record.topics.length > 1)
       warn(

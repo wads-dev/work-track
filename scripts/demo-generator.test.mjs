@@ -90,7 +90,7 @@ test('JSON deterministic 56 scoped documents and references', () => {
     docs.filter(
       ([path, data]) => path.startsWith('projects/') && !('type' in data),
     ).length,
-    2,
+    0,
   );
   assert.equal(new Set(docs.map(([p]) => p)).size, 56);
   const projects = new Set(

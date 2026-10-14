@@ -10,6 +10,7 @@ it('executes the existing personal use case with a client repository and unchang
       startedAt: '2026-10-08T12:00:00Z',
       endedAt: '2026-10-08T13:30:00Z',
       timeZone: 'UTC',
+      deletedAt: null,
       topics: [],
     },
   ];

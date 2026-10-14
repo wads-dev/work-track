@@ -7,12 +7,14 @@ import {
 } from 'firebase-admin/firestore';
 import type { Auth } from 'firebase-admin/auth';
 import { FirestoreProjectReportRepository } from './firestore-project-report.js';
-it.each([undefined, null, '2026-10-08T11:00:00Z'])(
+it.each([null, '2026-10-08T11:00:00Z'])(
   'bounds a collection-group page, uses document cursor, omits private content and uses display names only',
   async (endedAt) => {
     const source = {
       uid: 'alice',
       projectId: 'project',
+      deletedAt: null,
+
       startedAt: '2026-10-08T10:00:00Z',
       endedAt,
       timeZone: 'UTC',
@@ -37,7 +39,10 @@ it.each([undefined, null, '2026-10-08T11:00:00Z'])(
     const limit = vi.fn().mockReturnValue({ get });
     const startAfter = vi.fn().mockReturnValue({ limit });
     const orderBy = vi.fn().mockReturnValue({ startAfter, limit });
-    const where = vi.fn().mockReturnValue({ orderBy });
+    const where = vi.fn().mockReturnValue({
+      where: (...args: unknown[]): unknown => where(...args),
+      orderBy,
+    });
     const collectionGroup = vi.fn().mockReturnValue({ where });
     const db = {
       collectionGroup,
@@ -48,8 +53,18 @@ it.each([undefined, null, '2026-10-08T11:00:00Z'])(
             Promise.resolve({
               exists: true,
               data: () => ({
+                createdBy: 'alice',
                 type: 'work',
-                topics: [{ id: 'code', title: 'Código' }],
+                archived: false,
+                confidential: false,
+                topics: [
+                  {
+                    id: 'code',
+                    title: 'Código',
+                    archived: false,
+                    confidential: false,
+                  },
+                ],
               }),
             }),
         }),
@@ -70,7 +85,8 @@ it.each([undefined, null, '2026-10-08T11:00:00Z'])(
       'alice',
     );
     expect(collectionGroup).toHaveBeenCalledExactlyOnceWith('records');
-    expect(where).toHaveBeenCalledExactlyOnceWith('projectId', '==', 'project');
+    expect(where).toHaveBeenCalledWith('projectId', '==', 'project');
+    expect(where).toHaveBeenCalledWith('deletedAt', '==', null);
     expect(startAfter).toHaveBeenCalledExactlyOnceWith({
       path: 'users/alice/records/zero',
     });
@@ -102,11 +118,17 @@ function nativePageFixture(personal = false) {
           Promise.resolve({
             exists: true,
             data: () => ({
+              archived: false,
+              confidential: false,
               type: personal ? 'personal' : 'work',
               createdBy: 'alice',
               topics: [
-                { id: 'old', title: 'Old', mergedIntoTopicId: 'current' },
-                { id: 'current', title: 'Current' },
+                {
+                  id: 'current',
+                  title: 'Current',
+                  archived: false,
+                  confidential: false,
+                },
               ],
             }),
           }),
@@ -137,10 +159,12 @@ function nativePageFixture(personal = false) {
       data: () => ({
         uid: 'alice',
         projectId: 'project',
+        deletedAt: null,
+
         startedAt: '2026-10-08T10:00:00Z',
         endedAt: '2026-10-08T11:00:00Z',
         timeZone: 'UTC',
-        topics: [{ topicId: 'old' }],
+        topics: [{ topicId: 'current' }],
         ...data,
       }),
     }) as unknown as QueryDocumentSnapshot;
@@ -165,6 +189,7 @@ const queryFilters = (personal: boolean) => [
       value: { stringValue: 'project' },
     },
   },
+  { unaryFilter: { field: { fieldPath: 'deletedAt' }, op: 'IS_NULL' } },
   ...(personal
     ? [
         {
@@ -229,11 +254,29 @@ it('advances the dated cursor by the physical page even when all rows fail tombs
   const startedAt = '2026-01-01T00:00:00Z';
   pages.push(
     [
-      record('a', { startedAt, deletedAt: '2026-10-08T00:00:00Z' }),
-      record('b', { startedAt, endedAt: '2026-01-02T00:00:00Z' }),
-      record('c', { startedAt, endedAt: '2026-12-01T00:00:00Z' }),
+      record('a', {
+        endedAt: null,
+        startedAt,
+        deletedAt: '2026-10-08T00:00:00Z',
+      }),
+      record('b', {
+        deletedAt: null,
+        startedAt,
+        endedAt: '2026-01-02T00:00:00Z',
+      }),
+      record('c', {
+        deletedAt: null,
+        startedAt,
+        endedAt: '2026-12-01T00:00:00Z',
+      }),
     ],
-    [record('c', { startedAt, endedAt: '2026-12-01T00:00:00Z' })],
+    [
+      record('c', {
+        deletedAt: null,
+        startedAt,
+        endedAt: '2026-12-01T00:00:00Z',
+      }),
+    ],
   );
   const first = await repo.readPage('project', 2, undefined, 'alice', period);
   expect(first?.records).toEqual([]);
@@ -257,23 +300,37 @@ it('advances the dated cursor by the physical page even when all rows fail tombs
   });
 });
 
-it('keeps full-span and historical old opens, offset overlap and topic aliases under the padded native date guard', async () => {
+it('keeps full-span and historical old opens, offset overlap and canonical topics under the padded native date guard', async () => {
   const { repo, pages, record, queries } = nativePageFixture();
   pages.push([
     record('span', {
+      deletedAt: null,
+
       startedAt: '2026-01-01T00:00:00Z',
       endedAt: '2026-12-01T00:00:00Z',
     }),
-    record('null-open', { startedAt: '2026-01-01T00:00:00Z', endedAt: null }),
-    record('missing-open', {
+    record('null-open', {
+      deletedAt: null,
       startedAt: '2026-01-01T00:00:00Z',
-      endedAt: undefined,
+      endedAt: null,
+    }),
+    record('old-open', {
+      deletedAt: null,
+
+      startedAt: '2026-01-01T00:00:00Z',
+      endedAt: null,
     }),
     record('offset', {
+      deletedAt: null,
+
       startedAt: '2026-10-09T23:00:00+23:59',
       endedAt: '2026-10-09T23:30:00+23:59',
     }),
-    record('outside', { startedAt: '2026-10-10T00:00:00Z', endedAt: null }),
+    record('outside', {
+      deletedAt: null,
+      startedAt: '2026-10-10T00:00:00Z',
+      endedAt: null,
+    }),
     record('topic-other', { topics: [{ topicId: 'other' }] }),
   ]);
   const result = await repo.readPage('project', 10, undefined, 'alice', {
@@ -283,7 +340,7 @@ it('keeps full-span and historical old opens, offset overlap and topic aliases u
   expect(result?.records.map((row) => row.id)).toEqual([
     'span',
     'null-open',
-    'missing-open',
+    'old-open',
     'offset',
   ]);
   expect(queries[0]!.where).toEqual({

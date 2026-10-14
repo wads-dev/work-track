@@ -367,6 +367,8 @@ function validProject(id, owner, type = 'work') {
     type,
     createdBy: owner,
     createdAt: '2026-10-09T12:00:00Z',
+    archived: false,
+    confidential: false,
     title: 'Synthetic project',
     description: 'Synthetic project description for rules',
     topics: [],
@@ -377,6 +379,8 @@ function validRecord(projectId, uid = alice) {
     uid,
     projectId,
     startedAt: '2026-10-09T12:00:00Z',
+    endedAt: null,
+    deletedAt: null,
     timeZone: 'UTC',
     originalText: 'Synthetic transcript',
     interpretation: 'Synthetic context',
@@ -531,6 +535,23 @@ test('project authorization: public authenticated and own personal', async (t) =
     },
   );
   await t.test(
+    'rejects incomplete canonical project and record writes',
+    async () => {
+      for (const field of ['archived', 'confidential', 'type']) {
+        const p = validProject('incomplete-project', alice);
+        delete p[field];
+        await denied(write('projects/incomplete-project', p, aliceToken));
+      }
+      for (const field of ['endedAt', 'deletedAt', 'topics']) {
+        const r = validRecord('work');
+        delete r[field];
+        await denied(
+          write('users/' + alice + '/records/incomplete-record', r, aliceToken),
+        );
+      }
+    },
+  );
+  await t.test(
     'project writes preserve identity but allow scope changes by current access',
     async () => {
       const p = validProject('client-project', alice);
@@ -571,7 +592,13 @@ test('project authorization: public authenticated and own personal', async (t) =
       await allowed(
         write(
           'projects/shared-no-owner',
-          { id: 'shared-no-owner', type: 'work', title: 'Edited shared' },
+          {
+            id: 'shared-no-owner',
+            type: 'work',
+            archived: false,
+            confidential: false,
+            title: 'Edited shared',
+          },
           bobToken,
         ),
       );
@@ -919,6 +946,8 @@ test('native project creation can read a missing key without granting private pr
           'projects/native-new',
           {
             id: 'native-new',
+            archived: false,
+            confidential: false,
             type: 'personal',
             createdBy: alice,
             title: 'Native',

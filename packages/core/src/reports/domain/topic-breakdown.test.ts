@@ -10,6 +10,7 @@ const make = (
   topics: ReportSourceRecord['topics'],
   extra: Partial<ReportSourceRecord> = {},
 ): ReportSourceRecord => ({
+  deletedAt: null,
   id,
   uid: 'alice',
   projectId: 'project',
@@ -296,34 +297,60 @@ describe('buildTopicBreakdown', () => {
     expect(result.warnings.join(' ')).toContain('excedem');
   });
 
-  it('resolves a metadata alias chain to the canonical ID and title without mutation', () => {
-    const record = make('alias', [{ topicId: 'old' }]);
-    const projects = catalog([
-      { id: 'old', title: 'Old', mergedIntoTopicId: 'middle' },
-      { id: 'middle', title: 'Middle', mergedIntoTopicId: 'a' },
-      { id: 'a', title: 'Atual' },
-    ]);
-    const result = buildTopicBreakdown([record], [interval(record)], projects);
-    expect(result.byTopic[0]).toMatchObject({
-      topicId: 'a',
-      label: 'Atual',
-      minutes: 60,
-    });
-    expect(record.topics).toEqual([{ topicId: 'old' }]);
+  it.each(['a', 'old', 'missing', ''])(
+    'rejects alias metadata explicitly without redirecting to %s',
+    (destination) => {
+      const record = make('alias', [{ topicId: 'old' }]);
+      const projects = catalog([
+        { id: 'old', title: 'Old', mergedIntoTopicId: destination },
+        { id: 'a', title: 'Atual' },
+      ]);
+      expect(() =>
+        buildTopicBreakdown([record], [interval(record)], projects),
+      ).toThrow('aliases não suportados');
+      expect(record.topics).toEqual([{ topicId: 'old' }]);
+    },
+  );
+
+  it.each([2, 200, 201])('rejects alias chains of any size (%s)', (size) => {
+    const topics = Array.from({ length: size }, (_, index) => ({
+      id: 't' + index,
+      title: 'Topic ' + index,
+      ...(index < size - 1 ? { mergedIntoTopicId: 't' + (index + 1) } : {}),
+    }));
+    const record = make('chain', [{ topicId: 't0' }]);
+    expect(() =>
+      buildTopicBreakdown([record], [interval(record)], catalog(topics)),
+    ).toThrow('aliases não suportados');
   });
 
-  it('allows canonical aggregation across distinct intervals, not within one source', () => {
+  it('rejects unused aliases and mixed valid allocations rather than producing a partial report', () => {
+    const record = make('current', [{ topicId: 'a', durationMinutes: 10 }]);
+    const projects = catalog([
+      { id: 'old', title: 'Old', mergedIntoTopicId: 'a' },
+      { id: 'a', title: 'Atual' },
+    ]);
+    expect(() =>
+      buildTopicBreakdown([record], [interval(record)], projects),
+    ).toThrow('aliases não suportados');
+    const mixed = make('mixed', [
+      { topicId: 'old', durationMinutes: 20 },
+      { topicId: 'a', durationMinutes: 10 },
+    ]);
+    expect(() =>
+      buildTopicBreakdown([mixed], [interval(mixed)], projects),
+    ).toThrow('aliases não suportados');
+  });
+
+  it('aggregates current IDs across distinct intervals without alias compatibility', () => {
     const records = [
-      make('alias', [{ topicId: 'old', durationMinutes: 20 }]),
-      make('current', [{ topicId: 'a', percentage: 50 }], { uid: 'bob' }),
+      make('first', [{ topicId: 'a', durationMinutes: 20 }]),
+      make('second', [{ topicId: 'a', percentage: 50 }], { uid: 'bob' }),
     ];
     const result = buildTopicBreakdown(
       records,
       records.map((r) => interval(r)),
-      catalog([
-        { id: 'old', title: 'Old', mergedIntoTopicId: 'a' },
-        { id: 'a', title: 'Atual' },
-      ]),
+      catalog(),
     );
     expect(minutesByTopic(result)).toEqual([['a', 50]]);
     expect(result.byTopic[0]?.byUser.map((u) => [u.uid, u.minutes])).toEqual([
@@ -333,30 +360,6 @@ describe('buildTopicBreakdown', () => {
     expect(result.unassignedMinutes).toBe(70);
   });
 
-  it('rejects the whole interval when two explicit originals resolve to one canonical ID', () => {
-    const record = make('collision', [
-      { topicId: 'old', durationMinutes: 10 },
-      { topicId: 'a', percentage: 25 },
-      { topicId: 'b', durationMinutes: 5 },
-    ]);
-    const originalTopics = structuredClone(record.topics);
-    const result = buildTopicBreakdown(
-      [record],
-      [interval(record)],
-      catalog([
-        { id: 'old', title: 'Old', mergedIntoTopicId: 'a' },
-        { id: 'a', title: 'Atual' },
-        { id: 'b', title: 'Other' },
-      ]),
-    );
-    expect(result.byTopic).toEqual([]);
-    expect(result.unassignedMinutes).toBe(60);
-    expect(result.warnings.join(' ')).toContain('convergem');
-    expect(result.warnings.join(' ')).toContain('"old"');
-    expect(result.warnings.join(' ')).toContain('"a"');
-    expect(record.topics).toEqual(originalTopics);
-  });
-
   it('rejects duplicate explicit source topic allocations instead of silently adding them', () => {
     const result = run([
       { topicId: 'a', durationMinutes: 10 },
@@ -364,98 +367,22 @@ describe('buildTopicBreakdown', () => {
     ]);
     expect(result.byTopic).toEqual([]);
     expect(result.unassignedMinutes).toBe(60);
-    expect(result.warnings.join(' ')).toContain('convergem');
+    expect(result.warnings.join(' ')).toContain('duplicados');
   });
 
-  it('does not infer sole-topic attribution from multiple unallocated aliases', () => {
-    const record = make('ambiguous-aliases', [
-      { topicId: 'old' },
-      { topicId: 'a' },
-    ]);
-    const result = buildTopicBreakdown(
-      [record],
-      [interval(record)],
-      catalog([
-        { id: 'old', title: 'Old', mergedIntoTopicId: 'a' },
-        { id: 'a', title: 'Atual' },
-      ]),
-    );
-    expect(result.byTopic).toEqual([]);
-    expect(result.unassignedMinutes).toBe(60);
-  });
-
-  it.each([
-    {
-      topics: [{ id: 'old', title: 'Old', mergedIntoTopicId: 'missing' }],
-      warning: 'Destino',
-    },
-    {
-      topics: [
-        { id: 'old', title: 'Old', mergedIntoTopicId: 'next' },
-        { id: 'next', title: 'Next', mergedIntoTopicId: 'old' },
-      ],
-      warning: 'Ciclo',
-    },
-    {
-      topics: [{ id: 'old', title: 'Old', mergedIntoTopicId: 'old' }],
-      warning: 'Ciclo',
-    },
-  ])(
-    'keeps broken alias resolution unassigned ($warning)',
-    ({ topics, warning }) => {
-      const record = make('broken-alias', [{ topicId: 'old' }]);
-      const result = buildTopicBreakdown(
-        [record],
-        [interval(record)],
-        catalog(topics),
-      );
-      expect(result.byTopic).toEqual([]);
-      expect(result.unassignedMinutes).toBe(60);
-      expect(result.warnings.join(' ')).toContain(warning);
-    },
-  );
-
-  it.each([200, 201])(
-    'bounds alias resolution to 200 metadata entries (%s)',
-    (size) => {
-      const topics = Array.from({ length: size }, (_, index) => ({
-        id: 't' + index,
-        title: 'Topic ' + index,
-        ...(index < size - 1 ? { mergedIntoTopicId: 't' + (index + 1) } : {}),
-      }));
-      const record = make('chain', [{ topicId: 't0' }]);
-      const result = buildTopicBreakdown(
-        [record],
-        [interval(record)],
-        catalog(topics),
-      );
-      if (size === 200) {
-        expect(minutesByTopic(result)).toEqual([['t199', 60]]);
-        expect(result.unassignedMinutes).toBe(0);
-      } else {
-        expect(result.byTopic).toEqual([]);
-        expect(result.unassignedMinutes).toBe(60);
-        expect(result.warnings.join(' ')).toContain('200');
-      }
-    },
-  );
-
-  it('retains valid explicit topics while a broken alias allocation is unassigned', () => {
-    const record = make('mixed-alias', [
+  it('keeps removed historical IDs separate from current allocations without losing hours', () => {
+    const result = run([
       { topicId: 'old', durationMinutes: 20 },
       { topicId: 'a', durationMinutes: 10 },
     ]);
-    const result = buildTopicBreakdown(
-      [record],
-      [interval(record)],
-      catalog([
-        { id: 'old', title: 'Old', mergedIntoTopicId: 'missing' },
-        { id: 'a', title: 'Atual' },
-      ]),
+    expect(minutesByTopic(result)).toEqual([
+      ['a', 10],
+      ['old', 20],
+    ]);
+    expect(result.byTopic.find((t) => t.topicId === 'old')?.label).toBe(
+      'Tópico sem identificação',
     );
-    expect(minutesByTopic(result)).toEqual([['a', 10]]);
-    expect(result.unassignedMinutes).toBe(50);
-    expect(result.warnings.join(' ')).toContain('Destino');
+    expect(result.unassignedMinutes).toBe(30);
   });
 
   it('retains a missing historical raw topic with a stable ID and neutral label', () => {
@@ -642,7 +569,6 @@ describe('buildTopicBreakdown', () => {
       make('b', [{ topicId: 'missing' }]),
     ];
     const topics: Metadata[] = [
-      { id: 'old', title: 'Old', mergedIntoTopicId: 'a' },
       { id: 'a', title: 'Atual' },
       { id: 'b', title: 'B' },
     ];
@@ -664,7 +590,6 @@ describe('buildTopicBreakdown', () => {
       ]),
     ];
     const projects = catalog([
-      { id: 'old', title: 'Old', mergedIntoTopicId: 'a' },
       { id: 'a', title: 'Atual' },
       { id: 'b', title: 'B' },
     ]);
@@ -692,7 +617,7 @@ describe('buildTopicBreakdown', () => {
     Object.freeze(projects);
     Object.freeze(labels);
     const result = buildTopicBreakdown(records, intervals, projects, labels);
-    expect(minutesByTopic(result)).toEqual([['a', 20]]);
+    expect(minutesByTopic(result)).toEqual([['old', 20]]);
     expect(result.unassignedMinutes).toBe(40);
     expect({ records, intervals, projects: [...projects], labels }).toEqual(
       before,

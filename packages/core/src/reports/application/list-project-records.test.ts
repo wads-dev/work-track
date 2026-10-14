@@ -14,6 +14,7 @@ describe('ListProjectRecords', () => {
     const { service, listByProject } = setup();
     const records = [
       {
+        deletedAt: null,
         id: 'record',
         projectId: 'project-1',
         uid: 'alice',

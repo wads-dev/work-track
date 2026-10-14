@@ -14,6 +14,7 @@ const auth = {
   },
 };
 const record = (uid: string, id: string): ReportSourceRecord => ({
+  deletedAt: null,
   uid,
   id,
   projectId: 'w',
@@ -25,8 +26,8 @@ const record = (uid: string, id: string): ReportSourceRecord => ({
 function fixture(records: ReportSourceRecord[] = []) {
   let personal = false,
     topics = [
-      { id: 'x', title: 'X' },
-      { id: 'other', title: 'Other' },
+      { archived: false, id: 'x', title: 'X' },
+      { archived: false, id: 'other', title: 'Other' },
     ];
   const repo: TopicReportRepository = {
     readPage: (_projectId, _limit, _cursor, viewerUid, selection) =>
@@ -38,6 +39,8 @@ function fixture(records: ReportSourceRecord[] = []) {
                 [
                   'w',
                   {
+                    archived: false,
+                    confidential: false,
                     type: personal ? 'personal' : 'work',
                     createdBy: 'alice',
                     topics,
@@ -87,11 +90,13 @@ it('full facts actualstarts min/max inclzero future open; distinctUIDsameID anda
       ],
     },
     {
+      deletedAt: null,
       ...record('alice', 'zero'),
       startedAt: '2020-01-03T12:00:00Z',
       endedAt: '2020-01-03T12:00:00Z',
     },
     {
+      deletedAt: null,
       ...record('bob', 'future'),
       startedAt: '2030-01-03T12:00:00Z',
       endedAt: undefined,
@@ -182,7 +187,7 @@ it('authorization strictschema ownprivacy finalemptycatalog archive context andp
   f.repo.readPage = () =>
     Promise.resolve({
       records: [],
-      topics: [{ id: 'x', title: 'X' }],
+      topics: [{ archived: false, id: 'x', title: 'X' }],
       personal: false,
       topicLabels: {},
       nextCursor: 'page' + ++n,
@@ -206,44 +211,64 @@ it('authorization strictschema ownprivacy finalemptycatalog archive context andp
     getTopicReportHandler(cap.repo, request, auth),
   ).rejects.toMatchObject({ code: 'failed-precondition' });
 });
-it('canonical aliases converge cycle fails finalmerge race fails archive explicit owneronly fallback noUID', async () => {
-  const f = fixture([
-    { ...record('alice', 'a'), topics: [{ topicId: 'alias' }] },
-  ]);
+it('canonical topics preserve hours archive explicit owneronly fallback noUID and aliases or catalog races fail closed', async () => {
+  const f = fixture([{ ...record('alice', 'a'), topics: [{ topicId: 'x' }] }]);
   f.repo.readPage = () =>
     Promise.resolve({
-      records: [{ ...record('alice', 'a'), topics: [{ topicId: 'alias' }] }],
-      topics: [
-        { id: 'alias', title: 'Old', mergedIntoTopicId: 'x' },
-        { id: 'x', title: 'X' },
-      ],
+      records: [{ ...record('alice', 'a'), topics: [{ topicId: 'x' }] }],
+      topics: [{ archived: false, id: 'x', title: 'X' }],
       personal: true,
       archived: true,
       topicLabels: {},
       nextCursor: null,
     });
   await expect(
-    getTopicReportHandler(f.repo, { ...request, topicId: 'alias' }, auth),
+    getTopicReportHandler(f.repo, { ...request, topicId: 'x' }, auth),
   ).rejects.toMatchObject({ code: 'failed-precondition' });
   f.repo.userLabels = () => Promise.resolve({});
   const result = await getTopicReportHandler(
     f.repo,
-    { ...request, topicId: 'alias', includeArchived: true },
+    { ...request, topicId: 'x', includeArchived: true },
     auth,
   );
   expect(result).toMatchObject({
     mode: 'own',
     topicId: 'x',
-    requestedTopicId: 'alias',
+    requestedTopicId: 'x',
     topicLabel: 'X',
     totalMinutes: 120,
     participants: [{ label: 'Participante sem nome' }],
   });
+  const aliasRecords = [
+    record('alice', 'canonical'),
+    { ...record('bob', 'alias'), topics: [{ topicId: 'old' }] },
+  ];
+  const before = structuredClone(aliasRecords);
+  const alias = fixture(aliasRecords);
+  alias.repo.readPage = () =>
+    Promise.resolve({
+      records: aliasRecords,
+      topics: [
+        { archived: false, id: 'x', title: 'X' },
+        { archived: false, id: 'old', title: 'Old', mergedIntoTopicId: 'x' },
+      ],
+      personal: false,
+      topicLabels: {},
+      nextCursor: null,
+    });
+  for (const topicId of ['x', 'old']) {
+    await expect(
+      getTopicReportHandler(alias.repo, { ...request, topicId }, auth),
+    ).rejects.toMatchObject({ code: 'failed-precondition' });
+  }
+  expect(aliasRecords).toEqual(before);
   const cycle = fixture();
   cycle.repo.readPage = () =>
     Promise.resolve({
       records: [],
-      topics: [{ id: 'x', title: 'X', mergedIntoTopicId: 'x' }],
+      topics: [
+        { archived: false, id: 'x', title: 'X', mergedIntoTopicId: 'x' },
+      ],
       personal: false,
       topicLabels: {},
       nextCursor: null,
@@ -256,7 +281,9 @@ it('canonical aliases converge cycle fails finalmerge race fails archive explici
   race.repo.readPage = () =>
     Promise.resolve({
       records: [],
-      topics: [{ id: 'x', title: ++n === 1 ? 'Before' : 'After' }],
+      topics: [
+        { archived: false, id: 'x', title: ++n === 1 ? 'Before' : 'After' },
+      ],
       personal: false,
       topicLabels: {},
       nextCursor: null,
@@ -274,6 +301,7 @@ it('authorfullglobalcontext estimates independent of closed facts duplicateident
       own,
       bob,
       {
+        deletedAt: null,
         ...record('alice', 'closed'),
         projectId: 'otherProject',
         startedAt: '2026-10-02T06:00:00Z',
@@ -301,6 +329,7 @@ it('authorfullglobalcontext estimates independent of closed facts duplicateident
       own,
       bob,
       {
+        deletedAt: null,
         ...record('alice', 'malformed'),
         projectId: 'otherProject',
         startedAt: '2026-10-02T10:00:00Z',
@@ -348,7 +377,7 @@ it('finalsource read afterengine deletion/topicmove andfinalcatalogempty privacy
     empty.repo.readPage = () =>
       Promise.resolve({
         records: [],
-        topics: [{ id: 'x', title: 'X' }],
+        topics: [{ archived: false, id: 'x', title: 'X' }],
         topicLabels: {},
         nextCursor: null,
         personal: false,

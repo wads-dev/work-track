@@ -257,7 +257,14 @@ export const state = (
 });
 export const project = (id = 'p', data: Record<string, unknown> = {}) => ({
   id,
-  data: { type: 'work', topics: [], ...data },
+  data: {
+    type: 'work',
+    createdBy: 'alice',
+    archived: false,
+    confidential: false,
+    topics: [],
+    ...data,
+  },
 });
 export const row = (
   id = 'r',
@@ -268,6 +275,8 @@ export const row = (
   data: {
     uid,
     projectId: 'p',
+    endedAt: null,
+    deletedAt: null,
     startedAt: '2026-10-08T12:00:00Z',
     timeZone: 'UTC',
     topics: [],

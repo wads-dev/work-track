@@ -26,7 +26,7 @@ Extrair o núcleo neutro e repositórios reutilizáveis da main `393c78b`, incor
 
 ## Cuidados de compatibilidade
 
-Schemas de escrita não substituem decoders tolerantes de leitura. Ausência/null de `endedAt`, tombstones, aliases, representações históricas de registros e normalização de metadados mantêm sua semântica. Projetos exigem `type` explícito `work` ou `personal`; ausência ou tipo inválido nega acesso, sem fallback. Os modos históricos de leitura de tópicos permanecem explícitos. Dados de relatórios completos não são substituídos por primeira página ou cache parcial. Comandos e acesso ao diretório Auth permanecem no servidor.
+O contrato atual de leitura e escrita exige registros com `endedAt: string | null`, `deletedAt` presente (somente `null` ativo) e `topics` array obrigatório; projetos com `type` explícito `work` ou `personal`, `archived` e `confidential` boolean; tópicos com `archived` boolean. Não há fallback para campos ausentes. Tombstones e auditorias conservam evidências reais, sem serem convertidos em atividade. A [migração de produção](project-type-migration.md) concluída em 14/10/2026 cobre 13 projetos e 446 registros, com zero campos canônicos ausentes; os guards de publicação do rollout foram removidos a pedido humano. Dados de relatórios completos não são substituídos por primeira página ou cache parcial. Comandos e acesso ao diretório Auth permanecem no servidor.
 
 ## Progresso
 

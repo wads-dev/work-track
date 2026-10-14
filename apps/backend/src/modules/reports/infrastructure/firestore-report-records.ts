@@ -1,4 +1,6 @@
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
+import { z } from 'zod';
+import { decodeReportProjectMetadata } from '@work-track/data/codecs/report-project-metadata';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
   canAccessProject,
@@ -8,6 +10,16 @@ import type {
   ReportRecord,
   ReportRecordsRepository,
 } from '@work-track/core/reports/domain/report-record';
+const recordDates = z
+  .object({
+    startedAt: z.iso.datetime({ offset: true }),
+    endedAt: z.iso.datetime({ offset: true }).nullable(),
+    deletedAt: z.null(),
+  })
+  .refine(
+    (r) =>
+      r.endedAt === null || Date.parse(r.endedAt) >= Date.parse(r.startedAt),
+  );
 export class FirestoreReportRecordsRepository implements ReportRecordsRepository {
   constructor(private readonly db: Firestore) {}
   async listByProject(
@@ -19,13 +31,14 @@ export class FirestoreReportRecordsRepository implements ReportRecordsRepository
     const project = await this.db.collection('projects').doc(projectId).get();
     if (!project.exists || !canAccessProject(project.data(), viewerUid))
       throw new Error('Projeto não encontrado.');
-    const personal = effectiveProjectType(project.data()!) === 'personal';
+    const metadata = decodeReportProjectMetadata(project.data()!, 'admin');
+    const personal = effectiveProjectType(metadata) === 'personal';
     let query = this.db
       .collectionGroup('records')
-      .where('projectId', '==', projectId);
+      .where('projectId', '==', projectId)
+      .where('deletedAt', '==', null);
     if (personal) query = query.where('uid', '==', viewerUid);
-    // Missing/null deletedAt is active; Firestore equality/null drops missing historical
-    // documents. Bound the unavoidable tombstone residual and fail before truncating.
+    // Bound the canonical active query and fail before truncating.
     const snapshot = await query.limit(2001).get();
     if (snapshot.docs.length > 2000)
       throw new Error(
@@ -46,6 +59,7 @@ export class FirestoreReportRecordsRepository implements ReportRecordsRepository
           data.projectId !== projectId
         )
           throw new Error('Invalid canonical record ownership');
+        recordDates.parse(data);
         return {
           id: doc.id,
           projectId: data.projectId as string,

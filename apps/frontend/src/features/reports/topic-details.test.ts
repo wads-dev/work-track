@@ -80,15 +80,24 @@ describe('topic details facts and privacy', () => {
     ])
       expect(() => validateTopicReport(d, 'me', 'p', 't', 't')).toThrow();
   });
-  it('alias canonical resolution is explicit and missing cyclic failclosed', () => {
+  it('rejects catalog aliases and missing topics without redirecting', () => {
     expect(
       canonicalCatalogTopic(
-        [{ id: 'old', mergedIntoTopicId: 't' }, { id: 't' }],
+        [
+          { id: 'old', archived: true, mergedIntoTopicId: 't' },
+          { id: 't', archived: false },
+        ],
         'old',
       ),
-    ).toBe('t');
+    ).toBeNull();
+    expect(canonicalCatalogTopic([{ id: 't', archived: false }], 't')).toBe(
+      't',
+    );
     expect(
-      canonicalCatalogTopic([{ id: 'old', mergedIntoTopicId: 'old' }], 'old'),
+      canonicalCatalogTopic(
+        [{ id: 'old', archived: true, mergedIntoTopicId: 'old' }],
+        'old',
+      ),
     ).toBeNull();
     expect(canonicalCatalogTopic([], 'missing')).toBeNull();
   });

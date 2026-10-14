@@ -28,6 +28,4 @@ jobs:
         with:
           workload_identity_provider: projects/1048371748954/locations/global/workloadIdentityPools/github-actions/providers/work-track
           service_account: github-deploy@wadsworktrack.iam.gserviceaccount.com
-      - name: Require complete project type migration before deployment
-        run: node scripts/backfill-project-type.mjs --project wadsworktrack --verify
       - run: npx -y firebase-tools@latest deploy --only firestore --project wadsworktrack --non-interactive

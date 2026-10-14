@@ -1,11 +1,10 @@
-/** historical undefined/null markers remain active; any other marker fails closed. */
+/** Only an explicit null marker is active; missing or non-null markers fail closed. */
 export function isDeletedRecord(record: unknown): boolean {
-  return Boolean(
+  return !(
     record &&
     typeof record === 'object' &&
     'deletedAt' in record &&
-    record.deletedAt !== null &&
-    record.deletedAt !== undefined,
+    record.deletedAt === null
   );
 }
 export function activeRecords<T>(records: T[]): T[] {

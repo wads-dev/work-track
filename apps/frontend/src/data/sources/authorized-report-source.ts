@@ -1,6 +1,5 @@
 import {
   collection,
-  collectionGroup,
   documentId,
   getDocsFromCache,
   query,
@@ -11,10 +10,7 @@ import {
 import { decodeWebProjectSnapshot } from '../../infrastructure/firebase/web-read-adapter';
 import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 import type { ReportProjectMetadata } from '@work-track/data/codecs/report-project-metadata';
-import {
-  calendarQueryBounds,
-  type CalendarQueryRange,
-} from './calendar-firestore-query';
+import type { CalendarQueryRange } from './calendar-firestore-query';
 import { FirestoreReportRepository } from '../repositories/firestore-report-repository';
 import { observeWorkspace } from '../sync/workspace-runtime';
 import { traceFirestore } from '../sync/firestore-diagnostics';
@@ -24,31 +20,6 @@ export interface AuthorizedReportSnapshot {
   coherent: boolean;
   fromCache: boolean;
   hasPendingWrites: boolean;
-}
-export function authorizedRecordQueries(
-  db: Firestore,
-  projectId: string,
-  range?: CalendarQueryRange,
-) {
-  const base = collectionGroup(db, 'records'),
-    project = where('projectId', '==', projectId);
-  if (!range) return [query(base, project)];
-  const { lower, upper } = calendarQueryBounds(range);
-  return [
-    query(
-      base,
-      project,
-      where('startedAt', '>=', lower),
-      where('startedAt', '<', upper),
-    ),
-    query(
-      base,
-      project,
-      where('endedAt', '>=', lower),
-      where('startedAt', '<', upper),
-    ),
-    query(base, project, where('startedAt', '<', lower)),
-  ];
 }
 /** Session owns synchronization. This observer only constructs a query repository after readiness. */
 export function subscribeAuthorizedReport(

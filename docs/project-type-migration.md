@@ -1,16 +1,19 @@
-# Tipo explícito de projeto
+# Dados canônicos e migração Web
 
-Todos os projetos exigem `type: "work"` ou `type: "personal"`. Confidencialidade permanece apresentação, independente do escopo.
+## Execução em produção — 14/10/2026
 
-## Ordem de publicação
+A migração foi executada pelo Firebase Web SDK no navegador apontado para `wadsworktrack`, após prévia e backup privado fora do Git. A primeira etapa usou a conta corporativa autorizada; a etapa restante usou uma instância separada sem Auth, durante a janela de Rules temporária publicada pelo usuário. Não houve deploy de aplicação ou Rules pelo agente.
 
-1. Autenticar Admin SDK com credenciais administrativas aprovadas (ADC).
-2. Executar `node scripts/backfill-project-type.mjs --project wadsworktrack` para prévia completa paginada.
-3. Revisar contagens. Valores explícitos inválidos exigem revisão, nunca são convertidos automaticamente.
-4. Executar `node scripts/backfill-project-type.mjs --project wadsworktrack --apply --backup .release/project-type-before.ndjson`. O arquivo deve ser novo e privado, não versionado.
-5. Repetir a prévia e exigir `missing: 0` e `invalid: 0` antes de publicar leitores/regras estritos.
-6. Publicar o código e Rules somente após a confirmação da migração. Os três workflows de deploy executam `--verify` e recusam publicação enquanto houver tipo ausente ou inválido (leitura Admin via identidade federada, sem escrita).
+Inventário completo final: **13 projetos e 446 registros**. Verificado no servidor: zero `type`, `archived` ou `confidential` ausente nos projetos; zero `archived` ausente nos tópicos; zero `endedAt` ou `deletedAt` ausente nos registros; zero aliases `mergedIntoTopicId` no catálogo.
 
-A migração escreve apenas `type: "work"` em documentos de `projects` que não possuem esse campo, incluindo arquivados e mesclados. Não modifica projetos pessoais, confidencialidade, tópicos, apontamentos nem auditorias. Cada escrita exige precondição `lastUpdateTime`; conflito ou falha de backup aborta, sem sobrescrever alterações concorrentes. Uma execução interrompida pode ser retomada com outro arquivo de backup; documentos já classificados são ignorados.
+Patches: `type: "work"` somente em projetos sem tipo, flags boolean explícitas preservando o estado anterior, `endedAt: null` e `deletedAt: null` somente quando ausentes. Marcadores de remoção presentes não foram alterados. Tópicos sem archived receberam false. Um alias sem referências em allocations/snapshots operacionais foi removido após validar destino existente. Auditorias e comprovantes de exportação não foram reescritos.
 
-O backup NDJSON possui cabeçalho do ambiente e, por documento, um payload base64 serializado via `node:v8` com path, updateTime e campos protobuf Firestore (preserva bytes e representações). Proteja o arquivo: contém dados de projetos. Não aplique restauração automática que remova classificações ou sobrescreva edições posteriores.
+As escritas ocorreram em transações com releitura e comparação canônica dos dados de origem. A primeira etapa atualizou 263 documentos; a segunda 128, incluindo documentos de projetos já tocados para normalizar tópicos, mais uma atualização de catálogo para eliminar o alias. Todas as alterações previstas foram relidas; nenhuma alteração inesperada foi encontrada. Backups privados contêm conteúdo confidencial e não entram no PR.
+
+O usuário foi avisado para restaurar as Rules normais imediatamente após a verificação final. Não manter acesso público para desenvolvimento ou testes.
+
+## Contrato atual
+
+Projetos exigem `type: "work" | "personal"`, `archived` e `confidential` boolean. Tópicos têm archived boolean. Registros persistem `endedAt: string | null`, `deletedAt: null` quando ativos e topics array; tombstones são preservados. Writers devem produzir esse formato; leitores não recuperam automaticamente campos ausentes. Confidencialidade continua apresentação, não ACL.
+
+A migração não é responsabilidade da CI. Foram removidos os três guards de publicação adicionados no draft anterior. Scripts administrativos de migração são ferramentas operacionais, não caminhos de leitura do aplicativo.

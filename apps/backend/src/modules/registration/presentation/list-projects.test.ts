@@ -25,6 +25,8 @@ const catalog = [
   { id: 'f', createdBy: 'alice', title: 'Deny missing type' },
 ].map((p) => ({
   ...p,
+  archived: false,
+  confidential: false,
   description: 'Synthetic project description',
   topics: [],
   createdAt: '2026-10-01T00:00:00Z',

@@ -13,6 +13,7 @@ const auth = {
 };
 const records = [
   {
+    deletedAt: null,
     id: 'a',
     uid: 'alice',
     projectId: 'other',
@@ -22,6 +23,7 @@ const records = [
     topics: [],
   },
   {
+    deletedAt: null,
     id: 'b',
     uid: 'alice',
     projectId: 'chosen',

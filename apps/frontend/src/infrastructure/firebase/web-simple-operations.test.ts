@@ -57,6 +57,7 @@ const moveIntent = {
   confirmed: false,
 };
 const topic = {
+  archived: false,
   id: 'topic',
   title: 'Tópico',
   description: 'Original description',
@@ -68,6 +69,8 @@ beforeEach(() => {
   sdk.writes.length = 0;
   sdk.data.set('projects/source', {
     id: 'source',
+    archived: false,
+    confidential: false,
     type: 'work',
     createdBy: 'owner',
     title: 'Source',
@@ -75,6 +78,8 @@ beforeEach(() => {
   });
   sdk.data.set('projects/target', {
     id: 'target',
+    archived: false,
+    confidential: false,
     type: 'work',
     createdBy: 'other',
     title: 'Target',
@@ -82,6 +87,8 @@ beforeEach(() => {
     topics: [],
   });
   sdk.data.set(recordPath, {
+    deletedAt: null,
+    endedAt: null,
     id: 'record',
     uid: 'actor',
     projectId: 'source',
@@ -156,6 +163,8 @@ describe('simple Web transactions', () => {
     sdk.data.set('projects/source', {
       id: 'source',
       createdBy: 'owner',
+      archived: false,
+      confidential: false,
       type: 'work',
     });
     const preview = await scope.changeScope(scopeIntent, 'actor');
@@ -278,6 +287,8 @@ describe('simple Web transactions', () => {
     await expect(move.moveRecord(moveIntent, 'actor')).rejects.toThrow();
     sdk.data.set('projects/target', {
       ...sdk.data.get('projects/target'),
+      archived: false,
+      confidential: false,
       type: 'work',
     });
     const preview = await move.moveRecord(moveIntent, 'actor');

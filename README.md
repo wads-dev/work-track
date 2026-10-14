@@ -27,6 +27,12 @@ O cliente descobre o OAuth, registra seu callback, abre o navegador e solicita l
 
 A ferramenta temporária `whoami` permite confirmar a identidade autenticada. Ela não registra trabalho. Estão disponíveis search_projects, create_project, create_topic e register. Projetos exigem `type` explícito `work` (compartilhado no domínio corporativo) ou `personal` (restrito ao proprietário); ausência ou tipo inválido nega acesso, sem fallback. Registros ficam separados por usuário. Todo projeto nasce com tópico Geral. A busca V1 usa similaridade textual, não embeddings. O registro preserva texto, interpretação, início, fim opcional, momento da fala opcional e timestamp do servidor. Não divide tempo automaticamente nem encerra outros registros. requestId evita duplicações em retries.
 
+## Storage canônico
+
+Projetos persistem `type: "work" | "personal"`, `archived` e `confidential` boolean explícitos; tópicos persistem `archived` boolean explícito. Registros exigem `endedAt: string | null`, `deletedAt` presente e `topics` array obrigatório. Somente `endedAt: null` representa aberto e somente `deletedAt: null` representa ativo; campos ausentes não recebem fallback. O fim permanece opcional na entrada do comando, não no documento persistido.
+
+Produção foi migrada em 14/10/2026: 13 projetos e 446 registros, com zero campos canônicos ausentes no inventário final. Consulte [migração](docs/project-type-migration.md). A migração é operacional, não responsabilidade da CI; os guards de publicação desse rollout foram removidos a pedido humano. Auditorias e evidências históricas permanecem preservadas.
+
 ## Arquitetura e segurança
 
 - Firebase Hosting: página de login e origem HTTPS estável.

@@ -30,6 +30,7 @@ it('serializes exact owner/period predicates with date-first physical orders in 
   );
   const base = [
     fieldFilter('uid', 'EQUAL', 'alice'),
+    { unaryFilter: { field: { fieldPath: 'deletedAt' }, op: 'IS_NULL' } },
     fieldFilter('startedAt', 'LESS_THAN', '2026-10-13'),
   ];
   for (const [index, proto] of native.entries()) {
@@ -38,6 +39,16 @@ it('serializes exact owner/period predicates with date-first physical orders in 
         op: 'AND',
         filters: [
           ...base,
+          ...(index === 2
+            ? [
+                {
+                  unaryFilter: {
+                    field: { fieldPath: 'endedAt' },
+                    op: 'IS_NULL',
+                  },
+                },
+              ]
+            : []),
           [
             fieldFilter('startedAt', 'GREATER_THAN_OR_EQUAL', '2026-10-08'),
             fieldFilter('endedAt', 'GREATER_THAN_OR_EQUAL', '2026-10-08'),
@@ -56,11 +67,6 @@ it('serializes exact owner/period predicates with date-first physical orders in 
     expect(proto.startAt).toBeUndefined();
     expect(proto.limit).toEqual({ value: 2001 });
   }
-  expect(branches.map(({ oldOpenOnly }) => oldOpenOnly)).toEqual([
-    false,
-    false,
-    true,
-  ]);
 });
 
 it('pads bounds so opposite-offset starts and overlap ends are never lost', () => {
@@ -108,16 +114,12 @@ function stubBranchReads(
   return { limits, get };
 }
 
-it('deduplicates physical IDs and retains only missing/null-ended old-start residuals', async () => {
+it('deduplicates physical IDs returned by canonical native branches', async () => {
   const duplicate = { id: 'recent', startedAt: '2026-10-11T00:00:00Z' };
   const reads = stubBranchReads([
     [duplicate],
     [duplicate, { id: 'span', endedAt: '2026-10-11T00:00:00Z' }],
-    [
-      { id: 'historical-open' },
-      { id: 'null-open', endedAt: null },
-      { id: 'old-closed', endedAt: '2026-10-02T00:00:00Z' },
-    ],
+    [{ id: 'null-open', endedAt: null }],
   ]);
   try {
     const records = await readRecentRecordCandidates(
@@ -129,7 +131,6 @@ it('deduplicates physical IDs and retains only missing/null-ended old-start resi
     expect(records.map(({ id }) => id)).toEqual([
       'recent',
       'span',
-      'historical-open',
       'null-open',
     ]);
     expect(reads.limits).toEqual([2001, 2000, 1998]);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ReportRecordSelection } from '@work-track/core/reports/domain/personal-report';
 import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
+import { buildTopicBreakdown } from '@work-track/core/reports/domain/topic-breakdown';
 import type { ReportProjectMetadata } from '../codecs/report-project-metadata.js';
 import { ClientPersonalReportRepository } from './personal-report-repository.js';
 import { AuthorizedReportRepository } from './authorized-report-repository.js';
@@ -11,14 +12,14 @@ const uid = 'alice';
 const from = '2026-10-08T12:00:00Z';
 const to = '2026-10-08T14:00:00Z';
 const topics: ReportProjectMetadata['topics'] = [
-  { id: 'target', title: 'Target' },
-  { id: 'old', title: 'Old', mergedIntoTopicId: 'target' },
-  { id: 'other', title: 'Other' },
+  { archived: false, id: 'target', title: 'Target' },
+  { archived: false, id: 'other', title: 'Other' },
 ];
 const record = (
   id: string,
   options: Partial<ReportSourceRecord> = {},
 ): ReportSourceRecord => ({
+  deletedAt: null,
   id,
   uid,
   projectId: 'project',
@@ -31,15 +32,17 @@ const record = (
 
 const fixtures = [
   record('a-spanning', {
+    deletedAt: null,
     startedAt: '2026-10-07T00:00:00Z',
     endedAt: '2026-10-09T00:00:00Z',
-    topics: [{ topicId: 'old' }, { topicId: 'other' }],
+    topics: [{ topicId: 'target' }, { topicId: 'other' }],
   }),
   record('b-open', { startedAt: '2026-10-07T00:00:00Z', endedAt: undefined }),
   record('c-offset', {
+    deletedAt: null,
     startedAt: '2026-10-08T08:30:00-04:00',
     endedAt: '2026-10-08T09:30:00-04:00',
-    topics: [{ topicId: 'old', percentage: 0 }],
+    topics: [{ topicId: 'target', percentage: 0 }],
   }),
   record('d-before', {
     startedAt: '2026-10-08T08:00:00Z',
@@ -56,24 +59,58 @@ const fixtures = [
   record('j-merged-context', { projectId: 'merged' }),
 ];
 
-function repository(kind: string, archived = false) {
+function repository(
+  kind: string,
+  archived = false,
+  catalogTopics: ReportProjectMetadata['topics'] = topics,
+  records: ReportSourceRecord[] = fixtures,
+) {
   const personal = kind === 'personal-project';
   const projects = new Map<string, ReportProjectMetadata>([
     [
       'project',
       {
+        confidential: false,
         type: personal ? 'personal' : 'work',
         createdBy: uid,
         archived,
+        topics: catalogTopics,
+      },
+    ],
+    [
+      'other',
+      {
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
         topics,
       },
     ],
-    ['other', { type: 'work', topics }],
-    ['archived', { type: 'work', archived: true, topics }],
-    ['merged', { type: 'work', mergedInto: 'other', topics }],
+    [
+      'archived',
+      {
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        archived: true,
+        topics,
+      },
+    ],
+    [
+      'merged',
+      {
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        mergedInto: 'other',
+        topics,
+      },
+    ],
   ]);
-  const own = new ClientPersonalReportRepository(uid, fixtures, projects);
-  const authorized = new AuthorizedReportRepository(uid, fixtures, projects);
+  const own = new ClientPersonalReportRepository(uid, records, projects);
+  const authorized = new AuthorizedReportRepository(uid, records, projects);
   const personalProject = personalProjectReportRepository(own, uid);
   const authorizedProject = authorized.project();
   const calendar = ownCalendarRepository(own, uid);
@@ -149,20 +186,93 @@ for (const kind of [
       );
     });
 
-    it('resolves requested aliases without requiring a valid positive allocation', async () => {
+    it('selects canonical topics without requiring a valid positive allocation', async () => {
       const repo = repository(kind);
       const page = await repo.read({
         projectId: 'project',
         userIds: [uid],
         from,
         to,
-        topicId: 'old',
+        topicId: 'target',
       });
       expect(page!.records.map((r) => r.id)).toEqual([
         'a-spanning',
         'b-open',
         'c-offset',
       ]);
+    });
+
+    it('rejects requested alias chains instead of resolving canonical membership', async () => {
+      const repo = repository(kind, false, [
+        ...topics,
+        {
+          archived: false,
+          id: 'old',
+          title: 'Old',
+          mergedIntoTopicId: 'middle',
+        },
+        {
+          archived: false,
+          id: 'middle',
+          title: 'Middle',
+          mergedIntoTopicId: 'target',
+        },
+      ]);
+      await expect(
+        repo.read({ projectId: 'project', topicId: 'old' }),
+      ).rejects.toThrow('Catálogo de tópicos contém aliases não suportados');
+    });
+
+    it('rejects record aliases even when the requested topic is canonical', async () => {
+      const repo = repository(
+        kind,
+        false,
+        [
+          ...topics,
+          {
+            archived: false,
+            id: 'old',
+            title: 'Old',
+            mergedIntoTopicId: 'target',
+          },
+        ],
+        [record('alias-record', { topics: [{ topicId: 'old' }] })],
+      );
+      await expect(
+        repo.read({ projectId: 'project', topicId: 'target' }),
+      ).rejects.toThrow('Catálogo de tópicos contém aliases não suportados');
+    });
+
+    it('preserves missing historical topic IDs and hours without redirecting them', async () => {
+      const historical = record('historical', {
+        topics: [{ topicId: 'removed', percentage: 100 }],
+      });
+      const repo = repository(kind, false, topics, [historical]);
+      const page = await repo.read({
+        projectId: 'project',
+        topicId: 'removed',
+      });
+      expect(page!.records).toEqual([historical]);
+      expect(
+        (await repo.read({ projectId: 'project', topicId: 'target' }))!.records,
+      ).toEqual([]);
+      const breakdown = buildTopicBreakdown(
+        page!.records,
+        [{ id: historical.id, uid, projectId: 'project', minutes: 60 }],
+        new Map([['project', { topics }]]),
+      );
+      expect(breakdown.byTopic).toEqual([
+        expect.objectContaining({
+          topicId: 'removed',
+          label: 'Tópico sem identificação',
+          minutes: 60,
+        }),
+      ]);
+      expect(breakdown.unassignedMinutes).toBe(0);
+      expect(breakdown.warnings).toEqual([
+        expect.stringContaining('Tópico histórico ausente dos metadados'),
+      ]);
+      expect(await repo.context()).toEqual([historical]);
     });
 
     it('preserves omitted include-all reads but defaults supplied options to active projects', async () => {
@@ -216,10 +326,47 @@ it('keeps company participants independent of selected person/date/topic', async
     uid,
     fixtures,
     new Map([
-      ['project', { type: 'work', topics }],
-      ['other', { type: 'work', topics }],
-      ['archived', { type: 'work', archived: true, topics }],
-      ['merged', { type: 'work', mergedInto: 'other', topics }],
+      [
+        'project',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics,
+        },
+      ],
+      [
+        'other',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics,
+        },
+      ],
+      [
+        'archived',
+        {
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          archived: true,
+          topics,
+        },
+      ],
+      [
+        'merged',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          mergedInto: 'other',
+          topics,
+        },
+      ],
     ]),
   );
   const selected = await repo.readPage(100, undefined, 'project', {
@@ -238,10 +385,13 @@ it('keeps company participants independent of selected person/date/topic', async
 
 it('fails rather than pretending a cyclic topic alias has canonical membership', async () => {
   const cyclic: ReportProjectMetadata = {
+    archived: false,
+    confidential: false,
+    createdBy: 'alice',
     type: 'work',
     topics: [
-      { id: 'a', title: 'A', mergedIntoTopicId: 'b' },
-      { id: 'b', title: 'B', mergedIntoTopicId: 'a' },
+      { archived: false, id: 'a', title: 'A', mergedIntoTopicId: 'b' },
+      { archived: false, id: 'b', title: 'B', mergedIntoTopicId: 'a' },
     ],
   };
   const projects = new Map([['project', cyclic]]);
@@ -257,8 +407,8 @@ it('fails rather than pretending a cyclic topic alias has canonical membership',
   );
   await expect(
     own.readPage(uid, 100, undefined, { topicId: 'a' }),
-  ).rejects.toThrow('Identidade de tópico inválida');
+  ).rejects.toThrow('Catálogo de tópicos contém aliases não suportados');
   await expect(
     company.readPage(100, undefined, 'project', { topicId: 'a' }),
-  ).rejects.toThrow('Identidade de tópico inválida');
+  ).rejects.toThrow('Catálogo de tópicos contém aliases não suportados');
 });

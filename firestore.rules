@@ -73,6 +73,8 @@ service cloud.firestore {
     function isValidProject(project, projectId) {
       return isValidDocumentId(projectId)
         && project.id == projectId
+        && project.archived is bool
+        && project.confidential is bool
         && (isSharedProject(project)
           || (project.type == 'personal'
             && isValidUid(project.get('createdBy', ''))));
@@ -132,6 +134,9 @@ service cloud.firestore {
     function isValidRecord(record, ownerUid, recordId) {
       return isValidDocumentId(recordId)
         && record.uid == ownerUid
+        && record.keys().hasAll(['endedAt', 'deletedAt', 'topics'])
+        && (record.endedAt == null || record.endedAt is string)
+        && record.topics is list
         && (!('id' in record) || record.id == recordId)
         && canAccessRecordProject(record);
     }

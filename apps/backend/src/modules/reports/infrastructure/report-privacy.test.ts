@@ -50,6 +50,8 @@ function record(uid: string, id: string, projectId: string, patch: Data = {}) {
     data: vi.fn(() => ({
       uid,
       projectId,
+      deletedAt: null,
+
       startedAt: '2026-10-08T13:00:00Z',
       endedAt: '2026-10-08T14:00:00Z',
       timeZone: 'UTC',
@@ -63,13 +65,83 @@ function record(uid: string, id: string, projectId: string, patch: Data = {}) {
 
 function metadata() {
   return new Map<string, Data>([
-    ['work', { type: 'work', topics: [{ id: 'general', title: 'Geral' }] }],
-    ['historical', { type: 'work', createdBy: 'bob' }],
-    ['alice-private', { type: 'personal', createdBy: 'alice' }],
-    ['bob-private', { type: 'personal', createdBy: 'bob' }],
-    ['invalid', { type: 'unrecognized', createdBy: 'alice' }],
-    ['invalid-shape', { type: null, createdBy: 'alice' }],
-    ['ownerless', { type: 'personal' }],
+    [
+      'work',
+      {
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        topics: [
+          {
+            id: 'general',
+            title: 'Geral',
+            archived: false,
+            confidential: false,
+          },
+        ],
+      },
+    ],
+    [
+      'historical',
+      {
+        archived: false,
+        confidential: false,
+        topics: [],
+        type: 'work',
+        createdBy: 'bob',
+      },
+    ],
+    [
+      'alice-private',
+      {
+        topics: [],
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+      },
+    ],
+    [
+      'bob-private',
+      {
+        topics: [],
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: 'bob',
+      },
+    ],
+    [
+      'invalid',
+      {
+        type: 'personal',
+        createdBy: 'foreign',
+        archived: false,
+        confidential: false,
+        topics: [],
+      },
+    ],
+    [
+      'invalid-shape',
+      {
+        type: 'personal',
+        createdBy: 'foreign',
+        archived: false,
+        confidential: false,
+        topics: [],
+      },
+    ],
+    [
+      'ownerless',
+      {
+        type: 'personal',
+        createdBy: 'foreign',
+        archived: false,
+        confidential: false,
+        topics: [],
+      },
+    ],
   ]);
 }
 
@@ -215,43 +287,33 @@ describe('company reports use only current work-project metadata', () => {
     const rows = [
       record('alice', 'a-deleted', 'work', {
         deletedAt: false,
+
         startedAt: null,
         endedAt: 42,
         timeZone: null,
         topics: 'bad',
       }),
-      record('alice', 'b-deleted', 'work', { deletedAt: 0, startedAt: null }),
+      record('alice', 'b-deleted', 'work', {
+        deletedAt: false,
+        endedAt: null,
+        startedAt: null,
+      }),
       record('alice', 'z-active', 'work'),
     ];
     const mock = sdk(rows),
       company = new FirestoreCompanyReportRepository(mock.db, mock.auth),
       personal = new FirestorePersonalReportRepository(mock.db),
       project = new FirestoreProjectReportRepository(mock.db, mock.auth);
-    const cp = await company.readPage(1);
-    expect(cp.records).toEqual([]);
-    expect(cp.nextCursor).toBeTruthy();
+    expect((await company.readPage(1)).records.map((r) => r.id)).toEqual([
+      'z-active',
+    ]);
     expect(
-      (await company.readPage(10, cp.nextCursor!)).records.map((r) => r.id),
+      (await personal.readPage('alice', 1)).records.map((r) => r.id),
     ).toEqual(['z-active']);
-    const pp = await personal.readPage('alice', 1);
-    expect(pp.records).toEqual([]);
-    expect(pp.nextCursor).toBeTruthy();
     expect(
-      (await personal.readPage('alice', 10, pp.nextCursor!)).records.map(
+      (await project.readPage('work', 1, undefined, 'alice'))?.records.map(
         (r) => r.id,
       ),
-    ).toEqual(['z-active']);
-    const pr = await project.readPage('work', 1, undefined, 'alice');
-    if (!pr) throw new Error('expected accessible work project');
-    expect(pr.records).toEqual([]);
-    expect(pr.nextCursor).toBeTruthy();
-    expect(
-      (await project.readPage(
-        'work',
-        10,
-        pr.nextCursor!,
-        'alice',
-      ))!.records.map((r) => r.id),
     ).toEqual(['z-active']);
     expect((await company.loadContext(['alice'])).map((r) => r.id)).toEqual([
       'z-active',
@@ -291,6 +353,8 @@ describe('company reports use only current work-project metadata', () => {
         ...UIDS.map((uid) =>
           record(uid, 'poison', id, {
             uid: 'wrong-owner',
+            deletedAt: false,
+
             startedAt: null,
             endedAt: 42,
             timeZone: null,
@@ -313,13 +377,22 @@ describe('company reports use only current work-project metadata', () => {
   it('rechecks getAll metadata instead of trusting stale record access fields', async () => {
     const mock = sdk([
       record('alice', 'stale', 'work', {
+        topics: [],
         type: 'work',
+        archived: false,
+        confidential: false,
         createdBy: 'alice',
       }),
     ]);
     const repo = new FirestoreCompanyReportRepository(mock.db, mock.auth);
     expect((await repo.readPage(100)).scannedCount).toBe(1);
-    mock.projects.set('work', { type: 'personal', createdBy: 'alice' });
+    mock.projects.set('work', {
+      topics: [],
+      type: 'personal',
+      archived: false,
+      confidential: false,
+      createdBy: 'alice',
+    });
     await expect(repo.readPage(100)).resolves.toMatchObject({
       records: [],
       scannedCount: 0,
@@ -337,6 +410,8 @@ describe('company reports use only current work-project metadata', () => {
           'a-' + String(i).padStart(4, '0'),
           HIDDEN_PROJECTS[i % HIDDEN_PROJECTS.length]!,
           {
+            deletedAt: null,
+            endedAt: null,
             startedAt: null,
             topics: [{ topicId: 'secret', durationMinutes: -1 }],
           },
@@ -375,7 +450,13 @@ describe('company reports use only current work-project metadata', () => {
     expect(mock.transactionGet).toHaveBeenCalledTimes(20);
   });
   it('still rejects invalid or oversized visible work context', async () => {
-    const invalid = sdk([record('alice', 'bad', 'work', { startedAt: null })]);
+    const invalid = sdk([
+      record('alice', 'bad', 'work', {
+        deletedAt: null,
+        endedAt: null,
+        startedAt: null,
+      }),
+    ]);
     await expect(
       new FirestoreCompanyReportRepository(
         invalid.db,
@@ -398,19 +479,25 @@ describe('company reports use only current work-project metadata', () => {
 
   it('private closed facts, next starts and invalid dates cannot change company work estimates or totals', async () => {
     const work = [
-      record('alice', 'open-work', 'work', { endedAt: undefined }),
+      record('alice', 'open-work', 'work', { endedAt: null }),
       record('bob', 'closed-work', 'work'),
     ];
     const hidden = UIDS.flatMap((uid) => [
       record(uid, 'private-fact', uid + '-private', {
+        deletedAt: null,
+
         startedAt: '2026-10-08T06:00:00Z',
         endedAt: '2026-10-08T14:00:00Z',
       }),
       record(uid, 'private-next', uid + '-private', {
+        deletedAt: null,
+
         startedAt: '2026-10-08T13:30:00Z',
-        endedAt: undefined,
+        endedAt: null,
       }),
       record(uid, 'private-invalid-date', uid + '-private', {
+        deletedAt: null,
+
         startedAt: 'not-a-date',
         endedAt: 'also-not-a-date',
       }),
@@ -452,11 +539,21 @@ describe('personal report reads are owner-path and current-metadata scoped', () 
         record(uid, 'b-own', uid + '-private'),
         record(uid, 'c-historical', 'historical'),
         record(uid, 'd-stale', other + '-private', {
+          deletedAt: null,
+          endedAt: null,
           startedAt: null,
           topics: 'poison',
         }),
-        record(uid, 'e-invalid', 'invalid', { startedAt: null }),
-        record(uid, 'f-missing', 'missing', { startedAt: null }),
+        record(uid, 'e-invalid', 'invalid', {
+          deletedAt: null,
+          endedAt: null,
+          startedAt: null,
+        }),
+        record(uid, 'f-missing', 'missing', {
+          deletedAt: null,
+          endedAt: null,
+          startedAt: null,
+        }),
         record(other, 'other-work', 'work'),
         record(other, 'other-personal', other + '-private'),
       ]);
@@ -483,7 +580,13 @@ describe('personal report reads are owner-path and current-metadata scoped', () 
     const mock = sdk([record('alice', 'stale', 'work')]);
     const repo = new FirestorePersonalReportRepository(mock.db);
     expect((await repo.readPage('alice', 50)).records).toHaveLength(1);
-    mock.projects.set('work', { type: 'personal', createdBy: 'bob' });
+    mock.projects.set('work', {
+      topics: [],
+      type: 'personal',
+      archived: false,
+      confidential: false,
+      createdBy: 'bob',
+    });
     await expect(repo.readPage('alice', 50)).resolves.toMatchObject({
       records: [],
       scannedCount: 0,
@@ -494,10 +597,26 @@ describe('personal report reads are owner-path and current-metadata scoped', () 
 
 describe('project report authorization precedes any data or topic disclosure', () => {
   it.each([
-    ['third-party private', { type: 'personal', createdBy: 'alice' }, 'bob'],
+    [
+      'third-party private',
+      {
+        topics: [],
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+      },
+      'bob',
+    ],
     [
       'third-party private reverse',
-      { type: 'personal', createdBy: 'bob' },
+      {
+        topics: [],
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: 'bob',
+      },
       'alice',
     ],
     ['missing type', { createdBy: 'alice' }, 'alice'],
@@ -505,7 +624,17 @@ describe('project report authorization precedes any data or topic disclosure', (
     ['unknown type', { type: 'unknown', createdBy: 'alice' }, 'alice'],
     ['invalid type shape', { type: null, createdBy: 'bob' }, 'bob'],
     ['ownerless personal', { type: 'personal' }, 'alice'],
-    ['invalid personal owner', { type: 'personal', createdBy: 42 }, 'bob'],
+    [
+      'invalid personal owner',
+      {
+        topics: [],
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: 42,
+      },
+      'bob',
+    ],
     ['missing', undefined, 'alice'],
   ] as const)(
     'returns generic not-found for %s before records/topics/labels',
@@ -553,8 +682,17 @@ describe('project report authorization precedes any data or topic disclosure', (
       const projects = metadata();
       projects.set('target', {
         type: 'personal',
+        archived: false,
+        confidential: false,
         createdBy: uid,
-        topics: [{ id: 'general', title: 'Owner topic' }],
+        topics: [
+          {
+            id: 'general',
+            title: 'Owner topic',
+            archived: false,
+            confidential: false,
+          },
+        ],
       });
       const mock = sdk(
         [
@@ -582,12 +720,20 @@ describe('project report authorization precedes any data or topic disclosure', (
     async (uid) => {
       const other = uid === 'alice' ? 'bob' : 'alice';
       const projects = metadata();
-      projects.set('target', { type: 'personal', createdBy: uid });
+      projects.set('target', {
+        topics: [],
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: uid,
+      });
       const mock = sdk(
         [
           record(uid, 'a-own', 'target'),
           record(other, 'b-stale-other', 'target'),
           record(uid, 'c-inaccessible', other + '-private', {
+            deletedAt: null,
+            endedAt: null,
             startedAt: null,
           }),
         ],

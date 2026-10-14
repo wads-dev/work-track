@@ -29,6 +29,7 @@ const record = (
   id: string,
   projectId = 'w',
 ): ReportSourceRecord => ({
+  deletedAt: null,
   uid,
   id,
   projectId,
@@ -39,9 +40,36 @@ const record = (
 });
 function fixture() {
   const catalog = new Map<string, ReportProjectMetadata>([
-    ['w', { type: 'work', topics: [] }],
-    ['p', { type: 'personal', createdBy: 'alice', topics: [] }],
-    ['foreign', { type: 'personal', createdBy: 'bob', topics: [] }],
+    [
+      'w',
+      {
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        topics: [],
+      },
+    ],
+    [
+      'p',
+      {
+        archived: false,
+        confidential: false,
+        type: 'personal',
+        createdBy: 'alice',
+        topics: [],
+      },
+    ],
+    [
+      'foreign',
+      {
+        archived: false,
+        confidential: false,
+        type: 'personal',
+        createdBy: 'bob',
+        topics: [],
+      },
+    ],
   ]);
   let records = [
     record('alice', 'a'),
@@ -72,7 +100,12 @@ function fixture() {
         const current = new Map(
           [...catalog].map(([id, project]) => [
             id,
-            { ...project, topics: topics[id] ?? project.topics },
+            {
+              ...project,
+              topics: topics[id]
+                ? topics[id].map((topic) => ({ ...topic, archived: false }))
+                : project.topics,
+            },
           ]),
         );
         return {
@@ -103,7 +136,12 @@ function fixture() {
         const current = new Map(
           [...catalog].map(([id, project]) => [
             id,
-            { ...project, topics: topics[id] ?? project.topics },
+            {
+              ...project,
+              topics: topics[id]
+                ? topics[id].map((topic) => ({ ...topic, archived: false }))
+                : project.topics,
+            },
           ]),
         );
         return {
@@ -253,7 +291,13 @@ it('person filter intervals not safe picker; strict auth IDs ranges mode noUIDin
 });
 it('scopeconversion deletion move and archive affect next request; privacy midflight fails', async () => {
   const f = fixture();
-  f.catalog.set('w', { type: 'personal', createdBy: 'bob', topics: [] });
+  f.catalog.set('w', {
+    archived: false,
+    confidential: false,
+    type: 'personal',
+    createdBy: 'bob',
+    topics: [],
+  });
   const converted = await getCalendarReportHandler(
     f.repo,
     { ...input, mode: 'global' },
@@ -262,7 +306,13 @@ it('scopeconversion deletion move and archive affect next request; privacy midfl
   expect(converted.intervals).toEqual([]);
   expect(converted.participants).toEqual([]);
   expect(f.userLabels).toHaveBeenLastCalledWith([]);
-  f.catalog.set('w', { type: 'work', archived: true, topics: [] });
+  f.catalog.set('w', {
+    confidential: false,
+    createdBy: 'alice',
+    type: 'work',
+    archived: true,
+    topics: [],
+  });
   expect(
     (await getCalendarReportHandler(f.repo, { ...input, mode: 'global' }, auth))
       .totalMinutes,
@@ -276,9 +326,15 @@ it('scopeconversion deletion move and archive affect next request; privacy midfl
       )
     ).totalMinutes,
   ).toBe(120);
-  f.catalog.set('w', { type: 'work', topics: [] });
+  f.catalog.set('w', {
+    archived: false,
+    confidential: false,
+    createdBy: 'alice',
+    type: 'work',
+    topics: [],
+  });
   f.setRecords([
-    { ...record('bob', 'b'), deletedAt: false } as ReportSourceRecord,
+    { ...record('bob', 'b'), deletedAt: false },
     { ...record('alice', 'a'), projectId: 'p' },
   ]);
   expect(
@@ -287,7 +343,13 @@ it('scopeconversion deletion move and archive affect next request; privacy midfl
   ).toBe(0);
   const g = fixture();
   g.repo.company.loadContext = (uids) => {
-    g.catalog.set('w', { type: 'personal', createdBy: 'bob', topics: [] });
+    g.catalog.set('w', {
+      archived: false,
+      confidential: false,
+      type: 'personal',
+      createdBy: 'bob',
+      topics: [],
+    });
     return Promise.resolve(
       uids.map((uid) => record(uid, uid === 'alice' ? 'a' : 'b')),
     );
@@ -345,6 +407,7 @@ it('closed facts clip only view opens estimates explicit contextcap propagated',
   f.setRecords([
     { ...record('alice', 'closed'), endedAt: '2026-10-02T14:00:00Z' },
     {
+      deletedAt: null,
       ...record('alice', 'open'),
       startedAt: '2026-10-03T12:00:00Z',
       endedAt: undefined,
@@ -421,7 +484,13 @@ it('Global viewer discovery supports11participants, duplicate record IDs keep au
 it('archive change midcontext fails closed for selection and directory; includeArchived explicit permits', async () => {
   const f = fixture();
   f.repo.own.loadContext = () => {
-    f.catalog.set('w', { type: 'work', archived: true, topics: [] });
+    f.catalog.set('w', {
+      confidential: false,
+      createdBy: 'alice',
+      type: 'work',
+      archived: true,
+      topics: [],
+    });
     return Promise.resolve([record('alice', 'a'), record('alice', 'p', 'p')]);
   };
   await expect(
@@ -429,7 +498,13 @@ it('archive change midcontext fails closed for selection and directory; includeA
   ).rejects.toMatchObject({ code: 'failed-precondition' });
   const g = fixture();
   g.repo.company.loadContext = (uids) => {
-    g.catalog.set('w', { type: 'work', archived: true, topics: [] });
+    g.catalog.set('w', {
+      confidential: false,
+      createdBy: 'alice',
+      type: 'work',
+      archived: true,
+      topics: [],
+    });
     return Promise.resolve(
       uids.map((uid) => record(uid, uid === 'alice' ? 'a' : 'b')),
     );
@@ -508,19 +583,21 @@ it('optional own directory scan budget degrades truthfully; over100people remain
     getCalendarReportHandler(j.repo, input, auth),
   ).rejects.toMatchObject({ code: 'failed-precondition' });
 });
-it('allWeeks true oldhistory gaps canonical aliases multishares preservefullinterval and subjects requireproject no dates', async () => {
+it('allWeeks true oldhistory gaps canonical topics multishares preservefullinterval and subjects requireproject no dates', async () => {
   const f = fixture();
   f.setRecords([
     {
+      deletedAt: null,
       ...record('alice', 'old'),
       startedAt: '2023-01-02T12:00:00Z',
       endedAt: '2023-01-02T14:00:00Z',
       topics: [
-        { topicId: 'alias', percentage: 25 },
+        { topicId: 'target', percentage: 25 },
         { topicId: 'other', percentage: 75 },
       ],
     },
     {
+      deletedAt: null,
       ...record('alice', 'recent'),
       startedAt: '2026-10-02T12:00:00Z',
       endedAt: '2026-10-02T13:00:00Z',
@@ -529,9 +606,8 @@ it('allWeeks true oldhistory gaps canonical aliases multishares preservefullinte
   ]);
   const catalog = {
     w: [
-      { id: 'alias', title: 'Old', mergedIntoTopicId: 'target' },
-      { id: 'target', title: 'Canonical' },
-      { id: 'other', title: 'Other' },
+      { archived: false, id: 'target', title: 'Canonical' },
+      { archived: false, id: 'other', title: 'Other' },
     ],
   };
   f.repo.own.readTopics = () => Promise.resolve(catalog);
@@ -542,7 +618,7 @@ it('allWeeks true oldhistory gaps canonical aliases multishares preservefullinte
       timeZone: input.timeZone,
       allWeeks: true,
       projectId: 'w',
-      topicId: 'alias',
+      topicId: 'target',
     },
     auth,
   );
@@ -585,6 +661,7 @@ it('repository topic selection preserves a next-start cut from the unselected to
       topics: [{ topicId: 'wanted' }],
     },
     {
+      deletedAt: null,
       ...record('alice', 'other-cut'),
       startedAt: '2026-10-02T16:00:00Z',
       endedAt: '2026-10-02T17:00:00Z',
@@ -594,8 +671,8 @@ it('repository topic selection preserves a next-start cut from the unselected to
   f.repo.own.readTopics = () =>
     Promise.resolve({
       w: [
-        { id: 'wanted', title: 'Wanted' },
-        { id: 'other', title: 'Other' },
+        { archived: false, id: 'wanted', title: 'Wanted' },
+        { archived: false, id: 'other', title: 'Other' },
       ],
     });
   const result = await getCalendarReportHandler(
@@ -620,6 +697,7 @@ it('topic filtering afterengine preserves six-hour estimates without daily cap a
       topics: [{ topicId: 'other' }],
     },
     {
+      deletedAt: null,
       ...record('alice', 'second'),
       startedAt: '2026-10-02T16:00:00Z',
       endedAt: undefined,
@@ -629,8 +707,8 @@ it('topic filtering afterengine preserves six-hour estimates without daily cap a
   f.repo.own.readTopics = () =>
     Promise.resolve({
       w: [
-        { id: 'wanted', title: 'Wanted' },
-        { id: 'other', title: 'Other' },
+        { archived: false, id: 'wanted', title: 'Wanted' },
+        { archived: false, id: 'other', title: 'Other' },
       ],
     });
   const full = await getCalendarReportHandler(
@@ -653,7 +731,14 @@ it('topic filtering afterengine preserves six-hour estimates without daily cap a
   expect(filtered.totalMinutes).toBe(360);
   f.repo.own.readTopics = () =>
     Promise.resolve({
-      w: [{ id: 'wanted', title: 'Bad', mergedIntoTopicId: 'wanted' }],
+      w: [
+        {
+          archived: false,
+          id: 'wanted',
+          title: 'Bad',
+          mergedIntoTopicId: 'wanted',
+        },
+      ],
     });
   await expect(
     getCalendarReportHandler(
@@ -665,7 +750,7 @@ it('topic filtering afterengine preserves six-hour estimates without daily cap a
   let n = 0;
   f.repo.own.readTopics = () =>
     Promise.resolve({
-      w: [{ id: 'wanted', title: 'Read ' + ++n }],
+      w: [{ archived: false, id: 'wanted', title: 'Read ' + ++n }],
     });
   await expect(
     getCalendarReportHandler(
@@ -679,6 +764,7 @@ it('zero-duration valid record occupies realstart week withoccurrence count nofa
   const f = fixture();
   f.setRecords([
     {
+      deletedAt: null,
       ...record('alice', 'zero'),
       startedAt: '2022-01-03T12:00:00Z',
       endedAt: '2022-01-03T12:00:00Z',
@@ -686,7 +772,7 @@ it('zero-duration valid record occupies realstart week withoccurrence count nofa
     },
   ]);
   f.repo.own.readTopics = () =>
-    Promise.resolve({ w: [{ id: 'x', title: 'X' }] });
+    Promise.resolve({ w: [{ archived: false, id: 'x', title: 'X' }] });
   const result = await getCalendarReportHandler(
     f.repo,
     { allWeeks: true, projectId: 'w', topicId: 'x', timeZone: input.timeZone },
@@ -708,6 +794,7 @@ it('zero-duration valid record occupies realstart week withoccurrence count nofa
   expect(empty.weekOccurrences).toEqual([]);
   f.setRecords([
     {
+      deletedAt: null,
       ...record('alice', 'bad'),
       startedAt: '2022-01-10T12:00:00Z',
       endedAt: '2022-01-09T12:00:00Z',

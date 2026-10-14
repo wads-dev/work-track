@@ -14,7 +14,7 @@ An Admin-only users/{uid}/removalAudits/{operationId} ledger and source audit/re
 
 ## Functional read exclusion matrix
 
-Any non-null/non-undefined deletedAt marks a tombstone, including malformed values (0, false, arrays, objects). Historical absent/null markers remain active. Do not use a Firestore != query: missing historical fields would be lost.
+Canonical records require `deletedAt`: only explicit `null` is active. Every other marker, including malformed values (0, false, arrays, objects), is excluded from functional activity; an absent field is invalid storage, not an active-record fallback. `endedAt` is required as string or null and `topics` is a required array. Production was [migrated](project-type-migration.md) on 14/10/2026 (13 projects, 446 records, zero missing canonical fields); existing tombstones and audit evidence were preserved.
 
 | Surface                                                              | Exclusion rule                                                                                                                                             |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -30,7 +30,9 @@ Any non-null/non-undefined deletedAt marks a tombstone, including malformed valu
 
 Admin forensic reads, audit history and remove_record receipts intentionally retain tombstone data. These are evidence, not functional activity totals or list output.
 
-## Limits and operational tradeoffs
+## Historical limits and operational tradeoffs
+
+The following describes the removal increment at its original validation checkpoint, not the current storage or query contract. Current canonical storage and the completed production migration are described above.
 
 Historical list/open selection, project merge and previous/pause candidate paths scan the full relevant snapshot before active limits. This deliberately requires no index/backfill and ensures tombstones never consume active output caps. Merge writes remain bounded at100 active records per transaction. Full query reads can increase latency, memory and billed reads; this is not an unbounded-scale guarantee. Firestore transaction/read-size/time/resource limits still apply and fail atomically. No migration, deploy, rules changes or production data access accompanies this increment.
 

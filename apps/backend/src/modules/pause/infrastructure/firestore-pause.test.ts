@@ -16,15 +16,18 @@ interface Ref {
 }
 interface Collection {
   query: string;
+  filters: Array<[string, unknown]>;
   path: string;
   doc: (id: string) => Ref;
-  limit: () => { query: string };
+  limit: () => Collection;
   where: (field: string, operator: string, value: string) => Collection;
 }
 function fixture() {
   const data = new Map<string, Record<string, unknown>>();
   const source = {
     id: 'source',
+    deletedAt: null,
+    endedAt: null,
     uid: 'a',
     projectId: 'p',
     requestId: 'source',
@@ -55,16 +58,21 @@ function fixture() {
     ref: r,
     data: () => data.get(r.path),
   });
-  const collection = (path: string): Collection => ({
+  const collection = (
+    path: string,
+    filters: Array<[string, unknown]> = [],
+  ): Collection => ({
     query: path,
+    filters,
     path,
     doc: (id: string) => ref(path + '/' + id),
-    limit: () => ({ query: path }),
-    where: () => collection(path),
+    limit: () => collection(path, filters),
+    where: (field, _op, value) =>
+      collection(path, [...filters, [field, value]]),
   });
   let pending: (() => void)[] = [];
   const tx = {
-    get: vi.fn(async (r: Ref | { query: string }) => {
+    get: vi.fn(async (r: Ref | Collection) => {
       await Promise.resolve();
       return 'query' in r
         ? {
@@ -72,7 +80,10 @@ function fixture() {
               .filter(
                 (k) =>
                   k.startsWith(r.query + '/') &&
-                  k.split('/').length === r.query.split('/').length + 1,
+                  k.split('/').length === r.query.split('/').length + 1 &&
+                  r.filters.every(
+                    ([field, value]) => data.get(k)![field] === value,
+                  ),
               )
               .map((k) => snapshot(ref(k))),
           }
@@ -190,3 +201,16 @@ it('fails closed for no eligible, foreign project, future, missing source and ab
     expect(f.tx.update).not.toHaveBeenCalled();
   }
 });
+
+it.each(['endedAt', 'deletedAt', 'topics', 'timeZone'])(
+  'rejects missing storage %s without writes or normalization',
+  async (field) => {
+    const f = fixture();
+    delete (f.source as Record<string, unknown>)[field];
+    const before = structuredClone([...f.data]);
+    await expect(
+      f.repo.registerPause({ ...input, recordId: 'source' }, 'a', now),
+    ).rejects.toThrow();
+    expect([...f.data]).toEqual(before);
+  },
+);

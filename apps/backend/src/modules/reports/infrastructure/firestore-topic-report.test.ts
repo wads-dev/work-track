@@ -3,12 +3,14 @@ import type { Firestore } from 'firebase-admin/firestore';
 import type { Auth } from 'firebase-admin/auth';
 import { FirestoreTopicReportRepository } from './firestore-topic-report.js';
 
-it.each([undefined, null, '2026-10-08T11:00:00Z'])(
+it.each([null, '2026-10-08T11:00:00Z'])(
   'revalidates normalized canonical end %s',
   async (endedAt) => {
     const raw = {
       uid: 'alice',
       projectId: 'p',
+      deletedAt: null,
+
       startedAt: '2026-10-08T10:00:00Z',
       endedAt,
       timeZone: 'UTC',
@@ -29,7 +31,15 @@ it.each([undefined, null, '2026-10-08T11:00:00Z'])(
             id: 'p',
             exists: true,
             data: () =>
-              ref.name === 'projects' ? { type: 'work', topics: [] } : raw,
+              ref.name === 'projects'
+                ? {
+                    archived: false,
+                    confidential: false,
+                    createdBy: 'alice',
+                    type: 'work',
+                    topics: [],
+                  }
+                : raw,
           })),
         ),
     } as unknown as Firestore;

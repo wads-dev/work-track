@@ -9,6 +9,7 @@ it('runs the existing company use case in the client with full context and topic
     startedAt: '2026-10-08T12:00:00Z',
     endedAt: '2026-10-08T13:30:00Z',
     timeZone: 'UTC',
+    deletedAt: null,
     topics: [],
   };
   const repository: CompanyReportRepository = {

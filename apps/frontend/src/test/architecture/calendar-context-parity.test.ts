@@ -32,6 +32,7 @@ it.each([
       startedAt,
       endedAt,
       timeZone,
+      deletedAt: null,
       topics: [],
     });
     const full = [

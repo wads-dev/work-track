@@ -65,7 +65,8 @@ export class FirestoreProjectReportRepository implements ProjectReportRepository
     const personal = effectiveProjectType(project.data()!) === 'personal';
     let query = this.db
       .collectionGroup('records')
-      .where('projectId', '==', projectId);
+      .where('projectId', '==', projectId)
+      .where('deletedAt', '==', null);
     if (personal) query = query.where('uid', '==', viewerUid);
     else if (selection?.userIds?.length) {
       // Project pages use the same sharded corporate UID selector as calendar pages.
@@ -93,7 +94,7 @@ export class FirestoreProjectReportRepository implements ProjectReportRepository
     );
     const snapshot = await query.limit(limit + 1).get();
     const docs = snapshot.docs.slice(0, limit);
-    // Tombstones may be missing/null. Owner/path checks below validate ACL and
+    // Owner/path checks below validate ACL and
     // canonical query results; personal UID is selected in the native query above.
     const records = docs
       .filter((doc) => !isDeletedRecord(doc.data()))

@@ -9,6 +9,7 @@ const now = Date.parse('2026-10-09T15:00:00Z'),
     originalUtterance: 'Pausei30minutos',
   });
 const source = {
+  deletedAt: null,
   uid: 'a',
   projectId: 'p',
   requestId: 'source',
@@ -20,6 +21,8 @@ const source = {
   topicSnapshots: [],
 };
 const project = {
+  archived: false,
+  confidential: false,
   id: 'p',
   title: 'Projeto',
   description: 'desc',

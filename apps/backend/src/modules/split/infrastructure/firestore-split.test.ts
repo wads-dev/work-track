@@ -25,6 +25,7 @@ function fixture() {
   const data = new Map<string, Record<string, unknown>>();
   const source = {
     id: 'source',
+    deletedAt: null,
     uid: 'alice',
     projectId: 'origin',
     startedAt: '2026-10-09T12:00:00Z',
@@ -42,9 +43,18 @@ function fixture() {
     data.set('projects/' + id, {
       id,
       type: 'work',
+      archived: false,
+      confidential: false,
       title: id,
       description: 'Contexto projeto',
-      topics: [{ id: 'general', title: 'Geral', description: 'Tópico geral' }],
+      topics: [
+        {
+          id: 'general',
+          archived: false,
+          title: 'Geral',
+          description: 'Tópico geral',
+        },
+      ],
     });
   const ref = (path: string): Ref => ({
     path,
@@ -232,7 +242,16 @@ it('rechecks destination ACL, missing metadata, archived and canonical topics', 
     { type: 'work', archived: true },
     {
       type: 'work',
-      topics: [{ id: 'general', title: 'Geral', mergedIntoTopicId: 'new' }],
+      archived: false,
+      confidential: false,
+      topics: [
+        {
+          id: 'general',
+          archived: false,
+          title: 'Geral',
+          mergedIntoTopicId: 'new',
+        },
+      ],
     },
   ]) {
     const f = fixture();
@@ -415,3 +434,14 @@ it('uses actual offset instants and falls back explicitly to unique Geral', asyn
   expect(p.parts[1]!.milliseconds).toBe(3600000);
   expect(p.parts[1]!.data.topics).toEqual([{ topicId: 'general' }]);
 });
+
+it.each(['endedAt', 'deletedAt', 'topics', 'timeZone'])(
+  'rejects missing storage %s without writes or normalization',
+  async (field) => {
+    const f = fixture();
+    delete (f.source as Record<string, unknown>)[field];
+    const before = structuredClone([...f.data]);
+    await expect(f.repo.splitRecord(input, 'alice', now)).rejects.toThrow();
+    expect([...f.data]).toEqual(before);
+  },
+);

@@ -130,10 +130,29 @@ it('native global targets survive navigation and use only cached data for projec
   env();
   const stop = startWorkspaceSession(db, 'alice');
   await send('projects', [
-    { path: 'projects/p', data: { id: 'p', type: 'work', createdBy: 'alice' } },
+    {
+      path: 'projects/p',
+      data: {
+        id: 'p',
+        type: 'work',
+        createdBy: 'alice',
+        archived: false,
+        confidential: false,
+        topics: [],
+      },
+    },
   ]);
   await send('group:records', [
-    { path: 'users/bob/records/r', data: { uid: 'bob', projectId: 'p' } },
+    {
+      path: 'users/bob/records/r',
+      data: {
+        uid: 'bob',
+        projectId: 'p',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
+    },
   ]);
   let snapshot: WorkspaceSnapshot | undefined;
   const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
@@ -163,9 +182,23 @@ it('focus disables SDK network without destroying query resume targets, resume e
 it('revocation removes project rows and late callbacks cannot restore account data', async () => {
   env();
   const stop = startWorkspaceSession(db, 'alice');
-  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  await send('projects', [
+    {
+      path: 'projects/p',
+      data: { type: 'work', archived: false, confidential: false, topics: [] },
+    },
+  ]);
   await send('group:records', [
-    { path: 'users/alice/records/r', data: { uid: 'alice', projectId: 'p' } },
+    {
+      path: 'users/alice/records/r',
+      data: {
+        uid: 'alice',
+        projectId: 'p',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
+    },
   ]);
   await send('projects', []);
   let snapshot: WorkspaceSnapshot | undefined;
@@ -212,13 +245,28 @@ it('hundreds of records do not open hundreds of audit listeners; audit loading c
   env();
   const stop = startWorkspaceSession(db, 'alice');
   await send('projects', [
-    { path: 'projects/p', data: { type: 'work', createdBy: 'alice' } },
+    {
+      path: 'projects/p',
+      data: {
+        type: 'work',
+        createdBy: 'alice',
+        archived: false,
+        confidential: false,
+        topics: [],
+      },
+    },
   ]);
   await send(
     'group:records',
     Array.from({ length: 500 }, (_, i) => ({
       path: 'users/alice/records/r' + i,
-      data: { uid: 'alice', projectId: 'p' },
+      data: {
+        uid: 'alice',
+        projectId: 'p',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
     })),
   );
   let snapshot: WorkspaceSnapshot | undefined;
@@ -242,15 +290,38 @@ it('hundreds of records do not open hundreds of audit listeners; audit loading c
 it('metadata replays and blur preserve complete local views without notifications or target churn', async () => {
   const e = env();
   const stop = startWorkspaceSession(db, 'alice');
-  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  await send('projects', [
+    {
+      path: 'projects/p',
+      data: { type: 'work', archived: false, confidential: false, topics: [] },
+    },
+  ]);
   await send('group:records', [
-    { path: 'users/bob/records/r', data: { uid: 'bob', projectId: 'p' } },
+    {
+      path: 'users/bob/records/r',
+      data: {
+        uid: 'bob',
+        projectId: 'p',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
+    },
   ]);
   const next = vi.fn();
   const observe = observeWorkspace(db, 'alice', next);
   const before = next.mock.calls.at(-1)![0];
   await send('group:records', [
-    { path: 'users/bob/records/r', data: { uid: 'bob', projectId: 'p' } },
+    {
+      path: 'users/bob/records/r',
+      data: {
+        uid: 'bob',
+        projectId: 'p',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
+    },
   ]);
   expect(next).toHaveBeenCalledOnce();
   e.setFocus(false);
@@ -271,7 +342,7 @@ it('authorization grouping opens only one global records target for up to ten pr
     'projects',
     Array.from({ length: 21 }, (_, i) => ({
       path: 'projects/p' + i,
-      data: { type: 'work' },
+      data: { type: 'work', archived: false, confidential: false, topics: [] },
     })),
   );
   expect(m.listeners).toHaveLength(5);
@@ -286,7 +357,12 @@ it('authorization grouping opens only one global records target for up to ten pr
 it('online events let SDK reconnect without recreating targets or blanking local views', async () => {
   env();
   const stop = startWorkspaceSession(db, 'alice');
-  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  await send('projects', [
+    {
+      path: 'projects/p',
+      data: { type: 'work', archived: false, confidential: false, topics: [] },
+    },
+  ]);
   await send('group:records', []);
   const next = vi.fn();
   const observe = observeWorkspace(db, 'alice', next);
@@ -308,9 +384,23 @@ it('audit observer mounted before authentication session acquires its demand whe
     () => {},
   );
   const stop = startWorkspaceSession(db, 'alice');
-  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  await send('projects', [
+    {
+      path: 'projects/p',
+      data: { type: 'work', archived: false, confidential: false, topics: [] },
+    },
+  ]);
   await send('group:records', [
-    { path: 'users/alice/records/r', data: { uid: 'alice', projectId: 'p' } },
+    {
+      path: 'users/alice/records/r',
+      data: {
+        uid: 'alice',
+        projectId: 'p',
+        endedAt: null,
+        deletedAt: null,
+        topics: [],
+      },
+    },
   ]);
   expect(
     m.listeners.some((l) =>
@@ -330,7 +420,12 @@ it('remote counter counts added/modified documents but not removals, pending ech
   });
   vi.stubGlobal('navigator', {});
   const stop = startWorkspaceSession(db, 'alice');
-  await send('projects', [{ path: 'projects/p', data: { type: 'work' } }]);
+  await send('projects', [
+    {
+      path: 'projects/p',
+      data: { type: 'work', archived: false, confidential: false, topics: [] },
+    },
+  ]);
   const target = m.listeners.find((l) =>
     l.target.key.includes('group:records'),
   )!;

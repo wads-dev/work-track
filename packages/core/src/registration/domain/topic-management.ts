@@ -76,10 +76,9 @@ export interface TopicManagementRepository {
     uid: string,
   ): Promise<{ items: TopicMergeAudit[]; nextCursor?: string }>;
 }
-export function resolveTopicId(
+function assertTopicCatalog(
   topics: Pick<Topic, 'id' | 'mergedIntoTopicId' | 'archived'>[],
-  id: string,
-): string {
+): void {
   if (
     topics.length > 200 ||
     new Set(topics.map((t) => t.id)).size !== topics.length
@@ -88,46 +87,43 @@ export function resolveTopicId(
       'failed-precondition',
       'Catálogo de tópicos inválido.',
     );
-  const visited = new Set<string>();
-  let current = id;
-  while (!visited.has(current) && visited.size < 200) {
-    visited.add(current);
-    const topic = topics.find((t) => t.id === current);
-    if (!topic)
-      throw new ProjectManagementError(
-        'invalid-argument',
-        'Tópico ou destino não existe no projeto.',
-      );
-    if (!topic.mergedIntoTopicId) {
-      if (topic.archived)
-        throw new ProjectManagementError(
-          'failed-precondition',
-          'Tópico arquivado sem destino.',
-        );
-      return current;
-    }
-    current = topic.mergedIntoTopicId;
-  }
-  throw new ProjectManagementError(
-    'failed-precondition',
-    'Ciclo de aliases de tópicos.',
-  );
+  if (topics.some((topic) => topic.mergedIntoTopicId !== undefined))
+    throw new ProjectManagementError(
+      'failed-precondition',
+      'Catálogo de tópicos contém aliases não suportados.',
+    );
+}
+export function resolveTopicId(
+  topics: Pick<Topic, 'id' | 'mergedIntoTopicId' | 'archived'>[],
+  id: string,
+): string {
+  assertTopicCatalog(topics);
+  const topic = topics.find((t) => t.id === id);
+  if (!topic)
+    throw new ProjectManagementError(
+      'invalid-argument',
+      'Tópico não existe no projeto.',
+    );
+  if (topic.archived)
+    throw new ProjectManagementError(
+      'failed-precondition',
+      'Tópico arquivado.',
+    );
+  return id;
 }
 export function canonicalizeTopics(
   topics: Pick<Topic, 'id' | 'mergedIntoTopicId' | 'archived'>[],
   allocations: NonNullable<RegisterInput['topics']>,
 ) {
-  const mapped = allocations.map((a) => ({
-    ...a,
-    topicId: resolveTopicId(topics, a.topicId),
-  }));
-  // Keep explicit allocations; collapsing two IDs must never invent or lose time.
-  if (new Set(mapped.map((a) => a.topicId)).size !== mapped.length)
+  assertTopicCatalog(topics);
+  for (const allocation of allocations)
+    resolveTopicId(topics, allocation.topicId);
+  if (new Set(allocations.map((a) => a.topicId)).size !== allocations.length)
     throw new ProjectManagementError(
       'invalid-argument',
-      'Tópicos convergem para o mesmo destino. Envie uma única alocação explícita para o tópico canônico.',
+      'Tópicos duplicados. Envie uma única alocação explícita por tópico.',
     );
-  return mapped;
+  return allocations.map((allocation) => ({ ...allocation }));
 }
 export function previewTopicMerge(
   project: Project,
@@ -153,13 +149,7 @@ export function previewTopicMerge(
         'not-found',
         'Tópico origem não existe neste projeto.',
       );
-    const existingAlias =
-      topic.mergedIntoTopicId &&
-      resolveTopicId(project.topics, topic.id) === target.id;
-    if (
-      topic.id === 'general' ||
-      (!existingAlias && (topic.archived || topic.mergedIntoTopicId))
-    )
+    if (topic.id === 'general' || topic.archived)
       throw new ProjectManagementError(
         'failed-precondition',
         'Origem Geral, arquivada ou já mesclada não permitida.',
