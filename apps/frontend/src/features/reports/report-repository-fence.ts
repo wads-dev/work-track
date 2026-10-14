@@ -1,11 +1,27 @@
-/** Local reports belong to the exact immutable repository used to calculate them.
- * Check during render: passive-effect clearing is too late after access revocation.
- * Callable reports keep their existing owner/query/revision fences.
- */
+import { stableDataKey } from '../../data/repositories/stable-data-key';
+
+/** Keep old facts during record refresh only while the authorized project catalog
+ * is unchanged. Check during render: effects are too late after revocation. */
 export function reportRepositoryMatches(
   direct: boolean,
-  current: object | undefined,
-  calculated: object | undefined,
+  current:
+    | { db?: unknown; viewer?: string; projects?: ReadonlyMap<string, unknown> }
+    | undefined,
+  calculated: typeof current,
 ): boolean {
-  return !direct || (current !== undefined && current === calculated);
+  if (!direct || (current !== undefined && current === calculated)) return true;
+  if (
+    !current?.projects ||
+    !calculated?.projects ||
+    !current.db ||
+    !current.viewer
+  )
+    return false;
+  const catalog = (projects: ReadonlyMap<string, unknown>) =>
+    stableDataKey([...projects].sort(([a], [b]) => a.localeCompare(b)));
+  return (
+    current.db === calculated.db &&
+    current.viewer === calculated.viewer &&
+    catalog(current.projects) === catalog(calculated.projects)
+  );
 }
