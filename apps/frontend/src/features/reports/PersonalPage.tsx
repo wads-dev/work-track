@@ -11,7 +11,6 @@ import {
 } from '../../components/ui/tooltip';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Card } from '../../components/ui/card';
-import { Skeleton } from '../../components/ui/skeleton';
 import { MetadataLink, metadataNavigation } from '../../shared/ui/MetadataLink';
 import { InteractiveChart } from './InteractiveChart';
 import {
@@ -363,7 +362,6 @@ export function PersonalPage({
     calendar,
     company,
     accessRevision,
-    attempt,
     privacyBlocked,
     Boolean(invalid),
     person.mode,
@@ -411,7 +409,6 @@ export function PersonalPage({
     }
     setLoading(true);
     setError('');
-    setReport(null);
     if (!localRepository || !catalog) {
       const failure =
         catalogError?.key === catalogKey ? catalogError.message : localError;
@@ -603,7 +600,8 @@ export function PersonalPage({
       {!calendar ? (
         <ReportToolbar
           includeArchived={includeArchived}
-          total={report && !loading ? hours(report.totalMinutes) : '—'}
+          total={report ? hours(report.totalMinutes) : '—'}
+          loading={loading}
           fromDate={firstDate}
           toDate={lastDate}
           projectId={projectId}
@@ -617,6 +615,7 @@ export function PersonalPage({
         />
       ) : (
         <CalendarToolbar
+          loading={loading}
           key={String(revealed)}
           date={selected}
           view={view}
@@ -750,13 +749,7 @@ export function PersonalPage({
             </AlertDescription>
           </Alert>
         )}
-      {loading ? (
-        <Skeleton
-          role="status"
-          aria-label="Carregando relatório pessoal"
-          className={cn('size-6 rounded-full')}
-        />
-      ) : error ? (
+      {error ? (
         <Alert variant="destructive">
           <AlertDescription>
             {error}

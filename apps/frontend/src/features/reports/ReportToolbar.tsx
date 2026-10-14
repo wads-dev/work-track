@@ -24,6 +24,7 @@ export function ReportToolbar({
   projects,
   onFilter,
   onRefresh,
+  loading = false,
   onInfo,
   includeArchived,
 }: {
@@ -34,6 +35,7 @@ export function ReportToolbar({
   projects: ProjectOption[];
   onFilter: (key: string, value: string) => void;
   onRefresh: () => void;
+  loading?: boolean;
   onInfo: () => void;
   includeArchived?: boolean;
 }) {
@@ -87,6 +89,10 @@ export function ReportToolbar({
                 aria-label="Atualizar"
                 title="Atualizar"
                 onClick={onRefresh}
+                aria-busy={loading}
+                className={
+                  loading ? '[&>svg]:motion-safe:animate-spin' : undefined
+                }
               >
                 <UiIcon kind="refresh" />
               </Button>
