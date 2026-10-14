@@ -55,6 +55,57 @@ it('deduplicates consumers, hydrates >100 and reflects replacement/removal/error
   repo.subscribe(db, 'a', connect, () => {});
   expect(connect).toHaveBeenCalledTimes(3);
 });
+it('keeps the same native result during listener refresh and button retry', () => {
+  const repo = createOwnRecordsRepository();
+  repo.account('a');
+  const db = {};
+  let notify!: Parameters<Parameters<typeof repo.subscribe>[2]>[0];
+  repo.subscribe(
+    db,
+    'a',
+    (next) => {
+      notify = next;
+      return () => {};
+    },
+    () => {},
+  );
+  const rows = [
+    { id: 'r', data: { endedAt: null, deletedAt: null, topics: [] } },
+  ];
+  const listing = {
+    rows,
+    total: 51,
+    page: 2,
+    hasMore: true,
+    cursor: 'r',
+    openRows: [],
+    openCount: 0,
+  };
+  notify(rows, false, listing);
+  notify([], true, { ...listing, rows: [], refreshing: true });
+  expect(repo.snapshot(db, 'a')).toMatchObject({
+    rows,
+    total: 51,
+    page: 2,
+    loading: true,
+    complete: true,
+  });
+  notify(rows, false, listing);
+  repo.retry(db, 'a');
+  expect(repo.snapshot(db, 'a')).toMatchObject({
+    rows,
+    total: 51,
+    page: 2,
+    loading: true,
+    complete: true,
+  });
+  notify(rows, false, listing);
+  expect(repo.snapshot(db, 'a')).toMatchObject({
+    rows,
+    total: 51,
+    loading: false,
+  });
+});
 it('purges account, refuses stale subscribe, guards callbacks and isolates instances', () => {
   const repo = createOwnRecordsRepository();
   repo.account('a');

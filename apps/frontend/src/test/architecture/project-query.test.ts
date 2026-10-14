@@ -101,7 +101,7 @@ it('report errors remain visible and retries reopen project subscriptions', () =
       'utf8',
     );
     expect(source.indexOf('if (projects.error) {')).toBeLessThan(
-      source.indexOf('if (projects.loading || !projects.complete) return;'),
+      source.indexOf('if (!projects.complete) return;'),
     );
     expect(source).toContain('if (projects.error) projects.retry();');
   }

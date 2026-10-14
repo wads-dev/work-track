@@ -83,7 +83,6 @@ export function ProjectReport({
   const [reportQuery, setReportQuery] = useState('');
   const report =
     reportQuery === query &&
-    !projects.loading &&
     projects.complete &&
     !projects.error &&
     reportRevision === revision &&
@@ -93,8 +92,8 @@ export function ProjectReport({
       : null;
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    onLoadingChange?.(loading);
-  }, [loading, onLoadingChange]);
+    onLoadingChange?.(loading || projects.loading);
+  }, [loading, projects.loading, onLoadingChange]);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [provisional, setProvisional] = useState(false);
@@ -107,7 +106,7 @@ export function ProjectReport({
       setLoading(false);
       return;
     }
-    if (projects.loading || !projects.complete) return;
+    if (!projects.complete) return;
     let generation = 0;
     const stop = subscribeAuthorizedReport(
       db,
@@ -166,7 +165,6 @@ export function ProjectReport({
   }, [
     db,
     personal,
-    projects.loading,
     projects.complete,
     projects.error,
     authorizedProjectIdsKey,

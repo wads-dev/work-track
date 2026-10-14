@@ -80,8 +80,7 @@ export function TopicDetails({
   } | null>(null);
   useEffect(() => {
     let active = true;
-    setCatalogState(null);
-    if (projects.loading || !projects.complete || projects.error) return;
+    if (!projects.complete || projects.error) return;
     const repository = new BrowserDetailRepository(
       getFirestore(functions.app),
       uid,
@@ -103,14 +102,7 @@ export function TopicDetails({
     return () => {
       active = false;
     };
-  }, [
-    functions,
-    uid,
-    catalogKey,
-    projects.loading,
-    projects.complete,
-    projects.error,
-  ]);
+  }, [functions, uid, catalogKey, projects.complete, projects.error]);
   const catalog = catalogState?.key === catalogKey ? catalogState : undefined;
   const project = catalog?.value.project;
   const hidden = isHidden(project, revealed);
@@ -126,12 +118,12 @@ export function TopicDetails({
     hidden,
     access,
     deletion,
-    attempt,
   ]);
   const [state, setState] = useState<{
     identity: string;
     data?: TopicDetailReport;
     error?: string;
+    loading?: boolean;
   }>({ identity: '' });
   useEffect(() => {
     let active = true;
@@ -139,13 +131,16 @@ export function TopicDetails({
       !project ||
       hidden ||
       !canonical ||
-      projects.loading ||
       !projects.complete ||
       projects.error ||
       tab !== 'overview'
     )
       return;
-    setState({ identity });
+    setState((previous) => ({
+      identity,
+      data: previous.identity === identity ? previous.data : undefined,
+      loading: true,
+    }));
     let revision = 0;
     const isCurrent = (version: number) =>
       active &&
@@ -158,7 +153,11 @@ export function TopicDetails({
       (snapshot) => {
         const version = ++revision;
         if (!isCurrent(version)) return;
-        setState({ identity });
+        setState((previous) => ({
+          identity,
+          data: previous.identity === identity ? previous.data : undefined,
+          loading: true,
+        }));
         if (!snapshot.coherent) return;
         void getTopicReport(
           new LocalTopicReportRepository(snapshot.repository),
@@ -199,17 +198,18 @@ export function TopicDetails({
     canonical,
     project,
     hidden,
-    projects.loading,
     projects.complete,
     projects.error,
     identity,
+    attempt,
     access,
     deletion,
     tab,
   ]);
   const current =
     state.identity === identity && projects.complete ? state : undefined;
-  if (projects.loading || (!catalog && !projects.error))
+  const loading = projects.loading || current?.loading || !current;
+  if (!catalog && !projects.error)
     return (
       <Skeleton
         role="status"
@@ -303,8 +303,13 @@ export function TopicDetails({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-9"
+                  className={cn(
+                    'size-9',
+                    loading && '[&>svg]:motion-safe:animate-spin',
+                  )}
                   aria-label="Atualizar relatório do tópico"
+                  aria-busy={loading}
+                  disabled={loading}
                   onClick={() => setAttempt((n) => n + 1)}
                 >
                   <UiIcon kind="refresh" />

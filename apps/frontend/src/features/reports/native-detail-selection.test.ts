@@ -21,6 +21,28 @@ it('report screens use repository detail APIs, never snapshot record lists or ID
   expect(drawer).toContain('!editorDirty.current');
   expect(drawer).toContain('expectedUpdatedAt: editorVersion.current');
 });
+it('loading never tears down a ready catalog or report subscription', () => {
+  for (const path of [
+    './PersonalPage.tsx',
+    './ProjectReport.tsx',
+    './TopicDetails.tsx',
+  ]) {
+    const text = source(path);
+    expect(text).not.toContain('projects.loading || !projects.complete');
+    expect(text).not.toContain('    projects.loading,');
+    expect(text).not.toContain('!projects.loading &&');
+    expect(text).not.toContain('setCatalogState(null)');
+  }
+  const topic = source('./TopicDetails.tsx');
+  const identity = topic.split('const identity =')[1].split(']);')[0];
+  expect(identity).not.toContain('attempt');
+  expect(topic).toContain(
+    'data: previous.identity === identity ? previous.data : undefined',
+  );
+  expect(topic).toContain('aria-busy={loading}');
+  expect(topic).toContain('motion-safe:animate-spin');
+  expect(topic).toContain('onClick={() => setAttempt((n) => n + 1)}');
+});
 it('shared audit hook receives a prepared repository dataset without selecting snapshot rows', () => {
   const audit = source('../../shared/data.ts');
   expect(audit).toContain(

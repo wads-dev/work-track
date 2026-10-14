@@ -154,6 +154,8 @@ export function PersonalPage({
     projectId,
     includeArchived,
   ]);
+  const [attempt, setAttempt] = useState(0);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<{
     key: string;
     message: string;
@@ -164,9 +166,10 @@ export function PersonalPage({
   } | null>(null);
   useEffect(() => {
     let active = true;
-    setCatalogState(null);
+    setCatalogLoading(false);
     setCatalogError(null);
-    if (projects.loading || !projects.complete || projects.error) return;
+    if (!projects.complete || projects.error) return;
+    setCatalogLoading(true);
     const repository = new BrowserDetailRepository(
       db,
       uid,
@@ -180,23 +183,21 @@ export function PersonalPage({
         includeArchived,
       })
       .then((value) => {
-        if (active) setCatalogState({ key: catalogKey, value });
+        if (active) {
+          setCatalogLoading(false);
+          setCatalogState({ key: catalogKey, value });
+        }
       })
       .catch((error) => {
-        if (active)
+        if (active) {
+          setCatalogLoading(false);
           setCatalogError({ key: catalogKey, message: reportError(error) });
+        }
       });
     return () => {
       active = false;
     };
-  }, [
-    db,
-    uid,
-    catalogKey,
-    projects.loading,
-    projects.complete,
-    projects.error,
-  ]);
+  }, [db, uid, catalogKey, projects.complete, projects.error, attempt]);
   const catalog =
     catalogState?.key === catalogKey ? catalogState.value : undefined;
   const projectData = (id: string) => catalog?.projects.get(id);
@@ -307,7 +308,6 @@ export function PersonalPage({
   const [descriptions, setDescriptions] = useState<
     ReadonlyMap<string, DescriptionSource>
   >(new Map());
-  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!calendar) return;
     const refresh = () => {
@@ -327,6 +327,7 @@ export function PersonalPage({
     snapshot: AuthorizedReportSnapshot;
   } | null>(null);
   const [localError, setLocalError] = useState('');
+  const [sourceLoading, setSourceLoading] = useState(false);
   const authorizedProjectIdsKey = JSON.stringify(
     [
       ...new Set([
@@ -336,18 +337,21 @@ export function PersonalPage({
     ].sort(),
   );
   useEffect(() => {
-    setLocalSnapshot(null);
+    setLoading(true);
+    setSourceLoading(false);
     setLocalError('');
     if (privacyBlocked || invalid) return;
     if (projects.error) {
       setLocalError(projects.error);
       return;
     }
-    if (projects.loading || !projects.complete) return;
+    if (!projects.complete) return;
+    setSourceLoading(true);
     return subscribeAuthorizedReport(
       db,
       uid,
       (snapshot) => {
+        setSourceLoading(false);
         setLocalSnapshot({
           owner: uid,
           revision: accessRevision,
@@ -362,6 +366,7 @@ export function PersonalPage({
         });
       },
       (failure) => {
+        setSourceLoading(false);
         setLocalSnapshot(null);
         setLocalError(reportError(failure));
       },
@@ -377,17 +382,16 @@ export function PersonalPage({
     privacyBlocked,
     Boolean(invalid),
     person.mode,
-    projects.loading,
     projects.complete,
     projects.error,
     authorizedProjectIdsKey,
+    attempt,
     from,
     to,
     projectId,
     allWeeks,
   ]);
   const local =
-    !projects.loading &&
     projects.complete &&
     !projects.error &&
     localSnapshot?.owner === uid &&
@@ -526,7 +530,6 @@ export function PersonalPage({
     from,
     to,
     zone,
-    attempt,
     revision,
     accessRevision,
     uid,
@@ -613,7 +616,9 @@ export function PersonalPage({
         <ReportToolbar
           includeArchived={includeArchived}
           total={report ? hours(report.totalMinutes) : '—'}
-          loading={loading}
+          loading={
+            loading || projects.loading || sourceLoading || catalogLoading
+          }
           fromDate={firstDate}
           toDate={lastDate}
           projectId={projectId}
@@ -627,7 +632,9 @@ export function PersonalPage({
         />
       ) : (
         <CalendarToolbar
-          loading={loading}
+          loading={
+            loading || projects.loading || sourceLoading || catalogLoading
+          }
           key={String(revealed)}
           date={selected}
           view={view}
