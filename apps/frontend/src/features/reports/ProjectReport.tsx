@@ -83,7 +83,6 @@ export function ProjectReport({
   const [reportQuery, setReportQuery] = useState('');
   const report =
     reportQuery === query &&
-    !projects.loading &&
     projects.complete &&
     !projects.error &&
     reportRevision === revision &&
@@ -107,7 +106,7 @@ export function ProjectReport({
       setLoading(false);
       return;
     }
-    if (projects.loading || !projects.complete) return;
+    if (!projects.complete) return;
     let generation = 0;
     const stop = subscribeAuthorizedReport(
       db,
@@ -166,7 +165,6 @@ export function ProjectReport({
   }, [
     db,
     personal,
-    projects.loading,
     projects.complete,
     projects.error,
     authorizedProjectIdsKey,

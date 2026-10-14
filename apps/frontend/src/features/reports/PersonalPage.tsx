@@ -164,9 +164,8 @@ export function PersonalPage({
   } | null>(null);
   useEffect(() => {
     let active = true;
-    setCatalogState(null);
     setCatalogError(null);
-    if (projects.loading || !projects.complete || projects.error) return;
+    if (!projects.complete || projects.error) return;
     const repository = new BrowserDetailRepository(
       db,
       uid,
@@ -189,14 +188,7 @@ export function PersonalPage({
     return () => {
       active = false;
     };
-  }, [
-    db,
-    uid,
-    catalogKey,
-    projects.loading,
-    projects.complete,
-    projects.error,
-  ]);
+  }, [db, uid, catalogKey, projects.complete, projects.error]);
   const catalog =
     catalogState?.key === catalogKey ? catalogState.value : undefined;
   const projectData = (id: string) => catalog?.projects.get(id);
@@ -343,7 +335,7 @@ export function PersonalPage({
       setLocalError(projects.error);
       return;
     }
-    if (projects.loading || !projects.complete) return;
+    if (!projects.complete) return;
     return subscribeAuthorizedReport(
       db,
       uid,
@@ -377,7 +369,6 @@ export function PersonalPage({
     privacyBlocked,
     Boolean(invalid),
     person.mode,
-    projects.loading,
     projects.complete,
     projects.error,
     authorizedProjectIdsKey,
@@ -387,7 +378,6 @@ export function PersonalPage({
     allWeeks,
   ]);
   const local =
-    !projects.loading &&
     projects.complete &&
     !projects.error &&
     localSnapshot?.owner === uid &&
