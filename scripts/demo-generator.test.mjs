@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { decodeReportProjectMetadata } from '@work-track/data/codecs/report-project-metadata';
 import viteDevConfig, { demoConfig } from '../docker/firebase/vite.config.mjs';
 test('Vite demo bootstrap is dev-only and only intercepts exact init endpoint', () => {
   assert.equal(viteDevConfig.server.port, 5173);
@@ -57,6 +58,11 @@ test('Vite demo bootstrap is dev-only and only intercepts exact init endpoint', 
   assert(startup.includes('npm run build --workspace @work-track/backend'));
   assert(startup.includes('--only auth,firestore,functions'));
   assert(!startup.includes('functions,hosting'));
+  assert(startup.includes('--export-on-exit=/data/export'));
+  assert(
+    startup.indexOf('if [ -f /data/export/firebase-export-metadata.json ]') <
+      startup.indexOf('elif [ -f /data/firebase-export-metadata.json ]'),
+  );
 });
 const run = (args = [], env = {}) =>
   spawnSync(process.execPath, ['scripts/design-demo.mjs', ...args], {
@@ -107,6 +113,28 @@ test('JSON deterministic 56 scoped documents and references', () => {
       a.stdout,
     ),
   );
+});
+test('generated project topics satisfy the report contract and missing archived reproduces the failure', () => {
+  const output = run(['--json']);
+  assert.equal(output.status, 0, output.stderr);
+  const { docs } = JSON.parse(output.stdout);
+  let count = 0;
+  for (const [path, data] of docs) {
+    if (!path.startsWith('projects/')) continue;
+    const project = decodeReportProjectMetadata(data, 'authorized-web');
+    for (const topic of project.topics) assert.equal(topic.archived, false);
+    count += project.topics.length;
+    const outdated = structuredClone(data);
+    for (const topic of outdated.topics) delete topic.archived;
+    assert.throws(
+      () => decodeReportProjectMetadata(outdated, 'authorized-web'),
+      (error) =>
+        error.issues.some(
+          (issue) => issue.path.join('.') === 'topics.0.archived',
+        ),
+    );
+  }
+  assert.equal(count, 21);
 });
 test('guards reject production env, unconfirmed writes, mutation JSON and unknown args', () => {
   for (const [args, env] of [

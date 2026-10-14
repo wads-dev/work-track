@@ -28,3 +28,7 @@ O helper produz JSON determinístico em memória, envia pelo stdin para um conta
 O Docker da aplicação importa esta fixture na primeira execução sem export privado; após isso, o export privado tem precedência. O marcador `firebase-export-metadata.json` e os diretórios `auth_export`/`firestore_export` são o formato nativo Firebase CLI. Nunca copiar o export corrente misturado com OAuth para aqui.
 
 Verificado: export nativo e import novo com todos os payloads e contagens exatos; nenhum emulador visual corrente reiniciado.
+
+A persistência privada usa `/data/export`, não a raiz montada `/data`: o Firebase substitui o diretório de destino ao exportar e não consegue remover a raiz de um volume Docker. O bootstrap ainda aceita exports antigos na raiz para migração sem perda de dados.
+
+O export foi regenerado para o contrato atual: tipo explícito dos projetos, `archived` booleano em cada tópico, `endedAt` e `deletedAt` explícitos nos registros. Reiniciar não migra exports privados antigos em `/data`; preserve-os e atualize os campos ausentes separadamente, sem apagar o volume.

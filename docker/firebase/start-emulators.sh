@@ -16,7 +16,10 @@ cd /workspace
 npm ci --ignore-scripts --no-audit --no-fund
 npm run build --workspace @work-track/backend
 mkdir -p /data
-if [ -f /data/firebase-export-metadata.json ]; then
+if [ -f /data/export/firebase-export-metadata.json ]; then
+  echo "[firebase] Restoring private local data from /data/export"
+  set -- --import=/data/export
+elif [ -f /data/firebase-export-metadata.json ]; then
   echo "[firebase] Restoring private local data from /data"
   set -- --import=/data
 elif [ -f /input/docker/firebase/demo-data/firebase-export-metadata.json ]; then
@@ -28,4 +31,4 @@ else
 fi
 exec firebase emulators:start --config firebase.emulators.json \
   --project demo-work-track --only auth,firestore,functions \
-  --export-on-exit=/data "$@"
+  --export-on-exit=/data/export "$@"
