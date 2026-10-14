@@ -12,6 +12,7 @@ import {
   listingKey,
   type ProjectReadOptions,
 } from '../../../data/repositories/browser-listing-repository';
+import { projectAccessRevision } from '../../../data/cache/project-access-revision';
 import { workspaceRetry } from '../../../data/sync/workspace-runtime';
 const initial = {
   ...emptyListing,
@@ -35,13 +36,21 @@ export function useProjects(
       uid: string;
       db: typeof db;
       key: string;
+      accessRevision?: number;
       loading: boolean;
       error: string;
     }
   >({ ...initial, uid, db, key });
   useEffect(() => {
     let active = true;
-    setState({ ...initial, uid, db, key });
+    setState((previous) =>
+      previous.uid === uid &&
+      previous.db === db &&
+      previous.key === key &&
+      previous.accessRevision === projectAccessRevision()
+        ? { ...previous, loading: true, error: '' }
+        : { ...initial, uid, db, key },
+    );
     if (!uid)
       return () => {
         active = false;
@@ -51,14 +60,21 @@ export function useProjects(
       uid,
       (snapshot) => {
         if (active)
-          setState({
-            ...snapshot,
+          setState((previous) => ({
+            ...(snapshot.refreshing &&
+            previous.uid === uid &&
+            previous.db === db &&
+            previous.key === key &&
+            previous.accessRevision === projectAccessRevision()
+              ? previous
+              : snapshot),
             uid,
             db,
             key,
+            accessRevision: projectAccessRevision(),
             loading: !snapshot.complete,
             error: '',
-          });
+          }));
       },
       () => {
         if (active)
@@ -85,8 +101,10 @@ export function useProjects(
   return {
     ...current,
     retry: () => {
-      workspaceRetry(db, uid);
-      projectRepository.invalidate();
+      if (current.error) {
+        workspaceRetry(db, uid);
+        projectRepository.invalidate();
+      }
       setAttempt((value) => value + 1);
     },
   };

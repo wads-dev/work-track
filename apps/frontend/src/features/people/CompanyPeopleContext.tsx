@@ -65,13 +65,16 @@ export function CompanyPeopleProvider({
   });
   useEffect(() => {
     let active = true;
-    setState({
+    setState((previous) => ({
       owner: uid,
       connection: functions,
-      people: [],
+      people:
+        previous.owner === uid && previous.connection === functions
+          ? previous.people
+          : [],
       loading: true,
       error: '',
-    });
+    }));
     const call = createCallable<
       { pageSize: number; pageToken?: string },
       CompanyPeoplePage

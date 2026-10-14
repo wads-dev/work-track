@@ -137,8 +137,9 @@ describe('compact project list', () => {
       ),
     ).toContain('Secret topic');
   });
-  it('renders loading error and empty states instead of stale rows', () => {
-    expect(render(catalog, false, { loading: true })).toContain(
+  it('retains rows during loading but hides them on access errors', () => {
+    expect(render(catalog, false, { loading: true })).toContain('Zebra');
+    expect(render(catalog, false, { loading: true })).not.toContain(
       'Carregando projetos',
     );
     expect(render(catalog, false, { error: 'Falha de acesso' })).toContain(

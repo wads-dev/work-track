@@ -11,6 +11,12 @@ const props = {
   ],
 };
 describe('shared list table design', () => {
+  it('keeps existing rows rendered during refresh without a skeleton', () => {
+    const html = renderToStaticMarkup(<ListTable {...props} loading />);
+    expect(html).toContain('Projeto longo');
+    expect(html).toContain('<table');
+    expect(html).not.toContain('data-slot="skeleton"');
+  });
   it('owns table semantics responsive cards full width details and row accents', () => {
     const html = renderToStaticMarkup(
       <ListTable
@@ -30,7 +36,7 @@ describe('shared list table design', () => {
   it('does not claim empty results when loading or erroring and supports retry', () => {
     expect(
       renderToStaticMarkup(<ListTable {...props} rows={[]} loading />),
-    ).toContain('Carregando');
+    ).not.toMatch(/Carregando|Nenhum resultado|<table/);
     const html = renderToStaticMarkup(
       <ListTable {...props} error="Falha segura" retry={() => {}} />,
     );

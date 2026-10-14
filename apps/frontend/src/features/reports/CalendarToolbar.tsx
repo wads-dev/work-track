@@ -95,6 +95,7 @@ export function CalendarToolbar({
   onSubject,
   onArchived,
   onRefresh,
+  loading = false,
 }: {
   date: string;
   view: string;
@@ -120,6 +121,7 @@ export function CalendarToolbar({
   onSubject: (value: string) => void;
   onArchived: () => void;
   onRefresh: () => void;
+  loading?: boolean;
 }) {
   return (
     <QueryToolbar
@@ -150,6 +152,10 @@ export function CalendarToolbar({
                 size="icon"
                 aria-label="Atualizar calendário"
                 onClick={onRefresh}
+                aria-busy={loading}
+                className={
+                  loading ? '[&>svg]:motion-safe:animate-spin' : undefined
+                }
               >
                 <UiIcon kind="refresh" />
               </Button>

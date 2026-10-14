@@ -1,3 +1,5 @@
+import { projectAccessRevision } from './project-access-revision';
+import { deletionRevision } from './record-deletion';
 import type { Row } from '../../shared/data';
 import { isDeletedRecord, createDeletionObserver } from './record-deletion';
 import {
@@ -20,7 +22,11 @@ export const emptyRecords: RecordSnapshot = {
   error: '',
 };
 type Connect = (
-  next: (rows: Row[], fromCache: boolean, listing?: ListingResult) => void,
+  next: (
+    rows: Row[],
+    fromCache: boolean,
+    listing?: ListingResult & { refreshing?: boolean },
+  ) => void,
   error: (message?: string) => void,
 ) => () => void;
 type Entry = {
@@ -82,16 +88,31 @@ export function createOwnRecordsRepository() {
         map.set(cacheKey, entry);
         const current = entry;
         const observeDeletion = createDeletionObserver(uid);
+        let accessRevision = -1,
+          recordRevision = -1;
+        const retain = () =>
+          accessRevision === projectAccessRevision() &&
+          recordRevision === deletionRevision(uid);
         current.start = () => {
           current.stop();
-          current.state = emptyRecords;
+          current.state =
+            retain() && !current.state.error
+              ? { ...current.state, loading: true }
+              : emptyRecords;
           emit(current);
           const epoch = generation;
           let alive = true;
           const stop = connect(
             (rows, fromCache, listing) => {
               if (!alive || epoch !== generation || uid !== account) return;
+              if (listing?.refreshing && retain()) {
+                current.state = { ...current.state, loading: true };
+                emit(current);
+                return;
+              }
               observeDeletion(rows);
+              accessRevision = projectAccessRevision();
+              recordRevision = deletionRevision(uid);
               // Native listings already exclude tombstones; retain lifecycle
               // validation for legacy raw connectors, with coherent totals.
               const visible = listing

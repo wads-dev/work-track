@@ -88,7 +88,7 @@ export function PendingPage({
             Revise o fim de cada registro. Nada será encerrado automaticamente.
           </p>
         </div>
-        {!loading && !error && (
+        {!error && (!loading || open.length > 0) && (
           <Badge variant="secondary">
             {fromCache
               ? 'Dados provisórios'
@@ -96,6 +96,17 @@ export function PendingPage({
                 (open.length === 1 ? ' pendência' : ' pendências')}
           </Badge>
         )}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Atualizar pendências"
+          title="Atualizar pendências"
+          aria-busy={loading}
+          onClick={pending.retry}
+          className={loading ? '[&>svg]:motion-safe:animate-spin' : undefined}
+        >
+          <UiIcon kind="refresh" />
+        </Button>
       </header>
       {recordId && (
         <RecordDrawer

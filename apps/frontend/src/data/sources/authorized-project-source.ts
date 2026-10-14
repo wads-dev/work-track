@@ -11,6 +11,7 @@ export interface ProjectSnapshot extends ListingResult {
   fromCache: boolean;
   hasPendingWrites: boolean;
   complete: boolean;
+  refreshing?: boolean;
 }
 /** Synchronization signals readiness/content changes; it is never a UI dataset.
  * Each selection is a native SDK cache query, never another remote listener. */
@@ -45,6 +46,7 @@ export function subscribeAuthorizedProjects(
       fromCache: true,
       hasPendingWrites: false,
       complete: false,
+      refreshing: snapshot.complete,
     });
     if (!snapshot.complete) return;
     const ids = new Set(snapshot.projects.map((project) => project.id));

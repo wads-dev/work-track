@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '../../components/ui/tooltip';
 import { CalendarToolbar } from './CalendarToolbar';
-function markup(profile = false) {
+function markup(profile = false, loading = false) {
   const noop = vi.fn();
   return renderToStaticMarkup(
     createElement(TooltipProvider, {
@@ -34,11 +34,17 @@ function markup(profile = false) {
         onSubject: noop,
         onArchived: noop,
         onRefresh: noop,
+        loading,
       }),
     }),
   );
 }
 describe('calendar toolbar design-system contract', () => {
+  it('indicates refresh progress only on the refresh icon', () => {
+    expect(markup(false, true)).toContain('motion-safe:animate-spin');
+    expect(markup(false, true)).toContain('aria-busy="true"');
+    expect(markup()).not.toContain('animate-spin');
+  });
   it('uses one design-system trigger for all four selectors, including projects and avatar', () => {
     const html = markup();
     expect(html.match(/data-slot="select-trigger"/g)).toHaveLength(4);

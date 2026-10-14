@@ -20,6 +20,8 @@ export function RecordsToolbar({
   search,
   onFilter,
   onClear,
+  onRefresh,
+  refreshing = false,
 }: {
   catalog: Row[];
   revealed: boolean;
@@ -29,6 +31,8 @@ export function RecordsToolbar({
   search: string;
   onFilter: (key: string, value: string) => void;
   onClear: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const project = params.get('project') ?? '';
   const topics =
@@ -43,6 +47,8 @@ export function RecordsToolbar({
       onSearchChange={(value) => onFilter('q', value)}
       actionLabel="Limpar filtros"
       onAction={onClear}
+      onRefresh={onRefresh}
+      loading={refreshing}
       leading={
         <div className="grid min-w-0 grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap">
           <Input

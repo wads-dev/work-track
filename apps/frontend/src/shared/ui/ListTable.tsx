@@ -8,7 +8,6 @@ import {
 } from '../../components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
 import { Button } from '../../components/ui/button';
-import { Skeleton } from '../../components/ui/skeleton';
 import { cn } from '../../lib/utils';
 
 export type ListColumn<T> = {
@@ -52,12 +51,7 @@ export function ListTable<T>({
   return (
     <section aria-label={label} className="min-w-0">
       {!hideHeading && <h2 className="mb-4 text-2xl font-semibold">{label}</h2>}
-      {loading ? (
-        <div role="status" className="flex items-center gap-3 p-4">
-          <Skeleton className="size-6 rounded-full" />
-          <span>Carregando {label.toLocaleLowerCase('pt-BR')}…</span>
-        </div>
-      ) : error ? (
+      {loading && rows.length === 0 ? null : error ? (
         <Alert variant="destructive">
           <AlertTitle>
             Não foi possível carregar {label.toLocaleLowerCase('pt-BR')}

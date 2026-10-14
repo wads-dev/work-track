@@ -68,6 +68,7 @@ export function Dashboard({
 }) {
   const { revealed } = usePrivacy();
   const [reportRefresh, setReportRefresh] = useState(0);
+  const [reportLoading, setReportLoading] = useState(true);
   const [reportSummaryTarget, setReportSummaryTarget] =
     useState<HTMLDivElement | null>(null);
   const { projectId } = useParams();
@@ -229,7 +230,12 @@ export function Dashboard({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-9 shrink-0"
+                        className={
+                          reportLoading
+                            ? 'size-9 shrink-0 [&>svg]:motion-safe:animate-spin'
+                            : 'size-9 shrink-0'
+                        }
+                        aria-busy={reportLoading}
                         aria-label="Atualizar relatório"
                         onClick={() => {
                           if (rawProjects.error) rawProjects.retry();
@@ -299,6 +305,7 @@ export function Dashboard({
             {projectTab === 'overview' && (
               <ProjectReport
                 refreshKey={reportRefresh}
+                onLoadingChange={setReportLoading}
                 summaryTarget={reportSummaryTarget}
                 projectLabel={text(
                   safeProject(selectedProject?.data, revealed).title,
@@ -374,6 +381,8 @@ export function Dashboard({
             searchPlaceholder="Pesquisar projetos…"
             search={filter}
             onSearchChange={(value) => updateFilter('q', value)}
+            loading={selectedProjects.loading}
+            onRefresh={selectedProjects.retry}
             actionLabel="Limpar filtros"
             onAction={() => {
               setLocalFilter('');
@@ -414,6 +423,14 @@ export function Dashboard({
           catalog={rawProjects.rows}
           revealed={revealed}
           loading={rawProjects.loading}
+          refreshing={
+            rawRecords.loading ||
+            (mode === 'overview' && selectedProjects.loading)
+          }
+          onRefresh={() => {
+            rawRecords.retry();
+            if (mode === 'overview') selectedProjects.retry();
+          }}
           error={rawProjects.error}
           params={params}
           search={filter}

@@ -9,6 +9,7 @@ import {
 } from '../repositories/browser-listing-repository';
 export interface OwnRecordPage extends ListingResult {
   fromCache: boolean;
+  refreshing?: boolean;
 }
 /** UI parameters select from native persistent cache after session readiness.
  * Generation guards discard queries superseded by a content/ACL/account change. */
@@ -38,7 +39,12 @@ export function subscribeAuthorizedOwnRecords(
     if (signature === key) return;
     signature = key;
     generation = epoch;
-    next({ ...emptyListing, cursor: options.after ?? '', fromCache: true });
+    next({
+      ...emptyListing,
+      cursor: options.after ?? '',
+      fromCache: true,
+      refreshing: snapshot.complete,
+    });
     if (!snapshot.complete) return;
     const ids = new Set(snapshot.projects.map((project) => project.id));
     void readOwnRecordListing(db, uid, ids, options)

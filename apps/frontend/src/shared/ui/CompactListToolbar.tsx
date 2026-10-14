@@ -8,6 +8,7 @@ import {
 } from '../../components/ui/tooltip';
 import { UiIcon } from './UiIcons';
 import { FilterBar } from './FilterBar';
+import { cn } from '../../lib/utils';
 
 /** Compact list controls shared by the Projects and People directories. */
 export function CompactListToolbar({
@@ -21,6 +22,8 @@ export function CompactListToolbar({
   actionLabel,
   onAction,
   disabled = false,
+  loading = false,
+  onRefresh,
 }: {
   label: string;
   leading?: ReactNode;
@@ -32,6 +35,8 @@ export function CompactListToolbar({
   actionLabel: string;
   onAction: () => void;
   disabled?: boolean;
+  loading?: boolean;
+  onRefresh?: () => void;
 }) {
   return (
     <FilterBar
@@ -53,7 +58,11 @@ export function CompactListToolbar({
             <Button
               variant="ghost"
               size="icon"
-              className="size-9 shrink-0"
+              className={cn(
+                'size-9 shrink-0',
+                !onRefresh && loading && '[&>svg]:motion-safe:animate-spin',
+              )}
+              aria-busy={!onRefresh && loading}
               aria-label={actionLabel}
               disabled={disabled}
               onClick={onAction}
@@ -63,6 +72,22 @@ export function CompactListToolbar({
           </TooltipTrigger>
           <TooltipContent>{actionLabel}</TooltipContent>
         </Tooltip>
+        {onRefresh && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Atualizar"
+            title="Atualizar"
+            aria-busy={loading}
+            onClick={onRefresh}
+            className={cn(
+              'size-9 shrink-0',
+              loading && '[&>svg]:motion-safe:animate-spin',
+            )}
+          >
+            <UiIcon kind="refresh" />
+          </Button>
+        )}
       </div>
     </FilterBar>
   );

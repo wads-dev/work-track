@@ -26,10 +26,9 @@ export function PeoplePage() {
         actionLabel="Atualizar pessoas"
         onAction={refresh}
         disabled={loading}
+        loading={loading}
       />
-      {loading ? (
-        <p role="status">Carregando pessoas…</p>
-      ) : error ? (
+      {loading && total === 0 ? null : error ? (
         <Alert variant="destructive">
           <AlertDescription>
             {error}{' '}
