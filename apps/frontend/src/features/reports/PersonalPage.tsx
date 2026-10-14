@@ -308,6 +308,18 @@ export function PersonalPage({
     ReadonlyMap<string, DescriptionSource>
   >(new Map());
   const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!calendar) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') setAttempt((v) => v + 1);
+    };
+    window.addEventListener('focus', refresh);
+    const timer = window.setInterval(refresh, 5 * 60 * 1000);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.clearInterval(timer);
+    };
+  }, [calendar]);
   const [localSnapshot, setLocalSnapshot] = useState<{
     owner: string;
     revision: number;
