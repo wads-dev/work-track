@@ -9,6 +9,7 @@ const make = (
   projectId = id,
   endedAt?: string,
 ): ReportSourceRecord => ({
+  deletedAt: null,
   id,
   uid: 'alice',
   projectId,

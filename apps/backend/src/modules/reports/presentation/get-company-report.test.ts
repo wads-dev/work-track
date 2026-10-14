@@ -21,6 +21,7 @@ const make = (
   start: number,
   end?: number,
 ) => ({
+  deletedAt: null,
   id,
   uid,
   projectId,

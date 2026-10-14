@@ -27,13 +27,50 @@ const make = (
   startedAt,
   ...(endedAt ? { endedAt } : {}),
   timeZone,
+  deletedAt: null,
   topics: [],
 });
 const projects = new Map<string, ClientReportProject>([
-  ['p', { type: 'personal', createdBy: uid, topics: [] }],
-  ['other', { type: 'work', topics: [] }],
-  ['archived', { type: 'work', archived: true, topics: [] }],
-  ['foreign', { type: 'personal', createdBy: 'bob', topics: [] }],
+  [
+    'p',
+    {
+      type: 'personal',
+      createdBy: uid,
+      archived: false,
+      confidential: false,
+      topics: [],
+    },
+  ],
+  [
+    'other',
+    {
+      type: 'work',
+      createdBy: 'alice',
+      archived: false,
+      confidential: false,
+      topics: [],
+    },
+  ],
+  [
+    'archived',
+    {
+      type: 'work',
+      createdBy: 'alice',
+      archived: true,
+      confidential: false,
+      topics: [],
+    },
+  ],
+  [
+    'foreign',
+    {
+      type: 'personal',
+      createdBy: 'bob',
+      archived: false,
+      confidential: false,
+      topics: [],
+    },
+  ],
 ]);
 function bounded(records: ReportSourceRecord[], from: string, to: string) {
   const { lower, upper } = calendarQueryBounds({ from, to });

@@ -17,7 +17,14 @@ type QueryState = {
 };
 function setup(
   pages: Document[][],
-  projects: Record<string, DailyProject> = { a: {} },
+  projects: Record<string, DailyProject & { confidential?: boolean }> = {
+    a: {
+      createdBy: 'alice',
+      type: 'work',
+      archived: false,
+      confidential: false,
+    },
+  },
 ) {
   let reads = 0,
     historyReads = 0;
@@ -59,7 +66,12 @@ function setup(
           const state = request.state;
           nativeQueries.push(state);
           let docs: Document[];
-          if (state.where.length === 0) docs = pages[historyReads++] ?? [];
+          if (state.where.length === 1)
+            docs = (
+              pages.filter((page) =>
+                page.some((doc) => doc.value.deletedAt === null),
+              )[historyReads++] ?? []
+            ).filter((doc) => doc.value.deletedAt === null);
           else {
             docs = pages.flat().filter((doc) =>
               state.where.every(([field, op, value]) => {
@@ -123,6 +135,8 @@ const source = (id: string, value: Record<string, unknown> = {}) => ({
   id,
   value: {
     projectId: 'a',
+    deletedAt: null,
+    endedAt: null,
     startedAt: '2026-10-09T08:00:00-03:00',
     timeZone: 'America/Sao_Paulo',
     ...value,
@@ -133,7 +147,7 @@ const daySelection = (includeArchived = true): DailyHoursSelection => {
   return { startedAt: start, endedAt: end, includeArchived };
 };
 describe('read-only daily-hours own canonical repository', () => {
-  it.each([undefined, null, '2026-10-09T09:00:00-03:00'])(
+  it.each([null, '2026-10-09T09:00:00-03:00'])(
     'normalizes persisted end %s without mutating facts',
     async (endedAt) => {
       const fact = source('open', { endedAt });
@@ -145,7 +159,7 @@ describe('read-only daily-hours own canonical repository', () => {
       expect((fact.value as Record<string, unknown>).endedAt).toBe(endedAt);
     },
   );
-  it.each([false, 42, '', 'invalid', '2026-10-09T07:00:00-03:00'])(
+  it.each([undefined, false, 42, '', 'invalid', '2026-10-09T07:00:00-03:00'])(
     'still rejects invalid persisted end %s',
     async (endedAt) => {
       await expect(
@@ -160,6 +174,7 @@ describe('read-only daily-hours own canonical repository', () => {
       Array.from({ length: 500 }, (_, i) =>
         source('deleted' + i, {
           deletedAt: false,
+          endedAt: null,
           startedAt: null,
           timeZone: null,
         }),
@@ -168,7 +183,7 @@ describe('read-only daily-hours own canonical repository', () => {
     ]);
     const result = await mock.repository.loadOwnHistory('alice');
     expect(result.records.map((r) => r.id)).toEqual(['active']);
-    expect(mock.reads).toBe(2);
+    expect(mock.reads).toBe(1);
   });
   it('rejects empty/path UID and malformed project before any database read', async () => {
     const mock = setup([]);
@@ -188,8 +203,18 @@ describe('read-only daily-hours own canonical repository', () => {
       source('r' + i, { uid: 'untrusted' }),
     );
     const mock = setup([first, [source('last', { projectId: 'personal' })]], {
-      a: {},
-      personal: { type: 'personal', createdBy: 'alice' },
+      a: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+      },
+      personal: {
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+      },
     });
     const result = await mock.repository.loadOwnHistory('alice');
     expect(result.records).toHaveLength(501);
@@ -212,6 +237,8 @@ describe('read-only daily-hours own canonical repository', () => {
           source('ok'),
           source('foreign', {
             projectId: 'foreign',
+            deletedAt: null,
+            endedAt: null,
             startedAt: 'not-a-date',
             timeZone: 'invalid',
           }),
@@ -219,8 +246,18 @@ describe('read-only daily-hours own canonical repository', () => {
         ],
       ],
       {
-        a: {},
-        foreign: { type: 'personal', createdBy: 'bob' },
+        a: {
+          createdBy: 'alice',
+          type: 'work',
+          archived: false,
+          confidential: false,
+        },
+        foreign: {
+          type: 'personal',
+          archived: false,
+          confidential: false,
+          createdBy: 'bob',
+        },
         invalidtype: { type: 123 },
       },
     );
@@ -251,22 +288,49 @@ describe('read-only daily-hours own canonical repository', () => {
   it('keeps the native full-history context separate from project/date selection', async () => {
     const facts = [
       source('spanning', {
+        deletedAt: null,
+
         startedAt: '2026-10-01T00:00:00Z',
         endedAt: '2026-10-20T00:00:00Z',
       }),
-      source('old-open', { startedAt: '2026-09-01T08:00:00Z' }),
+      source('old-open', {
+        deletedAt: null,
+        endedAt: null,
+        startedAt: '2026-09-01T08:00:00Z',
+      }),
       source('offset-east', {
+        deletedAt: null,
+
         startedAt: '2026-10-10T16:00:00+14:00',
         endedAt: '2026-10-10T17:00:00+14:00',
       }),
       source('before', {
+        deletedAt: null,
+
         startedAt: '2026-10-08T01:00:00Z',
         endedAt: '2026-10-09T02:59:00Z',
       }),
-      source('future', { startedAt: '2026-11-01T09:00:00Z' }),
+      source('future', {
+        deletedAt: null,
+        endedAt: null,
+        startedAt: '2026-11-01T09:00:00Z',
+      }),
       source('other', { projectId: 'b' }),
     ];
-    const mock = setup([facts], { a: {}, b: { archived: true } });
+    const mock = setup([facts], {
+      a: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+      },
+      b: {
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        archived: true,
+      },
+    });
     const selection = daySelection(false);
     const context = await mock.repository.loadOwnHistory(
       'alice',
@@ -283,12 +347,13 @@ describe('read-only daily-hours own canonical repository', () => {
     ]);
     expect(mock.nativeQueries).toHaveLength(2);
     expect(mock.nativeQueries[0]).toMatchObject({
-      where: [],
+      where: [['deletedAt', '==', null]],
       orderBy: ['__name__'],
       limit: 500,
     });
     expect(mock.nativeQueries[1]).toMatchObject({
       where: [
+        ['deletedAt', '==', null],
         ['projectId', '==', 'a'],
         ['startedAt', '<', '2026-10-12'],
       ],
@@ -302,6 +367,8 @@ describe('read-only daily-hours own canonical repository', () => {
     const facts = [
       source('archived-fact', {
         projectId: 'b',
+        deletedAt: null,
+
         startedAt: '2026-10-09T01:00:00-03:00',
         endedAt: '2026-10-09T13:00:00-03:00',
       }),
@@ -309,12 +376,32 @@ describe('read-only daily-hours own canonical repository', () => {
         projectId: 'c',
         endedAt: '2026-10-09T09:00:00-03:00',
       }),
-      source('open', { startedAt: '2026-10-09T14:00:00-03:00' }),
+      source('open', {
+        deletedAt: null,
+        endedAt: null,
+        startedAt: '2026-10-09T14:00:00-03:00',
+      }),
     ];
     const mock = setup([facts], {
-      a: {},
-      b: { archived: true },
-      c: { mergedInto: 'a' },
+      a: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+      },
+      b: {
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        archived: true,
+      },
+      c: {
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        mergedInto: 'a',
+      },
     });
     const context = await mock.repository.loadOwnHistory(
       'alice',
@@ -337,29 +424,63 @@ describe('read-only daily-hours own canonical repository', () => {
       closedMinutes: 0,
     });
     const archived = await setup([facts], {
-      a: {},
-      b: { archived: true },
-      c: { mergedInto: 'a' },
+      a: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+      },
+      b: {
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        archived: true,
+      },
+      c: {
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        mergedInto: 'a',
+      },
     }).repository.loadOwnHistory('alice', 'b', daySelection(false));
     expect(archived.records).toHaveLength(3);
     expect(archived.selectedRecords).toEqual([]);
   });
   it('preserves same-project next starts and archived other-project facts before display filtering', async () => {
     const facts = [
-      source('open', { startedAt: '2026-10-09T09:00:00-03:00' }),
+      source('open', {
+        deletedAt: null,
+        endedAt: null,
+        startedAt: '2026-10-09T09:00:00-03:00',
+      }),
       source('other-next', {
         projectId: 'b',
+        deletedAt: null,
+
         startedAt: '2026-10-09T10:00:00-03:00',
         endedAt: '2026-10-09T20:00:00-03:00',
       }),
       source('next', {
+        deletedAt: null,
+
         startedAt: '2026-10-09T11:00:00-03:00',
         endedAt: '2026-10-09T12:00:00-03:00',
       }),
     ];
     const context = await setup([facts], {
-      a: {},
-      b: { archived: true },
+      a: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+      },
+      b: {
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
+        archived: true,
+      },
     }).repository.loadOwnHistory('alice', 'a', daySelection(false));
     expect(context.records.map((r) => r.id)).toEqual([
       'open',
@@ -390,6 +511,8 @@ describe('read-only daily-hours own canonical repository', () => {
   it('advances physical native selection cursors over all-residual pages', async () => {
     const rejected = Array.from({ length: 500 }, (_, i) =>
       source('expired-' + String(i).padStart(3, '0'), {
+        deletedAt: null,
+
         startedAt: '2026-09-01T08:00:00Z',
         endedAt: '2026-09-01T09:00:00Z',
       }),
@@ -404,7 +527,7 @@ describe('read-only daily-hours own canonical repository', () => {
       'visible',
     ]);
     const selections = mock.nativeQueries.filter(
-      (query) => query.where.length > 0,
+      (query) => query.where.length > 1,
     );
     expect(selections).toHaveLength(2);
     expect(selections[1]?.cursor?.id).toBe('expired-499');
@@ -414,6 +537,7 @@ describe('read-only daily-hours own canonical repository', () => {
     const deletedPage = Array.from({ length: 500 }, (_, i) =>
       source('deleted-' + i, {
         deletedAt: false,
+        endedAt: null,
         startedAt: null,
         timeZone: null,
       }),
@@ -427,11 +551,22 @@ describe('read-only daily-hours own canonical repository', () => {
         (r) => r.id,
       ),
     ).toEqual(['visible']);
-    expect(allowed.reads).toBe(6);
-    const oversized = setup([
-      ...Array<Document[]>(20).fill(deletedPage),
-      [source('overflow')],
-    ]);
+    expect(allowed.reads).toBe(1);
+    const inaccessible = deletedPage.map((doc) =>
+      source(doc.id, { projectId: 'foreign' }),
+    );
+    const oversized = setup(
+      [...Array<Document[]>(20).fill(inaccessible), [source('overflow')]],
+      {
+        a: { type: 'work', archived: false, confidential: false },
+        foreign: {
+          type: 'personal',
+          createdBy: 'bob',
+          archived: false,
+          confidential: false,
+        },
+      },
+    );
     await expect(
       oversized.repository.loadOwnHistory('alice', 'a', daySelection()),
     ).rejects.toMatchObject({
@@ -441,7 +576,7 @@ describe('read-only daily-hours own canonical repository', () => {
     });
     expect(oversized.reads).toBe(21);
     expect(
-      oversized.nativeQueries.every((query) => query.where.length === 0),
+      oversized.nativeQueries.every((query) => query.where.length === 1),
     ).toBe(true);
   });
   it('validates selection before any database read and fails closed for corrupt unselected global context', async () => {
@@ -457,15 +592,30 @@ describe('read-only daily-hours own canonical repository', () => {
     expect(mock.options).toBeUndefined();
     await expect(
       setup([[source('corrupt-other', { projectId: 'b', startedAt: 'bad' })]], {
-        a: {},
-        b: { archived: true },
+        a: {
+          createdBy: 'alice',
+          type: 'work',
+          archived: false,
+          confidential: false,
+        },
+        b: {
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          archived: true,
+        },
       }).repository.loadOwnHistory('alice', 'a', daySelection(false)),
     ).rejects.toMatchObject({ code: 'resource-exhausted' });
   });
   it('uses generic not-found for missing or inaccessible requested project and does not read records', async () => {
     for (const projectId of ['missing', 'foreign', 'invalidtype']) {
       const mock = setup([], {
-        foreign: { type: 'personal', createdBy: 'bob' },
+        foreign: {
+          type: 'personal',
+          archived: false,
+          confidential: false,
+          createdBy: 'bob',
+        },
         invalidtype: { type: false },
       });
       await expect(

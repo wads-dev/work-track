@@ -1,5 +1,5 @@
-import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
   assertProjectAccess,
@@ -89,32 +89,30 @@ export class FirestorePauseRepository implements PauseRepository {
       let sourceRef = input.recordId ? records.doc(input.recordId) : undefined;
       if (!sourceRef) {
         const scanned = await tx.get(
-          records.where('uid', '==', uid).limit(10001),
+          records
+            .where('uid', '==', uid)
+            .where('endedAt', '==', null)
+            .where('deletedAt', '==', null)
+            .limit(10001),
         );
         if (scanned.docs.length > 10000)
           throw new PauseError(
             'resource-exhausted',
             'Varredura física excede limite; informe recordId explícito.',
           );
-        if (
-          scanned.docs.filter((doc) => !isDeletedRecord(doc.data())).length >
-          1000
-        )
+        if (scanned.docs.length > 1000)
           throw new PauseError(
             'resource-exhausted',
             'Contexto excede limite; informe recordId explícito.',
           );
-        // Repository residual: legacy endedAt/deletedAt may be missing or null,
-        // ISO-offset timestamps cannot use chronological lexical ranges, and project
+        // Repository residual: ISO-offset timestamps require exact instant checks; project
         // ACL/archive/locks live in another document (Firestore has no joins).
         const open = scanned.docs.filter((doc) => {
           const r = doc.data();
           const started =
             typeof r.startedAt === 'string' ? Date.parse(r.startedAt) : NaN;
           return (
-            !isDeletedRecord(r) &&
             r.uid === uid &&
-            (r.endedAt === undefined || r.endedAt === null) &&
             Number.isFinite(started) &&
             started <= speech &&
             speech - started < 86400000 &&
@@ -156,6 +154,11 @@ export class FirestorePauseRepository implements PauseRepository {
       if (!sourceDoc.exists)
         throw new PauseError('not-found', 'Registro não encontrado.');
       const before = sourceDoc.data()!;
+      if (!reportRecordSchema('admin-owned').safeParse(before).success)
+        throw new PauseError(
+          'failed-precondition',
+          'Schema de storage inválido; nenhuma alteração.',
+        );
       if (
         before.uid !== uid ||
         typeof before.projectId !== 'string' ||
@@ -208,6 +211,7 @@ export class FirestorePauseRepository implements PauseRepository {
         uid,
         startedAt: input.resumedAt,
         endedAt: null,
+        deletedAt: null,
         requestId: input.requestId,
         receivedAt: recordedAt,
         pausedFrom: sourceRef.id,

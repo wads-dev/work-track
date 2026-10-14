@@ -89,6 +89,7 @@ export class WebWorkRepository {
         topics: [
           {
             id: 'general',
+            archived: false,
             title: 'Geral',
             description: 'Atividade geral ou tópico ainda não identificado.',
           },
@@ -303,7 +304,12 @@ export class WebWorkRepository {
       const project = target.data()! as {
         title: string;
         description: string;
-        topics: { id: string; title: string; description: string }[];
+        topics: {
+          id: string;
+          title: string;
+          description: string;
+          archived: boolean;
+        }[];
       };
       assertProjectWritable(target.data()!);
       if (input.projectId && input.projectId !== before.projectId)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { registerInput, type Project } from './work-model.js';
+import { projectInput, registerInput, type Project } from './work-model.js';
 import { searchProjects } from './project-search.js';
 const base = {
   projectId: 'project',
@@ -46,12 +46,27 @@ describe('work registration', () => {
     ).toBe(false);
   });
 });
+it('requires an explicit valid type for project creation', () => {
+  const input = {
+    title: 'Project',
+    description: 'A sufficiently detailed project scope',
+  };
+  for (const type of [undefined, null, '', 'unknown'])
+    expect(projectInput.safeParse({ ...input, type }).success).toBe(false);
+  for (const type of ['personal', 'work'])
+    expect(projectInput.safeParse({ ...input, type }).success).toBe(true);
+});
 describe('project matching', () => {
   const project: Project = {
+    archived: false,
+    confidential: false,
+    type: 'work',
     id: 'p',
     title: 'Wads Work Track',
     description: 'Organização pessoal de atividades e rotina',
-    topics: [{ id: 'general', title: 'Geral', description: 'Geral' }],
+    topics: [
+      { archived: false, id: 'general', title: 'Geral', description: 'Geral' },
+    ],
     createdBy: 'user',
     createdAt: '',
   };

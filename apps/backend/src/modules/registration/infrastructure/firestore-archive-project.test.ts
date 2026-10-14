@@ -1,9 +1,19 @@
 import { expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { FirestoreProjectManagementRepository } from './firestore-project-management.js';
-it('archives/unarchives legacy project audit once, rejects locks and merged reopen', async () => {
+it('archives/unarchives canonical project audit once, rejects locks and merged reopen', async () => {
   const values = new Map<string, Record<string, unknown>>([
-    ['projects/p', { id: 'p', title: 'Project', topics: [] }],
+    [
+      'projects/p',
+      {
+        id: 'p',
+        type: 'work',
+        archived: false,
+        confidential: false,
+        title: 'Project',
+        topics: [],
+      },
+    ],
   ]);
   let writes = 0;
   interface Ref {

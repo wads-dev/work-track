@@ -18,6 +18,7 @@ function fixture() {
   const data = new Map<string, Record<string, unknown>>();
   const source: Record<string, unknown> = {
     uid: 'alice',
+    deletedAt: null,
     projectId: 'p',
     startedAt: '2026-10-09T12:00:00Z',
     endedAt: '2026-10-09T13:00:00Z',
@@ -226,3 +227,14 @@ it('rolls back all writes on transaction failure', async () => {
   expect([...f.data]).toEqual(before);
   expect(f.writes()).toBe(0);
 });
+
+it.each(['endedAt', 'deletedAt', 'topics', 'timeZone'])(
+  'rejects missing storage %s without writes or normalization',
+  async (field) => {
+    const f = fixture();
+    delete f.source[field];
+    const before = structuredClone([...f.data]);
+    await expect(f.repo.mergeRecords(input, 'alice', now)).rejects.toThrow();
+    expect([...f.data]).toEqual(before);
+  },
+);

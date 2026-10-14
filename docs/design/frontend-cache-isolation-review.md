@@ -4,7 +4,7 @@ Nota delimitada — 2026-10-09. Sem afirmação de deploy ou check integral fina
 
 ## Comportamento esperado
 
-Os cálculos compartilham os casos de uso existentes do backend; os repositórios frontend recebem registros canônicos autorizados pelo projeto atual. Projetos públicos/work podem compartilhar seus registros entre usuários autenticados; projetos pessoais permanecem restritos ao proprietário. Não há necessidade de projeções ou reescrita do domínio para esta política.
+Os cálculos compartilham os casos de uso existentes do backend; os repositórios frontend recebem registros canônicos autorizados pelo projeto atual. Projetos com `type: work` podem compartilhar seus registros entre usuários corporativos autorizados; projetos com `type: personal` permanecem restritos ao proprietário. Ausência ou tipo inválido nega acesso ao projeto, sem fallback. Não há necessidade de projeções ou reescrita do domínio para esta política.
 
 O catálogo de projetos Web é realtime: consultas `type == work` e `type == personal && createdBy == uid` têm assinaturas locais (`source: cache`) e de sincronização (`source: default`). Documentos de projetos não são mais obtidos/cacheados pela Callable listProjects. O catálogo assume o contrato atual de criação com type obrigatório; não inclui documentos sem type nem adiciona fallback para eles. Listeners e metadados são descartados ao desmontar/trocar conta. Mudanças de proprietário/tipo, remoção ou erro invalidam resultados. Antes de expor metadados de sessões anteriores, ambas as consultas precisam confirmar acesso no servidor nesta assinatura; IndexedDB não é autorização permanente.
 

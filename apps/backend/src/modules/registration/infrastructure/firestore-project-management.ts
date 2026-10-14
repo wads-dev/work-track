@@ -1,4 +1,3 @@
-import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
 import {
   assertProjectAccess,
@@ -78,7 +77,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
         reason: input.reason,
         request: JSON.stringify(input),
         action: 'archive',
-        before: { archived: before.archived ?? false },
+        before: { archived: before.archived },
         after: { archived: input.archived },
         recordedAt: FieldValue.serverTimestamp(),
         result,
@@ -168,10 +167,9 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
       targetRef = this.db.collection('projects').doc(input.targetProjectId);
     // Personal merges never read another UID's records, including stale canonical references.
     // UID equality also excludes spoofed owner-collection facts from preview and migration.
-    // deletedAt is legacy optional/null: Firestore has no missing-field predicate.
-    // Query project/owner first; residual tombstone selection precedes mutation limits.
+    // Canonical active state is selected natively; tombstones are never migrated.
     const recordsQuery = (source: ManagedProject) =>
-      effectiveProjectType(source) === 'personal'
+      (effectiveProjectType(source) === 'personal'
         ? this.db
             .collection('users')
             .doc(source.createdBy)
@@ -180,7 +178,8 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
             .where('uid', '==', source.createdBy)
         : this.db
             .collectionGroup('records')
-            .where('projectId', '==', input.sourceProjectId);
+            .where('projectId', '==', input.sourceProjectId)
+      ).where('deletedAt', '==', null);
     if (!input.confirmed) {
       const [a, b] = await Promise.all([sourceRef.get(), targetRef.get()]);
       assertProjectMergeAccess(a.data(), b.data(), uid);
@@ -199,7 +198,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
         mode: 'preview' as const,
         sourceProjectId: input.sourceProjectId,
         targetProjectId: input.targetProjectId,
-        count: count.docs.filter((doc) => !isDeletedRecord(doc.data())).length,
+        count: count.docs.length,
         topicMapping: Object.entries(mapping).map(
           ([sourceTopicId, targetTopicId]) => ({
             sourceTopicId,
@@ -336,7 +335,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
           'Locks da mesclagem inconsistentes.',
         );
       const page = await tx.get(recordsQuery(a.data() as ManagedProject));
-      const active = page.docs.filter((doc) => !isDeletedRecord(doc.data()));
+      const active = page.docs;
       const docs = active.slice(0, 100);
       const target = b.data() as ManagedProject;
       const changes = docs.map((doc) => {

@@ -376,20 +376,31 @@ describe('versioned bounded complete deletion inventory', () => {
       expect([...f.data]).toEqual(before);
     },
   );
-  it('rejects legacy omitted-inventory digest and expired/wrong-identity receipts', async () => {
-    for (const kind of ['legacy', 'expired', 'uid', 'project']) {
+  it('rejects receipts with missing inventoryVersion even when the document digest matches', async () => {
+    const f = fixture();
+    const exported = await f.repo.exportProject('p', 'alice');
+    const receipt = f.data.get(
+      'projectDeletionExports/' + exported.snapshotToken,
+    )!;
+    delete receipt.inventoryVersion;
+    receipt.digest = createHash('sha256')
+      .update(JSON.stringify(exported.export.documents))
+      .digest('hex');
+    const before = structuredClone([...f.data]);
+    await expect(
+      f.repo.deleteProject('p', 'alice', exported.snapshotToken),
+    ).rejects.toMatchObject({ code: 'failed-precondition' });
+    expect([...f.data]).toEqual(before);
+  });
+  it('rejects expired and wrong-identity receipts', async () => {
+    for (const kind of ['expired', 'uid', 'project']) {
       const f = fixture();
       const old = await f.repo.exportProject('p', 'alice');
       seedNewInventory(f);
       const receipt = f.data.get(
         'projectDeletionExports/' + old.snapshotToken,
       )!;
-      if (kind === 'legacy') {
-        delete receipt.inventoryVersion;
-        receipt.digest = createHash('sha256')
-          .update(JSON.stringify(old.export.documents))
-          .digest('hex');
-      } else if (kind === 'expired') receipt.expiresAt = 100;
+      if (kind === 'expired') receipt.expiresAt = 100;
       else if (kind === 'uid') receipt.uid = 'bob';
       else receipt.projectId = 'q';
       const before = structuredClone([...f.data]);

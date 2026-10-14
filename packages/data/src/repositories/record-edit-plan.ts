@@ -15,7 +15,7 @@ export function buildRecordEditPlan(
       title: string;
       description: string;
       mergedIntoTopicId?: string;
-      archived?: boolean;
+      archived: boolean;
     }>;
   },
   updatedAt: string,
@@ -34,7 +34,6 @@ export function buildRecordEditPlan(
   ] as const)
     if (input[key] !== undefined) patch[key] = input[key];
   if (input.endedAt !== undefined) patch.endedAt = input.endedAt;
-  else if (before.endedAt === undefined) patch.endedAt = null;
   if (input.projectId !== undefined) {
     patch.projectId = input.projectId;
     patch.projectSnapshot = {

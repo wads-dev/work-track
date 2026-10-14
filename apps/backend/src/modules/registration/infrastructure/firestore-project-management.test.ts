@@ -4,9 +4,19 @@ import { FirestoreProjectManagementRepository } from './firestore-project-manage
 it('previews without writes then resumes bounded audited batches and preserves evidence', async () => {
   const values = new Map<string, Record<string, unknown>>();
   const base = {
+    type: 'work',
+    archived: false,
+    confidential: false,
     title: 'Project',
     description: 'Project description long',
-    topics: [{ id: 'general', title: 'Geral', description: 'Default' }],
+    topics: [
+      {
+        id: 'general',
+        archived: false,
+        title: 'Geral',
+        description: 'Default',
+      },
+    ],
     createdBy: 'alice',
     createdAt: 'now',
   };
@@ -15,6 +25,7 @@ it('previews without writes then resumes bounded audited batches and preserves e
   for (let i = 0; i < 101; i++)
     values.set('users/alice/records/deleted' + i, {
       uid: 'alice',
+      endedAt: null,
       projectId: 'source',
       deletedAt: false,
       topics: 'malformed',
@@ -25,6 +36,8 @@ it('previews without writes then resumes bounded audited batches and preserves e
     values.set('users/alice/records/r' + i, {
       uid: 'alice',
       projectId: 'source',
+      endedAt: null,
+      deletedAt: null,
       topics: [{ topicId: 'general' }],
       originalText: 'evidence',
       recordedAt: 'immutable',
@@ -53,6 +66,7 @@ it('previews without writes then resumes bounded audited batches and preserves e
   });
   let queriedProject = 'source';
   const query = {
+    where: () => query,
     query: true,
     n: Number.MAX_SAFE_INTEGER,
     get: () =>
@@ -62,7 +76,8 @@ it('previews without writes then resumes bounded audited batches and preserves e
             ([path, data]) =>
               path.startsWith('users/') &&
               path.split('/').length === 4 &&
-              data.projectId === queriedProject,
+              data.projectId === queriedProject &&
+              data.deletedAt === null,
           )
           .map(([path]) => ({ ref: ref(path), data: () => values.get(path) })),
       }),
@@ -75,7 +90,8 @@ it('previews without writes then resumes bounded audited batches and preserves e
               ([path, data]) =>
                 path.startsWith('users/') &&
                 path.split('/').length === 4 &&
-                data.projectId === queriedProject,
+                data.projectId === queriedProject &&
+                data.deletedAt === null,
             ).length,
           }),
         }),
@@ -102,7 +118,8 @@ it('previews without writes then resumes bounded audited batches and preserves e
                 .filter(
                   ([path, data]) =>
                     path.split('/').length === 4 &&
-                    data.projectId === queriedProject,
+                    data.projectId === queriedProject &&
+                    data.deletedAt === null,
                 )
                 .slice(0, value.n)
                 .map(([path]) => ({
@@ -208,6 +225,7 @@ it('previews without writes then resumes bounded audited batches and preserves e
     [...values.keys()].filter((path) => path.includes('/audit/merge_')),
   ).toHaveLength(101);
   expect(values.get('users/alice/records/deleted0')).toEqual({
+    endedAt: null,
     uid: 'alice',
     projectId: 'source',
     deletedAt: false,

@@ -6,7 +6,14 @@ it('personal merge never reads or migrates foreign canonical or spoofed owner fa
   const base = {
     title: 'Project',
     description: 'Project description long',
-    topics: [{ id: 'general', title: 'Geral', description: 'Default' }],
+    topics: [
+      {
+        id: 'general',
+        archived: false,
+        title: 'Geral',
+        description: 'Default',
+      },
+    ],
     createdBy: 'alice',
     type: 'personal',
     createdAt: 'now',
@@ -17,6 +24,8 @@ it('personal merge never reads or migrates foreign canonical or spoofed owner fa
     values.set('users/alice/records/r' + i, {
       uid: 'alice',
       projectId: 'source',
+      endedAt: null,
+      deletedAt: null,
       topics: [{ topicId: 'general' }],
       originalText: 'evidence',
       recordedAt: 'immutable',
@@ -80,7 +89,9 @@ it('personal merge never reads or migrates foreign canonical or spoofed owner fa
           .map(([path]) => ({ ref: ref(path), data: () => values.get(path) })),
       }),
     where: (field: string, op: string, value: string) => {
-      expect([field, op, value]).toEqual(['uid', '==', 'alice']);
+      expect([field, op, value]).toEqual(
+        field === 'uid' ? ['uid', '==', 'alice'] : ['deletedAt', '==', null],
+      );
       return query;
     },
     limit: (n: number) => ({ query: true, n }),

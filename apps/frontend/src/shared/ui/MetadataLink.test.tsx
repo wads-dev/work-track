@@ -4,10 +4,19 @@ import { MemoryRouter } from 'react-router-dom';
 import { MetadataLink, metadataNavigation } from './MetadataLink';
 
 const project = {
+  createdBy: 'me',
+  type: 'work',
+  archived: false,
+  confidential: false,
   title: 'Current project',
   topics: [
-    { id: 'legacy', title: 'Obsolete topic', mergedIntoTopicId: 'current' },
-    { id: 'current', title: 'Canonical topic' },
+    {
+      id: 'existing',
+      title: 'Obsolete topic',
+      archived: true,
+      mergedIntoTopicId: 'current',
+    },
+    { id: 'current', title: 'Canonical topic', archived: false },
   ],
 };
 const render = (
@@ -28,7 +37,7 @@ const render = (
 
 describe('metadata presentation links', () => {
   it('renders canonical topic links with design-system classes and full return context', () => {
-    const html = render(project, false, 'legacy');
+    const html = render(project, false, 'current');
     expect(html).toContain('Canonical topic');
     expect(html).not.toContain('Obsolete topic');
     expect(html).toContain(
@@ -40,7 +49,7 @@ describe('metadata presentation links', () => {
 
   it('never emits confidential label, topic identity or navigation until revealed', () => {
     const hidden = { ...project, confidential: true };
-    for (const topicId of [undefined, 'legacy']) {
+    for (const topicId of [undefined, 'existing']) {
       const html = render(hidden, false, topicId);
       expect(html).toContain(
         topicId ? 'Tópico reservado' : 'Projeto reservado',
@@ -48,14 +57,19 @@ describe('metadata presentation links', () => {
       expect(html).not.toContain('href=');
       expect(html).not.toContain('Current project');
       expect(html).not.toContain('Canonical topic');
-      expect(html).not.toContain('legacy');
+      expect(html).not.toContain('existing');
     }
-    expect(render(hidden, true, 'legacy')).toContain('Canonical topic');
+    expect(render(hidden, true, 'current')).toContain('Canonical topic');
+    expect(render(hidden, true, 'existing')).toContain('Tópico indisponível');
   });
 
-  it('stays neutral when the selected parent disappears or merge target is unavailable', () => {
+  it('stays neutral for missing parents or topics and rejects aliases even with an available target', () => {
     for (const revealed of [false, true]) {
-      expect(render(undefined, revealed, 'legacy')).not.toContain('href=');
+      expect(render(undefined, revealed, 'existing')).not.toContain('href=');
+      const alias = render(project, revealed, 'existing');
+      expect(alias).toContain('Tópico indisponível');
+      expect(alias).not.toContain('href=');
+      expect(alias).not.toContain('Canonical topic');
       expect(metadataNavigation('p', project, revealed, 'missing')).toEqual({
         label: 'Tópico indisponível',
       });
@@ -63,9 +77,14 @@ describe('metadata presentation links', () => {
     expect(
       metadataNavigation(
         'p',
-        { topics: [{ id: 'legacy', mergedIntoTopicId: 'missing' }] },
+        {
+          ...project,
+          topics: [
+            { id: 'existing', archived: true, mergedIntoTopicId: 'missing' },
+          ],
+        },
         true,
-        'legacy',
+        'existing',
       ),
     ).toEqual({ label: 'Tópico indisponível' });
   });

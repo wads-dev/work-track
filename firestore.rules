@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // Autorização do Firebase Web. O MCP usa Admin SDK e valida acesso no backend.
-// Refatoração de organização: mantém a política existente, inclusive o legado.
+// Projetos exigem escopo explícito work/personal; confidencialidade é apresentação.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -41,9 +41,8 @@ service cloud.firestore {
       return /databases/$(database)/documents/projects/$(projectId);
     }
 
-    // Projetos antigos sem type continuam compartilhados na leitura individual.
     function isSharedProject(project) {
-      return !('type' in project) || project.type == 'work';
+      return project.get('type', '') == 'work';
     }
 
     function isOwnPersonalProject(project) {
@@ -62,17 +61,20 @@ service cloud.firestore {
     }
 
     // Listagens usam os filtros explícitos das consultas Web. Rules não filtram
-    // resultados: consulta work ou createdBy próprio (inclui legado próprio).
+    // resultados: consulta work ou personal com createdBy próprio.
     // Nenhuma listagem ampla revela projetos pessoais de terceiros.
     function canDiscoverProject(project) {
       return isAuthenticated()
         && (project.get('type', '') == 'work'
-          || project.get('createdBy', '') == request.auth.uid);
+          || (project.get('type', '') == 'personal'
+            && project.get('createdBy', '') == request.auth.uid));
     }
 
     function isValidProject(project, projectId) {
       return isValidDocumentId(projectId)
         && project.id == projectId
+        && project.archived is bool
+        && project.confidential is bool
         && (isSharedProject(project)
           || (project.type == 'personal'
             && isValidUid(project.get('createdBy', ''))));
@@ -132,6 +134,9 @@ service cloud.firestore {
     function isValidRecord(record, ownerUid, recordId) {
       return isValidDocumentId(recordId)
         && record.uid == ownerUid
+        && record.keys().hasAll(['endedAt', 'deletedAt', 'topics'])
+        && (record.endedAt == null || record.endedAt is string)
+        && record.topics is list
         && (!('id' in record) || record.id == recordId)
         && canAccessRecordProject(record);
     }

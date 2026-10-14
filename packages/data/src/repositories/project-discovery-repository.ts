@@ -3,6 +3,7 @@ import type {
   ProjectSelection,
 } from '@work-track/core/registration/domain/work-model';
 import { searchProjects } from '@work-track/core/registration/domain/project-search';
+import { decodeReportProjectMetadata } from '../codecs/report-project-metadata.js';
 import {
   canAccessProject,
   effectiveProjectType,
@@ -29,9 +30,9 @@ export class ProjectDiscoveryRepository {
       );
     return ProjectDiscoveryRepository.selected(docs, uid, selection);
   }
-  /** Firebase cannot query missing type (legacy work), missing archived/mergedInto,
-   * normalized substring/bigram similarity or nested topic-title search. Adapters
-   * push explicit personal type/owner predicates before these concrete residuals.
+  /** Firebase cannot query normalized substring/bigram similarity or nested
+   * topic-title search. Adapters
+   * push explicit work/personal type and personal owner predicates before these residuals.
    */
   static selected(
     docs: readonly ProjectDiscoveryDocument[],
@@ -60,6 +61,10 @@ export class ProjectDiscoveryRepository {
   static authorized(docs: readonly ProjectDiscoveryDocument[], uid: string) {
     return docs
       .filter((d) => canAccessProject(d.data, uid))
+      .map((doc) => {
+        decodeReportProjectMetadata(doc.data, 'admin');
+        return doc;
+      })
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 }

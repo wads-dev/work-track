@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { ClientPersonalReportRepository } from './personal-report-repository.js';
 import { executePersonalReport } from '@work-track/core/reports/application/get-personal-report';
 const base = {
+  deletedAt: null,
   uid: 'alice',
   startedAt: '2026-10-08T12:00:00Z',
   endedAt: '2026-10-08T13:30:00Z',
@@ -22,15 +23,39 @@ it('preserves full budget context and excludes inaccessible, deleted and foreign
         id: 'f',
         projectId: 'work',
         deletedAt: '2026-10-09',
-      } as typeof base & { id: string; projectId: string },
+      },
     ],
     new Map([
-      ['work', { topics: [] }],
+      [
+        'work',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics: [],
+        },
+      ],
       [
         'personal',
-        { type: 'personal', createdBy: 'alice', archived: true, topics: [] },
+        {
+          confidential: false,
+          type: 'personal',
+          createdBy: 'alice',
+          archived: true,
+          topics: [],
+        },
       ],
-      ['foreign', { type: 'personal', createdBy: 'bob', topics: [] }],
+      [
+        'foreign',
+        {
+          archived: false,
+          confidential: false,
+          type: 'personal',
+          createdBy: 'bob',
+          topics: [],
+        },
+      ],
     ]),
   );
   expect((await repo.loadContext(['alice'])).map((r) => r.id)).toEqual([
@@ -57,7 +82,18 @@ it('uses consistent cursor ordering for mixed-case document IDs', async () => {
   const repo = new ClientPersonalReportRepository(
     'alice',
     ids.map((id) => ({ ...base, id, projectId: 'work' })),
-    new Map([['work', { topics: [] }]]),
+    new Map([
+      [
+        'work',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics: [],
+        },
+      ],
+    ]),
   );
   const seen: string[] = [];
   let cursor: string | undefined;
@@ -76,8 +112,26 @@ it('reads selected page without dropping other-project budget context', async ()
       { ...base, id: 'selected', projectId: 'work' },
     ],
     new Map([
-      ['work', { topics: [] }],
-      ['other', { topics: [] }],
+      [
+        'work',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics: [],
+        },
+      ],
+      [
+        'other',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics: [],
+        },
+      ],
     ]),
     new Set(['selected']),
   );
@@ -97,7 +151,18 @@ it('refuses to silently truncate the context', async () => {
       id: String(i),
       projectId: 'work',
     })),
-    new Map([['work', { topics: [] }]]),
+    new Map([
+      [
+        'work',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics: [],
+        },
+      ],
+    ]),
   );
   await expect(repo.loadContext(['alice'])).rejects.toThrow('2000 registros');
 });

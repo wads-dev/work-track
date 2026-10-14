@@ -109,7 +109,7 @@ describe('chart person identities are never confidential', () => {
     expect(hidden).toContain('da distribuição');
   });
 
-  it('supports legacy caller person UID and neutral missing-directory identity in both modes', () => {
+  it('supports existing caller person UID and neutral missing-directory identity in both modes', () => {
     const data = [
       { ...person, kind: undefined },
       {

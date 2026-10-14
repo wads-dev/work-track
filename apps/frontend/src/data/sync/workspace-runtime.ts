@@ -373,7 +373,11 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     emit();
     [
       query(collection(db, 'projects'), where('type', '==', 'work')),
-      query(collection(db, 'projects'), where('createdBy', '==', uid)),
+      query(
+        collection(db, 'projects'),
+        where('type', '==', 'personal'),
+        where('createdBy', '==', uid),
+      ),
     ].forEach((target, i) =>
       catalogStops.push(
         watch(target, 'catalog:' + i, (rows) => {

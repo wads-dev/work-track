@@ -20,7 +20,11 @@ function setup(
     })),
   });
   const limit = vi.fn().mockReturnValue({ get });
-  const where = vi.fn().mockReturnValue({ limit, get });
+  const where = vi.fn().mockReturnValue({
+    where: (...args: unknown[]): unknown => where(...args),
+    limit,
+    get,
+  });
   const collectionGroup = vi.fn().mockReturnValue({ where });
   // Mock only the SDK boundary; no Firebase initialization or live database access.
   const db = {
@@ -28,7 +32,16 @@ function setup(
     collection: () => ({
       doc: () => ({
         get: () =>
-          Promise.resolve({ exists: true, data: () => ({ type: 'work' }) }),
+          Promise.resolve({
+            exists: true,
+            data: () => ({
+              createdBy: 'alice',
+              topics: [],
+              type: 'work',
+              archived: false,
+              confidential: false,
+            }),
+          }),
       }),
     }),
   } as unknown as Firestore;
@@ -46,11 +59,17 @@ describe('FirestoreReportRecordsRepository', () => {
     const { repository } = setup([
       ...Array.from({ length: 101 }, (_, i) => ({
         id: 'deleted' + i,
-        data: () => ({ deletedAt: false, startedAt: null }),
+        data: () => ({ deletedAt: false, endedAt: null, startedAt: null }),
       })),
       {
         id: 'active',
-        data: () => ({ projectId: 'project', uid: 'alice', startedAt: 'now' }),
+        data: () => ({
+          projectId: 'project',
+          uid: 'alice',
+          deletedAt: null,
+          endedAt: null,
+          startedAt: '2026-10-08T10:00:00Z',
+        }),
       },
     ]);
     expect(
@@ -74,6 +93,8 @@ describe('FirestoreReportRecordsRepository', () => {
           id: 'untrusted-field',
           projectId: 'project',
           uid: 'alice',
+          deletedAt: null,
+          endedAt: null,
           startedAt,
           originalText: 'private transcript',
         }),
@@ -83,6 +104,7 @@ describe('FirestoreReportRecordsRepository', () => {
         data: () => ({
           projectId: 'project',
           uid: 'bob',
+          deletedAt: null,
           startedAt,
           endedAt,
           interpretation: 'private interpretation',
@@ -91,7 +113,8 @@ describe('FirestoreReportRecordsRepository', () => {
     ]);
     const result = await repository.listByProject('project', 25, 'alice');
     expect(collectionGroup).toHaveBeenCalledExactlyOnceWith('records');
-    expect(where).toHaveBeenCalledExactlyOnceWith('projectId', '==', 'project');
+    expect(where).toHaveBeenCalledWith('projectId', '==', 'project');
+    expect(where).toHaveBeenCalledWith('deletedAt', '==', null);
     expect(limit).toHaveBeenCalledExactlyOnceWith(2001);
     expect(get).toHaveBeenCalledExactlyOnceWith();
     expect(result).toEqual([
@@ -107,8 +130,8 @@ describe('FirestoreReportRecordsRepository', () => {
     expect(result[0]).not.toHaveProperty('endedAt');
   });
 
-  it.each([null, 123, false])(
-    'omits non-string optional end timestamps (%s)',
+  it.each([null])(
+    'omits canonical null open timestamp (%s)',
     async (endedAt) => {
       const { repository } = setup([
         {
@@ -116,6 +139,8 @@ describe('FirestoreReportRecordsRepository', () => {
           data: () => ({
             projectId: 'project',
             uid: 'alice',
+            deletedAt: null,
+
             startedAt: '2026-10-08T21:00:00Z',
             endedAt,
           }),
@@ -136,6 +161,8 @@ describe('FirestoreReportRecordsRepository', () => {
           data: () => ({
             projectId: 'project',
             uid: 'bob',
+            deletedAt: null,
+            endedAt: null,
             startedAt: '2026-10-08T10:00:00Z',
           }),
         },
@@ -161,3 +188,42 @@ describe('FirestoreReportRecordsRepository', () => {
     ).rejects.toBe(failure);
   });
 });
+
+it.each([undefined, false, 123, '', 'invalid'])(
+  'rejects noncanonical active endedAt %s',
+  async (endedAt) => {
+    const { repository } = setup([
+      {
+        id: 'bad',
+        data: () => ({
+          projectId: 'project',
+          uid: 'alice',
+          startedAt: '2026-10-08T10:00:00Z',
+          endedAt,
+          deletedAt: null,
+        }),
+      },
+    ]);
+    await expect(
+      repository.listByProject('project', 10, 'alice'),
+    ).rejects.toThrow();
+  },
+);
+it.each([undefined, false, 0, '', {}, 'removed'])(
+  'never treats non-null or missing deletion marker %s as active',
+  async (deletedAt) => {
+    const { repository } = setup([
+      {
+        id: 'removed',
+        data: () => ({
+          projectId: 'project',
+          uid: 'alice',
+          startedAt: null,
+          endedAt: false,
+          deletedAt,
+        }),
+      },
+    ]);
+    expect(await repository.listByProject('project', 10, 'alice')).toEqual([]);
+  },
+);

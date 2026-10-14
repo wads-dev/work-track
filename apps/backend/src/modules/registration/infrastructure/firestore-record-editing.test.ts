@@ -7,6 +7,8 @@ it('atomically audits edits, preserves immutable fields, and replays the same re
   values.set(recordPath, {
     id: 'record',
     uid: 'alice',
+    deletedAt: null,
+    endedAt: null,
     projectId: 'project',
     startedAt: '2026-10-08T10:00:00Z',
     timeZone: 'UTC',
@@ -18,9 +20,19 @@ it('atomically audits edits, preserves immutable fields, and replays the same re
     topics: [{ topicId: 'general' }],
   });
   values.set('projects/project', {
+    type: 'work',
+    archived: false,
+    confidential: false,
     title: 'Project',
     description: 'Description of project',
-    topics: [{ id: 'general', title: 'Geral', description: 'General work' }],
+    topics: [
+      {
+        id: 'general',
+        archived: false,
+        title: 'Geral',
+        description: 'General work',
+      },
+    ],
   });
   interface Ref {
     path: string;
@@ -191,35 +203,46 @@ it('pushes excluded record identity into the native owner query', async () => {
   expect(
     (await repo.listOpenRecords('alice', 10, 'saved')).records.map((r) => r.id),
   ).toEqual(['previous']);
-  expect(calls[0]?.slice(1)).toEqual(['!=', 'saved']);
+  expect(calls.at(-1)?.slice(1)).toEqual(['!=', 'saved']);
+  expect(calls.slice(0, 3)).toEqual([
+    ['uid', '==', 'alice'],
+    ['endedAt', '==', null],
+    ['deletedAt', '==', null],
+  ]);
 });
-it('lists nullable and legacy open records but not closed or deleted records', async () => {
+it('queries canonical opens before limits and excludes missing lifecycle fields and tombstones', async () => {
   const rows = [
-    { id: 'legacy' },
-    { id: 'nullable', endedAt: null },
-    { id: 'closed', endedAt: '2026-10-08T11:00:00Z' },
+    { id: 'missing-end', deletedAt: null },
+    { id: 'missing-deletion', endedAt: null },
+    { id: 'open', endedAt: null, deletedAt: null },
+    { id: 'second-open', endedAt: null, deletedAt: null },
+    { id: 'closed', endedAt: '2026-10-08T11:00:00Z', deletedAt: null },
     { id: 'deleted', endedAt: null, deletedAt: '2026-10-08T11:00:00Z' },
-  ];
-  const collection = {
-    limit: () => collection,
+  ].map((row) => ({
+    uid: 'alice',
+    projectId: 'p',
+    startedAt: '2026-10-08T10:00:00Z',
+    ...row,
+  }));
+  const query = (selected: typeof rows): unknown => ({
+    where: (field: string, _operator: string, value: unknown) =>
+      query(
+        selected.filter(
+          (row) => (row as Record<string, unknown>)[field] === value,
+        ),
+      ),
+    limit: () => query(selected),
     get: () =>
       Promise.resolve({
-        docs: rows.map((row) => ({
-          id: row.id,
-          data: () => ({
-            projectId: 'p',
-            startedAt: '2026-10-08T10:00:00Z',
-            ...row,
-          }),
-        })),
+        docs: selected.map((row) => ({ id: row.id, data: () => row })),
       }),
-  };
+  });
   const db = {
-    collection: () => ({ doc: () => ({ collection: () => collection }) }),
+    collection: () => ({ doc: () => ({ collection: () => query(rows) }) }),
   } as unknown as Firestore;
   const repo = new FirestoreRecordEditingRepository(db);
   expect(
     (await repo.listOpenRecords('alice', 10)).records.map((r) => r.id),
-  ).toEqual(['legacy', 'nullable']);
+  ).toEqual(['open', 'second-open']);
   expect((await repo.listOpenRecords('alice', 1)).partial).toBe(true);
 });

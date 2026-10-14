@@ -96,7 +96,7 @@ it('rejects unknown and server-only names asynchronously without callable fallba
   expect(mocks.callable).not.toHaveBeenCalled();
   expect(mocks.web).not.toHaveBeenCalled();
 });
-it('forwards creation payload and current uid preserving the legacy data envelope', async () => {
+it('forwards creation payload and current uid preserving the existing data envelope', async () => {
   const input = {
     title: 'Projeto',
     description: 'Descrição generosa para o projeto.',

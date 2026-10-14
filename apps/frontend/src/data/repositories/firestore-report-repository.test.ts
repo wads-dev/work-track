@@ -121,7 +121,10 @@ it('pushes project, owner/person, interval and local physical limits into native
   expect(page.records.map((r) => r.id)).toEqual(['selected']);
   expect(queries()[0]).toMatchObject({
     base: 'projects',
-    constraints: [{ field: '__name__', op: 'in', value: ['p'] }],
+    constraints: [
+      { field: '__name__', op: 'in', value: ['p'] },
+      { field: 'archived', op: '==', value: false },
+    ],
   });
   expect(recordQueries()).toHaveLength(3);
   for (const q of recordQueries()) {
@@ -178,37 +181,31 @@ it('batches project and person in predicates without dropping combinations or du
     });
   }
 });
-it('preserves missing/null legacy tombstones and opens while excluding non-null tombstones before schema checks', async () => {
-  const repo = fixture(
-    [
-      row('missing', { endedAt: undefined }),
-      row('null', { endedAt: null, deletedAt: null }),
-      ...[false, 0, '', 'removed'].map((deletedAt, i) =>
-        row('deleted' + i, { deletedAt, topics: 'bad' }),
-      ),
-      row('orphan', { projectId: 'gone', topics: 'bad' }),
-    ],
-    [project('p', { type: undefined })],
-  );
-  const context = await repo.own().loadContext(['alice']);
-  expect(context.map((r) => r.id)).toEqual(['missing', 'null']);
-  for (const r of context) expect(r.endedAt).toBeUndefined();
+it('rejects missing storage lifecycle fields and queries live records natively', async () => {
+  const repo = fixture([row('missing', { deletedAt: undefined }), row('null')]);
+  expect((await repo.own().loadContext(['alice'])).map((r) => r.id)).toEqual([
+    'null',
+  ]);
   expect(
-    recordQueries().every(
-      (q) =>
-        !q.constraints.some(
-          (c) => c.field === 'endedAt' || c.field === 'deletedAt',
-        ),
+    recordQueries().every((q) =>
+      q.constraints.some(
+        (c) => c.field === 'deletedAt' && c.op === '==' && c.value === null,
+      ),
     ),
   ).toBe(true);
+  await expect(
+    fixture([row('missing-end', { endedAt: undefined })])
+      .own()
+      .loadContext(['alice']),
+  ).rejects.toThrow();
 });
-it('queries full-spanning closed intervals, old missing/null opens and offset ISO boundary intersections exactly', async () => {
+it('queries full-spanning closed intervals, explicit null opens and offset ISO boundary intersections exactly', async () => {
   const repo = fixture([
     row('spanning', {
       startedAt: '2026-09-01T00:00:00Z',
       endedAt: '2026-11-01T00:00:00Z',
     }),
-    row('old-missing', { startedAt: '2026-01-01T00:00:00Z' }),
+
     row('old-null', { startedAt: '2026-01-01T00:00:00Z', endedAt: null }),
     row('offset', {
       startedAt: '2026-10-07T23:30:00-03:00',
@@ -227,10 +224,10 @@ it('queries full-spanning closed intervals, old missing/null opens and offset IS
     (await repo.own().readPage('alice', 100, undefined, range)).records.map(
       (r) => r.id,
     ),
-  ).toEqual(['offset', 'old-missing', 'old-null', 'spanning']);
+  ).toEqual(['offset', 'old-null', 'spanning']);
   expect(recordQueries()).toHaveLength(3);
 });
-it('matches legacy shared domain interval math, overlap sums, UTC-offset clipping and open 6h cap without daily cap', async () => {
+it('matches existing shared domain interval math, overlap sums, UTC-offset clipping and open 6h cap without daily cap', async () => {
   const records = [
     row('span', {
       startedAt: '2026-10-07T22:00:00-03:00',
@@ -273,8 +270,8 @@ it('matches legacy shared domain interval math, overlap sums, UTC-offset clippin
 });
 it('computes estimates from unselected same-project/topic history, and retains all archived projects in context', async () => {
   const topics = [
-    { id: 'x', title: 'X' },
-    { id: 'other', title: 'Other' },
+    { archived: false, id: 'x', title: 'X' },
+    { archived: false, id: 'other', title: 'Other' },
   ];
   const repo = fixture(
     [
@@ -329,7 +326,6 @@ it('preserves company author-qualified math and never leaks another owner person
       project(),
       project('private', { type: 'personal', createdBy: 'bob' }),
       project('mine', { type: 'personal', createdBy: 'alice' }),
-      project('invalid', { type: null }),
     ],
   );
   const input = {
@@ -388,15 +384,15 @@ it('qualifies cursors by owner and pushes pagination through documentId predicat
     value: 'same',
   });
 });
-it('queries active/archived legacy parents but never narrows full-context estimate facts', async () => {
+it('queries active/archived existing parents but never narrows full-context estimate facts', async () => {
   const repo = fixture(
     [
-      row('legacy', closed),
+      row('existing', closed),
       row('archived', { ...closed, projectId: 'a' }),
       row('merged', { ...closed, projectId: 'm' }),
     ],
     [
-      project('p', { type: undefined, archived: undefined }),
+      project('p', { type: 'work', archived: false }),
       project('a', { archived: true }),
       project('m', { mergedInto: 'p' }),
     ],
@@ -405,7 +401,7 @@ it('queries active/archived legacy parents but never narrows full-context estima
     (await repo.own().readPage('alice', 100, undefined, {})).records.map(
       (r) => r.id,
     ),
-  ).toEqual(['legacy']);
+  ).toEqual(['existing']);
   expect(
     (
       await repo
@@ -537,29 +533,15 @@ it('preserves Firestore owner segment ordering across UID prefixes during compan
   expect(second.records[0].uid).toBe('u-');
 });
 
-it('retains historical authorized calendar/project codecs separately from strict personal report codecs', async () => {
-  const repo = fixture(
-    [
-      row('legacy', {
-        ...closed,
-        topics: [{ topicId: 'x', percentage: -1 }],
-        originalText: 'legacy',
-      }),
-    ],
-    [project('p', { topics: [{ id: 'x', title: 'X' }] })],
-  );
+it('rejects invalid topic weights consistently in all web report modes', async () => {
+  const repo = fixture([
+    row('invalid', { ...closed, topics: [{ topicId: 'x', percentage: -1 }] }),
+  ]);
   await expect(repo.own().readPage('alice', 100)).rejects.toThrow();
-  const page = await repo.calendar().own.readPage('alice', 100);
-  expect(page.records[0]).toMatchObject({
-    originalText: 'legacy',
-    topics: [{ percentage: -1 }],
-  });
-  expect(
-    await repo.calendar().revalidate(page.records, 'alice', 'own'),
-  ).toHaveLength(1);
-  expect(
-    (await repo.project().readPage('p', 100, undefined, 'alice'))?.records,
-  ).toHaveLength(1);
+  await expect(repo.calendar().own.readPage('alice', 100)).rejects.toThrow();
+  await expect(
+    repo.project().readPage('p', 100, undefined, 'alice'),
+  ).rejects.toThrow();
 });
 it('matches native UTF8 owner path ordering for BMP and supplementary Unicode cursor pages', async () => {
   const repo = fixture([row('a', closed, '😀'), row('a', closed, '\uE000')]);
@@ -621,8 +603,8 @@ it('rejects duplicated topic IDs as ambiguous instead of silently using the last
     [
       project('p', {
         topics: [
-          { id: 'x', title: 'X' },
-          { id: 'x', title: 'Other' },
+          { archived: false, id: 'x', title: 'X' },
+          { archived: false, id: 'x', title: 'Other' },
         ],
       }),
     ],

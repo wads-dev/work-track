@@ -13,7 +13,7 @@ function sources(dir: string): string[] {
   });
 }
 describe('complete shadcn migration', () => {
-  it('has no MUI/Emotion dependencies or legacy style adapter', () => {
+  it('has no MUI/Emotion dependencies or existing style adapter', () => {
     const pkg = JSON.parse(
       readFileSync(new URL('../package.json', root), 'utf8'),
     );

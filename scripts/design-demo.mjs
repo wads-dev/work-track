@@ -63,8 +63,8 @@ const specs = [
     'Estudo pessoal demonstrativo sobre acessibilidade e prototipação de interfaces.',
   ],
   [
-    'legado',
-    'Migração do legado',
+    'estrutura',
+    'Migração da estrutura',
     'Projeto demonstrativo arquivado após concluir a migração e documentar o aprendizado.',
   ],
 ];
@@ -77,7 +77,6 @@ const projects = specs.map(([slug, title, description], i) => ({
     confidential: i === 4,
     publicAlias: i === 4 ? 'Projeto reservado 27' : 'Projeto reservado',
   }),
-  ...(i === 0 || i === 1 ? { type: undefined } : {}),
   archived: i === 6,
   createdBy: uid,
   createdAt: '2026-10-01T08:00:00-03:00',
@@ -86,16 +85,19 @@ const projects = specs.map(([slug, title, description], i) => ({
       id: 'general',
       title: 'Geral',
       description: 'Atividade geral do projeto.',
+      archived: false,
     },
     {
       id: prefix + 'discovery',
       title: 'Descoberta',
       description: 'Exploração de necessidades e caminhos de solução.',
+      archived: false,
     },
     {
       id: prefix + 'delivery',
       title: 'Entrega',
       description: 'Implementação, revisão e validação da solução.',
+      archived: false,
     },
   ],
 }));
@@ -137,6 +139,8 @@ function add(project, index, start, duration, topic = 'delivery') {
   });
   const data = {
     ...input,
+    endedAt: input.endedAt ?? null,
+    deletedAt: null,
     id,
     uid,
     receivedAt: stamp,

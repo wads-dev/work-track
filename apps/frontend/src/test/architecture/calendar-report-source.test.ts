@@ -132,7 +132,7 @@ it('navigation, date and project changes use local observers with ZERO remote Fi
   for (const observer of mocks.observers)
     expect(observer.stop).toHaveBeenCalledOnce();
 });
-it('waits for a full atomic materialization and retains missing-end records through native queried branches', async () => {
+it('waits for a full atomic materialization and retains explicit null-ended records through native queried branches', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribePersonalReport(db, 'alice', next, fail, [], range);
@@ -217,7 +217,11 @@ it('one revision updates facts and metadata together; removal/revocation cannot 
   const oldContext = await old.loadContext(['alice']);
   await emit(
     state({
-      projects: [project('p', { topics: [{ id: 'new', title: 'New' }] })],
+      projects: [
+        project('p', {
+          topics: [{ id: 'new', title: 'New', archived: false }],
+        }),
+      ],
       records: [row('closed', { endedAt: '2026-10-08T14:00:00Z' })],
     }),
   );
@@ -226,7 +230,7 @@ it('one revision updates facts and metadata together; removal/revocation cannot 
   ).toBe('2026-10-08T14:00:00Z');
   expect(
     await next.mock.lastCall![0].repository.readTopics(['p'], 'alice'),
-  ).toEqual({ p: [{ id: 'new', title: 'New' }] });
+  ).toEqual({ p: [{ id: 'new', title: 'New', archived: false }] });
   expect(oldContext[0].endedAt).toBe('2026-10-08T13:00:00Z');
   await emit(state());
   expect(
@@ -246,4 +250,18 @@ it('reports synchronization errors instead of emitting silently partial calendar
   await emit(state({ error: 'IndexedDB unavailable' }));
   expect(next).not.toHaveBeenCalled();
   expect(fail.mock.lastCall?.[0].message).toContain('IndexedDB');
+});
+
+it('rejects a missing end rather than estimating a persisted calendar record', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  const fact = row('missing-end');
+  delete fact.data.endedAt;
+  subscribePersonalReport(db, 'alice', next, fail, [], range);
+  await emit(state({ projects: [project()], records: [fact] }));
+  await expect(
+    next.mock.lastCall![0].repository.loadContext(['alice']),
+  ).rejects.toThrow();
+  expect(fact.data).not.toHaveProperty('endedAt');
+  expect(fail).not.toHaveBeenCalled();
 });

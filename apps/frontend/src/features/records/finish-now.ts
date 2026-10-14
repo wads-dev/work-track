@@ -9,7 +9,7 @@ export function canFinishNow(
     !!uid &&
     record.uid === uid &&
     !isDeletedRecord(record) &&
-    (record.endedAt === undefined || record.endedAt === null)
+    record.endedAt === null
   );
 }
 export function createFinishNowCommand() {

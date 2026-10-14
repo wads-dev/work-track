@@ -8,6 +8,7 @@ it('executes original calendar use case without private/company scans and marks 
     'alice',
     [
       {
+        deletedAt: null,
         id: 'a',
         uid: 'alice',
         projectId: 'p1',
@@ -17,7 +18,18 @@ it('executes original calendar use case without private/company scans and marks 
         topics: [],
       },
     ],
-    new Map([['p1', { topics: [] }]]),
+    new Map([
+      [
+        'p1',
+        {
+          archived: false,
+          confidential: false,
+          createdBy: 'alice',
+          type: 'work',
+          topics: [],
+        },
+      ],
+    ]),
   );
   const repository = ownCalendarRepository(own, 'alice');
   const input = calendarInput.parse({

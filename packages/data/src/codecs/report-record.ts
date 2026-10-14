@@ -8,72 +8,36 @@ export type ReportRecordMode =
   | 'authorized-web'
   | 'personal-web';
 
+const instant = z.iso.datetime({ offset: true });
 const fields = {
-  projectId: z.string(),
-  startedAt: z.string(),
-  endedAt: z
-    .string()
-    .nullish()
-    .transform((value) => value ?? undefined),
-  timeZone: z.string(),
-};
-const nonnegativeTopics = z
-  .array(
-    z.object({
-      topicId: z.string(),
-      percentage: z.number().finite().nonnegative().optional(),
-      durationMinutes: z.number().finite().nonnegative().optional(),
-    }),
-  )
-  .default([]);
-const legacyTopics = z
-  .array(
-    z.object({
-      topicId: z.string(),
-      percentage: z.number().optional(),
-      durationMinutes: z.number().optional(),
-    }),
-  )
-  .default([]);
-const adminOwnedSchema = z.object({ ...fields, topics: nonnegativeTopics });
-const adminCompanySchema = z.object({
-  uid: z.string(),
-  ...fields,
-  topics: nonnegativeTopics,
-});
-const legacySchema = z.object({
-  uid: z.string(),
-  ...fields,
-  topics: legacyTopics,
-});
-const personalTopics = z
-  .custom<ReportSourceRecord['topics']>(
-    (value) =>
-      Array.isArray(value) &&
-      (value as unknown[]).every((topic) => {
-        if (!topic || typeof topic !== 'object') return false;
-        const allocation = topic as Record<string, unknown>;
-        return (
-          typeof allocation.topicId === 'string' &&
-          [allocation.percentage, allocation.durationMinutes].every(
-            (number) =>
-              number === undefined ||
-              (typeof number === 'number' &&
-                Number.isFinite(number) &&
-                number >= 0),
-          )
-        );
-      }),
-  )
-  .nullish()
-  .transform((value) => value ?? []);
-const personalWebSchema = z.object({
-  ...fields,
   projectId: z.string().regex(/^[^/]+$/),
-  topics: personalTopics,
-});
+  startedAt: instant,
+  endedAt: instant.nullable().transform((value) => value ?? undefined),
+  deletedAt: z
+    .unknown()
+    .refine((value) => value !== undefined, 'deletedAt obrigatório'),
+  timeZone: z.string().refine((zone) => {
+    try {
+      if (/^[+-]/.test(zone)) return false;
+      new Intl.DateTimeFormat('en', { timeZone: zone });
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'Fuso IANA inválido'),
+};
+const topics = z.array(
+  z.object({
+    topicId: z.string(),
+    percentage: z.number().finite().nonnegative().optional(),
+    durationMinutes: z.number().finite().nonnegative().optional(),
+  }),
+);
+const adminOwnedSchema = z.object({ ...fields, topics });
+const adminCompanySchema = z.object({ uid: z.string(), ...fields, topics });
+const personalWebSchema = adminOwnedSchema;
 
-/** No default mode: callers must preserve their reader's historical tolerance. */
+/** All reader modes enforce the same storage contract. */
 export function reportRecordSchema(
   mode: 'admin-owned',
 ): typeof adminOwnedSchema;
@@ -82,7 +46,7 @@ export function reportRecordSchema(
 ): typeof adminCompanySchema;
 export function reportRecordSchema(
   mode: 'admin-project' | 'authorized-web',
-): typeof legacySchema;
+): typeof adminCompanySchema;
 export function reportRecordSchema(
   mode: 'personal-web',
 ): typeof personalWebSchema;
@@ -94,7 +58,7 @@ export function reportRecordSchema(mode: ReportRecordMode) {
       return adminCompanySchema;
     case 'admin-project':
     case 'authorized-web':
-      return legacySchema;
+      return adminCompanySchema;
     case 'personal-web':
       return personalWebSchema;
   }

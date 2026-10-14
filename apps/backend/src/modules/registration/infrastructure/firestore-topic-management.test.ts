@@ -5,7 +5,7 @@ import { FirestoreTopicManagementRepository } from './firestore-topic-management
 it.each([
   'normal',
   'inbound-alias',
-  'legacy-alias',
+  'historical-alias',
   'participants',
   'percentages',
   'minutes',
@@ -20,9 +20,10 @@ it.each([
       id,
       title: id,
       description: 'Synthetic topic',
+      archived: false,
     }));
     const values = new Map<string, Record<string, unknown>>([
-      ['projects/p', { id: 'p', topics }],
+      ['projects/p', { id: 'p', type: 'work', topics }],
       [
         'users/u/records/r',
         {
@@ -36,6 +37,7 @@ it.each([
     if (scenario === 'inbound-alias')
       values.set('projects/p', {
         id: 'p',
+        type: 'work',
         topics: [
           ...topics,
           {
@@ -47,9 +49,10 @@ it.each([
           },
         ],
       });
-    if (scenario === 'legacy-alias') {
+    if (scenario === 'historical-alias') {
       values.set('projects/p', {
         id: 'p',
+        type: 'work',
         topics: topics.map((t) =>
           t.id === 'a' ? { ...t, archived: true, mergedIntoTopicId: 'b' } : t,
         ),
@@ -165,16 +168,28 @@ it.each([
       targetTopicId: 'b',
       confirmed: false,
     };
-    expect(await repo.mergeTopics(input, 'u')).toMatchObject({
-      mode: 'preview',
-    });
-    expect(writes).toBe(0);
     const confirmed = {
       ...input,
       confirmed: true,
       reason: 'Equivalent topics',
       requestId: 'request1',
     };
+    if (['inbound-alias', 'historical-alias'].includes(scenario)) {
+      const initial = structuredClone(values);
+      for (const attempt of [input, confirmed]) {
+        await expect(repo.mergeTopics(attempt, 'u')).rejects.toMatchObject({
+          code: 'failed-precondition',
+          message: 'Catálogo de tópicos contém aliases não suportados.',
+        });
+        expect(writes).toBe(0);
+        expect(values).toEqual(initial);
+      }
+      return;
+    }
+    expect(await repo.mergeTopics(input, 'u')).toMatchObject({
+      mode: 'preview',
+    });
+    expect(writes).toBe(0);
     if (
       ['ambiguous', 'limit', 'scan-limit', 'foreign-personal'].includes(
         scenario,
@@ -207,7 +222,7 @@ it.each([
     });
     expect(result).toMatchObject({
       migratedRecordCount: scenario === 'participants' ? 2 : 1,
-      removedTopicIds: scenario === 'inbound-alias' ? ['a', 'old'] : ['a'],
+      removedTopicIds: ['a'],
     });
     expect(values.get('projects/p')!.topics).toEqual([topics[0], topics[2]]);
     expect(
@@ -218,24 +233,7 @@ it.each([
     const audit = [...values.entries()].find(([key]) =>
       key.includes('/topicMerges/'),
     )![1];
-    expect(audit.before).toEqual(
-      scenario === 'legacy-alias'
-        ? topics.map((t) =>
-            t.id === 'a' ? { ...t, archived: true, mergedIntoTopicId: 'b' } : t,
-          )
-        : scenario === 'inbound-alias'
-          ? [
-              ...topics,
-              {
-                id: 'old',
-                title: 'Old',
-                description: 'Alias',
-                archived: true,
-                mergedIntoTopicId: 'a',
-              },
-            ]
-          : topics,
-    );
+    expect(audit.before).toEqual(topics);
     if (scenario === 'participants')
       expect(values.get('users/v/records/other')).toMatchObject({
         uid: 'v',

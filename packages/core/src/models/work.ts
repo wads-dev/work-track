@@ -3,18 +3,18 @@ export interface Topic {
   mergedIntoTopicId?: string;
   mergedAt?: string;
   mergedBy?: string;
-  archived?: boolean;
+  archived: boolean;
   id: string;
   title: string;
   description: string;
 }
 export interface Project {
   color?: string | null;
-  type?: 'personal' | 'work';
+  type: 'personal' | 'work';
   githubUrl?: string | null;
-  confidential?: boolean;
+  confidential: boolean;
   publicAlias?: string;
-  archived?: boolean;
+  archived: boolean;
   mergedInto?: string;
   mergeLock?: string;
   id: string;

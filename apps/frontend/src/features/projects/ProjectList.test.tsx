@@ -11,16 +11,30 @@ const catalog: Row[] = [
     id: 'z',
     data: {
       title: 'Zebra',
+      createdBy: 'alice',
+      type: 'work',
+      archived: false,
+      confidential: false,
       description: 'Long description must stay in details',
       color: '#ff8800',
       createdAt: '2026-10-09T12:00:00Z',
       topics: [
-        { id: 't1', title: 'Geral' },
-        { id: 't2', title: 'Infraestrutura' },
+        { id: 't1', title: 'Geral', archived: false },
+        { id: 't2', title: 'Infraestrutura', archived: false },
       ],
     },
   },
-  { id: 'a', data: { title: 'Árvore', topics: [] } },
+  {
+    id: 'a',
+    data: {
+      title: 'Árvore',
+      createdBy: 'alice',
+      type: 'work',
+      archived: false,
+      confidential: false,
+      topics: [],
+    },
+  },
 ];
 function render(rows = catalog, revealed = false, state = {}) {
   return renderToStaticMarkup(
@@ -69,9 +83,20 @@ describe('compact project list', () => {
     const topics = Array.from({ length: 24 }, (_, i) => ({
       id: 'topic-' + i,
       title: 'Tópico extenso de infraestrutura ' + i,
+      archived: false,
     }));
     const html = render([
-      { id: 'many', data: { title: 'Muitos tópicos', topics } },
+      {
+        id: 'many',
+        data: {
+          title: 'Muitos tópicos',
+          createdBy: 'alice',
+          type: 'work',
+          archived: false,
+          confidential: false,
+          topics,
+        },
+      },
     ]);
     expect(html.match(/data-slot="badge"/g)).toHaveLength(24);
     expect(html).toContain('Tópico extenso de infraestrutura 23');
@@ -105,11 +130,16 @@ describe('compact project list', () => {
         id: 'secret',
         data: {
           title: 'Secret title',
+          createdBy: 'alice',
+          type: 'work',
+          archived: false,
           description: 'Secret description',
           confidential: true,
           color: '#abcdef',
           createdAt: '2026-10-09T12:00:00Z',
-          topics: [{ id: 'secret-topic', title: 'Secret topic' }],
+          topics: [
+            { id: 'secret-topic', title: 'Secret topic', archived: false },
+          ],
         },
       },
     ]);
@@ -128,8 +158,11 @@ describe('compact project list', () => {
             id: 'secret',
             data: {
               title: 'Secret title',
+              createdBy: 'alice',
+              type: 'work',
+              archived: false,
               confidential: true,
-              topics: [{ id: 't', title: 'Secret topic' }],
+              topics: [{ id: 't', title: 'Secret topic', archived: false }],
             },
           },
         ],

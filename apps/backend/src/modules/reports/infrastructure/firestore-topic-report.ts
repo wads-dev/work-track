@@ -1,3 +1,4 @@
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
 import type { Firestore } from 'firebase-admin/firestore';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import type { Auth } from 'firebase-admin/auth';
@@ -37,11 +38,13 @@ export class FirestoreTopicReportRepository extends FirestoreProjectReportReposi
           record = batch[j]!,
           data = doc.data();
         if (!data || isDeletedRecord(data)) continue;
+        reportRecordSchema('admin-project').parse(data);
         if (
           data.uid !== record.uid ||
           data.projectId !== record.projectId ||
           data.startedAt !== record.startedAt ||
-          (data.endedAt ?? undefined) !== record.endedAt ||
+          (data.endedAt === null ? undefined : data.endedAt) !==
+            record.endedAt ||
           JSON.stringify(data.topics ?? []) !== JSON.stringify(record.topics)
         )
           continue;

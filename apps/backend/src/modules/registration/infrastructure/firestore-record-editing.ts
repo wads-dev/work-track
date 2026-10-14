@@ -98,7 +98,12 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
       const project = projectSnapshot.data() as {
         title: string;
         description: string;
-        topics: { id: string; title: string; description: string }[];
+        topics: {
+          id: string;
+          title: string;
+          description: string;
+          archived: boolean;
+        }[];
       };
       assertProjectWritable(
         projectSnapshot.data() as { mergeLock?: string; archived?: boolean },
@@ -143,12 +148,14 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
     });
   }
   async listOpenRecords(uid: string, limit: number, excludeRecordId?: string) {
-    // Legacy missing fields cannot use equality-to-null or != tombstone filters.
-    // Scan complete snapshot; exclude tombstones before active result limits.
+    // Select canonical active opens natively before applying result limits.
     let query: FirebaseFirestore.Query = this.db
       .collection('users')
       .doc(uid)
-      .collection('records');
+      .collection('records')
+      .where('uid', '==', uid)
+      .where('endedAt', '==', null)
+      .where('deletedAt', '==', null);
     if (excludeRecordId)
       query = query.where(FieldPath.documentId(), '!=', excludeRecordId);
     const snapshot = await query.limit(10001).get();
@@ -156,20 +163,14 @@ export class FirestoreRecordEditingRepository implements RecordEditingRepository
       throw new Error(
         'Varredura de abertos excede 10000 documentos físicos; consulta indisponível, não presuma ausência de tracking.',
       );
-    const open = snapshot.docs
-      .filter(
-        (doc) =>
-          !isDeletedRecord(doc.data()) &&
-          (doc.data().endedAt === undefined || doc.data().endedAt === null),
-      )
-      .map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          projectId: data.projectId as string,
-          startedAt: data.startedAt as string,
-        };
-      });
+    const open = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        projectId: data.projectId as string,
+        startedAt: data.startedAt as string,
+      };
+    });
     return {
       records: open.slice(0, limit),
       partial: open.length > limit,

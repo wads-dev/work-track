@@ -25,6 +25,7 @@ export async function loadGlobalContext(
             .collection('users')
             .doc(uid)
             .collection('records')
+            .where('deletedAt', '==', null)
             .orderBy(FieldPath.documentId());
           if (cursor) q = q.startAfter(cursor);
           const page = await tx.get(q.limit(501));

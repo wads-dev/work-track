@@ -8,6 +8,7 @@ export interface ReportSourceRecord {
   id: string;
   uid: string;
   projectId: string;
+  deletedAt?: unknown;
   startedAt: string;
   endedAt?: string;
   timeZone: string;

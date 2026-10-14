@@ -6,14 +6,19 @@ import {
 import { readFileSync } from 'node:fs';
 const record = {
   uid: 'owner',
+  endedAt: null,
+  deletedAt: null,
+  topics: [],
   startedAt: '2026-10-09T09:00:00.000Z',
   updatedAt: 'version',
 };
 describe('finish now', () => {
-  it('only active own missing/null end, never malformed/deleted/foreign', () => {
+  it('only active own explicit null end, never malformed/deleted/foreign', () => {
     expect(canFinishNow(record, 'owner')).toBe(true);
     expect(canFinishNow({ ...record, endedAt: null }, 'owner')).toBe(true);
     for (const extra of [
+      { endedAt: undefined },
+      { deletedAt: undefined },
       { endedAt: '' },
       { endedAt: false },
       { endedAt: '2026-10-09T10:00:00Z' },

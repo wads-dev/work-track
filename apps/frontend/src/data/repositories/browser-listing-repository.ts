@@ -1,3 +1,4 @@
+import { canonicalProject, canonicalRecord } from '../cache/canonical-storage';
 import {
   collection,
   doc,
@@ -109,7 +110,9 @@ export async function readAuthorizedProjectById(
     });
     if (!result.exists()) return undefined;
     const data = result.data();
-    return canAccessProject(data, uid) ? { id, data } : undefined;
+    return canonicalProject(data) && canAccessProject(data, uid)
+      ? { id, data }
+      : undefined;
   } catch (error) {
     traceFirestore('cache.result', {
       collection: 'projects',
@@ -136,9 +139,7 @@ function listing(
     : 0;
   const visible = size ? rows.slice(page * size, (page + 1) * size) : rows;
   const open = rows.filter(
-    (row) =>
-      !isDeletedRecord(row.data) &&
-      (row.data.endedAt === null || row.data.endedAt === undefined),
+    (row) => !isDeletedRecord(row.data) && row.data.endedAt === null,
   );
   return {
     rows: visible,
@@ -172,14 +173,13 @@ export async function readProjectListing(
     const clauses: QueryConstraint[] = [
       where(documentId(), 'in', ids.slice(start, start + 30)),
     ];
-    if (options.scope === 'personal')
-      clauses.push(where('type', '==', 'personal'));
-    // Archived-only has no missing-field inclusion: query the union of archived
-    // flags and merge targets, including the empty-string legacy merge marker.
-    // Separate AND branches also stay within Firestore's 30-disjunction ID cap.
+    if (options.scope === 'personal' || options.scope === 'work')
+      clauses.push(where('type', '==', options.scope));
+    // Archive state is explicit in canonical storage. Merge markers remain an
+    // independent write/ACL guard, not a substitute for archived.
     const branches =
-      options.archive === 'archived'
-        ? [where('archived', '==', true), where('mergedInto', '>=', '')]
+      options.archive === 'archived' || options.archive === 'active'
+        ? [where('archived', '==', options.archive === 'archived')]
         : [undefined];
     for (const branch of branches)
       rows.push(
@@ -194,21 +194,15 @@ export async function readProjectListing(
       );
   }
   const candidates = [...new Map(rows.map((row) => [row.id, row])).values()];
-  // Firebase has no predicate for missing fields. Work includes legacy missing
-  // type; active includes missing archived/mergedInto. Substring/full-text and
-  // properties inside embedded topic arrays are also unsupported. The archived
-  // union is native; its range can include higher Firestore types, so validate
-  // the string merge marker and ACL after deduplicating the two query branches.
+  // Firestore cannot search normalized substrings or properties inside embedded
+  // topic arrays. Validate schema and current ACL before presentation.
   const selected = candidates.filter((row) => {
     if (!authorizedIds.has(row.id) || !canAccessProject(row.data, uid))
       return false;
-    if (options.scope === 'work' && row.data.type === 'personal') return false;
-    const archived =
-      row.data.archived === true || typeof row.data.mergedInto === 'string';
-    if (
-      (options.archive === 'active' && archived) ||
-      (options.archive === 'archived' && !archived)
-    )
+    if (!canonicalProject(row.data)) return false;
+    // Optional merge markers cannot be selected by absence; retain the merge
+    // safety guard even if a malformed document claims archived:false.
+    if (options.archive === 'active' && typeof row.data.mergedInto === 'string')
       return false;
     const display = safeProject(row.data, options.revealed ?? false);
     return normalized(
@@ -256,7 +250,10 @@ export async function readOwnRecordListing(
   if (options.id) clauses.push(where(documentId(), '==', options.id));
   if (filters.project) clauses.push(where('projectId', '==', filters.project));
   if (options.after) clauses.push(where(documentId(), '>', options.after));
+  if (filters.status === 'open') clauses.push(where('endedAt', '==', null));
   if (filters.status === 'closed') clauses.push(where('endedAt', '>', ''));
+  if (options.includeDeleted === false || options.openOnly || options.alertOnly)
+    clauses.push(where('deletedAt', '==', null));
   if (range) {
     clauses.push(where('startedAt', '<=', datePrefixEnvelope(range.to, 1)));
     if (filters.status === 'closed')
@@ -271,30 +268,35 @@ export async function readOwnRecordListing(
         datePrefixEnvelope(new Date(alertBefore).toISOString(), 1),
       ),
     );
-  const raw: Row[] = [];
-  if (filters.project) {
-    if (!authorizedIds.has(filters.project)) return emptyListing;
-    raw.push(
-      ...(await readQuery(
-        query(collection(db, 'users', uid, 'records'), ...clauses),
-        'records',
-      )),
-    );
-  } else {
-    const ids = [...authorizedIds];
-    for (let start = 0; start < ids.length; start += 30) {
-      raw.push(
+  const branches: QueryConstraint[][] =
+    range && filters.status === 'all'
+      ? [
+          [where('endedAt', '==', null)],
+          [where('endedAt', '>=', datePrefixEnvelope(range.from, -1))],
+        ]
+      : [[]];
+  const candidates: Row[] = [];
+  if (filters.project && !authorizedIds.has(filters.project))
+    return emptyListing;
+  const ids = filters.project ? [filters.project] : [...authorizedIds];
+  for (let start = 0; start < ids.length; start += 30) {
+    for (const branch of branches) {
+      candidates.push(
         ...(await readQuery(
           query(
             collection(db, 'users', uid, 'records'),
             ...clauses,
-            where('projectId', 'in', ids.slice(start, start + 30)),
+            ...branch,
+            ...(filters.project
+              ? []
+              : [where('projectId', 'in', ids.slice(start, start + 30))]),
           ),
           'records',
         )),
       );
     }
   }
+  const raw = [...new Map(candidates.map((row) => [row.id, row])).values()];
   const parents = new Map<string, Row | undefined>();
   for (const row of raw) {
     const id = text(row.data.projectId, '');
@@ -310,9 +312,10 @@ export async function readOwnRecordListing(
       parents.has(text(row.data.projectId, '')) &&
       Boolean(parents.get(text(row.data.projectId, ''))),
   );
-  // Missing endedAt/deletedAt, substring text, topic arrays/alias graphs and
-  // comparisons of ISO strings with offsets are not expressible in Firestore.
+  // Substring text, embedded topic array properties and exact comparisons
+  // of ISO strings with offsets are not expressible in Firestore.
   const selected = authorized.filter((row) => {
+    if (!canonicalRecord(row.data)) return false;
     if (
       (options.includeDeleted === false ||
         options.openOnly ||
@@ -406,8 +409,8 @@ export function filterRecords(
     ),
   );
 }
-/** Firebase cannot query missing end fields, normalized substrings, embedded
- * array properties/alias graphs or timestamp instants stored as ISO offsets. */
+/** Firebase cannot query normalized substrings, embedded array properties
+ * or timestamp instants stored as ISO offsets. */
 function matchesRecordResidual(
   id: string,
   data: Record<string, unknown>,
@@ -426,7 +429,8 @@ function matchesRecordResidual(
     )
   )
     return false;
-  const open = data.endedAt === null || data.endedAt === undefined;
+  if (!canonicalRecord(data)) return false;
+  const open = data.endedAt === null;
   if (
     (filters.status === 'open' && !open) ||
     (filters.status === 'closed' && open)
@@ -466,22 +470,14 @@ export function resolveRecordTopic(
   catalog: Record<string, unknown>[],
   id: unknown,
 ): unknown {
-  const visited = new Set();
-  let current = id;
-  while (
-    typeof current === 'string' &&
-    !visited.has(current) &&
-    visited.size < 200
-  ) {
-    visited.add(current);
-    const matches = catalog.filter((t) => t.id === current);
-    if (matches.length !== 1)
-      return matches.length === 0 && current === id ? id : undefined;
-    const topic = matches[0];
-    if (topic.mergedIntoTopicId === undefined) return current;
-    current = topic.mergedIntoTopicId;
-  }
-  return undefined;
+  if (typeof id !== 'string' || !id.trim()) return undefined;
+  const matches = catalog.filter((topic) => topic.id === id);
+  // A truly removed topic retains its original ID for neutral historical records.
+  // A catalog alias is invalid and must never redirect to another topic.
+  if (matches.length === 0) return id;
+  return matches.length === 1 && matches[0].mergedIntoTopicId === undefined
+    ? id
+    : undefined;
 }
 function matchesRecordTopic(
   catalog: Record<string, unknown>[],

@@ -7,9 +7,36 @@ import { executeCompanyReport } from '@work-track/core/reports/application/get-c
 import { executeCalendarReport } from '@work-track/core/reports/application/get-calendar-report';
 import { getProjectReport } from '@work-track/core/reports/application/get-project-report';
 const projects = new Map([
-  ['a', { type: 'work', topics: [] }],
-  ['b', { type: 'work', topics: [] }],
-  ['private', { type: 'personal', createdBy: 'other', topics: [] }],
+  [
+    'a',
+    {
+      archived: false,
+      confidential: false,
+      createdBy: 'alice',
+      type: 'work',
+      topics: [],
+    },
+  ],
+  [
+    'b',
+    {
+      archived: false,
+      confidential: false,
+      createdBy: 'alice',
+      type: 'work',
+      topics: [],
+    },
+  ],
+  [
+    'private',
+    {
+      archived: false,
+      confidential: false,
+      type: 'personal',
+      createdBy: 'other',
+      topics: [],
+    },
+  ],
 ]);
 const r = (
   id: string,
@@ -18,6 +45,7 @@ const r = (
   start: string,
   end?: string,
 ) => ({
+  deletedAt: null,
   id,
   uid,
   projectId,
@@ -103,7 +131,18 @@ it('filters revoked foreign personal parents and rejects mismatched viewer', asy
   const repo = new AuthorizedReportRepository(
     'viewer',
     rows,
-    new Map([['a', { type: 'personal', createdBy: 'other', topics: [] }]]),
+    new Map([
+      [
+        'a',
+        {
+          archived: false,
+          confidential: false,
+          type: 'personal',
+          createdBy: 'other',
+          topics: [],
+        },
+      ],
+    ]),
   );
   expect(await repo.loadContext(['alice', 'bob'])).toEqual([]);
   expect(

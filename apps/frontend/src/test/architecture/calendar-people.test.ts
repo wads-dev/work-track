@@ -239,10 +239,22 @@ it('formats a factual calendar from the public shared repository and use case', 
         startedAt: '2026-10-08T12:00:00Z',
         endedAt: '2026-10-08T13:30:00Z',
         timeZone: 'UTC',
+        deletedAt: null,
         topics: [],
       },
     ],
-    new Map([['p1', { topics: [] }]]),
+    new Map([
+      [
+        'p1',
+        {
+          type: 'work',
+          createdBy: 'alice',
+          archived: false,
+          confidential: false,
+          topics: [],
+        },
+      ],
+    ]),
   );
   const result = await executeCalendarReport(
     ownCalendarRepository(repository, 'alice'),

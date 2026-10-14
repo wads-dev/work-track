@@ -158,7 +158,7 @@ test('test-support import guard classifies real module syntax, not comments', ()
     "import type { Row } from './test-support/static';",
     "export { adapter } from '@work-track/data/test-support/snapshots';",
     "const dynamic = import('./snapshots/dynamic');",
-    "const legacy = require('./test-support/require');",
+    "const commonjsConnector = require('./test-support/require');",
     "type Port = import('./test-support/type').Port;",
     "import alias = require('./test-support/alias');",
   ].join('\n');

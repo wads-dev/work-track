@@ -185,16 +185,14 @@ export function planSplit(
         'Tópico destino inexistente, arquivado ou alias; escolha tópico canônico.',
       );
   }
-  if (
-    origin.type === 'personal' &&
-    (destination.type === undefined || destination.type === 'work')
-  ) {
+  if (origin.type === 'personal' && destination.type === 'work') {
     const known = new Set([
       'id',
       'uid',
       'projectId',
       'startedAt',
       'endedAt',
+      'deletedAt',
       'timeZone',
       'originalText',
       'interpretation',

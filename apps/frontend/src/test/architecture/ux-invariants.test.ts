@@ -70,9 +70,11 @@ describe('navigation and privacy remain intact across visual redesign', () => {
       id: 'p',
       title: 'Private title',
       description: 'Private description',
+      type: 'work',
+      archived: false,
       confidential: true,
       publicAlias: 'Secret public alias',
-      topics: ['Private topic'],
+      topics: [{ id: 't', title: 'Private topic', archived: false }],
     };
     expect(isHidden(project, false)).toBe(true);
     const masked = safeProject(project, false);
@@ -83,6 +85,9 @@ describe('navigation and privacy remain intact across visual redesign', () => {
       id: 'r',
       uid: 'u',
       projectId: 'p',
+      endedAt: null,
+      deletedAt: null,
+      topics: [],
       startedAt: '2026-10-08T10:00:00-03:00',
       originalText: 'Secret speech',
       interpretation: 'Secret inference',
@@ -126,7 +131,14 @@ describe('editing remains explicit and date bounds remain trustworthy', () => {
 describe('meaningful status and report states remain independent of their visual style', () => {
   it('only flags genuinely open activities older than eight hours', () => {
     const now = new Date('2026-10-09T09:00:00-03:00');
-    const old = { startedAt: '2026-10-08T21:00:00-03:00', endedAt: null };
+    const old = {
+      startedAt: '2026-10-08T21:00:00-03:00',
+      endedAt: null,
+      deletedAt: null,
+      topics: [],
+    };
+    expect(isOpen({ ...old, endedAt: undefined })).toBe(false);
+    expect(isAlertOpen({ ...old, endedAt: undefined }, now)).toBe(false);
     expect(isOpen(old)).toBe(true);
     expect(isAlertOpen(old, now)).toBe(true);
     expect(

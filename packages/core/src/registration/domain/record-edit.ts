@@ -92,7 +92,7 @@ export function applyRecordPatch(
   input: UpdateRecordInput,
   uid: string,
   project: {
-    topics: { id: string; mergedIntoTopicId?: string; archived?: boolean }[];
+    topics: { id: string; mergedIntoTopicId?: string; archived: boolean }[];
   },
   allowCorporateEdit = false,
 ): Record<string, unknown> {
@@ -114,6 +114,16 @@ export function applyRecordPatch(
       'aborted',
       'Registro alterado. Recarregue antes de salvar.',
     );
+  if (
+    !('endedAt' in existing) ||
+    existing.endedAt === undefined ||
+    !Array.isArray(existing.topics) ||
+    !registerInput.safeParse({
+      ...existing,
+      endedAt: existing.endedAt === null ? undefined : existing.endedAt,
+    }).success
+  )
+    throw new RecordEditError('invalid-argument', 'Registro storage inválido.');
   const after = { ...existing };
   for (const key of [
     'startedAt',

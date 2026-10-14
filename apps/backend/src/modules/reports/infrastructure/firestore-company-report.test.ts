@@ -16,6 +16,7 @@ it('pushes project and requested people into native queries and shards complete 
   );
   await repo.readPage(100, undefined, 'p', { userIds: ['alice', 'bob'] });
   expect(query.where.mock.calls).toEqual([
+    ['deletedAt', '==', null],
     ['projectId', '==', 'p'],
     ['uid', 'in', ['alice', 'bob']],
   ]);
@@ -25,6 +26,7 @@ it('pushes project and requested people into native queries and shards complete 
   const uids = Array.from({ length: 31 }, (_, i) => 'u' + i);
   await repo.readPage(100, undefined, 'p', { userIds: uids });
   expect(query.where.mock.calls).toEqual([
+    ['deletedAt', '==', null],
     ['projectId', '==', 'p'],
     ['uid', 'in', uids.slice(0, 30)],
     ['uid', '==', 'u30'],
@@ -34,6 +36,8 @@ it('pushes project and requested people into native queries and shards complete 
 it('merges person shards in canonical document order before limiting and resumes every shard after one cursor', async () => {
   const source = {
     projectId: 'p',
+    deletedAt: null,
+    endedAt: null,
     startedAt: '2026-10-08T10:00:00Z',
     timeZone: 'UTC',
     topics: [],
@@ -63,7 +67,17 @@ it('merges person shards in canonical document order before limiting and resumes
       collection: () => ({ doc: (id: string) => ({ id }) }),
       getAll: () =>
         Promise.resolve([
-          { id: 'p', exists: true, data: () => ({ type: 'work' }) },
+          {
+            id: 'p',
+            exists: true,
+            data: () => ({
+              createdBy: 'alice',
+              topics: [],
+              type: 'work',
+              archived: false,
+              confidential: false,
+            }),
+          },
         ]),
     } as unknown as Firestore,
     {} as Auth,
@@ -83,12 +97,15 @@ it('merges person shards in canonical document order before limiting and resumes
   expect(next.records.map((r) => r.uid)).toEqual(['u30']);
   expect(next.nextCursor).toBeNull();
 });
-it.each([undefined, null, '2026-10-08T11:00:00Z'])(
+it.each([null, '2026-10-08T11:00:00Z'])(
   'bounds canonical collection-group pages and rejects payload ownership mismatch',
   async (endedAt) => {
     const value = {
+      topics: [],
       uid: 'alice',
       projectId: 'p',
+      deletedAt: null,
+
       startedAt: '2026-10-08T10:00:00Z',
       endedAt,
       timeZone: 'UTC',
@@ -111,14 +128,26 @@ it.each([undefined, null, '2026-10-08T11:00:00Z'])(
     const limit = vi.fn().mockReturnValue({ get }),
       startAfter = vi.fn().mockReturnValue({ limit }),
       orderBy = vi.fn().mockReturnValue({ limit, startAfter }),
-      collectionGroup = vi.fn().mockReturnValue({ orderBy });
+      collectionGroup = vi
+        .fn()
+        .mockReturnValue({ where: () => ({ orderBy }), orderBy });
     const repo = new FirestoreCompanyReportRepository(
       {
         collectionGroup,
         collection: () => ({ doc: (id: string) => ({ id }) }),
         getAll: () =>
           Promise.resolve([
-            { id: 'p', exists: true, data: () => ({ type: 'work' }) },
+            {
+              id: 'p',
+              exists: true,
+              data: () => ({
+                createdBy: 'alice',
+                topics: [],
+                type: 'work',
+                archived: false,
+                confidential: false,
+              }),
+            },
           ]),
         doc: () => ({ path: 'users/alice/records/zero' }),
       } as unknown as Firestore,
@@ -150,6 +179,8 @@ it('merges dated UID shards by date then document key before bounding each physi
     data: () => ({
       uid,
       projectId: 'p',
+      deletedAt: null,
+      endedAt: null,
       startedAt,
       timeZone: 'UTC',
       topics: [],
@@ -176,7 +207,17 @@ it('merges dated UID shards by date then document key before bounding each physi
       collection: () => ({ doc: (id: string) => ({ id }) }),
       getAll: () =>
         Promise.resolve([
-          { id: 'p', exists: true, data: () => ({ type: 'work' }) },
+          {
+            id: 'p',
+            exists: true,
+            data: () => ({
+              createdBy: 'alice',
+              topics: [],
+              type: 'work',
+              archived: false,
+              confidential: false,
+            }),
+          },
         ]),
     } as unknown as Firestore,
     {} as Auth,
@@ -192,6 +233,7 @@ it('merges dated UID shards by date then document key before bounding each physi
   const first = await repo.readPage(1, undefined, 'p', selection);
   expect(first.records.map((r) => r.id)).toEqual(['old-open']);
   expect(query.where.mock.calls).toEqual([
+    ['deletedAt', '==', null],
     ['projectId', '==', 'p'],
     ['uid', 'in', selection.userIds.slice(0, 30)],
     ['startedAt', '<', '2026-10-11'],
@@ -225,6 +267,8 @@ it.each([undefined, '2026-10-09T00:00:00Z'])(
       data: () => ({
         uid: 'alice',
         projectId: 'p',
+        deletedAt: null,
+        endedAt: null,
         startedAt: '2026-10-08T12:00:00Z',
         timeZone: 'UTC',
         topics: [],
@@ -240,11 +284,19 @@ it.each([undefined, '2026-10-09T00:00:00Z'])(
         docs,
       } as unknown as FirebaseFirestore.QuerySnapshot);
     });
-    const catalog = vi
-      .spyOn(db, 'getAll')
-      .mockResolvedValue([
-        { id: 'p', exists: true, data: () => ({ type: 'work' }) },
-      ] as unknown as FirebaseFirestore.DocumentSnapshot[]);
+    const catalog = vi.spyOn(db, 'getAll').mockResolvedValue([
+      {
+        id: 'p',
+        exists: true,
+        data: () => ({
+          createdBy: 'alice',
+          topics: [],
+          type: 'work',
+          archived: false,
+          confidential: false,
+        }),
+      },
+    ] as unknown as FirebaseFirestore.DocumentSnapshot[]);
     try {
       const repo = new FirestoreCompanyReportRepository(db, {} as Auth);
       const selection = { to, userIds: ['alice', 'bob'] };

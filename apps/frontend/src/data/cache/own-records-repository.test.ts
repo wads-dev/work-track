@@ -23,14 +23,22 @@ it('deduplicates consumers, hydrates >100 and reflects replacement/removal/error
   expect(stop).not.toHaveBeenCalled();
   const rows = Array.from({ length: 150 }, (_, i) => ({
     id: String(i),
-    data: {},
+    data: { endedAt: null, deletedAt: null, topics: [] },
   }));
   next(rows, true);
   expect(repo.snapshot(db, 'a').complete).toBe(false);
   next(rows, false);
   expect(repo.snapshot(db, 'a').rows).toHaveLength(150);
   expect(repo.snapshot(db, 'a').complete).toBe(true);
-  next([{ id: '1', data: { updated: true } }], false);
+  next(
+    [
+      {
+        id: '1',
+        data: { endedAt: null, deletedAt: null, topics: [], updated: true },
+      },
+    ],
+    false,
+  );
   expect(repo.snapshot(db, 'a').rows).toHaveLength(1);
   repo.retry(db, 'a');
   expect(repo.snapshot(db, 'a').loading).toBe(true);
@@ -67,14 +75,20 @@ it('purges account, refuses stale subscribe, guards callbacks and isolates insta
   const stale = vi.fn(() => () => {});
   repo.subscribe(db, 'a', stale, () => {});
   expect(stale).not.toHaveBeenCalled();
-  next([{ id: 'foreign', data: {} }], false);
+  next(
+    [{ id: 'foreign', data: { endedAt: null, deletedAt: null, topics: [] } }],
+    false,
+  );
   expect(repo.snapshot(db, 'a')).toBe(emptyRecords);
   const other = {};
   repo.subscribe(
     other,
     'b',
     (cb) => {
-      cb([{ id: 'b', data: {} }], false);
+      cb(
+        [{ id: 'b', data: { endedAt: null, deletedAt: null, topics: [] } }],
+        false,
+      );
       return () => {};
     },
     () => {},
@@ -103,7 +117,10 @@ it('reconnects one central entry and updates both active subscribers', () => {
   repo.retry(db, 'a');
   a.mockClear();
   b.mockClear();
-  next([{ id: 'new', data: {} }], false);
+  next(
+    [{ id: 'new', data: { endedAt: null, deletedAt: null, topics: [] } }],
+    false,
+  );
   expect(connect).toHaveBeenCalledTimes(2);
   expect(a).toHaveBeenCalledOnce();
   expect(b).toHaveBeenCalledOnce();
@@ -116,15 +133,19 @@ it('isolates filter/page result entries and keeps complete counts supplied by th
     db,
     'a',
     (next) => {
-      next([{ id: 'page', data: {} }], false, {
-        rows: [],
-        total: 151,
-        page: 2,
-        hasMore: true,
-        cursor: 'page',
-        openRows: [],
-        openCount: 0,
-      });
+      next(
+        [{ id: 'page', data: { endedAt: null, deletedAt: null, topics: [] } }],
+        false,
+        {
+          rows: [],
+          total: 151,
+          page: 2,
+          hasMore: true,
+          cursor: 'page',
+          openRows: [],
+          openCount: 0,
+        },
+      );
       return () => {};
     },
     () => {},
@@ -134,7 +155,10 @@ it('isolates filter/page result entries and keeps complete counts supplied by th
     db,
     'a',
     (next) => {
-      next([{ id: 'open', data: {} }], false);
+      next(
+        [{ id: 'open', data: { endedAt: null, deletedAt: null, topics: [] } }],
+        false,
+      );
       return () => {};
     },
     () => {},
@@ -149,4 +173,42 @@ it('isolates filter/page result entries and keeps complete counts supplied by th
   expect(repo.snapshot(db, 'a')).toBe(emptyRecords);
   repo.account('b');
   expect(repo.snapshot(db, 'a', 'page:2')).toBe(emptyRecords);
+});
+it('rejects missing deletion state and preserves raw tombstones while publishing active rows', () => {
+  const repo = createOwnRecordsRepository();
+  repo.account('a');
+  const db = {};
+  const active = {
+    id: 'active',
+    data: { endedAt: null, deletedAt: null, topics: [] },
+  };
+  const tombstone = {
+    id: 'deleted',
+    data: {
+      endedAt: null,
+      deletedAt: '2026-10-09T00:00:00Z',
+      topics: [],
+      originalText: 'Audit preserved',
+    },
+  };
+  const rows = [
+    active,
+    tombstone,
+    { id: 'missing', data: { endedAt: null, topics: [] } },
+  ];
+  const before = structuredClone(rows);
+  const stop = repo.subscribe(
+    db,
+    'a',
+    (next) => {
+      next(rows, false);
+      return () => {};
+    },
+    () => {},
+  );
+  expect(repo.snapshot(db, 'a').rows).toEqual([active]);
+  expect(repo.snapshot(db, 'a').total).toBe(1);
+  expect(rows).toEqual(before);
+  expect(tombstone.data.originalText).toBe('Audit preserved');
+  stop();
 });

@@ -4,7 +4,7 @@
 
 - MCP: `move_topic` substitui `move_subject`; `topic_origin`/`topic_target` substituem `subject_origin`/`subject_target`. Resposta usa `resolvedTopic`. Clientes precisam redescobrir as tools e adaptar parâmetros; não há alias MCP antigo.
 - Callable: `moveTopic` substitui `moveSubject`; frontend atualizado no mesmo PR. Auditorias históricas `move_subject` continuam legíveis. Não reescrever histórico.
-- `move_topic` entre projetos corporativos inclui registros ativos de todos os participantes do tópico. O ator deve estar autenticado e autorizado a acessar ambos os projetos. Legado sem tipo conserva escopo corporativo existente.
+- `move_topic` entre projetos corporativos inclui registros ativos de todos os participantes do tópico. O ator deve estar autenticado e autorizado a acessar ambos os projetos. Ambos os projetos exigem `type` explícito `work` ou `personal`; ausência ou tipo inválido nega acesso, sem fallback de escopo.
 - `move_record` aceita `recordOwnerUid` opcional: omissão mantém o comportamento de localizar o próprio registro; valor explícito identifica o proprietário de um registro corporativo, nunca o ator.
 - Projetos pessoais continuam restritos ao proprietário. Não há transferência entre pessoal/corporativo.
 
@@ -22,4 +22,4 @@ Consulta corporativa usa `collectionGroup(records)` filtrada por `projectId` ap�
 
 ## Publicação
 
-Este PR não executa migração de dados nem deploy manual. Após revisão/merge e deploy backend+frontend, reconectar clientes MCP, obter nova prévia e confirmar migração real. O callable legado `moveSubject` permanece exportado como alias de `moveTopic` para impedir que o Firebase tente apagá-lo no deploy não interativo. Ele usa o contrato canônico `topic_*`, autenticação e confirmação da mesma implementação; não aceita automaticamente payloads antigos `subject_*`. Clientes novos usam apenas `moveTopic`. A retirada do alias exige uma etapa operacional explícita, não `--force` na esteira.
+Este PR não executa migração de dados nem deploy manual. Após revisão/merge e deploy backend+frontend, reconectar clientes MCP, obter nova prévia e confirmar migração real. O callable histórico `moveSubject` permanece exportado como alias de `moveTopic` para impedir que o Firebase tente apagá-lo no deploy não interativo. Ele usa o contrato canônico `topic_*`, autenticação e confirmação da mesma implementação; não aceita automaticamente payloads antigos `subject_*`. Clientes novos usam apenas `moveTopic`. A retirada do alias exige uma etapa operacional explícita, não `--force` na esteira.

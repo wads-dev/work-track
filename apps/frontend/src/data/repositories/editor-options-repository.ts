@@ -1,3 +1,4 @@
+import { canonicalProject } from '../cache/canonical-storage';
 import {
   collection,
   documentId,
@@ -37,15 +38,14 @@ export const emptyEditorOptions: EditorOptions = {
  * cannot project or query properties of maps inside the embedded topics array
  * (array-contains only compares complete values), including merged aliases. */
 export function selectProjectTopics(project: Record<string, unknown>) {
-  return objects(project.topics).filter((topic) => !topic.mergedIntoTopicId);
+  return objects(project.topics).filter(
+    (topic) => typeof topic.archived === 'boolean' && !topic.mergedIntoTopicId,
+  );
 }
 
-/** Residual over native-query candidates, also usable with prepared test data.
- * Firestore inequalities omit absent fields. Legacy archived/mergedInto/mergeLock
- * and confidential fields default to active/unmerged/unlocked/public, so their
- * falsy-or-absent predicates cannot be expressed by a Firestore query. Retaining
- * the current selected project intentionally overrides only these states, not ACL.
- * Embedded topic eligibility/retention has the array-of-map limitation above. */
+/** Native candidates already satisfy archive/confidential state. Current selected
+ * project retention overrides those states, never schema or ACL. Firestore cannot
+ * query embedded topic properties or absent optional merge/lock markers. */
 export function prepareEditorOptions(
   authorizedCandidates: readonly Row[],
   selection: EditorOptionsSelection,
@@ -60,11 +60,12 @@ export function prepareEditorOptions(
     projects: authorizedCandidates
       .filter(
         (row) =>
-          row.id === selection.projectId ||
-          (!isHidden(row.data, selection.revealed) &&
-            !row.data.archived &&
-            !row.data.mergedInto &&
-            !row.data.mergeLock),
+          canonicalProject(row.data) &&
+          (row.id === selection.projectId ||
+            (!isHidden(row.data, selection.revealed) &&
+              row.data.archived === false &&
+              !row.data.mergedInto &&
+              !row.data.mergeLock)),
       )
       .map((row) => {
         const title = text(safeProject(row.data, selection.revealed).title);
@@ -75,8 +76,9 @@ export function prepareEditorOptions(
       : objects(selectedProject?.topics)
           .filter(
             (topic) =>
-              (!topic.archived && !topic.mergedIntoTopicId) ||
-              selectedTopics.has(text(topic.id, '')),
+              typeof topic.archived === 'boolean' &&
+              ((!topic.archived && !topic.mergedIntoTopicId) ||
+                selectedTopics.has(text(topic.id, ''))),
           )
           .map((topic) => ({
             id: text(topic.id),
@@ -110,6 +112,8 @@ export class EditorOptionsRepository {
         query(
           collection(this.db, 'projects'),
           where(documentId(), 'in', ids.slice(start, start + 30)),
+          where('archived', '==', false),
+          ...(!selection.revealed ? [where('confidential', '==', false)] : []),
         ),
       );
       traceFirestore('cache.result', {
@@ -121,6 +125,7 @@ export class EditorOptionsRepository {
         const data = document.data();
         if (
           this.authorizedIds.has(document.id) &&
+          canonicalProject(data) &&
           canAccessProject(data, this.uid)
         )
           rows.push({ id: document.id, data });
@@ -152,10 +157,13 @@ export class EditorOptionsRepository {
       if (
         document?.id === selection.projectId &&
         data &&
+        canonicalProject(data) &&
         canAccessProject(data, this.uid)
       )
         selectedProject = data;
     }
+    if (selectedProject && !rows.some((row) => row.id === selection.projectId))
+      rows.push({ id: selection.projectId, data: selectedProject });
     return prepareEditorOptions(rows, selection, selectedProject);
   }
 }

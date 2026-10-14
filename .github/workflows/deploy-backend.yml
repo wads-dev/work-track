@@ -66,7 +66,6 @@ jobs:
             'mergeTopics',
             'moveTopic',
             'getTopicReport',
-            'discoverLegacyProjectIds',
           ];
           const listed = JSON.parse(execFileSync('npx', [
             ...cli, 'functions:list', '--project', project, '--json', '--non-interactive',

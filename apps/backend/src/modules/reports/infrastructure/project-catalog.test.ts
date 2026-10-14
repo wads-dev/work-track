@@ -37,18 +37,44 @@ it('Admin adapter maps getAll snapshots, skips data on missing documents and per
 it('Admin catalog uses100-document batches, preserves archive metadata and rejects invalid types without repairing topics', async () => {
   const metadata = new Map<string, Record<string, unknown>>([
     [
-      'legacy',
+      'historical',
       {
-        archived: 'legacy',
+        createdBy: 'alice',
+        type: 'work',
+        confidential: false,
+        archived: true,
         mergedInto: 'target',
-        topics: [{ id: 't', title: 'Title', extra: 'strip' }],
+        topics: [
+          {
+            id: 't',
+            title: 'Title',
+            archived: false,
+            confidential: false,
+            extra: 'strip',
+          },
+        ],
       },
     ],
     [
       'invalid',
-      { type: null, topics: [{ id: 't', title: 'Title' }, { id: 'invalid' }] },
+      {
+        type: null,
+        topics: [
+          { id: 't', title: 'Title', archived: false, confidential: false },
+          { id: 'invalid' },
+        ],
+      },
     ],
-    ['private', { type: 'personal', createdBy: 'bob' }],
+    [
+      'private',
+      {
+        topics: [],
+        type: 'personal',
+        archived: false,
+        confidential: false,
+        createdBy: 'bob',
+      },
+    ],
   ]);
   const getAll = vi.fn((...refs: { id: string }[]) =>
     Promise.resolve(
@@ -64,44 +90,42 @@ it('Admin catalog uses100-document batches, preserves archive metadata and rejec
     getAll,
   } as unknown as Firestore;
   const ids = [
-    'legacy',
-    'invalid',
+    'historical',
     'private',
     ...Array.from({ length: 101 }, (_, i) => 'missing' + i),
   ];
-  const catalog = await readProjectCatalog(db, [...ids, 'legacy']);
-  expect(getAll.mock.calls.map((batch) => batch.length)).toEqual([100, 4]);
-  expect(catalog.size).toBe(3);
-  expect(catalog.get('legacy')).toMatchObject({
+  const catalog = await readProjectCatalog(db, [...ids, 'historical']);
+  expect(getAll.mock.calls.map((batch) => batch.length)).toEqual([100, 3]);
+  expect(catalog.size).toBe(2);
+  await expect(readProjectCatalog(db, ['invalid'])).rejects.toThrow();
+  expect(catalog.get('historical')).toMatchObject({
     archived: true,
     mergedInto: 'target',
-    topics: [{ id: 't', title: 'Title' }],
+    topics: [{ id: 't', title: 'Title', archived: false }],
   });
-  expect(catalog.get('invalid')).toMatchObject({
-    type: '__invalid__',
-    topics: [],
-  });
-  const records = ['legacy', 'invalid', 'private'].map((projectId) => ({
+
+  const records = ['historical', 'invalid', 'private'].map((projectId) => ({
     id: projectId,
     uid: 'alice',
     projectId,
-    startedAt: 'legacy',
+    deletedAt: null,
+    startedAt: 'historical',
     timeZone: 'UTC',
     topics: [],
   }));
   const tombstone = {
     ...records[0],
     id: 'removed',
-    deletedAt: 'legacy',
+    deletedAt: 'historical',
   } as ReportSourceRecord;
   expect(
     selectReportRecords([...records, tombstone], catalog, {
       viewerUid: 'alice',
     }).map((r) => r.id),
-  ).toEqual(['legacy']);
+  ).toEqual(['historical']);
   expect(
     selectReportRecords(records, catalog, { companyOnly: true }).map(
       (r) => r.id,
     ),
-  ).toEqual(['legacy']);
+  ).toEqual(['historical']);
 });

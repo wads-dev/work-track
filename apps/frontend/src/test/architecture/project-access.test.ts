@@ -24,16 +24,17 @@ const preview: ScopePreview = {
   previewToken: 'token',
 };
 describe('project access', () => {
-  it('personal requires owner; public and missing-type work allow any authenticated editor', () => {
+  it('personal requires owner; work allows authenticated editors and missing type is denied', () => {
     for (const project of [
       { createdBy: 'owner', type: 'personal' },
       { type: 'work' },
       { createdBy: 'other', type: 'work' },
-      { createdBy: 'other' },
     ])
       expect(scopeDisabledReason(project, 'owner')).toBe('');
     expect(scopeDisabledReason({ type: 'work' }, '')).not.toBe('');
     for (const project of [
+      { createdBy: 'other' },
+      { createdBy: 'owner' },
       { createdBy: 'other', type: 'personal' },
       { createdBy: 'owner', type: 'work', archived: true },
       { createdBy: 'owner', type: 'work', mergedInto: 'target' },

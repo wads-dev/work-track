@@ -78,8 +78,7 @@ export function canReadDailyProject(
   return Boolean(
     project &&
     uid &&
-    (project.type === undefined ||
-      project.type === 'work' ||
+    (project.type === 'work' ||
       (project.type === 'personal' && project.createdBy === uid)),
   );
 }

@@ -26,7 +26,7 @@ Extrair o núcleo neutro e repositórios reutilizáveis da main `393c78b`, incor
 
 ## Cuidados de compatibilidade
 
-Schemas de escrita não substituem decoders tolerantes de leitura. Ausência/null de `endedAt`, tombstones, aliases, tipos legados e normalização de metadados mantêm sua semântica. Os modos históricos de leitura de tópicos permanecem explícitos. Dados de relatórios completos não são substituídos por primeira página ou cache parcial. Comandos e acesso ao diretório Auth permanecem no servidor.
+O contrato atual de leitura e escrita exige registros com `endedAt: string | null`, `deletedAt` presente (somente `null` ativo) e `topics` array obrigatório; projetos com `type` explícito `work` ou `personal`, `archived` e `confidential` boolean; tópicos com `archived` boolean. Não há fallback para campos ausentes. Tombstones e auditorias conservam evidências reais, sem serem convertidos em atividade. A [migração de produção](project-type-migration.md) concluída em 14/10/2026 cobre 13 projetos e 446 registros, com zero campos canônicos ausentes; os guards de publicação do rollout foram removidos a pedido humano. Dados de relatórios completos não são substituídos por primeira página ou cache parcial. Comandos e acesso ao diretório Auth permanecem no servidor.
 
 ## Progresso
 
@@ -34,7 +34,7 @@ Schemas de escrita não substituem decoders tolerantes de leitura. Ausência/nul
 - Referência completa `npm run check`: exit 0; 470 testes backend, 256 frontend e 4 testes do gerador.
 - Extração inicial core: 54 arquivos movidos; 146 testes core, 324 backend e 256 frontend passaram (726 testes preservados).
 - Snapshots, codecs e catálogo extraídos para data; frontend reorganizado por funcionalidades, sources, cache e infraestrutura. Gateway Callable centraliza chamadas sem substituir comandos por writes diretos.
-- Instalação limpa `npm ci --ignore-scripts --no-audit --no-fund`, `npm run check` e `git diff --check` passaram após rebase em origin/main `7d7c652`; testes de packaging verificaram instalação fora do workspace e descoberta oficial do Firebase Functions, incluindo o alias legado moveSubject.
+- Instalação limpa `npm ci --ignore-scripts --no-audit --no-fund`, `npm run check` e `git diff --check` passaram após rebase em origin/main `7d7c652`; testes de packaging verificaram instalação fora do workspace e descoberta oficial do Firebase Functions, incluindo o alias histórico moveSubject.
 - Testes atuais: core146/data28/backend327/frontend264 +14 scripts Node (779), incluindo apresentação, carregamento ESM de todos os exports públicos e transformação Vite dos paths refatorados/shared/PWA sem iniciar servidor. Paths privados não declarados são recusados pelo runtime Node. Teste middleware não substitui validação Docker/browser/HMR.
 - Reviews independentes: sem regressão funcional bloqueante; gate backend corrigido para testar core/data antes de publicar.
 - Validação Docker/browser pendente: buildx precisa gravar em ~/.docker fora do sandbox; solicitações de aprovação expiraram, inclusive nas duas primeiras rodadas de continuação. Compose ps confirmou novamente que nenhum container foi iniciado. CI remoto do PR #8 está aprovado; o PR permanece draft até a validação obrigatória.

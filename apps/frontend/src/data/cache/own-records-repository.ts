@@ -114,7 +114,7 @@ export function createOwnRecordsRepository() {
               accessRevision = projectAccessRevision();
               recordRevision = deletionRevision(uid);
               // Native listings already exclude tombstones; retain lifecycle
-              // validation for legacy raw connectors, with coherent totals.
+              // validation for existing raw connectors, with coherent totals.
               const visible = listing
                 ? rows
                 : rows.filter((row) => !isDeletedRecord(row.data));

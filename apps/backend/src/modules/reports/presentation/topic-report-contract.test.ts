@@ -30,10 +30,8 @@ type TopicCatalog = Awaited<ReturnType<PersonalReportRepository['readTopics']>>;
 type CommonReport = Pick<TopicBreakdown, 'byTopic' | 'unassignedMinutes'> & {
   totalMinutes: number;
 };
-const aliases: TopicCatalog = {
+const canonicalTopics: TopicCatalog = {
   project: [
-    { id: 'old', title: 'Anterior', mergedIntoTopicId: 'middle' },
-    { id: 'middle', title: 'Intermediário', mergedIntoTopicId: 'code' },
     { id: 'code', title: 'Código atual' },
     { id: 'general', title: 'Geral' },
   ],
@@ -45,6 +43,7 @@ function record(
   extra: Partial<ReportSourceRecord> = {},
 ): ReportSourceRecord {
   return {
+    deletedAt: null,
     id,
     uid: 'alice',
     projectId: 'project',
@@ -58,7 +57,7 @@ function record(
 
 function personalRepository(
   records: ReportSourceRecord[],
-  topics: TopicCatalog = aliases,
+  topics: TopicCatalog = canonicalTopics,
   archived: string[] = [],
 ) {
   return {
@@ -92,7 +91,7 @@ function personalRepository(
 
 function companyRepository(
   records: ReportSourceRecord[],
-  topics: TopicCatalog = aliases,
+  topics: TopicCatalog = canonicalTopics,
 ) {
   return {
     readPage: vi.fn<CompanyReportRepository['readPage']>().mockResolvedValue({
@@ -142,6 +141,57 @@ function expectCommonTopicContract(report: CommonReport) {
   }
 }
 
+describe('unsupported alias report catalogs', () => {
+  it.each(['personal', 'company', 'project'] as const)(
+    'rejects the entire %s report instead of returning partial or lost hours',
+    async (kind) => {
+      const records = [
+        record('canonical', [{ topicId: 'code' }]),
+        record('alias', [{ topicId: 'old', percentage: 50 }], { uid: 'bob' }),
+      ];
+      const topics = {
+        project: [
+          ...canonicalTopics.project!,
+          { id: 'old', title: 'Anterior', mergedIntoTopicId: 'code' },
+        ],
+      };
+      const before = structuredClone({ records, topics });
+      const result =
+        kind === 'personal'
+          ? getPersonalReportHandler(
+              personalRepository(records, topics),
+              input,
+              auth,
+              asOf,
+            )
+          : kind === 'company'
+            ? getCompanyReportHandler(
+                companyRepository(records, topics),
+                input,
+                auth,
+                asOf,
+              )
+            : getProjectReportHandler(
+                {
+                  readPage: vi.fn().mockResolvedValue({
+                    records,
+                    topics: topics.project,
+                    topicLabels: {},
+                    nextCursor: null,
+                  }),
+                  loadContext: vi.fn().mockResolvedValue(records),
+                  userLabels: vi.fn().mockResolvedValue({}),
+                },
+                { projectId: 'project' },
+                auth,
+                asOf,
+              );
+      await expect(result).rejects.toMatchObject({ code: 'internal' });
+      expect({ records, topics }).toEqual(before);
+    },
+  );
+});
+
 describe('personal report topic contract', () => {
   it('requires explicit verified corporate Google auth before reading topics or records', async () => {
     const repository = personalRepository([]);
@@ -174,7 +224,7 @@ describe('personal report topic contract', () => {
 
   it('reads only its authenticated UID and explicitly passes it to topic metadata reads', async () => {
     const repository = personalRepository([
-      record('own', [{ topicId: 'old' }]),
+      record('own', [{ topicId: 'code' }]),
     ]);
     const result = await getPersonalReportHandler(
       repository,
@@ -222,7 +272,7 @@ describe('personal report topic contract', () => {
         }),
       ],
       {
-        ...aliases,
+        ...canonicalTopics,
         archive: [{ id: 'archive-topic', title: 'Histórico' }],
       },
       ['archive'],
@@ -258,12 +308,13 @@ describe('personal report topic contract', () => {
       record(
         'clipped',
         [
-          { topicId: 'old', percentage: 50 },
+          { topicId: 'code', percentage: 50 },
           { topicId: 'general', durationMinutes: 5 },
         ],
         { endedAt: '2026-10-08T12:00:00-03:00' },
       ),
       record('outside-period', [{ topicId: 'code' }], {
+        deletedAt: null,
         startedAt: '2026-10-08T08:00:00-03:00',
         endedAt: '2026-10-08T09:00:00-03:00',
       }),
@@ -310,7 +361,7 @@ describe('personal report topic contract', () => {
 describe('company report topic contract', () => {
   it('aggregates two UIDs per canonical topic without confusing repeated record IDs', async () => {
     const records = [
-      record('same', [{ topicId: 'old', percentage: 50 }]),
+      record('same', [{ topicId: 'code', percentage: 50 }]),
       record('same', [{ topicId: 'code', percentage: 50 }], {
         uid: 'bob',
         endedAt: '2026-10-08T12:00:00-03:00',
@@ -390,10 +441,10 @@ describe('company report topic contract', () => {
     expectCommonTopicContract(result);
   });
 
-  it('keeps the entire interval unassigned when explicit originals converge to one canonical topic', async () => {
+  it('keeps the entire interval unassigned when canonical topic allocations are duplicated', async () => {
     const records = [
       record('collision', [
-        { topicId: 'old', durationMinutes: 20 },
+        { topicId: 'code', durationMinutes: 20 },
         { topicId: 'code', percentage: 25 },
         { topicId: 'general', durationMinutes: 5 },
       ]),
@@ -409,9 +460,7 @@ describe('company report topic contract', () => {
     expect(result.totalMinutes).toBe(60);
     expect(result.byTopic).toEqual([]);
     expect(result.unassignedMinutes).toBe(60);
-    expect(result.warnings.join(' ')).toContain('convergem');
-    expect(result.warnings.join(' ')).toContain('"old"');
-    expect(result.warnings.join(' ')).toContain('"code"');
+    expect(result.warnings.join(' ')).toContain('duplicados');
     expect(records).toEqual(before);
     expectCommonTopicContract(result);
   });
@@ -453,9 +502,9 @@ describe('company report topic contract', () => {
 });
 
 describe('project report common topic contract', () => {
-  it('uses alias metadata through the real handler and emits canonical topics with byUser', async () => {
+  it('uses canonical metadata through the real handler and emits topics with byUser', async () => {
     const records = [
-      record('same', [{ topicId: 'old', percentage: 50 }]),
+      record('same', [{ topicId: 'code', percentage: 50 }]),
       record(
         'same',
         [
@@ -468,8 +517,8 @@ describe('project report common topic contract', () => {
     const page: ReportPage = {
       records,
       nextCursor: null,
-      topicLabels: { old: 'Rótulo legado', code: 'Cache obsoleto' },
-      topics: aliases.project,
+      topicLabels: { code: 'Cache obsoleto' },
+      topics: canonicalTopics.project,
     };
     const repository = {
       readPage: vi

@@ -26,8 +26,13 @@ const intent = {
   reason: 'Move',
 };
 describe('audited record movement', () => {
-  it('only same effective scope, legacy work compatible', () => {
-    expect(compatibleMoveProject({ type: 'work' }, {})).toBe(true);
+  it('only matching explicit scopes are compatible', () => {
+    expect(compatibleMoveProject({ type: 'work' }, {})).toBe(false);
+    expect(compatibleMoveProject({}, { type: 'work' })).toBe(false);
+    expect(compatibleMoveProject({}, {})).toBe(false);
+    expect(compatibleMoveProject({ type: 'work' }, { type: 'work' })).toBe(
+      true,
+    );
     expect(
       compatibleMoveProject({ type: 'personal' }, { type: 'personal' }),
     ).toBe(true);

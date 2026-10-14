@@ -1,5 +1,6 @@
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
 import type { Firestore } from 'firebase-admin/firestore';
 import { assertProjectAccess } from '@work-track/core/registration/domain/project-access';
 import type { Project } from '@work-track/core/registration/domain/work-model';
@@ -99,6 +100,11 @@ export class FirestoreSplitRepository implements SplitRepository {
       if (!sourceDoc.exists || sourceDoc.data()!.uid !== uid)
         throw new SplitError('not-found', 'Registro não encontrado.');
       const source = sourceDoc.data()!;
+      if (!reportRecordSchema('admin-owned').safeParse(source).success)
+        throw new SplitError(
+          'failed-precondition',
+          'Schema de storage inválido; nenhuma alteração.',
+        );
       if (isDeletedRecord(source))
         throw new SplitError(
           'failed-precondition',
@@ -120,8 +126,7 @@ export class FirestoreSplitRepository implements SplitRepository {
         ? ({ ...destDoc.data(), id: destDoc.id } as Project)
         : undefined;
       const requiresSharedAcknowledgment =
-        origin?.type === 'personal' &&
-        (destination?.type === 'work' || destination?.type === undefined);
+        origin?.type === 'personal' && destination?.type === 'work';
       if (
         confirmed &&
         requiresSharedAcknowledgment &&
@@ -155,6 +160,8 @@ export class FirestoreSplitRepository implements SplitRepository {
         const recordId = i === 0 ? input.recordId : hash([operationId, p.role]);
         const data = {
           ...p.data,
+          endedAt: p.data.endedAt,
+          deletedAt: p.data.deletedAt,
           id: recordId,
           splitOperationId: operationId,
           splitSourceRecordId: input.recordId,

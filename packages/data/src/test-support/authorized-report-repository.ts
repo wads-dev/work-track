@@ -7,6 +7,7 @@ import type {
   ReportSourceRecord,
 } from '@work-track/core/reports/domain/project-report';
 import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
+import { canAccessProject } from '@work-track/core/registration/domain/project-access';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import type { ReportProjectMetadata } from '../codecs/report-project-metadata.js';
 import { ClientPersonalReportRepository } from './personal-report-repository.js';
@@ -24,9 +25,7 @@ export class AuthorizedReportRepository implements CompanyReportRepository {
   workRecords() {
     return this.records.filter((r) => {
       const p = this.projects.get(r.projectId);
-      return (
-        p && (p.type === undefined || p.type === 'work') && !isDeletedRecord(r)
-      );
+      return p && p.type === 'work' && !isDeletedRecord(r);
     });
   }
   async loadContext(uids: string[]) {
@@ -120,11 +119,7 @@ export class AuthorizedReportRepository implements CompanyReportRepository {
       userLabels: (uids) => this.userLabels(uids),
       readPage: async (id, limit, cursor, viewer, selection) => {
         const p = this.projects.get(id);
-        if (
-          viewer !== this.viewer ||
-          !p ||
-          (p.type === 'personal' && p.createdBy !== viewer)
-        )
+        if (viewer !== this.viewer || !p || !canAccessProject(p, viewer))
           return null;
         const rows = (
             p.type === 'personal'

@@ -20,20 +20,43 @@ vi.mock('firebase/firestore', async (original) => ({
 }));
 beforeEach(() => vi.clearAllMocks());
 const catalog: Row[] = [
-  { id: 'other', data: { title: 'Other', color: '#f97316' } },
+  {
+    id: 'other',
+    data: {
+      type: 'work',
+      createdBy: 'alice',
+      archived: false,
+      confidential: false,
+      topics: [],
+      title: 'Other',
+      color: '#f97316',
+    },
+  },
   {
     id: 'private',
     data: {
+      type: 'work',
+      createdBy: 'alice',
+      archived: false,
       title: 'Private project',
       description: 'Private activity',
       confidential: true,
       color: '#123abc',
-      topics: [{ id: 'private-topic', title: 'Private topic' }],
+      topics: [
+        { id: 'private-topic', title: 'Private topic', archived: false },
+      ],
     },
   },
   {
     id: 'selected',
-    data: { title: 'Selected', topics: [{ id: 't', title: 'Selected topic' }] },
+    data: {
+      type: 'work',
+      createdBy: 'alice',
+      archived: false,
+      confidential: false,
+      title: 'Selected',
+      topics: [{ id: 't', title: 'Selected topic', archived: false }],
+    },
   },
 ];
 
@@ -43,7 +66,7 @@ describe('embedded metadata presentation joins', () => {
     expect(repository.project('selected')).toMatchObject({
       id: 'selected',
       project: { title: 'Selected' },
-      topics: [{ id: 't', title: 'Selected topic' }],
+      topics: [{ id: 't', title: 'Selected topic', archived: false }],
     });
     expect(repository.project('missing')).toBeUndefined();
     expect(repository.project('private')?.topics).toEqual([]);
@@ -53,20 +76,42 @@ describe('embedded metadata presentation joins', () => {
     expect(
       createMetadataPresentationRepository(catalog, true).project('private')
         ?.topics,
-    ).toEqual([{ id: 'private-topic', title: 'Private topic' }]);
+    ).toEqual([
+      { id: 'private-topic', title: 'Private topic', archived: false },
+    ]);
   });
 
-  it('resolves merged identities and labels and fails closed for broken catalogs', () => {
+  it('rejects merged aliases and malformed topics while retaining canonical labels', () => {
     const topics = [
-      { id: 'old', title: 'Obsolete', mergedIntoTopicId: 'intermediate' },
-      { id: 'intermediate', mergedIntoTopicId: 'current' },
-      { id: 'current', title: 'Current topic' },
+      {
+        id: 'old',
+        title: 'Obsolete',
+        archived: false,
+        mergedIntoTopicId: 'intermediate',
+      },
+      { id: 'intermediate', archived: false, mergedIntoTopicId: 'current' },
+      { id: 'current', title: 'Current topic', archived: false },
     ];
-    expect(readTopicMetadata({ topics }, 'old')).toEqual({
+    expect(readTopicMetadata({ topics }, 'old')).toBeUndefined();
+    expect(readTopicMetadata({ topics }, 'intermediate')).toBeUndefined();
+    expect(readTopicMetadata({ topics }, 'current')).toEqual({
       id: 'current',
       title: 'Current topic',
     });
     expect(readTopicMetadata({ topics }, 'missing')).toBeUndefined();
+    for (const topic of [
+      { id: 'a' },
+      { id: 'a', archived: null },
+      { id: 'a', archived: 'false' },
+      { id: 'a', archived: false, mergedIntoTopicId: undefined },
+    ])
+      expect(readTopicMetadata({ topics: [topic] }, 'a')).toBeUndefined();
+    expect(
+      readTopicMetadata(
+        { topics: [{ id: 'a', title: 'Archived', archived: true }] },
+        'a',
+      ),
+    ).toEqual({ id: 'a', title: 'Archived' });
     expect(
       readTopicMetadata(
         {
@@ -79,12 +124,22 @@ describe('embedded metadata presentation joins', () => {
       ),
     ).toBeUndefined();
     expect(
-      readTopicMetadata({ topics: [{ id: 'a' }, { id: 'a' }] }, 'a'),
+      readTopicMetadata(
+        {
+          topics: [
+            { id: 'a', archived: false },
+            { id: 'a', archived: false },
+          ],
+        },
+        'a',
+      ),
     ).toBeUndefined();
     expect(
       readTopicMetadata({ topics: [{ id: 'a', mergedIntoTopicId: 42 }] }, 'a'),
     ).toBeUndefined();
-    expect(readTopicMetadata({ topics: [{ id: 'a' }] }, 'a')).toEqual({
+    expect(
+      readTopicMetadata({ topics: [{ id: 'a', archived: false }] }, 'a'),
+    ).toEqual({
       id: 'a',
       title: 'Tópico',
     });

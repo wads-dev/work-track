@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { selectPrevious } from './close-previous.js';
 import { registerInput } from './work-model.js';
 const previous = {
+  deletedAt: null,
   id: 'one',
   uid: 'alice',
   projectId: 'p',

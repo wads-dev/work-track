@@ -31,6 +31,7 @@ export function safeRecord(
     projectId: record.projectId,
     startedAt: record.startedAt,
     endedAt: record.endedAt,
+    deletedAt: record.deletedAt,
     timeZone: record.timeZone,
     recordedAt: record.recordedAt,
     originalText: 'Conteúdo oculto',

@@ -23,8 +23,9 @@ export function readProjectCatalog(
     'admin',
   ).readCatalog(ids);
 }
-/** Firebase residuals: archive/type are joined project metadata with legacy missing fields;
- * tombstones can be absent or null. ISO-offset strings do not sort chronologically, so
+/** Firebase residuals: archive/type are joined project metadata; type must be explicit;
+ * active tombstones are selected with native deletedAt null. ISO-offset strings
+ * do not sort chronologically, so
  * a startedAt/endedAt lexical range would omit valid spanning records. Array-of-object
  * topic allocations and alias chains cannot be queried by a nested array member ID.
  * Project/UID/docId predicates are pushed into native queries before this residual.

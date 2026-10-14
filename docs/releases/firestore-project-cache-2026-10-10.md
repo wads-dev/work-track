@@ -11,7 +11,7 @@ Implementado diretamente no checkout principal, branch main, por pedido humano e
 - Usuários/pessoas continuam consultados no backend, com provider em memória. Callables de comandos e autorização do servidor não mudam.
 - Primeira assinatura exige confirmação de ambas as consultas no servidor antes de expor documentos persistidos de sessões anteriores. Não promete abertura offline após reload/logout nem autorização atual offline. Após confirmação, metadata de cache e pending permanece explícita. Logout não apaga IndexedDB: use em dispositivos confiáveis.
 - Cache vazio/incompleto não é total confirmado; pendências provisórias não mostram “Tudo em dia”. Erros encerram assinaturas e descartam seus dados; retries dos relatórios reabrem o catálogo quando necessário.
-- Catálogo cobre o contrato atual de criação com type obrigatório work/personal. Não foi acrescentada descoberta/fallback para documentos sem type nem alegada sua existência no banco; tais documentos não integram esta lista.
+- Catálogo exige `type` explícito `work` ou `personal`. Ausência ou tipo inválido nega acesso ao projeto, sem fallback de descoberta ou autorização; não se afirma a existência de documentos sem tipo no banco.
 
 ## Evidência
 

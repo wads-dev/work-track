@@ -14,7 +14,7 @@ An Admin-only users/{uid}/removalAudits/{operationId} ledger and source audit/re
 
 ## Functional read exclusion matrix
 
-Any non-null/non-undefined deletedAt marks a tombstone, including malformed values (0, false, arrays, objects). Legacy absent/null markers remain active. Do not use a Firestore != query: missing legacy fields would be lost.
+Canonical records require `deletedAt`: only explicit `null` is active. Every other marker, including malformed values (0, false, arrays, objects), is excluded from functional activity; an absent field is invalid storage, not an active-record fallback. `endedAt` is required as string or null and `topics` is a required array. Production was [migrated](project-type-migration.md) on 14/10/2026 (13 projects, 446 records, zero missing canonical fields); existing tombstones and audit evidence were preserved.
 
 | Surface                                                              | Exclusion rule                                                                                                                                             |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,7 +22,7 @@ Any non-null/non-undefined deletedAt marks a tombstone, including malformed valu
 | Global estimates and report builders                                 | Filter page and context before consistency, next-start boundaries, tiny-record checks, closed facts, 4h/open estimate and global480min/day budget.         |
 | Daily-hours own canonical reader and calculator                      | Filter before normalization, project visibility, intervals, counts and budgeting; physical pages still advance.                                            |
 | Topic breakdown                                                      | Removed sources cannot be attributed or become unassigned activity.                                                                                        |
-| Legacy project record listing and own open list                      | Filter before returned active limit; no >100 deleted-prefix starvation.                                                                                    |
+| Historical project record listing and own open list                  | Filter before returned active limit; no >100 deleted-prefix starvation.                                                                                    |
 | Project merge preview/execute                                        | Only active records count/migrate; all-deleted sources finish with zero migrated. Tombstones retain historical source project and removal ledger equality. |
 | register closePrevious, pause automatic selection                    | Filter before eligibility and active context caps; explicit deleted source rejects.                                                                        |
 | update_record, pause, split and their retries                        | Reject tombstones or changed exact replay state; no write or evidence edit.                                                                                |
@@ -30,8 +30,10 @@ Any non-null/non-undefined deletedAt marks a tombstone, including malformed valu
 
 Admin forensic reads, audit history and remove_record receipts intentionally retain tombstone data. These are evidence, not functional activity totals or list output.
 
-## Limits and operational tradeoffs
+## Historical limits and operational tradeoffs
 
-Legacy list/open selection, project merge and previous/pause candidate paths scan the full relevant snapshot before active limits. This deliberately requires no index/backfill and ensures tombstones never consume active output caps. Merge writes remain bounded at100 active records per transaction. Full query reads can increase latency, memory and billed reads; this is not an unbounded-scale guarantee. Firestore transaction/read-size/time/resource limits still apply and fail atomically. No migration, deploy, rules changes or production data access accompanies this increment.
+The following describes the removal increment at its original validation checkpoint, not the current storage or query contract. Current canonical storage and the completed production migration are described above.
+
+Historical list/open selection, project merge and previous/pause candidate paths scan the full relevant snapshot before active limits. This deliberately requires no index/backfill and ensures tombstones never consume active output caps. Merge writes remain bounded at100 active records per transaction. Full query reads can increase latency, memory and billed reads; this is not an unbounded-scale guarantee. Firestore transaction/read-size/time/resource limits still apply and fail atomically. No migration, deploy, rules changes or production data access accompanies this increment.
 
 The established personal-v3 estimate remains 4h/open and480min/day; six-hour estimates are not authorized. Tests use SDK-boundary mocks, not production or emulator verification.

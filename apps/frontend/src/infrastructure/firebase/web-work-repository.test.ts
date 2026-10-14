@@ -69,16 +69,27 @@ vi.mock('firebase/firestore', () => {
 import { WebWorkRepository } from './web-work-repository';
 const repo = new WebWorkRepository({} as Firestore);
 const project = {
+  archived: false,
+  confidential: false,
+  type: 'work' as const,
   title: 'Projeto',
   description: 'Descrição generosa suficiente para validar metadados.',
   createdBy: 'alice',
-  topics: [{ id: 'general', title: 'Geral', description: 'Contexto geral' }],
+  topics: [
+    {
+      id: 'general',
+      archived: false,
+      title: 'Geral',
+      description: 'Contexto geral',
+    },
+  ],
 };
 const record = {
   uid: 'alice',
   requestId: 'original',
   projectId: 'p',
   startedAt: '2026-10-10T09:00:00-03:00',
+  deletedAt: null,
   endedAt: null,
   topics: [{ topicId: 'general' }],
   originalText: 'comecei',
@@ -95,7 +106,7 @@ beforeEach(() => {
   state.data.set('projects/p', project);
   state.data.set('users/alice/records/r', record);
 });
-it('allows authenticated noncreator work/legacy writes and atomic actor audit, retries same intent', async () => {
+it('allows authenticated noncreator work/existing writes and atomic actor audit, retries same intent', async () => {
   const input = {
     projectId: 'p',
     requestId: 'req',
@@ -304,6 +315,7 @@ it('requires explicit personal publication acknowledgement and atomically audits
   expect(audit.after).toMatchObject({
     projectId: 'q',
     interpretation: 'Novo contexto',
+    deletedAt: null,
     endedAt: null,
   });
   expect(audit.updatedAt).toBe(result.updatedAt);
@@ -340,6 +352,7 @@ it('creates backend-compatible work IDs and atomically audits the current creato
     topics: [
       {
         id: 'general',
+        archived: false,
         title: 'Geral',
         description: 'Atividade geral ou tópico ainda não identificado.',
       },
@@ -445,6 +458,7 @@ it('rejects inaccessible or scope-changed projects and archived or merged reuse 
   for (const metadata of [
     { type: 'personal', createdBy: 'bob' },
     { type: 'personal', createdBy: 'alice' },
+    { type: undefined },
     { type: 'work', archived: true },
     { type: 'work', mergeLock: 'job' },
     { type: 'work', mergedInto: 'target' },
@@ -454,7 +468,7 @@ it('rejects inaccessible or scope-changed projects and archived or merged reuse 
   }
   expect(state.writes).toHaveLength(0);
 });
-it('reuses readable legacy work projects without changing their scope or evidence', async () => {
+it('reuses readable existing work projects without changing their scope or evidence', async () => {
   const id = backendKey(createInput.title);
   state.data.set('projects/' + id, { ...project, id });
   expect(await repo.createProject(createInput, 'bob')).toEqual({

@@ -60,7 +60,9 @@ export class FirestoreCompanyReportRepository implements CompanyReportRepository
     if (selection?.userIds?.length === 0)
       return { records: [], scannedCount: 0, nextCursor: null };
     const upper = reportUpperDatePrefix(selection);
-    let query: FirebaseFirestore.Query = this.db.collectionGroup('records');
+    let query: FirebaseFirestore.Query = this.db
+      .collectionGroup('records')
+      .where('deletedAt', '==', null);
     if (projectId) query = query.where('projectId', '==', projectId);
     const readQueryPage = (filtered: FirebaseFirestore.Query) =>
       resumeReportQuery(

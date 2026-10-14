@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { globalEstimates, recordKey } from './global-estimates.js';
 import type { ReportSourceRecord } from './project-report.js';
 const first: ReportSourceRecord = {
+  deletedAt: null,
   id: 'work',
   uid: 'alice',
   projectId: 'work',
@@ -13,6 +14,7 @@ const candidate = (
   projectId: string,
   minutes?: number,
 ): ReportSourceRecord => ({
+  deletedAt: null,
   id: 'voice',
   uid: 'alice',
   projectId,

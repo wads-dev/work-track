@@ -43,13 +43,23 @@ it('requires neutral aliases and explicit confirmed merge IDs/reason', () => {
 });
 it('reconciles general and normalized titles without mutating inputs', () => {
   const target = [
-    { id: 'general', title: 'Geral', description: 'Default' },
-    { id: 'target-code', title: 'Código', description: 'Code' },
+    { archived: false, id: 'general', title: 'Geral', description: 'Default' },
+    {
+      archived: false,
+      id: 'target-code',
+      title: 'Código',
+      description: 'Code',
+    },
   ];
   const source = [
-    { id: 'general', title: 'Geral', description: 'Default' },
-    { id: 'source-code', title: 'codigo', description: 'Code' },
-    { id: 'new', title: 'Meeting', description: 'Meet' },
+    { archived: false, id: 'general', title: 'Geral', description: 'Default' },
+    {
+      archived: false,
+      id: 'source-code',
+      title: 'codigo',
+      description: 'Code',
+    },
+    { archived: false, id: 'new', title: 'Meeting', description: 'Meet' },
   ];
   const result = mapTopics(source, target);
   expect(result.mapping).toEqual({

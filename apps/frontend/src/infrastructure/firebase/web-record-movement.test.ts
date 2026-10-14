@@ -70,18 +70,28 @@ beforeEach(() => {
   state.write.mockReset();
   state.failCommit = false;
   const topic = {
+    archived: false,
     id: 'topic',
     title: 'Private topic',
     description: 'Private context',
   };
-  state.data.set('projects/source', { type: 'work', topics: [topic] });
+  state.data.set('projects/source', {
+    type: 'work',
+    archived: false,
+    confidential: false,
+    topics: [topic],
+  });
   state.data.set('projects/target', {
+    archived: false,
+    confidential: false,
     type: 'work',
     title: 'Private title',
     description: 'Private description',
     topics: [topic],
   });
   state.data.set(recordPath, {
+    deletedAt: null,
+    endedAt: null,
     uid: 'actor',
     projectId: 'source',
     originalText: 'Private original text',

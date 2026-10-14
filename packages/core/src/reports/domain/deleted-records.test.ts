@@ -10,6 +10,7 @@ import type { ReportSourceRecord } from './project-report.js';
 const start = '2026-10-08T09:00:00-03:00',
   now = Date.parse('2026-10-09T00:00:00-03:00');
 const open: ReportSourceRecord = {
+  deletedAt: null,
   id: 'open',
   uid: 'alice',
   projectId: 'p',
@@ -102,6 +103,10 @@ it.each(['now', 0, false, {}, []])(
     expect(breakdown.unassignedMinutes).toBe(0);
   },
 );
-it.each([undefined, null])('legacy marker %s remains active', (deletedAt) =>
-  expect(isDeletedRecord({ ...open, deletedAt })).toBe(false),
-);
+it('only explicit null is active; absent and undefined markers fail closed', () => {
+  expect(isDeletedRecord({ ...open, deletedAt: null })).toBe(false);
+  expect(isDeletedRecord({ ...open, deletedAt: undefined })).toBe(true);
+  const missing = { ...open };
+  delete missing.deletedAt;
+  expect(isDeletedRecord(missing)).toBe(true);
+});

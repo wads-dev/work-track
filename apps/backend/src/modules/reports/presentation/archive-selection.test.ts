@@ -11,6 +11,7 @@ const auth = {
 };
 it('active selection excludes archive totals but archived closed facts do not reduce open estimates', async () => {
   const closed = {
+    deletedAt: null,
     id: 'closed',
     uid: 'alice',
     projectId: 'archived',
@@ -20,6 +21,7 @@ it('active selection excludes archive totals but archived closed facts do not re
     topics: [],
   };
   const open = {
+    deletedAt: null,
     id: 'open',
     uid: 'alice',
     projectId: 'active',

@@ -29,11 +29,62 @@ import {
   readProjectListing,
   readOwnRecordListing,
   createProjectOptionRepository,
+  resolveRecordTopic,
 } from './browser-listing-repository';
+it('rejects topic aliases without redirecting and retains records for truly removed topics', async () => {
+  const project = mocks.docs.get('projects/p')!;
+  mocks.docs.set('projects/p', {
+    ...project,
+    topics: [{ id: 'current', archived: false }],
+  });
+  for (const topicId of ['old', 'current', 'removed']) {
+    record(topicId, {
+      topics: [{ topicId }],
+      topicSnapshots: [{ id: topicId, title: topicId }],
+      startedAt: '2026-10-09T00:00:00Z',
+      endedAt: '2026-10-09T01:00:00Z',
+    });
+  }
+  const all = await readOwnRecordListing(db, 'alice', allowed);
+  expect(all.total).toBe(3);
+  const old = await readOwnRecordListing(db, 'alice', allowed, {
+    topic: 'old',
+  });
+  expect(old.rows.map((row) => row.id)).toEqual(['old']);
+  const aliasCatalog = [
+    { id: 'old', mergedIntoTopicId: 'current', archived: true },
+    { id: 'current', archived: false },
+  ];
+  expect(resolveRecordTopic(aliasCatalog, 'old')).toBeUndefined();
+  mocks.docs.set('projects/p', { ...project, topics: aliasCatalog });
+  expect(
+    (await readOwnRecordListing(db, 'alice', allowed, { topic: 'old' })).total,
+  ).toBe(0);
+  expect(
+    (await readOwnRecordListing(db, 'alice', allowed, { topic: 'current' }))
+      .total,
+  ).toBe(0);
+  mocks.docs.set('projects/p', {
+    ...project,
+    topics: [{ id: 'current', archived: false }],
+  });
+  const current = await readOwnRecordListing(db, 'alice', allowed, {
+    topic: 'current',
+  });
+  expect(current.rows.map((row) => row.id)).toEqual(['current']);
+  const removed = await readOwnRecordListing(db, 'alice', allowed, {
+    topic: 'removed',
+  });
+  expect(removed.rows.map((row) => row.id)).toEqual(['removed']);
+  expect(removed.rows[0].data.topics).toEqual([{ topicId: 'removed' }]);
+  expect(removed.rows[0].data.endedAt).toBe('2026-10-09T01:00:00Z');
+});
 const db = {} as Firestore;
-const allowed = new Set(['p', 'legacy', 'private', 'archived', 'revoked']);
+const allowed = new Set(['p', 'existing', 'private', 'archived', 'revoked']);
 const record = (id: string, data: Record<string, unknown> = {}) =>
   mocks.docs.set('users/alice/records/' + id, {
+    endedAt: null,
+    deletedAt: null,
     uid: 'alice',
     projectId: 'p',
     ...data,
@@ -42,7 +93,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.queries.length = 0;
   mocks.docs.clear();
-  mocks.docs.set('projects/p', { type: 'work', title: 'Public' });
+  mocks.docs.set('projects/p', {
+    createdBy: 'alice',
+    topics: [],
+    archived: false,
+    confidential: false,
+    type: 'work',
+    title: 'Public',
+  });
   mocks.getDoc.mockImplementation(async ({ path }: { path: string }) => ({
     exists: () => mocks.docs.has(path),
     data: () => mocks.docs.get(path),
@@ -75,15 +133,34 @@ beforeEach(() => {
     },
   );
 });
-it('pushes supported project predicates into native cache and retains legacy absent fields', async () => {
-  mocks.docs.set('projects/legacy', { title: 'Legacy' });
-  mocks.docs.set('projects/private', { type: 'personal', createdBy: 'alice' });
-  mocks.docs.set('projects/archived', { type: 'work', archived: true });
+it('pushes explicit active and archived project state into native cache', async () => {
+  mocks.docs.set('projects/existing', {
+    createdBy: 'alice',
+    topics: [],
+    archived: false,
+    confidential: false,
+    type: 'work',
+    title: 'Existing',
+  });
+  mocks.docs.set('projects/private', {
+    topics: [],
+    archived: false,
+    confidential: false,
+    type: 'personal',
+    createdBy: 'alice',
+  });
+  mocks.docs.set('projects/archived', {
+    createdBy: 'alice',
+    confidential: false,
+    type: 'work',
+    topics: [],
+    archived: true,
+  });
   const result = await readProjectListing(db, 'alice', allowed, {
     scope: 'work',
     archive: 'active',
   });
-  expect(result.rows.map((r) => r.id)).toEqual(['p', 'legacy']);
+  expect(result.rows.map((r) => r.id)).toEqual(['p', 'existing']);
   await readProjectListing(db, 'alice', allowed, {
     scope: 'personal',
     archive: 'archived',
@@ -94,25 +171,31 @@ it('pushes supported project predicates into native cache and retains legacy abs
       { field: 'type', op: '==', value: 'personal' },
       { field: 'archived', op: '==', value: true },
     ],
-    [
-      { field: '__name__', op: 'in', value: [...allowed] },
-      { field: 'type', op: '==', value: 'personal' },
-      { field: 'mergedInto', op: '>=', value: '' },
-    ],
   ]);
   expect(mocks.trace).toHaveBeenCalledWith(
     'cache.result',
-    expect.objectContaining({ count: 4 }),
+    expect.objectContaining({ count: 2 }),
   );
+});
+it('excludes missing project type from listings, direct reads and owner access', async () => {
+  mocks.docs.set('projects/existing', { title: 'Untyped', createdBy: 'alice' });
+  for (const scope of ['all', 'work', 'personal'] as const) {
+    const result = await readProjectListing(db, 'alice', allowed, { scope });
+    expect(result.rows.map((row) => row.id)).not.toContain('existing');
+  }
+  expect(
+    (await readProjectListing(db, 'alice', allowed, { id: 'existing' })).rows,
+  ).toEqual([]);
 });
 it('search uses masked display metadata, never hidden raw titles/descriptions/topics', async () => {
   mocks.docs.set('projects/private', {
+    archived: false,
     confidential: true,
     type: 'personal',
     createdBy: 'alice',
     title: 'secret',
     description: 'secret',
-    topics: [{ title: 'secret' }],
+    topics: [{ title: 'secret', archived: false }],
   });
   expect(
     (await readProjectListing(db, 'alice', allowed, { query: 'secret' })).rows,
@@ -143,7 +226,13 @@ it('queries uid/project/ID/date guards and rechecks current parent ACL before ex
     endedAt: '2026-10-20T00:00:00Z',
   });
   record('other', { projectId: 'revoked' });
-  mocks.docs.set('projects/revoked', { type: 'personal', createdBy: 'bob' });
+  mocks.docs.set('projects/revoked', {
+    topics: [],
+    archived: false,
+    confidential: false,
+    type: 'personal',
+    createdBy: 'bob',
+  });
   const result = await readOwnRecordListing(db, 'alice', allowed, {
     project: 'p',
     fromDate: '2026-10-09',
@@ -166,7 +255,7 @@ it('queries uid/project/ID/date guards and rechecks current parent ACL before ex
   ).toEqual([]);
   expect(mocks.getDoc).toHaveBeenCalledWith({ path: 'projects/revoked' });
 });
-it('retains offset/date-spanning/open legacy records and paginates complete selected history', async () => {
+it('retains offset/date-spanning/open existing records and paginates complete selected history', async () => {
   for (let i = 0; i < 151; i++)
     record(String(i).padStart(3, '0'), { originalText: 'match' });
   record('deleted', { deletedAt: '2026-10-09T00:00:00Z' });
@@ -197,9 +286,11 @@ it('retains offset/date-spanning/open legacy records and paginates complete sele
 });
 it('does not allow hidden record text/topic membership to become a search oracle', async () => {
   mocks.docs.set('projects/p', {
+    createdBy: 'alice',
+    archived: false,
     type: 'work',
     confidential: true,
-    topics: [{ id: 't', title: 'Secret topic' }],
+    topics: [{ id: 't', title: 'Secret topic', archived: false }],
   });
   record('r', {
     originalText: 'Secret',
@@ -228,8 +319,8 @@ it('rejects incomplete/reversed date selection before any DB read', async () => 
   ).rejects.toThrow('duas datas');
   expect(mocks.get).not.toHaveBeenCalled();
 });
-it('pushes closed status/end guards and keeps legacy missing/null ends in open selection', async () => {
-  record('missing');
+it('pushes closed/open state natively and rejects absent ends', async () => {
+  record('missing', { endedAt: undefined });
   record('null', { endedAt: null });
   record('closed', {
     startedAt: '2026-10-01T00:00:00Z',
@@ -239,7 +330,7 @@ it('pushes closed status/end guards and keeps legacy missing/null ends in open s
     (
       await readOwnRecordListing(db, 'alice', allowed, { openOnly: true })
     ).rows.map((r) => r.id),
-  ).toEqual(['missing', 'null']);
+  ).toEqual(['null']);
   const result = await readOwnRecordListing(db, 'alice', allowed, {
     status: 'closed',
     fromDate: '2026-10-09',
@@ -275,7 +366,13 @@ it('calculates pending age budget inside repository and preserves strict eight h
 it('chunks native authorization ID constraints without silently limiting complete counts', async () => {
   const ids = new Set(Array.from({ length: 65 }, (_, i) => 'p' + i));
   for (const id of ids) {
-    mocks.docs.set('projects/' + id, { type: 'work' });
+    mocks.docs.set('projects/' + id, {
+      createdBy: 'alice',
+      type: 'work',
+      topics: [],
+      archived: false,
+      confidential: false,
+    });
     record(id, { projectId: id });
   }
   const result = await readOwnRecordListing(db, 'alice', ids, {
@@ -317,16 +414,24 @@ it('logs read/result counts for cache failures and never falls back remotely for
   );
 });
 
-it('retains merged projects without archived flags and excludes them from active selection', async () => {
-  mocks.docs.set('projects/legacy', { title: 'merged', mergedInto: 'p' });
+it('retains canonical archived merged projects and excludes them from active selection', async () => {
+  mocks.docs.set('projects/existing', {
+    createdBy: 'alice',
+    topics: [],
+    archived: true,
+    confidential: false,
+    type: 'work',
+    title: 'merged',
+    mergedInto: 'p',
+  });
   const active = await readProjectListing(db, 'alice', allowed, {
     archive: 'active',
   });
-  expect(active.rows.map((r) => r.id)).not.toContain('legacy');
+  expect(active.rows.map((r) => r.id)).not.toContain('existing');
   const archived = await readProjectListing(db, 'alice', allowed, {
     archive: 'archived',
   });
-  expect(archived.rows.map((r) => r.id)).toEqual(['legacy']);
+  expect(archived.rows.map((r) => r.id)).toEqual(['existing']);
 });
 it('covers writer-accepted offsets beyond fourteen hours without dropping civil-day overlap', async () => {
   record('offset', {
@@ -344,7 +449,10 @@ it('covers writer-accepted offsets beyond fourteen hours without dropping civil-
 
 it('includes old still-open records crossing the whole selected period without a lower-start query', async () => {
   record('old-null', { startedAt: '2026-01-01T00:00:00Z', endedAt: null });
-  record('old-missing', { startedAt: '2026-01-01T00:00:00Z' });
+  record('old-missing', {
+    startedAt: '2026-01-01T00:00:00Z',
+    endedAt: undefined,
+  });
   const result = await readOwnRecordListing(db, 'alice', allowed, {
     status: 'open',
     fromDate: '2026-10-08',
@@ -352,10 +460,7 @@ it('includes old still-open records crossing the whole selected period without a
     zone: 'UTC',
     includeDeleted: false,
   });
-  expect(result.rows.map((r) => r.id).sort()).toEqual([
-    'old-missing',
-    'old-null',
-  ]);
+  expect(result.rows.map((r) => r.id).sort()).toEqual(['old-null']);
   expect(
     mocks.queries.some((q) =>
       q.clauses.some((c) => c.field === 'startedAt' && c.op === '>='),
@@ -363,47 +468,25 @@ it('includes old still-open records crossing the whole selected period without a
   ).toBe(false);
 });
 
-it('queries archived flags and merge markers natively, deduplicates the union and validates marker types', async () => {
-  const fixtures: Record<string, Record<string, unknown>> = {
-    flag: { archived: true },
-    both: { archived: true, mergedInto: 'p' },
-    merged: { mergedInto: 'p' },
-    empty: { mergedInto: '' },
-    active: {},
-    invalid: { mergedInto: { target: 'p' } },
-    foreign: { type: 'personal', createdBy: 'bob', archived: true },
-  };
-  const ids = new Set(Object.keys(fixtures));
-  for (const [id, data] of Object.entries(fixtures))
-    mocks.docs.set('projects/' + id, data);
-  mocks.docs.set('projects/not-authorized', { archived: true });
-  const result = await readProjectListing(db, 'alice', ids, {
-    archive: 'archived',
-    size: 2,
-    page: 1,
-  });
-  expect(result.total).toBe(4);
-  expect(result.rows.map((row) => row.id)).toEqual(['merged', 'empty']);
-  expect(result.hasMore).toBe(false);
-  expect(mocks.queries).toHaveLength(2);
-  expect(mocks.queries.map((target) => target.clauses)).toEqual([
-    [
-      { field: '__name__', op: 'in', value: [...ids] },
-      { field: 'archived', op: '==', value: true },
-    ],
-    [
-      { field: '__name__', op: 'in', value: [...ids] },
-      { field: 'mergedInto', op: '>=', value: '' },
-    ],
-  ]);
+it('rejects missing archived/confidential state rather than defaulting it', async () => {
+  mocks.docs.set('projects/existing', { type: 'work' });
+  for (const archive of ['all', 'active', 'archived']) {
+    expect(
+      (await readProjectListing(db, 'alice', allowed, { archive })).rows.map(
+        (r) => r.id,
+      ),
+    ).not.toContain('existing');
+  }
 });
 
 it('chunks archived-only native branches with personal type selection before merging complete counts', async () => {
   const ids = new Set(Array.from({ length: 65 }, (_, i) => 'p' + i));
   for (const id of ids)
     mocks.docs.set('projects/' + id, {
+      confidential: false,
       type: 'personal',
       createdBy: 'alice',
+      topics: [],
       archived: true,
       mergedInto: 'p',
     });
@@ -415,7 +498,7 @@ it('chunks archived-only native branches with personal type selection before mer
   });
   expect(result.total).toBe(65);
   expect(result.rows).toHaveLength(15);
-  expect(mocks.queries).toHaveLength(6);
+  expect(mocks.queries).toHaveLength(3);
   for (const target of mocks.queries) {
     expect(target.clauses).toContainEqual({
       field: 'type',

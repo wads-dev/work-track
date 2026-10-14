@@ -27,7 +27,6 @@ const retiredWebCallables = [
   'mergeTopics',
   'moveTopic',
   'getTopicReport',
-  'discoverLegacyProjectIds',
 ];
 
 async function retirementScript() {
@@ -97,7 +96,7 @@ function assertRetirementCalls(calls, targets) {
   }
 }
 
-test('backend retirement deletes only the six deployed Web callables in the target region/codebase', async () => {
+test('backend retirement deletes only the configured deployed Web callables in the target region/codebase', async () => {
   const calls = await runRetirement([
     ...retiredWebCallables.map((name) => deployedCallable(name)),
     deployedCallable('mcp'),
@@ -322,7 +321,7 @@ test(
           "import { ClientPersonalReportRepository } from '@work-track/data/test-support/personal-report-repository';\n" +
           "test('data sees mocked core dependency', async () => {\n" +
           "  const spy = vi.spyOn(access, 'canAccessProject').mockReturnValue(true);\n" +
-          "  const record = { id: 'fixture', uid: 'synthetic', projectId: 'missing', startedAt: '2026-01-01T00:00:00Z', timeZone: 'UTC', topics: [] };\n" +
+          "  const record = { id: 'fixture', uid: 'synthetic', projectId: 'missing', deletedAt: null, startedAt: '2026-01-01T00:00:00Z', timeZone: 'UTC', topics: [] };\n" +
           "  const repository = new ClientPersonalReportRepository('synthetic', [record], new Map());\n" +
           "  expect(await repository.loadContext(['synthetic'])).toEqual([record]);\n" +
           '  expect(spy).toHaveBeenCalledOnce();\n' +

@@ -6,6 +6,7 @@ const make = (
   startedAt: string,
   extra: Partial<ReportSourceRecord> = {},
 ): ReportSourceRecord => ({
+  deletedAt: null,
   id,
   uid: 'alice',
   projectId: 'project',

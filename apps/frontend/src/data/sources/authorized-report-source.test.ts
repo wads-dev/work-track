@@ -5,7 +5,6 @@ import {
   row,
   state,
   flushCache,
-  type CacheQuery,
 } from '../repositories/firestore-report-fixture';
 vi.mock(
   'firebase/firestore',
@@ -33,69 +32,47 @@ afterEach(() => {
   expect(mocks.callable).not.toHaveBeenCalled();
 });
 
-import {
-  authorizedRecordQueries,
-  subscribeAuthorizedReport,
-} from './authorized-report-source';
+import { subscribeAuthorizedReport } from './authorized-report-source';
+import { calendarQueryBounds } from './calendar-firestore-query';
+import { reportRecordSchema } from '@work-track/data/codecs/report-record';
 import { decodeWebProjectSnapshot } from '../../infrastructure/firebase/web-read-adapter';
 const range = {
   from: '2026-10-08T00:00:00Z',
   to: '2026-10-09T00:00:00Z',
   projectId: 'p',
 };
-it('retains the exported query builder independently of local UI subscriptions', () => {
-  expect(authorizedRecordQueries(db, 'p')).toEqual([
-    {
-      base: { group: 'records' },
-      constraints: [{ field: 'projectId', op: '==', value: 'p' }],
-    },
-  ]);
-  const queries = authorizedRecordQueries(
-    db,
-    'p',
-    range,
-  ) as unknown as CacheQuery[];
-  expect(queries).toHaveLength(3);
-  for (const q of queries.slice(0, 2)) {
-    expect(q.constraints).toContainEqual({
-      field: 'projectId',
-      op: '==',
-      value: 'p',
-    });
-    expect(q.constraints).toContainEqual({
-      field: 'startedAt',
-      op: '<',
-      value: '2026-10-11',
-    });
-  }
-  expect(queries[0].constraints).toContainEqual({
-    field: 'startedAt',
-    op: '>=',
-    value: '2026-10-06',
-  });
-  expect(queries[1].constraints).toContainEqual({
-    field: 'endedAt',
-    op: '>=',
-    value: '2026-10-06',
+it('retains canonical calendar query bounds independently of local UI subscriptions', () => {
+  expect(calendarQueryBounds(range)).toEqual({
+    lower: '2026-10-06',
+    upper: '2026-10-11',
   });
   expect(() =>
-    authorizedRecordQueries(db, 'p', { from: 'invalid', to: range.to }),
+    calendarQueryBounds({ from: 'invalid', to: range.to }),
   ).toThrow();
 });
 it('decodes project snapshots synchronously without mutating raw data or SDK metadata', () => {
   const raw = {
     type: 'work',
-    topics: [{ id: 't', title: 'Title', custom: true }, null],
-    archived: 'legacy',
+    createdBy: 'alice',
+    confidential: false,
+    topics: [{ id: 't', title: 'Title', archived: false, custom: true }],
+    archived: true,
     custom: { raw: true },
   };
   const snapshot = {
     data: vi.fn(() => raw),
     metadata: { fromCache: true, hasPendingWrites: true },
   };
-  expect(
-    decodeWebProjectSnapshot(snapshot, 'p', 'authorized-web'),
-  ).toMatchObject(raw);
+  const decoded = decodeWebProjectSnapshot(snapshot, 'p', 'authorized-web');
+  expect(decoded).toStrictEqual({
+    type: 'work',
+    createdBy: 'alice',
+    archived: true,
+    confidential: false,
+    topics: [{ id: 't', title: 'Title', archived: false }],
+  });
+  expect(raw.custom).toEqual({ raw: true });
+  expect(raw.topics[0].custom).toBe(true);
   expect(snapshot.data).toHaveBeenCalledOnce();
   expect(snapshot.metadata).toEqual({
     fromCache: true,
@@ -124,72 +101,40 @@ it('waits for complete atomic context and reports local errors without partial t
     hasPendingWrites: false,
   });
 });
-it('retains authorized raw extras and permissive negative legacy allocations', async () => {
+it('rejects negative allocations without repairing authorized persisted facts', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
-  const topic = {
-    id: 't',
-    title: 'Title',
-    mergedIntoTopicId: 42,
-    custom: 'retained',
-  };
   const fact = row('r', {
     topics: [{ topicId: 't', percentage: -2, durationMinutes: -1 }],
-    originalText: 'legacy-extra',
   });
-  await emit(
-    state({
-      projects: [
-        project('p', {
-          topics: [topic],
-          archived: 'legacy',
-          custom: { raw: true },
-        }),
-      ],
-      records: [fact],
-    }),
-  );
-  const repository = next.mock.lastCall![0].repository;
-  expect(repository.projects.get('p')).toMatchObject({
-    topics: [topic],
-    archived: 'legacy',
-    custom: { raw: true },
-  });
-  expect(await repository.loadContext(['alice'])).toEqual([
-    expect.objectContaining({
-      topics: [{ topicId: 't', percentage: -2, durationMinutes: -1 }],
-      originalText: 'legacy-extra',
-    }),
-  ]);
-  expect((await repository.loadContext(['alice']))[0].endedAt).toBeUndefined();
-  expect(await repository.userLabels(['alice', 'viewer'])).toEqual({
-    alice: 'alice',
-    viewer: 'Você',
-  });
+  await emit(state({ projects: [project()], records: [fact] }));
+  await expect(
+    next.mock.lastCall![0].repository.loadContext(['alice']),
+  ).rejects.toThrow();
   expect(fact.data.topics).toEqual([
     { topicId: 't', percentage: -2, durationMinutes: -1 },
   ]);
   expect(fail).not.toHaveBeenCalled();
 });
-it.each([null, false, 0, {}, 'invalid'])(
-  'invalid metadata type %s never becomes legacy work',
+it.each([undefined, null, false, 0, {}, 'invalid'])(
+  'invalid metadata type %s never becomes existing work',
   async (type) => {
-    const next = vi.fn();
-    subscribeAuthorizedReport(db, 'viewer', next, vi.fn());
+    const next = vi.fn(),
+      fail = vi.fn();
+    subscribeAuthorizedReport(db, 'viewer', next, fail);
     await emit(state({ projects: [project('p', { type })], records: [row()] }));
-    expect(
-      await next.mock.lastCall![0].repository.loadContext(['alice']),
-    ).toEqual([]);
+    expect(next).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledOnce();
   },
 );
-it('keeps legacy parents and excludes absent parents and tombstones before field validation', async () => {
+it('keeps existing parents and excludes absent parents and tombstones before field validation', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribeAuthorizedReport(db, 'viewer', next, fail);
   await emit(
     state({
-      projects: [project('p', { type: undefined })],
+      projects: [project('p', { type: 'work' })],
       records: [
         row('live', { deletedAt: null }),
         row('deleted', { deletedAt: false, topics: 'invalid' }),
@@ -320,7 +265,7 @@ it('does not publish duplicate content, audit-only changes or incomplete refresh
   await emit(
     state({
       ...complete,
-      projects: [{ id: 'p', data: { topics: [], type: 'work' } }],
+      projects: [project()],
       records: [
         {
           path: row().path,
@@ -385,7 +330,7 @@ it('publishes nested mutations with new repositories and immutable computed snap
   });
   const complete = state({
     projects: [
-      project('p', { topics: [{ id: 't', title: 'Before' }] }),
+      project('p', { topics: [{ id: 't', title: 'Before', archived: false }] }),
       project('q'),
     ],
     records: [
@@ -499,4 +444,37 @@ it('does not publish or report a catalog failure from a superseded generation', 
   await flushCache();
   expect(next).toHaveBeenCalledOnce();
   expect(fail).not.toHaveBeenCalled();
+});
+
+it.each(['endedAt', 'deletedAt', 'topics'])(
+  'rejects missing authorized storage %s instead of supplying defaults',
+  (field) => {
+    const fact = row();
+    delete fact.data[field];
+    expect(() =>
+      reportRecordSchema('authorized-web').parse(fact.data),
+    ).toThrow();
+    expect(fact.data).not.toHaveProperty(field);
+  },
+);
+it.each(['type', 'archived', 'confidential', 'topics'])(
+  'rejects missing authorized project %s without publishing a repaired catalog',
+  async (field) => {
+    const next = vi.fn(),
+      fail = vi.fn();
+    const parent = project();
+    delete (parent.data as Record<string, unknown>)[field];
+    subscribeAuthorizedReport(db, 'viewer', next, fail);
+    await emit(state({ projects: [parent], records: [row()] }));
+    expect(next).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledOnce();
+    expect(parent.data).not.toHaveProperty(field);
+  },
+);
+it('rejects missing topic archived metadata without supplying false', () => {
+  const raw = project('p', { topics: [{ id: 't', title: 'Title' }] }).data;
+  expect(() =>
+    decodeWebProjectSnapshot({ data: () => raw }, 'p', 'authorized-web'),
+  ).toThrow();
+  expect(raw.topics).toEqual([{ id: 't', title: 'Title' }]);
 });

@@ -1,5 +1,3 @@
-import { collection, query, where, type Firestore } from 'firebase/firestore';
-
 export interface CalendarQueryRange {
   from: string;
   to: string;
@@ -30,37 +28,4 @@ export function calendarQueryBounds(range: CalendarQueryRange) {
     lower: isoDateCandidatePrefix(from, -1),
     upper: isoDateCandidatePrefix(to, 1),
   };
-}
-/** Local candidate branches, not listeners. Missing legacy endedAt requires an
- * old-start branch and an open-only residual in the repository; OR/range support
- * does not provide an IS MISSING predicate. */
-export function calendarRecordQueries(
-  db: Firestore,
-  uid: string,
-  range: CalendarQueryRange,
-  context = false,
-) {
-  if (!uid || uid.includes('/'))
-    throw new Error('Usuário de calendário inválido.');
-  const { lower, upper } = calendarQueryBounds(range);
-  const base = collection(db, 'users', uid, 'records');
-  const project =
-    !context && range.projectId
-      ? [where('projectId', '==', range.projectId)]
-      : [];
-  return [
-    query(
-      base,
-      ...project,
-      where('startedAt', '>=', lower),
-      where('startedAt', '<', upper),
-    ),
-    query(
-      base,
-      ...project,
-      where('endedAt', '>=', lower),
-      where('startedAt', '<', upper),
-    ),
-    query(base, ...project, where('startedAt', '<', lower)),
-  ];
 }

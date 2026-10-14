@@ -1,11 +1,38 @@
 import { expect, it } from 'vitest';
 import { ProjectDiscoveryRepository } from './project-discovery-repository.js';
-it('shares legacy and personal authorization independently of SDK', async () => {
+it('rejects missing type and enforces personal authorization independently of SDK', async () => {
   const docs = [
-    { id: 'legacy', data: {} },
-    { id: 'work', data: { type: 'work' } },
-    { id: 'mine', data: { type: 'personal', createdBy: 'alice' } },
-    { id: 'other', data: { type: 'personal', createdBy: 'bob' } },
+    { id: 'missing-type', data: {} },
+    {
+      id: 'work',
+      data: {
+        archived: false,
+        confidential: false,
+        createdBy: 'alice',
+        topics: [],
+        type: 'work',
+      },
+    },
+    {
+      id: 'mine',
+      data: {
+        archived: false,
+        confidential: false,
+        topics: [],
+        type: 'personal',
+        createdBy: 'alice',
+      },
+    },
+    {
+      id: 'other',
+      data: {
+        archived: false,
+        confidential: false,
+        topics: [],
+        type: 'personal',
+        createdBy: 'bob',
+      },
+    },
   ];
   expect(
     (
@@ -13,17 +40,28 @@ it('shares legacy and personal authorization independently of SDK', async () => 
         scanProjects: () => Promise.resolve(docs),
       }).list('alice')
     ).map((d) => d.id),
-  ).toEqual(['legacy', 'mine', 'work']);
+  ).toEqual(['mine', 'work']);
 });
-it('forwards repository selection and keeps legacy active work while excluding archive/merge/private before search limit', async () => {
+it('forwards repository selection and keeps explicit active work while excluding archive/merge/private before search limit', async () => {
   const docs = [
     {
-      id: 'legacy',
-      data: { title: 'Project', description: 'Synthetic', topics: [] },
+      id: 'active',
+      data: {
+        confidential: false,
+        createdBy: 'alice',
+        archived: false,
+        type: 'work',
+        title: 'Project',
+        description: 'Synthetic',
+        topics: [],
+      },
     },
     {
       id: 'archive',
       data: {
+        confidential: false,
+        createdBy: 'alice',
+        type: 'work',
         title: 'Project',
         description: 'Synthetic',
         topics: [],
@@ -33,15 +71,21 @@ it('forwards repository selection and keeps legacy active work while excluding a
     {
       id: 'merged',
       data: {
+        confidential: false,
+        createdBy: 'alice',
+        archived: false,
+        type: 'work',
         title: 'Project',
         description: 'Synthetic',
         topics: [],
-        mergedInto: 'legacy',
+        mergedInto: 'active',
       },
     },
     {
       id: 'private',
       data: {
+        confidential: false,
+        archived: false,
         type: 'personal',
         createdBy: 'bob',
         title: 'Project',
@@ -65,7 +109,7 @@ it('forwards repository selection and keeps legacy active work while excluding a
   };
   expect(
     (await repository.list('alice', options)).map((doc) => doc.id),
-  ).toEqual(['legacy']);
+  ).toEqual(['active']);
   expect(passed).toEqual(options);
   expect(
     (
@@ -75,7 +119,7 @@ it('forwards repository selection and keeps legacy active work while excluding a
         limit: 10,
       })
     ).map((doc) => doc.id),
-  ).toEqual(['archive', 'legacy', 'merged']);
+  ).toEqual(['active', 'archive', 'merged']);
 });
 it('never returns silently truncated catalog', async () => {
   await expect(
@@ -86,4 +130,31 @@ it('never returns silently truncated catalog', async () => {
         ),
     }).list('alice'),
   ).rejects.toThrow('orçamento');
+});
+it('rejects accessible malformed metadata instead of defaulting its state', () => {
+  for (const patch of [
+    { archived: undefined },
+    { confidential: undefined },
+    { topics: undefined },
+    { topics: null },
+  ]) {
+    expect(() =>
+      ProjectDiscoveryRepository.selected(
+        [
+          {
+            id: 'bad',
+            data: {
+              type: 'work',
+              createdBy: 'alice',
+              archived: false,
+              confidential: false,
+              topics: [],
+              ...patch,
+            },
+          },
+        ],
+        'alice',
+      ),
+    ).toThrow();
+  }
 });

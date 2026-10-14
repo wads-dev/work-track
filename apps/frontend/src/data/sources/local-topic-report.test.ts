@@ -20,9 +20,8 @@ import { LocalTopicReportRepository } from './local-topic-report';
 import { validateTopicReport } from '../../features/reports/topic-details';
 
 const topics = [
-  { id: 'x', title: 'X' },
-  { id: 'old', title: 'Old', mergedIntoTopicId: 'x' },
-  { id: 'other', title: 'Other' },
+  { id: 'x', title: 'X', archived: false },
+  { id: 'other', title: 'Other', archived: false },
 ];
 const record = (
   id: string,
@@ -34,6 +33,7 @@ const record = (
   projectId,
   startedAt: '2026-10-02T12:00:00Z',
   endedAt: '2026-10-02T14:00:00Z',
+  deletedAt: null,
   timeZone: 'America/Sao_Paulo',
   topics: [{ topicId: 'x' }],
 });
@@ -42,11 +42,46 @@ function fixture(
   extras: [string, ReportProjectMetadata][] = [],
 ) {
   const projects = new Map<string, ReportProjectMetadata>([
-    ['w', { type: 'work', topics }],
-    ['another', { type: 'work', archived: true, topics }],
-    ['mine', { type: 'personal', createdBy: 'alice', topics }],
-    ['private', { type: 'personal', createdBy: 'bob', topics }],
-    ['invalid', { type: 'bad', topics }],
+    [
+      'w',
+      {
+        type: 'work',
+        createdBy: 'alice',
+        archived: false,
+        confidential: false,
+        topics,
+      },
+    ],
+    [
+      'another',
+      {
+        type: 'work',
+        createdBy: 'alice',
+        archived: true,
+        confidential: false,
+        topics,
+      },
+    ],
+    [
+      'mine',
+      {
+        type: 'personal',
+        createdBy: 'alice',
+        archived: false,
+        confidential: false,
+        topics,
+      },
+    ],
+    [
+      'private',
+      {
+        type: 'personal',
+        createdBy: 'bob',
+        archived: false,
+        confidential: false,
+        topics,
+      },
+    ],
     ...extras,
   ]);
   nativeCache.seed([
@@ -56,17 +91,17 @@ function fixture(
     })),
     ...records.map(({ id, ...data }) => ({
       path: 'users/' + data.uid + '/records/' + id,
-      data,
+      data: { ...data, endedAt: data.endedAt ?? null },
     })),
   ]);
   return new LocalTopicReportRepository(
     new FirestoreReportRepository(nativeCache.db, 'alice', projects),
   );
 }
-const request = { projectId: 'w', topicId: 'old', includeArchived: true };
+const request = { projectId: 'w', topicId: 'x', includeArchived: true };
 const asOf = Date.parse('2026-10-03T00:00:00Z');
 
-it('reads complete history despite selected keys, preserving UID-qualified pagination and aliases', async () => {
+it('reads complete history despite selected keys, preserving UID-qualified pagination and canonical topics', async () => {
   const repo = fixture([
     record('same', 'bob'),
     record('same'),
@@ -77,12 +112,12 @@ it('reads complete history despite selected keys, preserving UID-qualified pagin
   const second = await repo.readPage('w', 1, first!.nextCursor!, 'alice');
   expect(second?.records.map((r) => r.uid)).toEqual(['alice']);
   const result = await getTopicReport(repo, request, 'alice', asOf);
-  expect(validateTopicReport(result, 'alice', 'w', 'old', 'x')).toBe(result);
+  expect(validateTopicReport(result, 'alice', 'w', 'x', 'x')).toBe(result);
   expect(result).toMatchObject({
     occurrenceCount: 3,
     totalMinutes: 360,
     topicId: 'x',
-    requestedTopicId: 'old',
+    requestedTopicId: 'x',
     page: { partial: false, nextCursor: null },
   });
   expect(result.participants.map((p) => [p.uid, p.label])).toEqual([
@@ -91,14 +126,39 @@ it('reads complete history despite selected keys, preserving UID-qualified pagin
   ]);
 });
 
-it('filters deleted, missing, invalid and other-owner personal sources; rejects a different viewer', async () => {
+it.each(['x', 'old'])(
+  'rejects alias catalogs for requested %s without returning partial or lost hours',
+  async (topicId) => {
+    const records = [
+      record('canonical'),
+      { ...record('alias', 'bob'), topics: [{ topicId: 'old' }] },
+    ];
+    const metadata: ReportProjectMetadata = {
+      type: 'work',
+      createdBy: 'alice',
+      archived: false,
+      confidential: false,
+      topics: [
+        ...topics,
+        { id: 'old', title: 'Old', archived: false, mergedIntoTopicId: 'x' },
+      ],
+    };
+    const before = structuredClone({ records, metadata });
+    const repo = fixture(records, [['w', metadata]]);
+    await expect(
+      getTopicReport(repo, { ...request, topicId }, 'alice', asOf),
+    ).rejects.toThrow();
+    expect({ records, metadata }).toEqual(before);
+  },
+);
+
+it('filters deleted, missing and other-owner personal sources; rejects a different viewer', async () => {
   const deleted = { ...record('deleted'), deletedAt: '2026-10-03T00:00:00Z' };
   const repo = fixture([
     record('ok'),
     deleted,
     record('foreign', 'bob', 'mine'),
     record('private', 'bob', 'private'),
-    record('bad', 'alice', 'invalid'),
     record('missing', 'alice', 'missing'),
   ]);
   expect((await repo.readPage('w', 100, undefined, 'alice'))?.records).toEqual([
@@ -210,7 +270,18 @@ it('estimates before topic membership filtering and reads every local history pa
 it('archived history requires explicit inclusion and alias cycles fail closed', async () => {
   const archived = fixture(
     [record('r')],
-    [['w', { type: 'work', archived: true, topics }]],
+    [
+      [
+        'w',
+        {
+          type: 'work',
+          createdBy: 'alice',
+          archived: true,
+          confidential: false,
+          topics,
+        },
+      ],
+    ],
   );
   await expect(
     getTopicReport(
@@ -229,9 +300,18 @@ it('archived history requires explicit inclusion and alias cycles fail closed', 
       [
         'w',
         {
+          type: 'work',
+          createdBy: 'alice',
+          archived: false,
+          confidential: false,
           topics: [
-            { id: 'x', title: 'X', mergedIntoTopicId: 'old' },
-            { id: 'old', title: 'Old', mergedIntoTopicId: 'x' },
+            { id: 'x', title: 'X', archived: false, mergedIntoTopicId: 'old' },
+            {
+              id: 'old',
+              title: 'Old',
+              archived: false,
+              mergedIntoTopicId: 'x',
+            },
           ],
         },
       ],
@@ -248,4 +328,43 @@ it('never returns silently partial reports when global context exceeds its budge
   await expect(getTopicReport(repo, request, 'alice', asOf)).rejects.toThrow(
     /2000/,
   );
+});
+
+it.each(['type', 'archived', 'confidential', 'topics'])(
+  'rejects missing project %s rather than repairing the topic catalog',
+  async (field) => {
+    const data = {
+      type: 'work',
+      createdBy: 'alice',
+      archived: false,
+      confidential: false,
+      topics,
+    } as Record<string, unknown>;
+    delete data[field];
+    const repo = fixture(
+      [record('r')],
+      [['w', data as unknown as ReportProjectMetadata]],
+    );
+    await expect(repo.readPage('w', 100, undefined, 'alice')).rejects.toThrow();
+    expect(data).not.toHaveProperty(field);
+  },
+);
+it('rejects an invalid project type rather than treating it as an inaccessible empty topic report', async () => {
+  const repo = fixture(
+    [record('r')],
+    [
+      [
+        'w',
+        {
+          type: 'bad',
+          createdBy: 'alice',
+          archived: false,
+          confidential: false,
+          topics,
+        },
+      ],
+    ],
+  );
+  await expect(repo.readPage('w', 100, undefined, 'alice')).rejects.toThrow();
+  await expect(getTopicReport(repo, request, 'alice', asOf)).rejects.toThrow();
 });

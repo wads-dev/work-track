@@ -94,7 +94,7 @@ export class FirestoreProjectScopeRepository implements ProjectScopeRepository {
       if (before.type !== 'personal' && before.type !== 'work')
         throw new ProjectManagementError(
           'failed-precondition',
-          'Escopo legado desconhecido; revisão explícita necessária.',
+          'Escopo anterior desconhecido; revisão explícita necessária.',
         );
       const fromType = effectiveProjectType(before);
       if (fromType === 'invalid')
