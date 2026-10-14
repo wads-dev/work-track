@@ -15,7 +15,6 @@ import {
 } from '../../components/ui/tooltip';
 import { TableBody } from '../../components/ui/table';
 import { Table } from '../../components/ui/table';
-import { Skeleton } from '../../components/ui/skeleton';
 import {
   useProjectAccessRevision,
   projectAccessRevision,
@@ -54,6 +53,7 @@ export function ProjectReport({
   uid,
   refreshKey = 0,
   summaryTarget,
+  onLoadingChange,
 }: {
   functions: Functions;
   db: Firestore;
@@ -65,6 +65,7 @@ export function ProjectReport({
   uid: string;
   refreshKey?: number;
   summaryTarget?: HTMLElement | null;
+  onLoadingChange?: (loading: boolean) => void;
 }) {
   const [params, setParams] = useSearchParams();
   const includeArchived = params.get('includeArchived') === 'true';
@@ -78,7 +79,10 @@ export function ProjectReport({
   const [reportOwner, setReportOwner] = useState('');
   const [reportRevision, setReportRevision] = useState(-1);
   const [cachedReport, setReport] = useState<Report | null>(null);
+  const query = JSON.stringify([projectId, includeArchived]);
+  const [reportQuery, setReportQuery] = useState('');
   const report =
+    reportQuery === query &&
     !projects.loading &&
     projects.complete &&
     !projects.error &&
@@ -88,6 +92,9 @@ export function ProjectReport({
       ? cachedReport
       : null;
   const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    onLoadingChange?.(loading);
+  }, [loading, onLoadingChange]);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [provisional, setProvisional] = useState(false);
@@ -95,7 +102,6 @@ export function ProjectReport({
     let active = true;
     setLoading(true);
     setError('');
-    setReport(null);
     if (projects.error) {
       setError(projects.error);
       setLoading(false);
@@ -108,7 +114,6 @@ export function ProjectReport({
       uid,
       (snapshot) => {
         const current = ++generation;
-        setReport(null);
         setLoading(true);
         void getProjectReport(
           snapshot.repository.project(),
@@ -127,6 +132,7 @@ export function ProjectReport({
             setReportAccessRevision(accessRevision);
             setReportOwner(uid);
             setReportRevision(revision);
+            setReportQuery(query);
             setReport(result);
             setProvisional(
               !snapshot.coherent ||
@@ -172,14 +178,9 @@ export function ProjectReport({
     revision,
     uid,
     accessRevision,
+    query,
   ]);
-  if (loading)
-    return (
-      <div role="status" className={cn('flex flex-row gap-4')}>
-        <Skeleton role="status" className={cn('size-6 rounded-full')} />
-        <p className={cn('text-base')}>Carregando relatório do projeto…</p>
-      </div>
-    );
+  if (loading && !report) return null;
   if (error)
     return (
       <Alert variant="destructive">

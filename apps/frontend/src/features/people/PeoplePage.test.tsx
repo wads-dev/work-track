@@ -80,6 +80,8 @@ it('uses a compact search row and an accessible icon-only refresh button', () =>
   expect(html).not.toContain('<h1');
   expect(html).not.toContain('>Atualizar</button>');
   directory.loading = true;
+  expect(render()).toContain('Ana Silva');
+  expect(render()).toContain('motion-safe:animate-spin');
   expect(render()).toMatch(
     /<button[^>]*aria-label="Atualizar pessoas"[^>]*disabled=""/,
   );
@@ -99,7 +101,9 @@ it('still masks confidential project and record content without masking people',
 
 it('shows loading and errors instead of a confidentiality gate', () => {
   directory.loading = true;
-  expect(render()).toContain('Carregando pessoas');
+  expect(render()).toContain('Ana Silva');
+  expect(render()).toContain('aria-busy="true"');
+  expect(render()).not.toContain('Carregando pessoas');
   expect(render()).toBe(render(true));
   directory.loading = false;
   directory.error = 'Falha ao carregar pessoas';

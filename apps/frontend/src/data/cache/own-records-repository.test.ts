@@ -32,6 +32,9 @@ it('deduplicates consumers, hydrates >100 and reflects replacement/removal/error
   expect(repo.snapshot(db, 'a').complete).toBe(true);
   next([{ id: '1', data: { updated: true } }], false);
   expect(repo.snapshot(db, 'a').rows).toHaveLength(1);
+  repo.retry(db, 'a');
+  expect(repo.snapshot(db, 'a').loading).toBe(true);
+  expect(repo.snapshot(db, 'a').rows).toHaveLength(1);
   fail();
   expect(repo.snapshot(db, 'a').rows).toEqual([]);
   expect(repo.snapshot(db, 'a').error).not.toBe('');
@@ -42,7 +45,7 @@ it('deduplicates consumers, hydrates >100 and reflects replacement/removal/error
   next(rows, false);
   expect(repo.snapshot(db, 'a').rows).toHaveLength(150);
   repo.subscribe(db, 'a', connect, () => {});
-  expect(connect).toHaveBeenCalledTimes(2);
+  expect(connect).toHaveBeenCalledTimes(3);
 });
 it('purges account, refuses stale subscribe, guards callbacks and isolates instances', () => {
   const repo = createOwnRecordsRepository();

@@ -28,12 +28,15 @@ it('keeps optional filters, search and icon action in the responsive list contro
         onSearchChange={() => {}}
         actionLabel="Atualizar"
         onAction={() => {}}
+        loading
       />
     </TooltipProvider>,
   );
   expect(html).toContain('lg:flex-row lg:items-center');
   expect(html).toContain('min-w-0 flex-1');
   expect(html).toContain('size-9 shrink-0');
+  expect(html).toContain('motion-safe:animate-spin');
+  expect(html).toContain('aria-busy="true"');
   expect(html).toContain('aria-label="Pesquisar"');
   expect(html).toContain('value="Ana"');
   expect(html).toContain('aria-label="Atualizar"');

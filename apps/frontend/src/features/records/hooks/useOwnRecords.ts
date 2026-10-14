@@ -1,4 +1,4 @@
-import { useState, useMemo, useSyncExternalStore, useCallback } from 'react';
+import { useMemo, useSyncExternalStore, useCallback } from 'react';
 import { type Firestore } from 'firebase/firestore';
 import { workspaceRetry } from '../../../data/sync/workspace-runtime';
 import { subscribeAuthorizedOwnRecords } from '../../../data/sources/authorized-own-record-source';
@@ -16,7 +16,6 @@ export function useOwnRecords(
   enabled = true,
   options: OwnRecordReadOptions = {},
 ) {
-  const [attempt, setAttempt] = useState(0);
   const key = listingKey({ ...options, includeDeleted: false });
   const selection = useMemo(
     () => JSON.parse(key) as OwnRecordReadOptions,
@@ -40,7 +39,7 @@ export function useOwnRecords(
             key,
           )
         : () => {},
-    [db, uid, attempt, enabled, key, selection],
+    [db, uid, enabled, key, selection],
   );
   const state = useSyncExternalStore(subscribe, () =>
     enabled ? ownRecordsRepository.snapshot(db, uid, key) : emptyRecords,
@@ -48,9 +47,8 @@ export function useOwnRecords(
   return {
     ...state,
     retry: () => {
-      workspaceRetry(db, uid);
+      if (state.error) workspaceRetry(db, uid);
       ownRecordsRepository.retry(db, uid, key);
-      setAttempt((value) => value + 1);
     },
   };
 }
