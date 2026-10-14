@@ -1,6 +1,5 @@
 import type { Firestore, Unsubscribe } from 'firebase/firestore';
 import { observeWorkspace } from '../sync/workspace-runtime';
-import { stableDataKey } from '../repositories/stable-data-key';
 import {
   readProjectListing,
   emptyListing,
@@ -23,23 +22,14 @@ export function subscribeAuthorizedProjects(
   options: ProjectReadOptions = {},
 ): Unsubscribe {
   let alive = true,
-    generation = 0,
-    signature = '';
+    generation = 0;
   const stop = observeWorkspace(db, uid, (snapshot) => {
     const epoch = generation + 1;
     if (snapshot.error) {
-      signature = '';
       generation++;
       fail();
       return;
     }
-    const key = stableDataKey({
-      complete: snapshot.complete,
-      projects: snapshot.projects,
-      records: snapshot.records,
-    });
-    if (signature === key) return;
-    signature = key;
     generation = epoch;
     next({
       ...emptyListing,
@@ -49,7 +39,7 @@ export function subscribeAuthorizedProjects(
       refreshing: snapshot.complete,
     });
     if (!snapshot.complete) return;
-    const ids = new Set(snapshot.projects.map((project) => project.id));
+    const ids = new Set(snapshot.completedProjects);
     void readProjectListing(db, uid, ids, options)
       .then((result) => {
         if (alive && epoch === generation)
@@ -62,7 +52,6 @@ export function subscribeAuthorizedProjects(
       })
       .catch(() => {
         if (alive && epoch === generation) {
-          signature = '';
           fail();
         }
       });

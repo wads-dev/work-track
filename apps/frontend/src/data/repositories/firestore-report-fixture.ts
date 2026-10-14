@@ -216,7 +216,13 @@ export function createNativeCacheFixture() {
     async emit(snapshot: WorkspaceSnapshot, index = 0) {
       this.seedWorkspace(snapshot);
       const observer = observers[index];
-      if (observer.active) observer.next(snapshot);
+      if (observer.active)
+        observer.next({
+          ...snapshot,
+          projects: [],
+          records: [],
+          completedProjects: snapshot.projects.map((p) => p.id),
+        });
       await flushCache();
     },
     deferRead() {

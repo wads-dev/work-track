@@ -71,11 +71,11 @@ const snapshot = (
 ): WorkspaceSnapshot => ({
   projects: [{ id: 'p', data: work }],
   records: [],
-  completedProjects: ['p'],
   complete: true,
   syncing: false,
   error: '',
   ...patch,
+  completedProjects: patch.projects?.map((p) => p.id) ?? ['p'],
 });
 const repository = (ids = ['p']) =>
   new BrowserDetailRepository(db, 'me', new Set(ids));

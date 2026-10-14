@@ -14,7 +14,6 @@ import type { CalendarQueryRange } from './calendar-firestore-query';
 import { FirestoreReportRepository } from '../repositories/firestore-report-repository';
 import { observeWorkspace } from '../sync/workspace-runtime';
 import { traceFirestore } from '../sync/firestore-diagnostics';
-import { stableDataKey } from '../repositories/stable-data-key';
 export interface AuthorizedReportSnapshot {
   repository: FirestoreReportRepository;
   coherent: boolean;
@@ -34,33 +33,18 @@ export function subscribeAuthorizedReport(
   void _requiredProjectIds;
   void _range;
   let active = true,
-    serial = 0,
-    signature = '',
-    lastError = '';
+    serial = 0;
   const stop = observeWorkspace(db, uid, (snapshot) => {
     const ticket = ++serial;
     if (snapshot.error) {
-      signature = '';
-      if (lastError !== snapshot.error) {
-        lastError = snapshot.error;
-        fail(new Error(snapshot.error));
-      }
+      fail(new Error(snapshot.error));
       return;
     }
     if (!snapshot.complete) return;
-    const nextSignature = stableDataKey({
-      projects: [...snapshot.projects].sort((a, b) =>
-        a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
-      ),
-      records: [...snapshot.records].sort((a, b) =>
-        a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
-      ),
-    });
-    if (signature === nextSignature) return;
     void (async () => {
       try {
         const projects = new Map<string, ReportProjectMetadata>();
-        const ids = snapshot.projects.map((p) => p.id);
+        const ids = snapshot.completedProjects;
         for (let i = 0; i < ids.length; i += 30) {
           traceFirestore('cache.read', {
             collection: 'projects',
@@ -85,8 +69,6 @@ export function subscribeAuthorizedReport(
           }
         }
         if (!active || ticket !== serial) return;
-        signature = nextSignature;
-        lastError = '';
         traceFirestore('local.report.read', {
           source: 'authorized-query-repository',
           projects: projects.size,
@@ -100,12 +82,8 @@ export function subscribeAuthorizedReport(
         });
       } catch (error) {
         if (!active || ticket !== serial) return;
-        signature = '';
         const e = error instanceof Error ? error : new Error(String(error));
-        if (lastError !== e.message) {
-          lastError = e.message;
-          fail(e);
-        }
+        fail(e);
       }
     })();
   });

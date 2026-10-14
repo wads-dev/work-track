@@ -197,7 +197,11 @@ const emit = (snapshot: WorkspaceSnapshot) => {
   for (const record of snapshot.records)
     workspace.docs.set(record.path, record.data);
   const listener = workspace.listeners.at(-1)!;
-  if (listener.active) listener.next(snapshot);
+  if (listener.active)
+    listener.next({
+      ...snapshot,
+      completedProjects: snapshot.projects.map((p) => p.id),
+    });
 };
 const expectNoRemoteReads = () => {
   for (const read of [

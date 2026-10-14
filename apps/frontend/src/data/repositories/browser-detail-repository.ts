@@ -313,7 +313,7 @@ export function observeRecordDetail(
     const repository = new BrowserDetailRepository(
       db,
       uid,
-      new Set(snapshot.projects.map((project) => project.id)),
+      new Set(snapshot.completedProjects),
       observeDeletion,
     );
     void repository
@@ -354,7 +354,7 @@ export function observeRecordAudit(
     const repository = new BrowserDetailRepository(
       db,
       uid,
-      new Set(snapshot.projects.map((project) => project.id)),
+      new Set(snapshot.completedProjects),
     );
     void (async () => {
       const parent = await repository.readRecordDetail(uid, recordId);

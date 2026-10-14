@@ -270,7 +270,7 @@ it('forwards local errors and releases the observer without remote fallback or l
   expect(next).not.toHaveBeenCalled();
   expect(mocks.observers[0].stop).toHaveBeenCalledOnce();
 });
-it('does not publish duplicate content, audit-only changes or incomplete refreshes', async () => {
+it('recalculates every complete notification, including identical content and audit changes', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribePersonalReport(db, 'alice', next, fail);
@@ -297,12 +297,12 @@ it('does not publish duplicate content, audit-only changes or incomplete refresh
   );
   await emit(state({ complete: false, syncing: true }));
   await emit(structuredClone(complete));
-  expect(next).toHaveBeenCalledOnce();
-  expect(next.mock.lastCall![0].repository).toBe(repository);
+  expect(next).toHaveBeenCalledTimes(4);
+  expect(next.mock.lastCall![0].repository).not.toBe(repository);
   expect(await repository.loadContext(['alice'])).toHaveLength(1);
   expect(fail).not.toHaveBeenCalled();
 });
-it('fails once per repeated error and publishes identical recovery content', async () => {
+it('reports every error and recalculates identical recovery content', async () => {
   const next = vi.fn(),
     fail = vi.fn();
   subscribePersonalReport(db, 'alice', next, fail);
@@ -313,14 +313,14 @@ it('fails once per repeated error and publishes identical recovery content', asy
   await emit(state({ error: 'permission-denied', audits: [] }));
   await emit(state({ complete: false }));
   await emit(state({ error: 'permission-denied' }));
-  expect(fail).toHaveBeenCalledOnce();
+  expect(fail).toHaveBeenCalledTimes(3);
   await emit(structuredClone(complete));
   expect(next).toHaveBeenCalledTimes(2);
   expect(next.mock.lastCall![0].repository).not.toBe(repository);
   await emit(structuredClone(complete));
-  expect(next).toHaveBeenCalledTimes(2);
+  expect(next).toHaveBeenCalledTimes(3);
   await emit(state({ error: 'permission-denied' }));
-  expect(fail).toHaveBeenCalledTimes(2);
+  expect(fail).toHaveBeenCalledTimes(4);
 });
 it('retries failed native catalog reads and recovers unchanged valid content', async () => {
   const next = vi.fn(),

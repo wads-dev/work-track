@@ -129,7 +129,7 @@ it('fails without publishing stale results and recovers on the next local conten
   expect(next.mock.lastCall?.[0].rows).toHaveLength(1);
 });
 
-it('preserves queried data and avoids duplicate local reads on transport-only and audit notifications', async () => {
+it('requeries local data on every complete notification, including transport and audit events', async () => {
   const next = vi.fn();
   subscribe(db, 'alice', next, vi.fn());
   mocks.next!(snapshot());
@@ -142,6 +142,6 @@ it('preserves queried data and avoids duplicate local reads on transport-only an
     }),
   );
   await flush();
-  expect(mocks.read).toHaveBeenCalledTimes(1);
-  expect(next).toHaveBeenCalledTimes(before);
+  expect(mocks.read).toHaveBeenCalledTimes(2);
+  expect(next).toHaveBeenCalledTimes(before + 2);
 });

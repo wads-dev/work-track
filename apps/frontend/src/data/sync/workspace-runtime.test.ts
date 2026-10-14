@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { WorkspaceSnapshot, LocalDocument } from './workspace-sync';
+import type { WorkspaceSignal, LocalDocument } from './workspace-sync';
 it('synchronizes only explicit work and owner-qualified personal projects', () => {
   env();
   const stop = startWorkspaceSession(db, 'alice');
@@ -16,6 +16,11 @@ type Options = { source?: string; includeMetadataChanges: boolean };
 type Snapshot = {
   metadata: { fromCache: boolean; hasPendingWrites: boolean };
   size: number;
+  docs: {
+    id: string;
+    ref: { path: string };
+    data: () => Record<string, unknown>;
+  }[];
   docChanges: () => unknown[];
 };
 const m = vi.hoisted(() => ({
@@ -33,7 +38,6 @@ const m = vi.hoisted(() => ({
     fail: (e: Error) => void;
     stop: ReturnType<typeof vi.fn>;
   }[],
-  cache: new Map<string, LocalDocument[]>(),
   disable: vi.fn(async () => {}),
   enable: vi.fn(async () => {}),
   call: vi.fn(),
@@ -59,12 +63,8 @@ vi.mock('firebase/firestore', () => ({
     m.listeners.push({ target, options, next, fail, stop });
     return stop;
   },
-  getDocsFromCache: async (t: Target) => ({
-    size: (m.cache.get(t.key) ?? []).length,
-    docs: (m.cache.get(t.key) ?? []).map((r) => ({
-      ref: { path: r.path },
-      data: () => r.data,
-    })),
+  getDocsFromCache: vi.fn(() => {
+    throw new Error('Listener must use snapshot documents, not reread cache');
   }),
   disableNetwork: m.disable,
   enableNetwork: m.enable,
@@ -97,18 +97,28 @@ function env() {
 async function settle() {
   for (let i = 0; i < 30; i++) await Promise.resolve();
 }
-async function send(path: string, rows: LocalDocument[]) {
+async function send(path: string, rows: LocalDocument[], changed = true) {
   const targets = m.listeners.filter(
     (l) => l.target.key.includes(path) && !l.stop.mock.calls.length,
   );
   for (const l of targets) {
-    m.cache.set(l.target.key, rows);
-    if (l.target.key.includes('group:records'))
-      m.cache.set(JSON.stringify(['group:records']), rows);
     l.next({
       metadata: { fromCache: false, hasPendingWrites: false },
       size: rows.length,
-      docChanges: () => [],
+      docs: rows.map((r) => ({
+        id: r.path.split('/').at(-1)!,
+        ref: { path: r.path },
+        data: () => r.data,
+      })),
+      docChanges: () =>
+        changed
+          ? [
+              {
+                type: rows.length ? 'modified' : 'removed',
+                doc: { metadata: { hasPendingWrites: false } },
+              },
+            ]
+          : [],
     });
   }
   await settle();
@@ -117,7 +127,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   m.listeners = [];
   m.cacheListeners = [];
-  m.cache.clear();
   vi.clearAllMocks();
 });
 it('views never create Firestore or callable work', () => {
@@ -154,10 +163,12 @@ it('native global targets survive navigation and use only cached data for projec
       },
     },
   ]);
-  let snapshot: WorkspaceSnapshot | undefined;
+  let snapshot: WorkspaceSignal | undefined;
   const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
   expect(snapshot!.complete).toBe(true);
-  expect(snapshot!.records).toHaveLength(1);
+  expect(snapshot!.completedProjects).toEqual(['p']);
+  expect(snapshot).not.toHaveProperty('records');
+  expect(snapshot).not.toHaveProperty('projects');
   const count = m.listeners.length;
   for (let i = 0; i < 30; i++) observeWorkspace(db, 'alice', () => {})();
   expect(m.listeners).toHaveLength(count);
@@ -201,15 +212,16 @@ it('revocation removes project rows and late callbacks cannot restore account da
     },
   ]);
   await send('projects', []);
-  let snapshot: WorkspaceSnapshot | undefined;
+  let snapshot: WorkspaceSignal | undefined;
   const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
-  expect(snapshot!.records).toEqual([]);
+  expect(snapshot!.completedProjects).toEqual([]);
   const old = m.listeners.slice();
   stop();
   old.forEach((l) =>
     l.next({
       metadata: { fromCache: false, hasPendingWrites: false },
       size: 0,
+      docs: [],
       docChanges: () => [],
     }),
   );
@@ -269,7 +281,7 @@ it('hundreds of records do not open hundreds of audit listeners; audit loading c
       },
     })),
   );
-  let snapshot: WorkspaceSnapshot | undefined;
+  let snapshot: WorkspaceSignal | undefined;
   const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
   expect(snapshot!.complete).toBe(true);
   expect(m.listeners).toHaveLength(3);
@@ -283,11 +295,20 @@ it('hundreds of records do not open hundreds of audit listeners; audit loading c
   expect(snapshot!.complete).toBe(true);
   await send('users/alice/records/r0/audit', []);
   expect(snapshot!.auditReady).toContain('users/alice/records/r0');
+  const auditChanged = vi.fn();
+  const stopAuditChanged = observeWorkspace(db, 'alice', auditChanged);
+  auditChanged.mockClear();
+  await send('users/alice/records/r0/audit', [
+    { path: 'users/alice/records/r0/audit/a', data: { action: 'updated' } },
+  ]);
+  expect(auditChanged).toHaveBeenCalled();
+  stopAuditChanged();
+  expect(snapshot).not.toHaveProperty('audits');
   audit();
   observe();
   stop();
 });
-it('metadata replays and blur preserve complete local views without notifications or target churn', async () => {
+it('every SDK event notifies while blur preserves readiness and targets', async () => {
   const e = env();
   const stop = startWorkspaceSession(db, 'alice');
   await send('projects', [
@@ -311,22 +332,26 @@ it('metadata replays and blur preserve complete local views without notification
   const next = vi.fn();
   const observe = observeWorkspace(db, 'alice', next);
   const before = next.mock.calls.at(-1)![0];
-  await send('group:records', [
-    {
-      path: 'users/bob/records/r',
-      data: {
-        uid: 'bob',
-        projectId: 'p',
-        endedAt: null,
-        deletedAt: null,
-        topics: [],
+  await send(
+    'group:records',
+    [
+      {
+        path: 'users/bob/records/r',
+        data: {
+          uid: 'bob',
+          projectId: 'p',
+          endedAt: null,
+          deletedAt: null,
+          topics: [],
+        },
       },
-    },
-  ]);
-  expect(next).toHaveBeenCalledOnce();
+    ],
+    false,
+  );
+  expect(next).toHaveBeenCalledTimes(2);
   e.setFocus(false);
   await settle();
-  expect(next).toHaveBeenCalledOnce();
+  expect(next).toHaveBeenCalledTimes(2);
   expect(before.complete).toBe(true);
   e.setFocus(true);
   e.setFocus(true);
@@ -426,12 +451,14 @@ it('remote counter counts added/modified documents but not removals, pending ech
       data: { type: 'work', archived: false, confidential: false, topics: [] },
     },
   ]);
+  store.clear();
   const target = m.listeners.find((l) =>
     l.target.key.includes('group:records'),
   )!;
   target.next({
     metadata: { fromCache: false, hasPendingWrites: false },
     size: 400,
+    docs: [],
     docChanges: () => [
       { type: 'added', doc: { metadata: { hasPendingWrites: false } } },
       { type: 'modified', doc: { metadata: { hasPendingWrites: false } } },
@@ -444,6 +471,7 @@ it('remote counter counts added/modified documents but not removals, pending ech
   target.next({
     metadata: { fromCache: false, hasPendingWrites: false },
     size: 400,
+    docs: [],
     docChanges: () => [],
   });
   await settle();
