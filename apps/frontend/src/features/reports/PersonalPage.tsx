@@ -1,4 +1,6 @@
 import { cn } from '../../lib/utils';
+import { useMediaQuery } from '../../shared/ui/theme';
+import { defaultCalendarView, PORTRAIT_MOBILE_QUERY } from './calendar-view';
 import { Clock3 } from 'lucide-react';
 import { ProjectAppearance } from '@work-track/core/registration/domain/project-color';
 import { useCompanyPeople } from '../people/CompanyPeopleContext';
@@ -124,8 +126,11 @@ export function PersonalPage({
   const location = useLocation();
   const person = calendarPerson(params, uid);
   useEffect(() => {
-    if (calendar && !params.get('uid'))
-      setParams(updateCalendarPerson(params, uid), { replace: true });
+    if (calendar && !params.get('uid')) {
+      const next = new URLSearchParams(params);
+      next.set('uid', uid);
+      setParams(next, { replace: true });
+    }
   }, [calendar, params, uid, setParams]);
   const { revealed } = usePrivacy();
   const companyPeople = useCompanyPeople();
@@ -136,7 +141,10 @@ export function PersonalPage({
     (params.get('view') === 'month' ? 'supercompact' : 'timeline');
   const selected =
     params.get('date') ?? dayKey(new Date(), 'America/Sao_Paulo');
-  const rawView = params.get('view') ?? (calendar ? 'week' : 'day');
+  const portraitMobile = useMediaQuery(PORTRAIT_MOBILE_QUERY);
+  const rawView =
+    params.get('view') ??
+    (calendar ? defaultCalendarView(portraitMobile) : 'day');
   const includeArchived = params.get('includeArchived') === 'true';
   const firstDate = params.get('fromDate') ?? '';
   const lastDate = params.get('toDate') ?? '';

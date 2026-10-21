@@ -78,7 +78,10 @@ describe('record and pending lists', () => {
     expect(html).toContain('/records?project=p&amp;record=r');
     const pending = render(false, true);
     expect(pending).toContain('Revisar fim');
-    expect(pending).toContain('/pending?project=p&amp;record=r');
+    expect(pending).toContain(
+      '/calendar?view=day&amp;record=r&amp;date=2026-10-11',
+    );
+    expect(pending).not.toContain('/pending?project=p&amp;record=r');
   });
   it('uses a shared compact header with no timezone or state input and privacy-safe project search', () => {
     const html = renderToStaticMarkup(
