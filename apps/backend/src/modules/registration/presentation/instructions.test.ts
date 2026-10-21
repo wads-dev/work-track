@@ -51,7 +51,7 @@ it('serves conceptual plain text with SDK, reads instructions once per context w
       'confirmação humana',
       'não são autorização',
       'preview',
-      'personal-v3',
+      'personal-v4',
       '6h',
       'list_recent_records',
       'search_repository_context',

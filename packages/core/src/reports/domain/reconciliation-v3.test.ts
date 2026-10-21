@@ -38,12 +38,12 @@ it('WorkTrack21 open +LiveVoice22:31-22:34 never cuts across projects', () => {
     Date.parse('2026-10-09T00:00:00-03:00'),
   );
 });
-it('sameproject closed<15 ignored; exactly15 and open cut', () => {
+it('same-project next activities never truncate an open interval', () => {
   expect(end(candidate('work', 3))).toBe(
     Date.parse('2026-10-09T00:00:00-03:00'),
   );
   expect(end(candidate('work', 15))).toBe(
-    Date.parse('2026-10-08T22:31:00-03:00'),
+    Date.parse('2026-10-09T00:00:00-03:00'),
   );
-  expect(end(candidate('work'))).toBe(Date.parse('2026-10-08T22:31:00-03:00'));
+  expect(end(candidate('work'))).toBe(Date.parse('2026-10-09T00:00:00-03:00'));
 });

@@ -15,7 +15,7 @@ export function registerDailyHoursTool(
     'get_daily_hours',
     {
       description:
-        'Consulta somente leitura das próprias horas por dia YYYY-MM-DD e projeto opcional. Fuso IANA padrão America/Sao_Paulo, arquivados incluídos por padrão para conciliação histórica. Separa fatos fechados de estimativas abertas, sem inventar fim; recorta o dia local e usa contexto global personal-v3 antes dos filtros, com limite de 6h por aberto e sem teto diário. Não escreve, importa ou concilia dados da planilha.',
+        'Consulta somente leitura das próprias horas por dia YYYY-MM-DD e projeto opcional. Fuso IANA padrão America/Sao_Paulo, arquivados incluídos por padrão para conciliação histórica. Separa fatos fechados de estimativas abertas, sem inventar fim; recorta o dia local e usa contexto autorizado completo personal-v4 antes dos filtros, rateando igualmente sobreposições da mesma pessoa, com limite de 6h por aberto e sem teto diário. Não escreve, importa ou concilia dados da planilha.',
       inputSchema: dailyHoursInput,
       annotations: {
         readOnlyHint: true,

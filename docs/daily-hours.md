@@ -19,7 +19,7 @@ Resposta com scope: own, date, timeZone, asOf, bounds (início inclusivo/fim exc
 
 Cada intervalo conserva startedAt e endedAt originais; o storage exige `endedAt: null` para aberto, sem inventar um horário de fim. effectiveStartedAt/effectiveEndedAt são exclusivamente o recorte calculado do dia. estimated identifica abertos, não fatos; minutes representa o recorte.
 
-Reutiliza a política personal-v3 existente: todos os fatos próprios de projetos autorizados contam para orçamento global de 8h por pessoa/dia America/Sao_Paulo, antes de filtros. Fechados preservados integralmente. Estimativas abertas limitadas a 4h, agora, meia-noite do registro e do orçamento, próximo início próprio no mesmo projeto (fechados menores que 15min não cortam) e saldo cronológico global. Sobreposições somadas, não automaticamente reconciliadas.
+Reutiliza a [política personal-v4](report-policy.md): sobreposições são divididas igualmente por trecho entre atividades da mesma pessoa no contexto autorizado completo antes dos filtros. Horários originais preservados; minutes representa o tempo contabilizado e loggedMinutes o recorte antes do rateio. Estimativas abertas limitadas a 6h, agora e meia-noite do registro/canônica, sem corte por próximo início e sem teto diário. Nenhum resultado derivado é persistido.
 
 Histórico e metadados são carregados em transação Firestore readOnly: true, em páginas de 500 até conclusão. Limite operacional de 2000 registros próprios: exceder ou encontrar registro autorizado inválido causa erro, nunca total parcial. A identidade dentro do payload histórico não concede acesso: o caminho canônico users/{uid autenticado}/records determina o dono.
 

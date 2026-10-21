@@ -260,7 +260,7 @@ it('matches existing shared domain interval math, overlap sums, UTC-offset clipp
     context,
   );
   expect(actual.intervals).toEqual(expected.intervals);
-  expect(actual.totalMinutes).toBe(1080);
+  expect(actual.totalMinutes).toBe(650);
   expect(actual.estimatedCount).toBe(1);
   expect(actual.page.partial).toBe(false);
   expect(actual.warnings.some((w) => w.includes('sobrepostos'))).toBe(true);
@@ -300,7 +300,7 @@ it('computes estimates from unselected same-project/topic history, and retains a
     asOf,
   );
   expect(result).toMatchObject({
-    totalMinutes: 60,
+    totalMinutes: 300,
     estimatedCount: 1,
     page: { partial: false },
   });

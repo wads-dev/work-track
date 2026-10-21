@@ -499,13 +499,13 @@ describe('read-only daily-hours own canonical repository', () => {
       Date.parse('2026-10-09T23:00:00-03:00'),
     );
     expect(report).toMatchObject({
-      estimatedMinutes: 120,
-      closedMinutes: 60,
-      totalMinutes: 180,
+      estimatedMinutes: 200,
+      closedMinutes: 20,
+      totalMinutes: 220,
     });
     expect(report.intervals[0]).toMatchObject({
       id: 'open',
-      effectiveEndedAt: '2026-10-09T14:00:00.000Z',
+      effectiveEndedAt: '2026-10-09T18:00:00.000Z',
     });
   });
   it('advances physical native selection cursors over all-residual pages', async () => {

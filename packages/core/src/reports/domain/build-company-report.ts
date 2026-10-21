@@ -14,7 +14,7 @@ export function buildCompanyReport(
   page = { ...page, records: activeRecords(page.records) };
   context = activeRecords(context);
   const output: CompanyReport = {
-    policy: 'company-v3',
+    policy: 'company-v4',
     budgetTimeZone: 'America/Sao_Paulo',
     asOf: new Date(asOf).toISOString(),
     ...(input.from ? { from: input.from } : {}),

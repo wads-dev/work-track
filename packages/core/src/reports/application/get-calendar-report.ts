@@ -228,7 +228,7 @@ export async function executeCalendarReport(
   return {
     scope: 'all-selected' as const,
     policy: 'calendar-v3' as const,
-    hoursPolicy: input.mode === 'own' ? 'personal-v3' : 'company-v3',
+    hoursPolicy: input.mode === 'own' ? 'personal-v4' : 'company-v4',
     mode: input.mode,
     viewerUid: uid,
     asOf: report.asOf,

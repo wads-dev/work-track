@@ -1,4 +1,6 @@
 import { cn } from '../../lib/utils';
+import { calendarDuration } from './calendar-duration';
+import type { AccountingSegment } from '@work-track/core/reports/domain/accounted-time';
 import { PersonIdentity } from '../people/PersonIdentity';
 import { useCompanyPeople } from '../people/CompanyPeopleContext';
 import { Button } from '../../components/ui/button';
@@ -32,6 +34,9 @@ import {
   type Timed,
 } from './timeline-layout';
 type Event = Timed & {
+  minutes?: number;
+  loggedMinutes?: number;
+  accountingSegments?: AccountingSegment[];
   uid?: string;
   projectId: string;
   estimated: boolean;
@@ -109,6 +114,9 @@ export function CalendarTimeline({
         </span>
       </span>
       <span className="block font-medium">{label(item.projectId)}</span>
+      <span className="block text-xs">
+        {calendarDuration(item, start, end)}
+      </span>
       {details && (
         <>
           <span className="block text-xs">{details(item).topics}</span>
@@ -309,10 +317,7 @@ export function CalendarTimeline({
                         ' — ' +
                         time(e.end) +
                         ' · ' +
-                        new Intl.NumberFormat('pt-BR', {
-                          maximumFractionDigits: 1,
-                        }).format((e.end - e.start) / 60000) +
-                        ' min' +
+                        calendarDuration(e.item, e.start, e.end) +
                         (e.item.estimated ? ' · Estimado' : '') +
                         (e.overlap ? ' · Sobreposição' : '');
                       return (

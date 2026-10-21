@@ -1,8 +1,11 @@
 import { activeRecords } from '../../registration/domain/record-lifecycle.js';
+import {
+  buildTimeAccounting,
+  accountedMinutes,
+} from '../../reports/domain/accounted-time.js';
 import { z } from 'zod';
 import {
   assertContext,
-  globalEstimates,
   recordKey,
 } from '../../reports/domain/global-estimates.js';
 import type { ReportSourceRecord } from '../../reports/domain/project-report.js';
@@ -88,7 +91,7 @@ export interface DailyHoursSelection {
   includeArchived: boolean;
 }
 export interface DailyHoursContext {
-  // Full authorized history, including archived projects, for personal-v3 estimates.
+  // Full authorized history, including archived projects, for personal-v4 estimates.
   records: ReportSourceRecord[];
   // Repository-selected candidates; the domain only validates and clips intervals.
   selectedRecords: ReportSourceRecord[];
@@ -166,8 +169,8 @@ export function buildDailyHours(
     !canReadDailyProject(context.projects.get(input.projectId), uid)
   )
     throw new DailyHoursError('not-found', 'Projeto não encontrado.');
-  // Baseline personal-v3: resolve estimates from all authorized history before selection filters.
-  const estimates = globalEstimates(records, asOf);
+  // Baseline personal-v4: resolve estimates from all authorized history before selection filters.
+  const estimates = buildTimeAccounting(records, asOf);
   const selectedRecords = activeRecords(context.selectedRecords).filter(
     (r) =>
       r.uid === uid &&
@@ -175,9 +178,9 @@ export function buildDailyHours(
   );
   assertContext(selectedRecords, records);
   const warnings = new Set([
-    'Política personal-v3: contexto global America/Sao_Paulo antes dos filtros de projeto e arquivados, sem teto diário. Fatos fechados são preservados.',
-    'Abertos são estimativas não persistidas: até 6h, agora, meia-noite do registro e do fuso canônico, próximo início próprio no mesmo projeto (fechados menores que 15min não cortam).',
-    'Somente o recorte do dia solicitado é somado; sobreposições são somadas e não representam horas únicas. Nenhum fim original é inventado.',
+    'Política personal-v4: contexto autorizado completo antes dos filtros de projeto e arquivados, com rateio igual por pessoa. Horários originais preservados.',
+    'Abertos são estimativas não persistidas: até 6h, agora, meia-noite do registro e do fuso canônico, sem corte por próximo início.',
+    'Somente o recorte do dia solicitado é contabilizado; sobreposições rateadas igualmente por trecho. Nenhum fim original é inventado.',
     ...estimates.warnings,
   ]);
   if (!input.includeArchived)
@@ -189,7 +192,7 @@ export function buildDailyHours(
     date: input.date,
     timeZone: input.timeZone,
     budgetTimeZone: 'America/Sao_Paulo',
-    policy: 'personal-v3',
+    policy: 'personal-v4',
     asOf: new Date(asOf).toISOString(),
     includeArchived: input.includeArchived,
     ...(input.projectId ? { projectId: input.projectId } : {}),
@@ -209,6 +212,8 @@ export function buildDailyHours(
       effectiveEndedAt: string;
       estimated: boolean;
       minutes: number;
+      loggedMinutes?: number;
+      accountingSegments?: import('../../reports/domain/accounted-time.js').AccountingSegment[];
     }[],
     warnings: [] as string[],
   };
@@ -229,7 +234,9 @@ export function buildDailyHours(
     );
     if (effectiveEnd <= effectiveStart) continue;
     const estimated = record.endedAt === undefined,
-      minutes = (effectiveEnd - effectiveStart) / 60000;
+      segments = estimates.segments(record, effectiveStart, effectiveEnd),
+      loggedMinutes = Math.max(0, (effectiveEnd - effectiveStart) / 60000),
+      minutes = accountedMinutes(segments);
     if (
       result.intervals.some(
         (r) =>
@@ -247,6 +254,8 @@ export function buildDailyHours(
       effectiveEndedAt: new Date(effectiveEnd).toISOString(),
       estimated,
       minutes,
+      loggedMinutes,
+      accountingSegments: segments,
     });
     const row = projects.get(record.projectId) ?? {
       projectId: record.projectId,

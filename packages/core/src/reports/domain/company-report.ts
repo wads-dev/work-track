@@ -11,7 +11,7 @@ export interface CompanyReport extends Omit<
   PersonalReport,
   'policy' | 'intervals'
 > {
-  policy: 'company-v3';
+  policy: 'company-v4';
   byUser: { uid: string; label: string; minutes: number }[];
   intervals: (PersonalReport['intervals'][number] & { uid: string })[];
 }

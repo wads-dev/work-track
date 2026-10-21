@@ -65,7 +65,7 @@ it('aggregates multipleUIDs but keeps independent estimates and archived facts, 
   expect(result.byProject).toEqual([{ projectId: 'active', minutes: 720 }]);
   expect(result.page.partial).toBe(false);
   expect(result.scope).toBe('all-selected');
-  expect(result.policy).toBe('company-v3');
+  expect(result.policy).toBe('company-v4');
   expect(result.intervals.map((r) => r.uid)).toEqual(['alice', 'bob']);
   expect(JSON.stringify(result)).not.toContain('@');
 });

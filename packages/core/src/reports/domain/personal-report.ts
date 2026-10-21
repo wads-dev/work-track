@@ -26,7 +26,7 @@ export interface PersonalReport extends Pick<
   'byTopic' | 'unassignedMinutes'
 > {
   scope?: 'all-selected';
-  policy: 'personal-v3';
+  policy: 'personal-v4';
   budgetTimeZone: 'America/Sao_Paulo';
   asOf: string;
   from?: string;
@@ -45,6 +45,8 @@ export interface PersonalReport extends Pick<
     effectiveEndedAt: string;
     estimated: boolean;
     minutes: number;
+    loggedMinutes?: number;
+    accountingSegments?: import('./accounted-time.js').AccountingSegment[];
   }[];
   warnings: string[];
   page: {

@@ -25,7 +25,7 @@ const report = (records: ReportSourceRecord[], asOf = '2026-10-09T20:00:00Z') =>
     false,
     records,
   );
-describe('project-report-v3', () => {
+describe('project-report-v4', () => {
   it('caps open work at six hours and never persists estimates', () => {
     const input = [make('open', '2026-10-08T10:00:00Z')];
     const result = report(input);
@@ -38,7 +38,7 @@ describe('project-report-v3', () => {
     expect(result.byTopic).toEqual([]);
     expect(result.unassignedMinutes).toBe(360);
   });
-  it('caps at now and next same user/project start, not another user', () => {
+  it('caps at now and shares same-author overlap, not another user', () => {
     const result = report(
       [
         make('a', '2026-10-08T10:00:00Z'),
@@ -47,8 +47,8 @@ describe('project-report-v3', () => {
       ],
       '2026-10-08T11:30:00Z',
     );
-    expect(result.records.find((r) => r.id === 'a')?.minutes).toBe(60);
-    expect(result.records.find((r) => r.id === 'b')?.minutes).toBe(30);
+    expect(result.records.find((r) => r.id === 'a')?.minutes).toBe(75);
+    expect(result.records.find((r) => r.id === 'b')?.minutes).toBe(15);
     expect(result.byUser.find((r) => r.uid === 'bob')?.minutes).toBe(60);
   });
   it.each([
@@ -76,15 +76,15 @@ describe('project-report-v3', () => {
       make('b', '2026-10-08T04:00:00Z'),
       make('c', '2026-10-08T08:00:00Z'),
     ]);
-    expect(result.records.find((r) => r.id === 'closed')?.minutes).toBe(720);
+    expect(result.records.find((r) => r.id === 'closed')?.minutes).toBe(325);
     expect(
       result.records
         .filter((r) => r.estimated)
         .reduce((sum, r) => sum + r.minutes, 0),
-    ).toBe(660);
-    expect(result.totalMinutes).toBe(1380);
+    ).toBe(395);
+    expect(result.totalMinutes).toBe(720);
     expect(result.warnings.some((w) => w.includes('sobreposições'))).toBe(true);
-    expect(result.warnings.some((w) => w.includes('global'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('contexto'))).toBe(true);
   });
   it('honors explicit topic percentages/durations and keeps undistributed remainder', () => {
     const result = report([
