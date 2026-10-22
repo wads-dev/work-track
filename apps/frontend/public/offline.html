@@ -3,16 +3,38 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#0d5963" />
     <title>Work Track — sem conexão</title>
     <style>
+      :root {
+        color-scheme: light;
+        --background: #f4f8f8;
+        --foreground: #16383d;
+        --muted-foreground: #526c71;
+        --primary: #0d5963;
+        --primary-foreground: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --background: #0e1c20;
+          --foreground: #edf5f5;
+          --muted-foreground: #a5bfc3;
+          --primary: #8bcdd2;
+          --primary-foreground: #10383f;
+        }
+      }
+      a:focus-visible {
+        outline: 3px solid var(--primary);
+        outline-offset: 4px;
+      }
       body {
         margin: 0;
         min-height: 100vh;
         display: grid;
         place-items: center;
-        background: #0f172a;
-        color: #fff;
+        background: var(--background);
+        color: var(--foreground);
         font:
           16px system-ui,
           sans-serif;
@@ -27,15 +49,15 @@
         height: 80px;
       }
       p {
-        color: #cbd5e1;
+        color: var(--muted-foreground);
         line-height: 1.6;
       }
       a {
         display: inline-block;
         padding: 12px 20px;
         border-radius: 10px;
-        background: #2dd4bf;
-        color: #0f172a;
+        background: var(--primary);
+        color: var(--primary-foreground);
         text-decoration: none;
         font-weight: 600;
       }

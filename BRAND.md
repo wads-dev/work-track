@@ -20,6 +20,12 @@ Identidade aprovada em 22/10/2026. Cada app tem cor própria, mas compartilha a 
 
 O desenho é encorpado e orgânico, como um gesto cursivo de mão firme: curvas contínuas, variação controlada de espessura e terminações suaves. Não imitar a marca com tremores, ondulações artificiais, fonte aproximada ou ícones de biblioteca. A assinatura de fundo é a Wads original, não o símbolo institucional com crina e estrelas.
 
+## Cores da interface web
+
+A interface usa o verde-petróleo do ícone (`#0D5963`) como cor primária no tema claro, superfícies discretamente tingidas de petróleo e acentos derivados do coral do documento. No tema escuro, superfícies profundas de petróleo e controles em petróleo claro mantêm a hierarquia e a leitura. Esses tons de interface são derivados funcionais, não novas cores oficiais nem variantes recoloridas da logo.
+
+Os tokens ficam em apps/frontend/src/styles.css; login MCP e aviso offline mantêm a mesma família em ambos os modos. Texto normal deve alcançar contraste mínimo de 4,5:1; foco e contornos de campos, 3:1. Coral de interface não substitui a semântica de erro. Cores próprias dos projetos e séries de gráficos continuam independentes da marca. Preservar os SVGs aprovados sem alteração.
+
 ## Camadas e composição
 
 - A fonte aprovada mantém a placa arredondada da apresentação. Não redesenhar nem alterar suas proporções.
