@@ -235,8 +235,8 @@ it('defaults own includes ownpersonal only; Global explicit org never foreignper
   expect(own).toMatchObject({
     mode: 'own',
     policy: 'calendar-v3',
-    hoursPolicy: 'personal-v3',
-    totalMinutes: 120,
+    hoursPolicy: 'personal-v4',
+    totalMinutes: 60,
     page: { partial: false, nextCursor: null },
   });
   expect(own.intervals.map((r) => r.uid)).toEqual(['alice', 'alice']);
@@ -684,8 +684,8 @@ it('repository topic selection preserves a next-start cut from the unselected to
   expect(result.intervals).toHaveLength(1);
   expect(result.intervals[0]).toMatchObject({
     id: 'wanted-open',
-    minutes: 240,
-    effectiveEndedAt: '2026-10-02T16:00:00.000Z',
+    minutes: 330,
+    effectiveEndedAt: '2026-10-02T18:00:00.000Z',
   });
 });
 it('topic filtering afterengine preserves six-hour estimates without daily cap and fails unsafe aliases or midread merges', async () => {
@@ -728,7 +728,7 @@ it('topic filtering afterengine preserves six-hour estimates without daily cap a
       .filter((r) => r.id === 'second')
       .map((r) => ({ ...r, subjectAssignedMinutes: r.minutes })),
   );
-  expect(filtered.totalMinutes).toBe(360);
+  expect(filtered.totalMinutes).toBe(300);
   f.repo.own.readTopics = () =>
     Promise.resolve({
       w: [

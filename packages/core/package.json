@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./reports/domain/accounted-time": {
+      "types": "./lib/reports/domain/accounted-time.d.ts",
+      "development": "./src/reports/domain/accounted-time.ts",
+      "default": "./lib/reports/domain/accounted-time.js"
+    },
     "./registration/domain/project-color": {
       "types": "./lib/registration/domain/project-color.d.ts",
       "development": "./src/registration/domain/project-color.ts",

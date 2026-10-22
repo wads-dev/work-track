@@ -160,14 +160,14 @@ describe('daily-hours factual versus estimated totals', () => {
       asOf,
     );
     expect(report).toMatchObject({
-      closedMinutes: 65,
-      estimatedMinutes: 120,
-      totalMinutes: 185,
+      closedMinutes: 32.5,
+      estimatedMinutes: 327.5,
+      totalMinutes: 360,
     });
     expect(report.intervals[0]).not.toHaveProperty('endedAt');
     expect(report.intervals[0]).toMatchObject({
       estimated: true,
-      effectiveEndedAt: '2026-10-09T14:00:00.000Z',
+      effectiveEndedAt: '2026-10-09T18:00:00.000Z',
     });
     expect(report.warnings).toContain('Há intervalos sobrepostos no dia.');
   });
@@ -255,7 +255,7 @@ describe('daily-hours factual versus estimated totals', () => {
         uid,
         asOf,
       ).totalMinutes,
-    ).toBe(300);
+    ).toBe(270);
   });
   it('excludes foreign personal, malformed type and foreign UID before parsing', () => {
     const projects = new Map([
@@ -316,9 +316,9 @@ describe('daily-hours factual versus estimated totals', () => {
       asOf,
     );
     expect(report).toMatchObject({
-      estimatedMinutes: 120,
+      estimatedMinutes: 170,
       closedMinutes: 0,
-      totalMinutes: 120,
+      totalMinutes: 170,
     });
     expect(report.intervals.map((r) => r.id)).toEqual(['open']);
     // Required selection cannot silently fall back to the complete context.

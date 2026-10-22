@@ -146,7 +146,7 @@ it.each([
     expect(buttons[1]).toContain('top:14.7875rem;height:2rem');
     // Short card: top = 108px of activity + a 48px collapsed band; no duration inflation.
     const shortCardStyle = html.match(
-      /aria-label="Projeto · 06:37 — 07:09 · 32 min" style="([^"]+)"/,
+      /aria-label="Projeto · 06:37 — 07:09 · Logged: 32min" style="([^"]+)"/,
     )?.[1];
     expect(shortCardStyle).toBeDefined();
     const numericStyle = Object.fromEntries(

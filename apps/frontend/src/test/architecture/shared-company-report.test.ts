@@ -28,7 +28,7 @@ it('runs the existing company use case in the client with full context and topic
     { timeZone: 'UTC' },
     Date.parse('2026-10-09T00:00:00Z'),
   );
-  expect(report.policy).toBe('company-v3');
+  expect(report.policy).toBe('company-v4');
   expect(report.totalMinutes).toBe(90);
   expect(report.page.partial).toBe(false);
   expect(repository.loadContext).toHaveBeenCalledWith(['alice']);

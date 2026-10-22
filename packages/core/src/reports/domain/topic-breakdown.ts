@@ -14,6 +14,7 @@ type TopicInterval = {
   uid: string;
   projectId: string;
   minutes: number;
+  loggedMinutes?: number;
 };
 export type TopicBreakdown = {
   byTopic: {
@@ -161,7 +162,14 @@ export function buildTopicBreakdown(
             ' com alocação inválida ignorada',
         );
       let minutes: number | undefined;
-      if (duration !== undefined) minutes = duration;
+      // Explicit durations remain logged facts; apply the same overlap share,
+      // never mutate or silently normalize invalid over-allocation.
+      if (duration !== undefined)
+        minutes =
+          duration *
+          (interval.loggedMinutes && interval.loggedMinutes > 0
+            ? interval.minutes / interval.loggedMinutes
+            : 1);
       else if (percentage !== undefined)
         minutes = interval.minutes * (percentage / 100);
       else if (

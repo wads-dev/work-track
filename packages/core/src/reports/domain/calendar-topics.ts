@@ -15,6 +15,7 @@ export function calendarTopics(
   record: ReportSourceRecord,
   minutes: number,
   topics: TopicMetadata[],
+  loggedMinutes?: number,
 ) {
   const map = topicMetadataMap(topics),
     members = new Map<
@@ -36,7 +37,15 @@ export function calendarTopics(
   }
   const allocation = buildTopicBreakdown(
     [record],
-    [{ id: record.id, uid: record.uid, projectId: record.projectId, minutes }],
+    [
+      {
+        id: record.id,
+        uid: record.uid,
+        projectId: record.projectId,
+        minutes,
+        loggedMinutes,
+      },
+    ],
     new Map([[record.projectId, { topics }]]),
   );
   for (const topic of allocation.byTopic) {

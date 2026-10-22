@@ -43,7 +43,7 @@ it('executes the existing personal use case with a client repository and unchang
     Date.parse('2026-10-09T00:00:00Z'),
   );
   expect(report.totalMinutes).toBe(90);
-  expect(report.policy).toBe('personal-v3');
+  expect(report.policy).toBe('personal-v4');
   expect(report.page.partial).toBe(false);
   expect(report.byProject).toEqual([{ projectId: 'p1', minutes: 90 }]);
 });

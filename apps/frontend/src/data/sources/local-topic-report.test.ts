@@ -115,7 +115,7 @@ it('reads complete history despite selected keys, preserving UID-qualified pagin
   expect(validateTopicReport(result, 'alice', 'w', 'x', 'x')).toBe(result);
   expect(result).toMatchObject({
     occurrenceCount: 3,
-    totalMinutes: 360,
+    totalMinutes: 240,
     topicId: 'x',
     requestedTopicId: 'x',
     page: { partial: false, nextCursor: null },
@@ -203,7 +203,7 @@ it('personal report keeps own full global context (including work) while excludi
   expect(result).toMatchObject({
     mode: 'own',
     occurrenceCount: 1,
-    totalMinutes: 120,
+    totalMinutes: 60,
   });
   expect((await repo.loadContext(['alice'], 'alice')).map((r) => r.id)).toEqual(
     ['own', 'work'],
@@ -227,8 +227,8 @@ it('global context retains archived activity without introducing a daily cap', a
   );
   expect(result).toMatchObject({
     occurrenceCount: 1,
-    estimatedMinutes: 360,
-    totalMinutes: 360,
+    estimatedMinutes: 180,
+    totalMinutes: 180,
   });
   expect(
     (await fixture([open, context]).loadContext(['alice'])).map((r) => r.id),
@@ -250,9 +250,10 @@ it('estimates before topic membership filtering and reads every local history pa
   );
   expect(result).toMatchObject({
     occurrenceCount: 1,
-    estimatedMinutes: 60,
-    totalMinutes: 60,
+    estimatedMinutes: 330,
+    totalMinutes: 330,
   });
+  // All 205 records occupy the same two hours: their shares sum to 120 minutes.
   const history = Array.from({ length: 205 }, (_, i) => record(String(i)));
   const complete = await getTopicReport(
     fixture(history),
@@ -260,9 +261,9 @@ it('estimates before topic membership filtering and reads every local history pa
     'alice',
     asOf,
   );
+  expect(complete.totalMinutes).toBeCloseTo(120, 8);
   expect(complete).toMatchObject({
     occurrenceCount: 205,
-    totalMinutes: 24600,
     page: { partial: false, nextCursor: null },
   });
 });

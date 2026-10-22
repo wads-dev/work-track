@@ -27,6 +27,7 @@ export function calendarIntervalMembership(
       source,
       r.minutes,
       topics[r.projectId] ?? [],
+      r.loggedMinutes,
     );
     for (const w of membership.warnings) warnings.add(w);
     const subject = new Map(membership.topics.map((t) => [t.topicId, t])).get(

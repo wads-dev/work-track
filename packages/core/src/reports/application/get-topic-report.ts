@@ -156,8 +156,8 @@ export async function getTopicReport(
       mode: initial.personal ? ('own' as const) : ('global' as const),
       viewerUid: uid,
       hoursPolicy: initial.personal
-        ? ('personal-v3' as const)
-        : ('company-v3' as const),
+        ? ('personal-v4' as const)
+        : ('company-v4' as const),
       budgetTimeZone: 'America/Sao_Paulo' as const,
       asOf: new Date(asOf).toISOString(),
       ...result,

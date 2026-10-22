@@ -73,7 +73,7 @@ it('accepts a62 civil day range spanning fall DST', async () => {
       },
       auth,
     ),
-  ).resolves.toMatchObject({ policy: 'personal-v3' });
+  ).resolves.toMatchObject({ policy: 'personal-v4' });
   const start = Date.parse('2026-08-01T00:00:00Z');
   for (const duration of [
     61 * 86400000,
@@ -90,7 +90,7 @@ it('accepts a62 civil day range spanning fall DST', async () => {
         },
         auth,
       ),
-    ).resolves.toMatchObject({ policy: 'personal-v3' });
+    ).resolves.toMatchObject({ policy: 'personal-v4' });
   }
   const calls = repo.readPage.mock.calls.length;
   await expect(

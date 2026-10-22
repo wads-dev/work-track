@@ -317,7 +317,7 @@ it('authorfullglobalcontext estimates independent of closed facts duplicateident
   );
   expect(result).toMatchObject({
     occurrenceCount: 2,
-    hoursPolicy: 'company-v3',
+    hoursPolicy: 'company-v4',
     estimatedMinutes: 720,
     participants: [
       { uid: 'alice', assignedMinutes: 360 },

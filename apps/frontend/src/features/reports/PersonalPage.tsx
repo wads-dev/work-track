@@ -42,6 +42,7 @@ import {
 } from '../../data/cache/record-deletion';
 
 import type { Functions } from 'firebase/functions';
+import { calendarDuration, durationLabel } from './calendar-duration';
 import { executePersonalReport } from '@work-track/core/reports/application/get-personal-report';
 import { executeCalendarReport } from '@work-track/core/reports/application/get-calendar-report';
 import { calendarInput } from '@work-track/core/reports/application/calendar-input';
@@ -1268,19 +1269,13 @@ export function PersonalPage({
                                     minute: '2-digit',
                                   }).format(new Date(item.effectiveEndedAt)) +
                                   ' · ' +
-                                  new Intl.NumberFormat('pt-BR', {
-                                    maximumFractionDigits: 1,
-                                  }).format(
-                                    (Date.parse(item.effectiveEndedAt) -
-                                      Date.parse(item.effectiveStartedAt)) /
-                                      60000,
-                                  ) +
-                                  ' min' +
+                                  calendarDuration(item, start, end) +
                                   (item.estimated ? ' · Duração estimada' : '')}
                               </TooltipContent>
                             </Tooltip>
                             <span className={cn('text-xs block px-2')}>
-                              {projectLink(item.projectId)}
+                              {projectLink(item.projectId)} ·{' '}
+                              {calendarDuration(item, start, end)}
                               {item.estimated &&
                                 item.effectiveStartedAt ===
                                   item.effectiveEndedAt && (
@@ -1309,7 +1304,20 @@ export function PersonalPage({
                       className={cn('inline-block size-3 mr-2')}
                       style={{ backgroundColor: color(p.projectId) }}
                     />
-                    {projectLink(p.projectId)} · {hours(p.minutes)}
+                    {projectLink(p.projectId)} · {durationLabel(p.minutes)}
+                    {(() => {
+                      const logged = report.intervals.reduce(
+                        (sum, i) =>
+                          sum +
+                          (i.projectId === p.projectId
+                            ? (i.loggedMinutes ?? 0)
+                            : 0),
+                        0,
+                      );
+                      return logged > p.minutes + 0.000001
+                        ? ' (logged: ' + durationLabel(logged) + ')'
+                        : '';
+                    })()}
                   </li>
                 ))}
               </ul>

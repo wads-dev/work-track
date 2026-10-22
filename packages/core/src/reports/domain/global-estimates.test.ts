@@ -80,7 +80,7 @@ it('next outside selected page and timezone filters cannot change estimated ends
     expect(personal.intervals[0]?.effectiveEndedAt).toBe(
       project.records[0]?.effectiveEndedAt,
     );
-    expect(personal.totalMinutes).toBe(60);
+    expect(personal.totalMinutes).toBe(210);
   }
 });
 it('preserves now and future starts without mutating source records', () => {
@@ -99,13 +99,15 @@ it('preserves now and future starts without mutating source records', () => {
   expect(records).toEqual(before);
   expect(open).not.toHaveProperty('endedAt');
 });
-it('ignores closed cuts below fifteen minutes but cuts at exactly fifteen minutes', () => {
+it('preserves open ends regardless of the next closed duration', () => {
   const open = make('open', 9, 'a');
   const tiny = make('tiny', 10, 'a', '2026-10-08T10:14:59-03:00');
   const next = make('next', 13, 'a', '2026-10-08T13:15:00-03:00');
   const otherUser = { ...make('foreign', 11, 'a'), uid: 'bob' };
   const result = globalEstimates([open, tiny, otherUser, next], now);
-  expect(result.ends.get(recordKey(open))).toBe(Date.parse(next.startedAt));
+  expect(result.ends.get(recordKey(open))).toBe(
+    Date.parse('2026-10-08T15:00:00-03:00'),
+  );
   expect(result.ends.get(recordKey(tiny))).toBe(Date.parse(tiny.endedAt!));
 });
 it('preserves record and canonical midnight limits with mixed time zones', () => {
