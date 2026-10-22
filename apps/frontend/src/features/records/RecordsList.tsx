@@ -14,6 +14,7 @@ import { projectColors } from '../../shared/ui/project-colors';
 import { UiIcon } from '../../shared/ui/UiIcons';
 import { contextualRecordPath } from '../../app/routes';
 import { isAlertOpen } from '../pending/pending-utils';
+import { pendingCalendarPath } from '../pending/pending-calendar';
 export function RecordsList({
   state,
   catalog,
@@ -136,7 +137,11 @@ export function RecordsList({
                   className="shrink-0"
                 >
                   <RouterLink
-                    to={contextualRecordPath(pathname, search, row.id)}
+                    to={
+                      pending
+                        ? pendingCalendarPath(row.id, row.data.startedAt)
+                        : contextualRecordPath(pathname, search, row.id)
+                    }
                     aria-label={
                       pending
                         ? 'Revisar fim do registro'
