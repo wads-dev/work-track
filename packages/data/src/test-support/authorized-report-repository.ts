@@ -1,3 +1,5 @@
+import { resolveTimeMultiplier } from '@work-track/core/registration/domain/time-multipliers';
+import { selectedProjectIds } from '@work-track/core/reports/domain/personal-report';
 /* eslint-disable @typescript-eslint/require-await -- Test doubles preserve async repository rejection contracts without database I/O. */
 import type { CompanyReportRepository } from '@work-track/core/reports/domain/company-report';
 import type { ReportRecordSelection } from '@work-track/core/reports/domain/personal-report';
@@ -23,10 +25,18 @@ export class AuthorizedReportRepository implements CompanyReportRepository {
     readonly selectedKeys?: ReadonlySet<string>,
   ) {}
   workRecords() {
-    return this.records.filter((r) => {
-      const p = this.projects.get(r.projectId);
-      return p && p.type === 'work' && !isDeletedRecord(r);
-    });
+    return this.records
+      .filter((r) => {
+        const p = this.projects.get(r.projectId);
+        return p && p.type === 'work' && !isDeletedRecord(r);
+      })
+      .map((r) => ({
+        ...r,
+        timeMultiplier: resolveTimeMultiplier(
+          this.projects.get(r.projectId)?.timeMultipliers?.[r.uid],
+          r.startedAt,
+        ),
+      }));
   }
   async loadContext(uids: string[]) {
     const rows = this.workRecords().filter((r) => uids.includes(r.uid));
@@ -43,6 +53,7 @@ export class AuthorizedReportRepository implements CompanyReportRepository {
     projectId?: string,
     selection?: ReportRecordSelection,
   ) {
+    selectedProjectIds(selection, projectId);
     const rows = this.workRecords()
       .filter(
         (r) =>

@@ -1,3 +1,4 @@
+import { resolveTimeMultiplier } from '@work-track/core/registration/domain/time-multipliers';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
@@ -71,17 +72,30 @@ export function selectReportRecords(
   catalog: Map<string, ReportProjectMetadata>,
   scope: { viewerUid: string } | { companyOnly: true },
   selection?: ReportRecordSelection,
+  enrich = true,
 ): ReportSourceRecord[] {
-  return records.filter((record) => {
-    if (isDeletedRecord(record)) return false;
-    const project = catalog.get(record.projectId);
-    if (
-      !project ||
-      !('companyOnly' in scope
-        ? effectiveProjectType(project) === 'work'
-        : canAccessProject(project, scope.viewerUid))
-    )
-      return false;
-    return matchesReportSelection(record, project, selection);
-  });
+  return records
+    .filter((record) => {
+      if (isDeletedRecord(record)) return false;
+      const project = catalog.get(record.projectId);
+      if (
+        !project ||
+        !('companyOnly' in scope
+          ? effectiveProjectType(project) === 'work'
+          : canAccessProject(project, scope.viewerUid))
+      )
+        return false;
+      return matchesReportSelection(record, project, selection);
+    })
+    .map((record) =>
+      !enrich
+        ? record
+        : {
+            ...record,
+            timeMultiplier: resolveTimeMultiplier(
+              catalog.get(record.projectId)?.timeMultipliers?.[record.uid],
+              record.startedAt,
+            ),
+          },
+    );
 }

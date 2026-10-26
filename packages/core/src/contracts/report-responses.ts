@@ -28,6 +28,8 @@ export type CalendarResponse = {
     estimated: boolean;
     minutes: number;
     loggedMinutes?: number;
+    allocatedMinutes?: number;
+    timeMultiplier?: number;
     accountingSegments?: import('../reports/domain/accounted-time.js').AccountingSegment[];
     topics?: { topicId: string; label: string; assignedMinutes?: number }[];
     subjectAssignedMinutes?: number;
@@ -86,6 +88,8 @@ export type TopicDetailReport = TopicFacts & {
     estimated: boolean;
     minutes: number;
     loggedMinutes?: number;
+    allocatedMinutes?: number;
+    timeMultiplier?: number;
     accountingSegments?: import('../reports/domain/accounted-time.js').AccountingSegment[];
     assignedMinutes?: number;
     readOnly: boolean;

@@ -21,6 +21,8 @@ import type {
   PersonalReportRepository,
   ReportRecordSelection,
 } from '@work-track/core/reports/domain/personal-report';
+import { selectedProjectIds } from '@work-track/core/reports/domain/personal-report';
+import { resolveTimeMultiplier } from '@work-track/core/registration/domain/time-multipliers';
 import type { CompanyReportRepository } from '@work-track/core/reports/domain/company-report';
 import type { CalendarRepository } from '@work-track/core/reports/application/get-calendar-report';
 import {
@@ -105,14 +107,18 @@ export class FirestoreReportRepository implements CompanyReportRepository {
         (project.type === 'personal' && data.uid !== this.viewer)
       )
         return [];
+      const parsed = personal ? personalSchema.parse(data) : schema.parse(data);
       return [
-        (personal
-          ? { ...personalSchema.parse(data), uid: parts[1], id: parts[3] }
-          : {
-              ...data,
-              ...schema.parse(data),
-              id: parts[3],
-            }) as ReportSourceRecord,
+        {
+          ...(personal ? {} : data),
+          ...parsed,
+          uid: parts[1],
+          id: parts[3],
+          timeMultiplier: resolveTimeMultiplier(
+            project.timeMultipliers?.[parts[1]],
+            parsed.startedAt,
+          ),
+        } as ReportSourceRecord,
       ];
     });
   }
@@ -157,11 +163,7 @@ export class FirestoreReportRepository implements CompanyReportRepository {
     return candidates;
   }
   private async projectIds(own: boolean, selection?: ReportRecordSelection) {
-    const allowed = selection?.projectId
-      ? this.projects.has(selection.projectId)
-        ? [selection.projectId]
-        : []
-      : [...this.projects.keys()];
+    const allowed = selectedProjectIds(selection) ?? [...this.projects.keys()];
     const candidates = await this.readCatalog(
       allowed,
       false,
@@ -197,9 +199,16 @@ export class FirestoreReportRepository implements CompanyReportRepository {
     if (own && selection?.userIds && !selection.userIds.includes(this.viewer))
       return [];
     const users = own ? [this.viewer] : selection?.userIds;
+    // DNF10 conservatively fits Firestore100 components including range guards,
+    // implicit/explicit orders and parent path; overlap branches stay independent.
     for (let i = 0; i < ids.length; i += 10) {
       const projects = ids.slice(i, i + 10),
-        userBatches = users ? users.map((uid) => [uid]) : [undefined];
+        userShardSize = Math.floor(10 / projects.length),
+        userBatches: (string[] | undefined)[] = [];
+      if (users) {
+        for (let j = 0; j < users.length; j += userShardSize)
+          userBatches.push(users.slice(j, j + userShardSize));
+      } else userBatches.push(undefined);
       for (const batch of userBatches) {
         const base = own
           ? collection(this.db, 'users', this.viewer, 'records')
@@ -299,6 +308,7 @@ export class FirestoreReportRepository implements CompanyReportRepository {
     projectId?: string,
     selection?: ReportRecordSelection,
   ) {
+    selectedProjectIds(selection, projectId);
     const rows = await this.records(
         false,
         cursor,
@@ -441,7 +451,11 @@ export class FirestoreReportRepository implements CompanyReportRepository {
     }
     return rows.filter((r) => {
       const value = current.get(recordPath(r));
-      return value && stableDataKey(value) === stableDataKey(r);
+      return (
+        value &&
+        stableDataKey(value) ===
+          stableDataKey({ ...r, timeMultiplier: r.timeMultiplier ?? 1 })
+      );
     });
   }
   project(): ProjectReportRepository {

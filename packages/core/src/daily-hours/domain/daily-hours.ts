@@ -69,6 +69,7 @@ export const dailyHoursInput = z
   .strict();
 export type DailyHoursInput = z.infer<typeof dailyHoursInput>;
 export interface DailyProject {
+  timeMultipliers?: unknown;
   type?: unknown;
   createdBy?: unknown;
   archived?: unknown;
@@ -213,6 +214,8 @@ export function buildDailyHours(
       estimated: boolean;
       minutes: number;
       loggedMinutes?: number;
+      allocatedMinutes?: number;
+      timeMultiplier?: number;
       accountingSegments?: import('../../reports/domain/accounted-time.js').AccountingSegment[];
     }[],
     warnings: [] as string[],
@@ -236,7 +239,9 @@ export function buildDailyHours(
     const estimated = record.endedAt === undefined,
       segments = estimates.segments(record, effectiveStart, effectiveEnd),
       loggedMinutes = Math.max(0, (effectiveEnd - effectiveStart) / 60000),
-      minutes = accountedMinutes(segments);
+      allocatedMinutes = accountedMinutes(segments),
+      timeMultiplier = record.timeMultiplier ?? 1,
+      minutes = allocatedMinutes * timeMultiplier;
     if (
       result.intervals.some(
         (r) =>
@@ -255,6 +260,8 @@ export function buildDailyHours(
       estimated,
       minutes,
       loggedMinutes,
+      allocatedMinutes,
+      timeMultiplier,
       accountingSegments: segments,
     });
     const row = projects.get(record.projectId) ?? {

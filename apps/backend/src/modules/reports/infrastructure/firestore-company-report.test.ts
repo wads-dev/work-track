@@ -28,10 +28,74 @@ it('pushes project and requested people into native queries and shards complete 
   expect(query.where.mock.calls).toEqual([
     ['deletedAt', '==', null],
     ['projectId', '==', 'p'],
-    ['uid', 'in', uids.slice(0, 30)],
+    ['uid', 'in', uids.slice(0, 10)],
+    ['uid', 'in', uids.slice(10, 20)],
+    ['uid', 'in', uids.slice(20, 30)],
     ['uid', '==', 'u30'],
   ]);
-  expect(query.get).toHaveBeenCalledTimes(2);
+  expect(query.get).toHaveBeenCalledTimes(4);
+});
+it('shards project/person Cartesian predicates within10 component-safe terms without truncation', async () => {
+  const calls: { field: string; op: string; value: unknown }[][] = [];
+  const resumed: unknown[] = [];
+  function source(
+    filters: { field: string; op: string; value: unknown }[] = [],
+  ): unknown {
+    const q = {
+      where: (field: string, op: string, value: unknown) =>
+        source([...filters, { field, op, value }]),
+      orderBy: () => q,
+      startAfter: (key: unknown) => {
+        resumed.push(key);
+        return q;
+      },
+      limit: () => q,
+      get: () => {
+        calls.push(filters);
+        return Promise.resolve({ docs: [] });
+      },
+    };
+    return q;
+  }
+  const repo = new FirestoreCompanyReportRepository(
+    {
+      collectionGroup: () => source(),
+      doc: (path: string) => ({ path }),
+    } as unknown as Firestore,
+    {} as Auth,
+  );
+  const projectIds = Array.from({ length: 11 }, (_, i) => 'p' + i),
+    userIds = Array.from({ length: 31 }, (_, i) => 'u' + i);
+  await repo.readPage(100, undefined, undefined, { projectIds, userIds });
+  const combinations = new Set<string>();
+  for (const filters of calls) {
+    const values = (field: string) => {
+      const f = filters.find((f) => f.field === field)!;
+      return (f.op === 'in' ? f.value : [f.value]) as string[];
+    };
+    const projects = values('projectId'),
+      users = values('uid');
+    expect(projects.length * users.length).toBeLessThanOrEqual(10);
+    for (const p of projects)
+      for (const u of users) combinations.add(p + '/' + u);
+  }
+  expect(combinations.size).toBe(341);
+  const count = calls.length;
+  await repo.readPage(100, 'users/u0/records/cursor', undefined, {
+    projectIds,
+    userIds,
+  });
+  expect(resumed).toHaveLength(count);
+  expect(
+    resumed.every(
+      (key) =>
+        JSON.stringify(key) ===
+        JSON.stringify({ path: 'users/u0/records/cursor' }),
+    ),
+  ).toBe(true);
+  await expect(
+    repo.readPage(100, undefined, 'p0', { projectIds: ['p0'] }),
+  ).rejects.toThrow('Conflicting');
 });
 it('merges person shards in canonical document order before limiting and resumes every shard after one cursor', async () => {
   const source = {
@@ -52,7 +116,8 @@ it('merges person shards in canonical document order before limiting and resumes
   const get = vi
     .fn()
     .mockResolvedValueOnce({ docs: [b] })
-    .mockResolvedValueOnce({ docs: [a] });
+    .mockResolvedValueOnce({ docs: [a] })
+    .mockResolvedValue({ docs: [] });
   const query = {
     where: vi.fn().mockImplementation(() => query),
     startAfter: vi.fn().mockImplementation(() => query),
@@ -192,7 +257,8 @@ it('merges dated UID shards by date then document key before bounding each physi
   const get = vi
     .fn()
     .mockResolvedValueOnce({ docs: [a] })
-    .mockResolvedValueOnce({ docs: [b, c] });
+    .mockResolvedValueOnce({ docs: [b, c] })
+    .mockResolvedValue({ docs: [] });
   const query = {
     where: vi.fn().mockImplementation(() => query),
     orderBy: vi.fn().mockImplementation(() => query),
@@ -235,16 +301,22 @@ it('merges dated UID shards by date then document key before bounding each physi
   expect(query.where.mock.calls).toEqual([
     ['deletedAt', '==', null],
     ['projectId', '==', 'p'],
-    ['uid', 'in', selection.userIds.slice(0, 30)],
+    ['uid', 'in', selection.userIds.slice(0, 10)],
+    ['startedAt', '<', '2026-10-11'],
+    ['uid', 'in', selection.userIds.slice(10, 20)],
+    ['startedAt', '<', '2026-10-11'],
+    ['uid', 'in', selection.userIds.slice(20, 30)],
     ['startedAt', '<', '2026-10-11'],
     ['uid', '==', 'u30'],
     ['startedAt', '<', '2026-10-11'],
   ]);
-  expect(query.limit.mock.calls).toEqual([[2], [2]]);
+  expect(query.limit.mock.calls).toEqual([[2], [2], [2], [2]]);
   get.mockResolvedValueOnce({ docs: [a] }).mockResolvedValueOnce({ docs: [c] });
   const second = await repo.readPage(1, first.nextCursor!, 'p', selection);
   expect(second.records.map((r) => r.id)).toEqual(['one']);
   expect(query.startAfter.mock.calls).toEqual([
+    ['2026-09-01T10:00:00Z', { path: b.ref.path }],
+    ['2026-09-01T10:00:00Z', { path: b.ref.path }],
     ['2026-09-01T10:00:00Z', { path: b.ref.path }],
     ['2026-09-01T10:00:00Z', { path: b.ref.path }],
   ]);

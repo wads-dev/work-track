@@ -91,6 +91,7 @@ describe('record and pending lists', () => {
           params={new URLSearchParams()}
           search=""
           onFilter={() => {}}
+          onProjectsChange={() => {}}
           onClear={() => {}}
         />
       </TooltipProvider>,

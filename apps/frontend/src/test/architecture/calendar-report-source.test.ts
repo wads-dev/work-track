@@ -85,12 +85,10 @@ it('navigation, date and project changes use local observers with ZERO remote Fi
     await personal.mock.lastCall![0].repository.loadContext(['alice']),
   ).toHaveLength(3);
   expect(
-    await company.mock.lastCall![0].repository.readPage(
-      100,
-      undefined,
-      'q',
-      range,
-    ),
+    await company.mock.lastCall![0].repository.readPage(100, undefined, 'q', {
+      ...range,
+      projectId: 'q',
+    }),
   ).toMatchObject({ records: [expect.objectContaining({ id: 'budget' })] });
   stopPersonal();
   stopCompany();

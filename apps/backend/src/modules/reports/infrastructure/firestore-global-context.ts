@@ -1,3 +1,4 @@
+import { resolveTimeMultiplier } from '@work-track/core/registration/domain/time-multipliers';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { reportRecordSchema } from '@work-track/data/codecs/report-record';
@@ -58,6 +59,8 @@ export async function loadGlobalContext(
                       ],
                       catalog,
                       scope,
+                      undefined,
+                      false,
                     ).length > 0,
                 )
               : page.docs.filter((doc) => !isDeletedRecord(doc.data()));
@@ -71,7 +74,15 @@ export async function loadGlobalContext(
               throw new ReportContextError(
                 'Contexto global contém registro inválido.',
               );
-            loaded.push({ ...parsed.data, id: doc.id, uid });
+            loaded.push({
+              ...parsed.data,
+              id: doc.id,
+              uid,
+              timeMultiplier: resolveTimeMultiplier(
+                catalog?.get(parsed.data.projectId)?.timeMultipliers?.[uid],
+                parsed.data.startedAt,
+              ),
+            });
           }
           count += visible.length;
           if (page.docs.length < 501) break;

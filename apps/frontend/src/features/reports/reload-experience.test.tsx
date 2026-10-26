@@ -170,6 +170,9 @@ vi.mock('../../data/repositories/browser-detail-repository', () => ({
 vi.mock('@work-track/core/reports/application/get-personal-report', () => ({
   executePersonalReport: (...args: unknown[]) => m.calculate(...args),
 }));
+vi.mock('@work-track/core/reports/application/get-company-report', () => ({
+  executeCompanyReport: (...args: unknown[]) => m.calculate(...args),
+}));
 vi.mock('@work-track/core/reports/application/get-calendar-report', () => ({
   executeCalendarReport: (...args: unknown[]) => m.calculate(...args),
 }));
@@ -251,6 +254,37 @@ const props = {
   functions: m.functions as never,
   uid: 'alice',
 };
+it.each([false, true])(
+  'report company=%s forwards project arrays and fences stale results after selection changes',
+  async (company) => {
+    m.params = new URLSearchParams('projectIds=b&projectIds=a&projectIds=b');
+    const view = () => PersonalPage({ ...props, company });
+    let tree = await settle(view);
+    expect(m.calculate.mock.calls.at(-1)![1]).toMatchObject({
+      projectIds: ['a', 'b'],
+    });
+    expect(m.calculate.mock.calls.at(-1)![1]).not.toHaveProperty('projectId');
+    const toolbar = () =>
+      elements(tree).find((element) => element.type === ReportToolbar)!;
+    expect(toolbar().props.projectIds).toEqual(['a', 'b']);
+    (toolbar().props.onRefresh as () => void)();
+    tree = await settle(view);
+    expect(toolbar().props.projectIds).toEqual(['a', 'b']);
+    expect(m.calculate.mock.calls.at(-1)![1]).toMatchObject({
+      projectIds: ['a', 'b'],
+    });
+    m.deferSource = true;
+    m.params = new URLSearchParams('projectIds=a&projectIds=c');
+    tree = await settle(view);
+    expect(toolbar().props.total).toBe('—');
+    m.subscriptions.at(-1)!.next(repository());
+    tree = await settle(view);
+    expect(m.calculate.mock.calls.at(-1)![1]).toMatchObject({
+      projectIds: ['a', 'c'],
+    });
+    expect(toolbar().props.total).toBe('1 h');
+  },
+);
 it('personal report loads, survives listener refresh while a calculation is pending and then updates', async () => {
   const view = () => PersonalPage(props);
   let tree = await settle(view);

@@ -172,6 +172,7 @@ test(
         'listProjects',
         'archiveProject',
         'updateProject',
+        'updateProjectTimeMultipliers',
         'changeProjectScope',
         'updateRecord',
         'moveRecord',

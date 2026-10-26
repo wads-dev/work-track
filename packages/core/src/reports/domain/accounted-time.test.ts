@@ -159,6 +159,66 @@ it('applies overlap shares to explicit topic durations without mutating logged a
   expect(breakdown.byTopic).toEqual([]);
   expect(breakdown.unassignedMinutes).toBe(180);
 });
+it('multiplies after rateio, preserving logged and allocated minutes across reports', () => {
+  const a = { ...record('a', 13, 17), timeMultiplier: 0.25 },
+    b = record('b', 14, 16),
+    context = [a, b];
+  const report = buildPersonalReport(
+    { timeZone: 'America/Sao_Paulo' },
+    { records: context, scannedCount: 2, nextCursor: null },
+    at(17),
+    context,
+  );
+  expect(report.intervals[0]).toMatchObject({
+    loggedMinutes: 240,
+    allocatedMinutes: 180,
+    timeMultiplier: 0.25,
+    minutes: 45,
+  });
+  expect(report.totalMinutes).toBe(105);
+  const cropped = buildPersonalReport(
+    {
+      timeZone: 'America/Sao_Paulo',
+      from: new Date(at(14)).toISOString(),
+      to: new Date(at(16)).toISOString(),
+    },
+    { records: [a], scannedCount: 1, nextCursor: null },
+    at(17),
+    context,
+  );
+  expect(cropped.intervals[0]).toMatchObject({
+    loggedMinutes: 120,
+    allocatedMinutes: 60,
+    timeMultiplier: 0.25,
+    minutes: 15,
+  });
+  const project = buildProjectReport(
+    'a',
+    { records: [a], topicLabels: { code: 'Code' }, nextCursor: null },
+    100,
+    at(17),
+    {},
+    false,
+    context,
+  );
+  expect(project.totalMinutes).toBe(45);
+  expect(project.byTopic[0]?.minutes).toBe(45);
+  expect(() =>
+    buildTimeAccounting([{ ...a, timeMultiplier: NaN }], at(17)),
+  ).toThrow('Multiplicador');
+  expect(() =>
+    buildPersonalReport(
+      { timeZone: 'UTC' },
+      {
+        records: [{ ...a, timeMultiplier: 0.5 }],
+        scannedCount: 1,
+        nextCursor: null,
+      },
+      at(17),
+      context,
+    ),
+  ).toThrow('contexto consistente');
+});
 it('rejects duplicated context identity and preserves input order independence', () => {
   const a = record('a', 13, 17),
     b = record('b', 14, 16);

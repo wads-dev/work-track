@@ -1,3 +1,7 @@
+import {
+  resolveTimeMultiplier,
+  timeMultipliersSchema,
+} from '@work-track/core/registration/domain/time-multipliers';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import {
   FieldPath,
@@ -99,6 +103,19 @@ export class FirestoreDailyHoursRepository implements DailyHoursRepository {
                     'resource-exhausted',
                     'Projeto autorizado contém flags inválidas; nenhum total parcial foi retornado.',
                   );
+                if (
+                  canReadDailyProject(data, uid) &&
+                  data.timeMultipliers !== undefined
+                ) {
+                  const config = timeMultipliersSchema.safeParse(
+                    data.timeMultipliers,
+                  );
+                  if (!config.success)
+                    throw new DailyHoursError(
+                      'resource-exhausted',
+                      'Projeto autorizado contém multiplicadores inválidos; nenhum total parcial foi retornado.',
+                    );
+                }
                 projects.set(doc.id, data);
               }
           }
@@ -147,7 +164,20 @@ export class FirestoreDailyHoursRepository implements DailyHoursRepository {
                 'resource-exhausted',
                 'Histórico próprio autorizado contém registro inválido; nenhum total parcial foi retornado.',
               );
-            records.push({ ...parsed.data, id: doc.id, uid, topics: [] });
+            const project = projects.get(raw.projectId);
+            const multipliers = timeMultipliersSchema.parse(
+              project?.timeMultipliers ?? {},
+            );
+            records.push({
+              ...parsed.data,
+              id: doc.id,
+              uid,
+              topics: [],
+              timeMultiplier: resolveTimeMultiplier(
+                multipliers[uid],
+                parsed.data.startedAt,
+              ),
+            });
             guardVisible(records.length);
           }
           if (page.docs.length < pageSize) break;

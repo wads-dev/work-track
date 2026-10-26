@@ -83,7 +83,9 @@ export function buildProjectReport(
     const effectiveEnd = end ?? start;
     const segments = global.segments(record, start, effectiveEnd),
       loggedMinutes = Math.max(0, (effectiveEnd - start) / 60000),
-      minutes = accountedMinutes(segments);
+      allocatedMinutes = accountedMinutes(segments),
+      timeMultiplier = record.timeMultiplier ?? 1,
+      minutes = allocatedMinutes * timeMultiplier;
     if (
       result.records.some(
         (other) =>
@@ -116,6 +118,8 @@ export function buildProjectReport(
       estimated,
       minutes,
       loggedMinutes,
+      allocatedMinutes,
+      timeMultiplier,
       accountingSegments: segments,
       topics: allocated,
     });

@@ -12,9 +12,19 @@ O motor percorre eventos de início/fim por autor, usando intervalos semiabertos
 
 Início/fim originais não são alterados. Fechados podem atravessar dias ou ultrapassar oito horas. Abertos usam estimativa não persistida até agora, no máximo seis horas, limitada à meia-noite do registro e do fuso canônico America/Sao_Paulo. **O próximo início não corta mais o aberto**, inclusive no mesmo projeto; ele participa do rateio. Não há teto diário nem saldo cronológico. Interrupções textuais não são descontadas automaticamente.
 
+## Multiplicadores por projeto e pessoa
+
+O projeto pode definir `timeMultipliers[userId]: [{ multiplier, effectiveFrom }]`. A vigência é resolvida exclusivamente pelo `startedAt` ORIGINAL do registro: maior instante `effectiveFrom <= startedAt`; se não houver, regra-base com `effectiveFrom: null`; sem regra aplicável, fator 1. A ordem do array não altera o resultado. Datas exigem offset explícito. Instantes duplicados (inclusive offsets equivalentes) e bases duplicadas são inválidos. Fatores finitos não negativos são aceitos, inclusive zero.
+
+O registro que cruza uma mudança de vigência mantém o fator do começo para todo seu intervalo, inclusive quando o relatório recorta só uma parte posterior. Primeiro rateia-se a sobreposição física; depois aplica-se o fator. Pessoas diferentes não dividem o mesmo saldo. Exemplo: sênior 1h ×1 + júnior 4h ×0,25 = 2h computadas e 5h logged.
+
+Alterar regras existentes pode recalcular o histórico correspondente; para mudanças futuras acrescente nova vigência, em vez de editar a regra antiga. A edição exige compare-and-set do mapa anterior e auditoria. O frontend grava diretamente pelo Firebase SDK em transação, com validação compartilhada de schema, compare-and-set e auditoria, sem callable. As Rules mantêm as ACLs existentes: qualquer pessoa autenticada com acesso de edição ao projeto pode alterar o mapa, não apenas a pessoa cujo fator está sendo editado. Validação de histórico e CAS são garantias do cliente oficial, não restrições de campo das Rules; consumidores rejeitam configurações inválidas em vez de calcular totais parciais. Os leitores autorizados do projeto podem ler os fatores; não são dados globais do perfil.
+
 ## Logged e apresentação
 
-- `minutes` e `totalMinutes` são contabilizados.
+- `minutes` e `totalMinutes` são computados após rateio × multiplicador.
+- `allocatedMinutes` guarda o tempo físico após rateio e antes do fator.
+- `timeMultiplier` é o fator confiável resolvido do projeto pelo início original.
 - `loggedMinutes` é a duração do intervalo efetivo antes do rateio, recortada no mesmo período.
 - `accountingSegments` transporta somente limites e quantidade de atividades concorrentes, sem identidade ou conteúdo dos outros registros. Permite recortar corretamente dias sem usar a média do registro inteiro.
 - Calendário: `3h (logged: 4h)` quando houver diferença; caso contrário apenas `4h`. Totais da legenda seguem a mesma convenção.

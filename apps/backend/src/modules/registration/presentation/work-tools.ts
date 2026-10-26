@@ -150,7 +150,7 @@ export function registerWorkTools(
       'update_project',
       {
         description:
-          'Edite metadados de projeto com ID explícito, motivo e requestId estável. Confidencialidade é apenas apresentação, não autorização.',
+          'Edite metadados de projeto com ID explícito, motivo e requestId estável. timeMultipliers associa userId a histórico [{multiplier,effectiveFrom}]: fator finito não negativo, base null ou ISO com fuso explícito, instantes únicos por pessoa. Envie expectedTimeMultipliers igual ao mapa salvo (null se ausente) para evitar sobrescrita concorrente. A regra usa o início original do registro, não o recorte do relatório. Confidencialidade é apenas apresentação, não autorização.',
         inputSchema: updateProjectInput,
       },
       (input) => run(() => management.updateProject(input, uid)),

@@ -381,3 +381,32 @@ it('preserves active-to-tombstone lifecycle invalidation without exposing tombst
   expect(deletionRevision('me')).toBe(initial + 1);
   stop();
 });
+it('exposes topic catalog only at exactly one selected project and validates all selected ACLs', async () => {
+  mocks.documents.set('projects/p', {
+    ...work,
+    topics: [{ id: 't', title: 'Topic', archived: false }],
+  });
+  mocks.documents.set('projects/q', { ...work, title: 'Second' });
+  const repo = repository(['p', 'q']);
+  const options = { revealed: true, includeArchived: false };
+  const single = await repo.readReportCatalog({
+    ...options,
+    projectIds: ['p', 'p'],
+  });
+  expect(single.topics).toEqual([{ id: 't', label: 'Topic' }]);
+  for (const projectIds of [[], ['p', 'q']]) {
+    const result = await repo.readReportCatalog({ ...options, projectIds });
+    expect(result.selectedProject).toBeUndefined();
+    expect(result.topics).toEqual([]);
+    expect(result.validTopicIds.size).toBe(0);
+    expect(result.selectionAvailable).toBe(true);
+  }
+  expect(
+    (await repo.readReportCatalog({ ...options, projectIds: ['p', 'missing'] }))
+      .selectionAvailable,
+  ).toBe(false);
+  await expect(
+    repo.readReportCatalog({ ...options, projectId: 'p', projectIds: ['q'] }),
+  ).rejects.toThrow();
+  expect(mocks.remote).not.toHaveBeenCalled();
+});

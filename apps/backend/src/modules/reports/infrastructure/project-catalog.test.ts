@@ -109,7 +109,7 @@ it('Admin catalog uses100-document batches, preserves archive metadata and rejec
     uid: 'alice',
     projectId,
     deletedAt: null,
-    startedAt: 'historical',
+    startedAt: '2026-10-08T10:00:00Z',
     timeZone: 'UTC',
     topics: [],
   }));

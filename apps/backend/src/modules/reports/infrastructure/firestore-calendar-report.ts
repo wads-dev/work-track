@@ -26,10 +26,20 @@ export class FirestoreCalendarReportRepository implements CalendarRepository {
     );
     // Revalidation is ACL validation of previously selected rows, not a new
     // dataset query: never let stale owner/project metadata widen authorization.
-    return selectReportRecords(
+    const visible = selectReportRecords(
       mode === 'own' ? records.filter((r) => r.uid === viewerUid) : records,
       catalog,
       mode === 'own' ? { viewerUid } : { companyOnly: true },
     );
+    // Catalog changes cannot silently replace the trusted factor used by this snapshot.
+    return visible.filter((record) => {
+      const original = records.find(
+        (r) =>
+          r.id === record.id &&
+          r.uid === record.uid &&
+          r.projectId === record.projectId,
+      );
+      return (original?.timeMultiplier ?? 1) === record.timeMultiplier;
+    });
   }
 }

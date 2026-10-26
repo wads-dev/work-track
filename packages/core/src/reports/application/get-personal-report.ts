@@ -17,7 +17,9 @@ export async function executePersonalReport(
   const page = await completeSelection((cursor) =>
     repository.readPage(uid, 100, cursor, {
       projectId: input.projectId,
+      projectIds: input.projectIds,
       includeArchived: input.includeArchived,
+      userIds: input.userIds,
       from: input.from,
       to: input.to,
     }),

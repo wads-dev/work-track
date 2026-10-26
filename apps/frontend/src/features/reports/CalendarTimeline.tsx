@@ -1,5 +1,5 @@
 import { cn } from '../../lib/utils';
-import { calendarDuration } from './calendar-duration';
+import { calendarDuration, calendarDurationDetails } from './calendar-duration';
 import type { AccountingSegment } from '@work-track/core/reports/domain/accounted-time';
 import { PersonIdentity } from '../people/PersonIdentity';
 import { useCompanyPeople } from '../people/CompanyPeopleContext';
@@ -36,6 +36,8 @@ import {
 type Event = Timed & {
   minutes?: number;
   loggedMinutes?: number;
+  allocatedMinutes?: number;
+  timeMultiplier?: number;
   accountingSegments?: AccountingSegment[];
   uid?: string;
   projectId: string;
@@ -318,6 +320,8 @@ export function CalendarTimeline({
                         time(e.end) +
                         ' · ' +
                         calendarDuration(e.item, e.start, e.end) +
+                        ' · ' +
+                        calendarDurationDetails(e.item, e.start, e.end) +
                         (e.item.estimated ? ' · Estimado' : '') +
                         (e.overlap ? ' · Sobreposição' : '');
                       return (

@@ -1,6 +1,11 @@
 import { z } from 'zod';
+import {
+  timeMultipliersSchema,
+  type TimeMultipliers,
+} from '@work-track/core/registration/domain/time-multipliers';
 
 const metadataSchema = z.object({
+  timeMultipliers: timeMultipliersSchema.optional(),
   type: z.enum(['personal', 'work']),
   createdBy: z.string(),
   archived: z.boolean(),
@@ -21,6 +26,7 @@ const metadataSchema = z.object({
   ),
 });
 export interface ReportProjectMetadata {
+  timeMultipliers?: TimeMultipliers;
   type: string;
   createdBy?: string;
   archived: boolean;

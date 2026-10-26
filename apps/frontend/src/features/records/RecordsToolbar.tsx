@@ -1,5 +1,6 @@
 import { CompactListToolbar } from '../../shared/ui/CompactListToolbar';
 import { ProjectSelector } from '../projects/ProjectSelector';
+import { recordProjectIds } from './records-selection';
 import { Input } from '../../components/ui/input';
 import {
   Select,
@@ -19,6 +20,7 @@ export function RecordsToolbar({
   params,
   search,
   onFilter,
+  onProjectsChange,
   onClear,
   onRefresh,
   refreshing = false,
@@ -30,11 +32,13 @@ export function RecordsToolbar({
   params: URLSearchParams;
   search: string;
   onFilter: (key: string, value: string) => void;
+  onProjectsChange: (ids: string[]) => void;
   onClear: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
-  const project = params.get('project') ?? '';
+  const projectIds = recordProjectIds(params);
+  const project = projectIds.length === 1 ? projectIds[0] : '';
   const topics =
     createMetadataPresentationRepository(catalog, revealed).project(project)
       ?.topics ?? [];
@@ -75,13 +79,14 @@ export function RecordsToolbar({
                 searchText: text(p.title, '') + ' ' + text(p.description, ''),
               };
             })}
-            projectId={project}
+            multiple={true}
+            projectIds={projectIds}
             loading={loading}
             error={error}
-            onChange={(id) => onFilter('project', id)}
+            onChange={onProjectsChange}
           />
           <Select
-            value={params.get('topic') || '__all__'}
+            value={(project && params.get('topic')) || '__all__'}
             disabled={!project}
             onValueChange={(value) =>
               onFilter('topic', value === '__all__' ? '' : value)

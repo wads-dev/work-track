@@ -17,7 +17,8 @@ export function ReportToolbar({
   total,
   fromDate,
   toDate,
-  projectId,
+  projectIds,
+  onProjectsChange,
   projects,
   onFilter,
   onRefresh,
@@ -28,7 +29,8 @@ export function ReportToolbar({
   total: string;
   fromDate: string;
   toDate: string;
-  projectId: string;
+  projectIds: string[];
+  onProjectsChange: (ids: string[]) => void;
   projects: ProjectOption[];
   onFilter: (key: string, value: string) => void;
   onRefresh: () => void;
@@ -42,14 +44,14 @@ export function ReportToolbar({
       label="Filtros do relatório"
       summary={
         <div>
-          <p className="text-xs text-muted-foreground">Tempo registrado</p>
+          <p className="text-xs text-muted-foreground">Tempo computado</p>
           <p className="text-2xl tabular-nums">{total}</p>
         </div>
       }
       actions={
         <>
           {' '}
-          {(fromDate || toDate || projectId) && (
+          {(fromDate || toDate || projectIds.length > 0) && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -131,8 +133,9 @@ export function ReportToolbar({
         <ProjectSelector
           key={String(revealed)}
           projects={projects}
-          projectId={projectId}
-          onChange={(id) => onFilter('projectId', id)}
+          multiple={true}
+          projectIds={projectIds}
+          onChange={onProjectsChange}
         />
       </QueryToolbarField>
     </QueryToolbar>

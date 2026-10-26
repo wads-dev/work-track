@@ -106,3 +106,41 @@ it('accepts a62 civil day range spanning fall DST', async () => {
   ).rejects.toMatchObject({ code: 'invalid-argument' });
   expect(repo.readPage).toHaveBeenCalledTimes(calls);
 });
+
+it('validates multiple project selection and forwards it without narrowing global context', async () => {
+  const repo = {
+    readPage: vi
+      .fn<PersonalReportRepository['readPage']>()
+      .mockResolvedValue({ records: [], scannedCount: 0, nextCursor: null }),
+    readTopics: vi.fn().mockResolvedValue({}),
+    loadContext: vi.fn().mockResolvedValue([]),
+    userLabels: vi.fn().mockResolvedValue({}),
+    archivedProjectIds: vi.fn().mockResolvedValue([]),
+  };
+  for (const projectIds of [
+    ['duplicate', 'duplicate'],
+    ['../invalid'],
+    Array.from({ length: 101 }, (_, i) => 'p' + i),
+  ]) {
+    await expect(
+      getPersonalReportHandler(repo, { timeZone: 'UTC', projectIds }, auth),
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+  }
+  await expect(
+    getPersonalReportHandler(
+      repo,
+      { timeZone: 'UTC', projectId: 'a', projectIds: ['a'] },
+      auth,
+    ),
+  ).rejects.toMatchObject({ code: 'invalid-argument' });
+  expect(repo.readPage).not.toHaveBeenCalled();
+  await getPersonalReportHandler(
+    repo,
+    { timeZone: 'UTC', projectIds: ['a', 'b'] },
+    auth,
+  );
+  expect(repo.readPage.mock.calls[0]![3]).toMatchObject({
+    projectIds: ['a', 'b'],
+  });
+  expect(repo.loadContext).toHaveBeenCalledWith(['alice']);
+});

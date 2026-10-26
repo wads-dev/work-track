@@ -51,10 +51,13 @@ export type DetailState = {
   error: string;
 };
 export type AuditState = { rows: Row[]; loading: boolean; error: string };
+/** @deprecated Use the neutral presentation option repository. */
+export { searchOptions as searchCalendarOptions } from './option-search-repository';
 export type ReportCatalogOptions = {
   revealed: boolean;
   global?: boolean;
   projectId?: string;
+  projectIds?: readonly string[];
   includeArchived: boolean;
 };
 
@@ -214,17 +217,25 @@ export class BrowserDetailRepository {
         searchText: text(display.title) + ' ' + text(display.description),
       };
     });
-    const selectedProject = options.projectId
-      ? byId.get(options.projectId)
-      : undefined;
-    const selectionAvailable =
-      !options.projectId ||
-      Boolean(
-        selectedProject &&
+    if (options.projectId && options.projectIds)
+      throw new Error('Use projectId ou projectIds, não ambos.');
+    const selectedIds = [
+      ...new Set(
+        options.projectIds ?? (options.projectId ? [options.projectId] : []),
+      ),
+    ].sort();
+    if (selectedIds.length > 100)
+      throw new Error('Selecione no máximo 100 projetos.');
+    const selectedProject =
+      selectedIds.length === 1 ? byId.get(selectedIds[0]) : undefined;
+    const selectionAvailable = selectedIds.every((id) => {
+      const project = byId.get(id);
+      return Boolean(
+        project &&
         (!options.global ||
-          (selectedProject.type === 'work' &&
-            !isHidden(selectedProject, options.revealed))),
+          (project.type === 'work' && !isHidden(project, options.revealed))),
       );
+    });
     const topics = selectCalendarTopics(
       selectedProject,
       options.revealed,

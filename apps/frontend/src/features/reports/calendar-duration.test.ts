@@ -23,6 +23,21 @@ it('shows accounted time first and logged only when different', () => {
     '1h (logged: 2h)',
   );
 });
+it('applies project factor after physical overlap for whole and clipped intervals', () => {
+  expect(calendarDuration({ ...item, timeMultiplier: 0.25 })).toBe(
+    '45min (logged: 4h)',
+  );
+  expect(
+    calendarDuration(
+      { ...item, timeMultiplier: 0.25 },
+      start + 3600000,
+      start + 3 * 3600000,
+    ),
+  ).toBe('15min (logged: 2h)');
+  expect(calendarDuration({ ...item, timeMultiplier: 0 })).toBe(
+    '0min (logged: 4h)',
+  );
+});
 it('labels wall-clock duration explicitly when accounting context is unavailable', () => {
   expect(
     calendarDuration({
