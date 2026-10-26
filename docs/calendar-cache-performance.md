@@ -18,7 +18,7 @@ Contagens determinísticas sintéticas, não latência de produção:
 | 128 descrições,1 projeto           | 256 leituras                  | 6 consultas,129 documentos  |
 | 300 descrições,300 projetos        | 600 leituras                  | 20 consultas,600 documentos |
 
-Fixture de benchmark local,1000 registros,1 warmup e5 amostras alternadas: medianas pessoal162,34ms →25,16ms; empresa168,08ms →30,48ms. Não são medições de IndexedDB real nem do tempo total da tela. Sem threshold de tempo em CI.
+Fixture de benchmark local,1000 registros,1 warmup e5 amostras alternadas: medianas pessoal162,34ms →25,16ms; empresa168,08ms →30,48ms. Não são medições de IndexedDB real nem do tempo total da tela. Benchmark de tempo opt-in, fora do check padrão para não depender da velocidade do runner. As regressões exatas de consultas/documentos continuam obrigatórias no CI. Executar explicitamente: `WORK_TRACK_RUN_BENCHMARK=1 npm exec --workspace @work-track/frontend -- vitest run src/data/repositories/firestore-report-selection-benchmark.test.ts`. A execução explícita tem orçamento de60s; não há threshold de ganho temporal.
 
 Navegador com Docker isolado, demo-work-track: semana de06/10/2026 carregou14h52,5min; cálculo51,6ms e descrições2,7ms em uma amostra pequena. Alterar Régua→Compacto preservou total e gerou zero cache.read e zero performance.start, somente people.memory.read. Console sem erros. Não é comparação de latência de produção.
 
