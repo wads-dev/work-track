@@ -184,6 +184,61 @@ function fixture() {
     },
   };
 }
+it.each(['own', 'global'] as const)(
+  'uses complete selection in %s mode and preserves revalidation fences',
+  async (mode) => {
+    const f = fixture();
+    const own = f.repo.own.readPage.bind(f.repo.own),
+      company = f.repo.company.readPage.bind(f.repo.company);
+    const ownComplete = vi.fn(
+      (uid: string, selection?: ReportRecordSelection) =>
+        own(uid, 2000, undefined, selection),
+    );
+    const companyComplete = vi.fn((selection?: ReportRecordSelection) =>
+      company(2000, undefined, selection?.projectId, selection),
+    );
+    const ownPage = vi.fn(() => {
+      throw new Error('unexpected pagination');
+    });
+    const companyPage = vi.fn(() => {
+      throw new Error('unexpected pagination');
+    });
+    const revalidate = vi.fn(f.repo.revalidate.bind(f.repo));
+    f.repo.own.readCompleteSelection = ownComplete;
+    f.repo.company.readCompleteSelection = companyComplete;
+    f.repo.own.readPage = ownPage;
+    f.repo.company.readPage = companyPage;
+    f.repo.revalidate = revalidate;
+    const result = await executeCalendarReport(
+      f.repo,
+      { ...input, mode, allWeeks: false, includeArchived: false },
+      'alice',
+    );
+    expect(result.totalMinutes).toBeGreaterThan(0);
+    expect(revalidate).toHaveBeenCalledTimes(4);
+    expect(companyComplete).toHaveBeenCalled();
+    expect(ownPage).not.toHaveBeenCalled();
+    expect(companyPage).not.toHaveBeenCalled();
+  },
+);
+it.each([
+  { nextCursor: 'partial', scannedCount: 1 },
+  { nextCursor: null, scannedCount: 2001 },
+])('rejects partial complete-selection adapter: %j', async (partial) => {
+  const f = fixture();
+  f.repo.company.readCompleteSelection = () =>
+    Promise.resolve({
+      records: [],
+      ...partial,
+    });
+  await expect(
+    executeCalendarReport(
+      f.repo,
+      { ...input, mode: 'global', allWeeks: false, includeArchived: false },
+      'alice',
+    ),
+  ).rejects.toThrow('parcial');
+});
 it('keeps open zero-duration starts visible without adding hours or exposing private records', async () => {
   const f = fixture();
   const start = '2026-10-02T12:00:00Z';

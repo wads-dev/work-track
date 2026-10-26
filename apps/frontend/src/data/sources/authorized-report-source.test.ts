@@ -101,6 +101,44 @@ it('waits for complete atomic context and reports local errors without partial t
     hasPendingWrites: false,
   });
 });
+it('reuses the same content revision across metadata and audit events, including an in-flight catalog read', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedReport(db, 'viewer', next, fail);
+  const snapshot = {
+    ...state({ projects: [project()], records: [row()] }),
+    dataRevision: 1,
+  };
+  const pending = mocks.deferRead();
+  await emit(snapshot);
+  await emit({ ...snapshot, auditRevision: 2 });
+  expect(mocks.getDocsFromCache).toHaveBeenCalledTimes(1);
+  pending.release();
+  await flushCache();
+  expect(next).toHaveBeenCalledTimes(1);
+  const repository = next.mock.lastCall![0].repository;
+  await emit({ ...snapshot, auditRevision: 3 });
+  expect(next.mock.lastCall![0].repository).toBe(repository);
+  await emit({ ...snapshot, dataRevision: 2 });
+  expect(next).toHaveBeenCalledTimes(2);
+  await emit({ ...snapshot, dataRevision: 2, complete: false });
+  await emit({ ...snapshot, dataRevision: 2 });
+  expect(next).toHaveBeenCalledTimes(3);
+  expect(fail).not.toHaveBeenCalled();
+});
+it('permits retry of the same revision after transient cache read failure', async () => {
+  const next = vi.fn(),
+    fail = vi.fn();
+  subscribeAuthorizedReport(db, 'viewer', next, fail);
+  const snapshot = { ...state({ projects: [project()] }), dataRevision: 1 };
+  const pending = mocks.deferRead();
+  await emit(snapshot);
+  pending.reject(new Error('cache unavailable'));
+  await flushCache();
+  expect(fail).toHaveBeenCalledOnce();
+  await emit(snapshot);
+  expect(next).toHaveBeenCalledOnce();
+});
 it('rejects negative allocations without repairing authorized persisted facts', async () => {
   const next = vi.fn(),
     fail = vi.fn();

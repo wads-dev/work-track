@@ -19,6 +19,7 @@ import type {
 } from '@work-track/core/reports/domain/project-report';
 import type {
   PersonalReportRepository,
+  PersonalReportPage,
   ReportRecordSelection,
 } from '@work-track/core/reports/domain/personal-report';
 import { selectedProjectIds } from '@work-track/core/reports/domain/personal-report';
@@ -302,6 +303,29 @@ export class FirestoreReportRepository implements CompanyReportRepository {
       compareRecordPaths(recordPath(a), recordPath(b)),
     );
   }
+  private async completeSelection(
+    own: boolean,
+    selection?: ReportRecordSelection,
+    personalCodec = own,
+  ): Promise<PersonalReportPage> {
+    // A complete selection is fresh per invocation, never a memoized cursor snapshot.
+    const records = await this.records(
+      own,
+      undefined,
+      selection,
+      personalCodec,
+    );
+    // Native branches/shards each enforce their physical budget; their deduplicated
+    // union must also fit the complete selection budget before exposing any totals.
+    if (records.length > 2000)
+      throw new ReportContextError('Seleção completa excede2000registros.');
+    return { records, scannedCount: records.length, nextCursor: null };
+  }
+  async readCompleteSelection(
+    selection?: ReportRecordSelection,
+  ): Promise<PersonalReportPage> {
+    return this.completeSelection(false, selection);
+  }
   async readPage(
     size: number,
     cursor?: string,
@@ -373,6 +397,10 @@ export class FirestoreReportRepository implements CompanyReportRepository {
   }
   own(strictPersonalCodec = true): PersonalReportRepository {
     return {
+      readCompleteSelection: async (uid, selection) => {
+        if (uid !== this.viewer) throw new Error('Visualizador incompatível.');
+        return this.completeSelection(true, selection, strictPersonalCodec);
+      },
       readPage: async (uid, size, cursor, selection) => {
         if (uid !== this.viewer) throw new Error('Visualizador incompatível.');
         const rows = await this.records(
