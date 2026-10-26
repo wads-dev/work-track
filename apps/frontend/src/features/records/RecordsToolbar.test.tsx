@@ -34,9 +34,19 @@ vi.mock('../../components/ui/select', () => ({
 vi.mock('../projects/ProjectSelector', () => ({
   ProjectSelector: ({
     projects,
+    multiple,
+    projectIds,
   }: {
+    multiple: boolean;
+    projectIds: string[];
     projects: { id: string; label: string; searchText: string }[];
-  }) => <div data-project-options={JSON.stringify(projects)} />,
+  }) => (
+    <div
+      data-project-options={JSON.stringify(projects)}
+      data-multiple={multiple}
+      data-selected={JSON.stringify(projectIds)}
+    />
+  ),
 }));
 const catalog = [
   {
@@ -71,15 +81,32 @@ const render = (projectId = 'selected', revealed = false) =>
         revealed={revealed}
         loading={false}
         error=""
-        params={new URLSearchParams({ project: projectId })}
+        params={
+          projectId.includes('=')
+            ? new URLSearchParams(projectId)
+            : new URLSearchParams({ project: projectId })
+        }
         search="query"
         onFilter={() => {}}
+        onProjectsChange={() => {}}
         onClear={() => {}}
       />
     </TooltipProvider>,
   );
 
 describe('record toolbar metadata presentation', () => {
+  it('passes canonical multiple selections and disables topics for many or all projects', () => {
+    for (const query of [
+      'projectIds=selected&projectIds=other&topic=selected-topic',
+      '',
+    ]) {
+      const html = render(query);
+      expect(html).toContain('data-multiple="true"');
+      expect(html).toContain('data-disabled="true"');
+      expect(html).not.toContain('data-option="selected-topic"');
+      expect(html).toContain('data-value="__all__"');
+    }
+  });
   it('receives only the selected parent embedded topic options via repository output', () => {
     const html = render();
     expect(html).toContain('Selected topic');

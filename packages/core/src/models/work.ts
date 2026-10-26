@@ -1,3 +1,5 @@
+import type { TimeMultipliers } from '../registration/domain/time-multipliers.js';
+
 export interface Topic {
   githubUrl?: string | null;
   mergedIntoTopicId?: string;
@@ -9,6 +11,7 @@ export interface Topic {
   description: string;
 }
 export interface Project {
+  timeMultipliers?: TimeMultipliers;
   color?: string | null;
   type: 'personal' | 'work';
   githubUrl?: string | null;

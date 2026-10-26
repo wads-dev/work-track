@@ -162,12 +162,14 @@ it('filters deleted, missing and other-owner personal sources; rejects a differe
     record('missing', 'alice', 'missing'),
   ]);
   expect((await repo.readPage('w', 100, undefined, 'alice'))?.records).toEqual([
-    record('ok'),
+    { ...record('ok'), timeMultiplier: 1 },
   ]);
   expect(await repo.readPage('private', 100, undefined, 'alice')).toBeNull();
   expect(await repo.readPage('invalid', 100, undefined, 'alice')).toBeNull();
   expect(await repo.readPage('w', 100, undefined, 'bob')).toBeNull();
-  expect(await repo.loadContext(['alice'])).toEqual([record('ok')]);
+  expect(await repo.loadContext(['alice'])).toEqual([
+    { ...record('ok'), timeMultiplier: 1 },
+  ]);
   expect(
     await repo.revalidate(
       [

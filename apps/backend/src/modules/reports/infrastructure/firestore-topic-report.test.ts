@@ -44,7 +44,9 @@ it.each([null, '2026-10-08T11:00:00Z'])(
         ),
     } as unknown as Firestore;
     const repo = new FirestoreTopicReportRepository(db, {} as Auth);
-    expect(await repo.revalidate([record], 'alice', false)).toEqual([record]);
+    expect(await repo.revalidate([record], 'alice', false)).toEqual([
+      { ...record, timeMultiplier: 1 },
+    ]);
     raw.endedAt = '2026-10-08T12:00:00Z';
     expect(await repo.revalidate([record], 'alice', false)).toEqual([]);
   },

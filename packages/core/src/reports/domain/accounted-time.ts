@@ -39,6 +39,10 @@ export function buildTimeAccounting(
   const authors = new Map<string, Map<number, number>>();
   const keys = new Set<string>();
   for (const r of records) {
+    if (!Number.isFinite(r.timeMultiplier ?? 1) || (r.timeMultiplier ?? 1) < 0)
+      throw new ReportContextError(
+        'Multiplicador de tempo inválido no contexto autorizado.',
+      );
     const key = recordKey(r);
     if (keys.has(key))
       throw new ReportContextError(

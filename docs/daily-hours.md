@@ -17,7 +17,7 @@ MCP: get_daily_hours. Requer OAuth existente; consulta somente a coleção canô
 
 Resposta com scope: own, date, timeZone, asOf, bounds (início inclusivo/fim exclusivo UTC e duração real do dia, inclusive DST), totalMinutes/Hours, closedMinutes/Hours, estimatedMinutes/Hours, byProject com os mesmos totais, intervals e warnings. Minutos/horas são decimais, sem arredondamento intermediário.
 
-Cada intervalo conserva startedAt e endedAt originais; o storage exige `endedAt: null` para aberto, sem inventar um horário de fim. effectiveStartedAt/effectiveEndedAt são exclusivamente o recorte calculado do dia. estimated identifica abertos, não fatos; minutes representa o recorte.
+Cada intervalo conserva startedAt e endedAt originais; o storage exige `endedAt: null` para aberto, sem inventar um horário de fim. effectiveStartedAt/effectiveEndedAt são exclusivamente o recorte calculado do dia. estimated identifica abertos, não fatos; minutes representa o tempo computado do recorte, após rateio e fator por projeto/pessoa. allocatedMinutes representa o tempo físico rateado, loggedMinutes a duração original recortada e timeMultiplier o fator resolvido no início original do registro.
 
 Reutiliza a [política personal-v4](report-policy.md): sobreposições são divididas igualmente por trecho entre atividades da mesma pessoa no contexto autorizado completo antes dos filtros. Horários originais preservados; minutes representa o tempo contabilizado e loggedMinutes o recorte antes do rateio. Estimativas abertas limitadas a 6h, agora e meia-noite do registro/canônica, sem corte por próximo início e sem teto diário. Nenhum resultado derivado é persistido.
 

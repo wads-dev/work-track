@@ -13,6 +13,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '../../components/ui/tooltip';
+import {
+  MultiSelect,
+  type MultiSelectOption,
+} from '../../shared/ui/MultiSelect';
 import { ProjectSelector } from '../projects/ProjectSelector';
 import type { ProjectOption } from '../projects/project-search';
 import { QueryToolbar } from '../../shared/ui/QueryToolbar';
@@ -20,12 +24,7 @@ import { UiIcon } from '../../shared/ui/UiIcons';
 import { layoutTokens } from '../../shared/ui/layout-tokens';
 import { cn } from '../../lib/utils';
 
-type Option = {
-  value: string;
-  label: ReactNode;
-  text: string;
-  disabled?: boolean;
-};
+type Option = MultiSelectOption;
 /** Every calendar filter uses the same design-system Select and popper behavior. */
 function CalendarSelect({
   label,
@@ -75,13 +74,12 @@ export function CalendarToolbar({
   view,
   density,
   allWeeks,
-  projectId,
+  projectIds,
   projects,
   projectsLoading,
   projectsError,
-  personId,
+  userIds,
   personOptions,
-  personAvatar,
   personDisabled,
   subject,
   topics,
@@ -101,13 +99,12 @@ export function CalendarToolbar({
   view: string;
   density: string;
   allWeeks: boolean;
-  projectId: string;
+  projectIds: string[];
   projects: ProjectOption[];
   projectsLoading: boolean;
   projectsError: string;
-  personId: string;
+  userIds: string[];
   personOptions: Option[];
-  personAvatar: ReactNode;
   personDisabled: boolean;
   subject: string;
   topics: { id: string; label: string }[];
@@ -116,8 +113,8 @@ export function CalendarToolbar({
   onMove: (direction: number) => void;
   onView: (value: string) => void;
   onDensity: (value: string) => void;
-  onPerson: (value: string) => void;
-  onProject: (value: string) => void;
+  onPerson: (value: string[]) => void;
+  onProject: (value: string[]) => void;
   onSubject: (value: string) => void;
   onArchived: () => void;
   onRefresh: () => void;
@@ -220,29 +217,31 @@ export function CalendarToolbar({
             value: 'all',
             label: 'Semanas com atividade',
             text: 'Semanas com atividade',
-            disabled: !projectId,
+            disabled: projectIds.length !== 1,
           },
         ]}
       />
       <div data-calendar-person className="shrink-0">
-        <CalendarSelect
-          label="Pessoa"
-          value={personId}
+        <MultiSelect
+          label="Pessoas"
+          values={userIds}
           options={personOptions}
-          selected={personAvatar}
+          allLabel="Todas as pessoas"
+          plural="pessoas selecionadas"
           disabled={personDisabled}
           onChange={onPerson}
         />
       </div>
       <ProjectSelector
+        multiple={true}
+        label="Projetos"
+        projectIds={projectIds}
         projects={projects}
-        projectId={projectId}
         loading={projectsLoading}
         error={projectsError}
         onChange={onProject}
-        className="w-[200px] space-y-0 sm:w-[200px] [&>label]:sr-only"
       />
-      {projectId && (
+      {projectIds.length === 1 && (
         <CalendarSelect
           label="Tópico"
           value={subject || '__all__'}

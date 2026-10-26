@@ -96,6 +96,8 @@ describe('calendar people default and safe scope', () => {
   it('empty URL and current UID are own only', () => {
     expect(calendarPerson(new URLSearchParams(), 'me')).toEqual({
       selected: 'me',
+      ids: ['me'],
+      showPeople: false,
       mode: 'own',
       userIds: ['me'],
     });
@@ -106,6 +108,8 @@ describe('calendar people default and safe scope', () => {
   it('discovery needs explicit choice and only requests viewer global intervals', () => {
     expect(calendarPerson(new URLSearchParams('uid=all'), 'me')).toEqual({
       selected: 'all',
+      ids: [],
+      showPeople: true,
       mode: 'global',
     });
     expect(
@@ -199,8 +203,8 @@ describe('calendar people default and safe scope', () => {
     expect(source).toContain('const localRepository = local?.repository;');
     expect(source).toContain('uid={uid}');
     expect(source).not.toContain('projectId: projectId || undefined');
-    expect(source).toContain(
-      'calendarRequest(params, uid, from, to, zone, includeArchived)',
+    expect(source).toMatch(
+      /calendarRequest\(\s*personParams,\s*uid,\s*from,\s*to,\s*zone,\s*includeArchived,?\s*\)/,
     );
     expect(source).toMatch(/item.uid && item.uid !== uid\s*\? \(/);
     expect(
@@ -210,7 +214,9 @@ describe('calendar people default and safe scope', () => {
     expect(source).toContain('privacyBlocked');
     expect(source).toContain('directory.owner === uid');
     expect(source).toContain('directory.revision === accessRevision');
-    expect(source).toContain('Todas as pessoas');
+    expect(source).toContain('updateCalendarPeople(params, value)');
+    expect(source).toContain('projectIds={projectIds}');
+    expect(source).toContain('userIds={person.ids}');
     const timeline = readFileSync(
       new URL('../../features/reports/CalendarTimeline.tsx', import.meta.url),
       'utf8',

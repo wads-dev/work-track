@@ -11,6 +11,7 @@ import { text } from '../../shared/data';
 import { ProjectDeletion } from './ProjectDeletion';
 import { ownsVisibleProject } from './project-deletion';
 import { ProjectTopics } from './ProjectTopics';
+import { ProjectTimeMultipliers } from './ProjectTimeMultipliers';
 import { useProjects } from './hooks/useProjects';
 import { getAuth } from 'firebase/auth';
 import { safeProject, usePrivacy } from '../../shared/ui/privacy';
@@ -61,6 +62,12 @@ export function ProjectEditor({
         />
         <div className="min-w-0">{access}</div>
       </div>
+      <ProjectTimeMultipliers
+        key={projectId + String(project.updatedAt)}
+        functions={functions}
+        projectId={projectId}
+        project={project}
+      />
       <ProjectTopics
         key={'topics/' + projectId}
         functions={functions}

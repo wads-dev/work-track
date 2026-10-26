@@ -16,6 +16,27 @@ const fact = {
   topics: [{ id: 't', title: 'Topic', archived: false }],
 };
 describe('canonical project metadata', () => {
+  it.each(modes)('preserves validated multiplier histories in %s', (mode) => {
+    const timeMultipliers = {
+      alice: [
+        { multiplier: 0, effectiveFrom: null },
+        { multiplier: 1.5, effectiveFrom: '2026-01-01T00:00:00-03:00' },
+      ],
+    };
+    expect(
+      decodeReportProjectMetadata({ ...fact, timeMultipliers }, mode)
+        .timeMultipliers,
+    ).toEqual(timeMultipliers);
+    expect(() =>
+      decodeReportProjectMetadata(
+        {
+          ...fact,
+          timeMultipliers: { alice: [{ multiplier: -1, effectiveFrom: null }] },
+        },
+        mode,
+      ),
+    ).toThrow();
+  });
   it.each(modes)('accepts explicit state in %s', (mode) => {
     expect(decodeReportProjectMetadata(fact, mode)).toEqual(fact);
   });

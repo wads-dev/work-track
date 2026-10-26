@@ -13,6 +13,11 @@ const schema = z
       .string()
       .regex(/^[A-Za-z0-9_-]{1,128}$/)
       .optional(),
+    projectIds: z
+      .array(z.string().regex(/^[A-Za-z0-9_-]{1,128}$/))
+      .max(100)
+      .refine((ids) => new Set(ids).size === ids.length)
+      .optional(),
     timeZone: z
       .string()
       .max(100)
@@ -32,6 +37,10 @@ const schema = z
       .optional(),
   })
   .strict()
+  .refine(
+    (v) => v.projectId === undefined || v.projectIds === undefined,
+    'Seletores de projeto conflitantes.',
+  )
   .refine(
     (v) =>
       !v.from ||

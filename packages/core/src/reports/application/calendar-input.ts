@@ -6,6 +6,7 @@ export const calendarInput = z
     userIds: z
       .array(id)
       .min(1)
+      .max(100)
       .refine((v) => new Set(v).size === v.length)
       .optional(),
     from: z.iso.datetime({ offset: true }).optional(),
@@ -24,14 +25,23 @@ export const calendarInput = z
         }
       }),
     projectId: id.optional(),
+    projectIds: z
+      .array(id)
+      .min(1)
+      .max(100)
+      .refine((v) => new Set(v).size === v.length)
+      .optional(),
     includeArchived: z.boolean().default(false),
   })
   .strict()
   .refine(
     (v) =>
-      (!v.topicId || Boolean(v.projectId)) &&
+      !(v.projectId !== undefined && v.projectIds !== undefined) &&
+      (!v.topicId || Boolean(v.projectId || v.projectIds?.length === 1)) &&
       (v.allWeeks
-        ? Boolean(v.projectId) && v.from === undefined && v.to === undefined
+        ? Boolean(v.projectId || v.projectIds?.length === 1) &&
+          v.from === undefined &&
+          v.to === undefined
         : Boolean(
             v.from &&
             v.to &&

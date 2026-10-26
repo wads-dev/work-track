@@ -1,3 +1,4 @@
+import { resolveTimeMultiplier } from '@work-track/core/registration/domain/time-multipliers';
 import { reportRecordSchema } from '@work-track/data/codecs/report-record';
 import type { Firestore } from 'firebase-admin/firestore';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
@@ -40,6 +41,10 @@ export class FirestoreTopicReportRepository extends FirestoreProjectReportReposi
         if (!data || isDeletedRecord(data)) continue;
         reportRecordSchema('admin-project').parse(data);
         if (
+          resolveTimeMultiplier(
+            catalog.get(record.projectId)?.timeMultipliers?.[record.uid],
+            record.startedAt,
+          ) !== (record.timeMultiplier ?? 1) ||
           data.uid !== record.uid ||
           data.projectId !== record.projectId ||
           data.startedAt !== record.startedAt ||

@@ -15,6 +15,7 @@ import type { PersonalReportRepository } from '../domain/personal-report.js';
 import type { CompanyReportRepository } from '../domain/company-report.js';
 import type { ReportSourceRecord } from '../domain/project-report.js';
 import type { PersonalReportPage } from '../domain/personal-report.js';
+import { selectedProjectIds } from '../domain/personal-report.js';
 import type { CalendarInput } from './calendar-input.js';
 export class CalendarReportError extends Error {
   constructor(
@@ -64,6 +65,7 @@ export async function executeCalendarReport(
   uid: string,
   asOf = Date.now(),
 ) {
+  selectedProjectIds(input);
   if (input.mode === 'own' && input.userIds?.some((id) => id !== uid))
     throw new CalendarReportError(
       'permission-denied',
@@ -71,6 +73,7 @@ export async function executeCalendarReport(
     );
   const options = {
     projectId: input.projectId,
+    projectIds: input.projectIds,
     includeArchived: input.includeArchived,
     userIds: input.userIds,
     from: input.from,
@@ -79,6 +82,7 @@ export async function executeCalendarReport(
   };
   const directoryOptions = {
     projectId: input.projectId,
+    projectIds: input.projectIds,
     includeArchived: input.includeArchived,
   };
   const raw = await selection((cursor) =>
@@ -144,7 +148,9 @@ export async function executeCalendarReport(
   let selectedTopic: string | undefined;
   if (input.topicId) {
     const resolved = resolveTopic(
-      topicMetadataMap(topics[input.projectId!] ?? []),
+      topicMetadataMap(
+        topics[(input.projectId ?? input.projectIds?.[0])!] ?? [],
+      ),
       input.topicId,
     );
     if ('error' in resolved)

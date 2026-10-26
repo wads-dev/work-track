@@ -14,6 +14,8 @@ export function matchesReportRecordSelection(
   if (!selection) return true;
   if (selection.projectId && record.projectId !== selection.projectId)
     return false;
+  if (selection.projectIds && !selection.projectIds.includes(record.projectId))
+    return false;
   if (selection.userIds && !selection.userIds.includes(record.uid))
     return false;
   const project = projects.get(record.projectId);

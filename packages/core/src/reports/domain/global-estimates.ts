@@ -17,7 +17,8 @@ export function assertContext(
       current.startedAt !== r.startedAt ||
       current.endedAt !== r.endedAt ||
       current.projectId !== r.projectId ||
-      current.timeZone !== r.timeZone
+      current.timeZone !== r.timeZone ||
+      (current.timeMultiplier ?? 1) !== (r.timeMultiplier ?? 1)
     )
       throw new ReportContextError(
         'Página mudou durante consulta; recarregue para obter contexto consistente.',

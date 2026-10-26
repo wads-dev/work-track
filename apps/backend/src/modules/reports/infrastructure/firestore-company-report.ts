@@ -16,6 +16,7 @@ import type { CompanyReportRepository } from '@work-track/core/reports/domain/co
 import { FirestorePersonalReportRepository } from './firestore-personal-report.js';
 import { FirestoreProjectReportRepository } from './firestore-project-report.js';
 import { loadGlobalContext } from './firestore-global-context.js';
+import { selectedProjectIds } from '@work-track/core/reports/domain/personal-report';
 const schema = reportRecordSchema('admin-company');
 export class FirestoreCompanyReportRepository implements CompanyReportRepository {
   constructor(
@@ -56,14 +57,13 @@ export class FirestoreCompanyReportRepository implements CompanyReportRepository
     projectId?: string,
     selection?: ReportRecordSelection,
   ) {
-    projectId ??= selection?.projectId;
-    if (selection?.userIds?.length === 0)
+    const projectIds = selectedProjectIds(selection, projectId);
+    if (projectIds?.length === 0 || selection?.userIds?.length === 0)
       return { records: [], scannedCount: 0, nextCursor: null };
     const upper = reportUpperDatePrefix(selection);
-    let query: FirebaseFirestore.Query = this.db
+    const query: FirebaseFirestore.Query = this.db
       .collectionGroup('records')
       .where('deletedAt', '==', null);
-    if (projectId) query = query.where('projectId', '==', projectId);
     const readQueryPage = (filtered: FirebaseFirestore.Query) =>
       resumeReportQuery(
         orderReportQuery(filtered, upper),
@@ -78,20 +78,37 @@ export class FirestoreCompanyReportRepository implements CompanyReportRepository
     // limit; never drop the remaining people or apply a UID array filter.
     const uids = [...new Set(selection?.userIds ?? [])];
     const snapshots: FirebaseFirestore.QuerySnapshot[] = [];
-    if (!uids.length) snapshots.push(await readQueryPage(query));
-    else
-      for (let i = 0; i < uids.length; i += 30) {
-        const shard = uids.slice(i, i + 30);
-        snapshots.push(
-          await readQueryPage(
-            query.where(
-              'uid',
-              shard.length === 1 ? '==' : 'in',
-              shard.length === 1 ? shard[0] : shard,
+    // DNF10 also fits the100-component cap after range/order/parent expansion.
+    // Separate project/UID shards preserve every Cartesian combination.
+    const projectShards: (string[] | undefined)[] = [];
+    if (projectIds) {
+      for (let i = 0; i < projectIds.length; i += 10)
+        projectShards.push(projectIds.slice(i, i + 10));
+    } else projectShards.push(undefined);
+    for (const projects of projectShards) {
+      const filtered = projects
+        ? query.where(
+            'projectId',
+            projects.length === 1 ? '==' : 'in',
+            projects.length === 1 ? projects[0] : projects,
+          )
+        : query;
+      const size = Math.floor(10 / (projects?.length ?? 1));
+      if (!uids.length) snapshots.push(await readQueryPage(filtered));
+      else
+        for (let i = 0; i < uids.length; i += size) {
+          const shard = uids.slice(i, i + size);
+          snapshots.push(
+            await readQueryPage(
+              filtered.where(
+                'uid',
+                shard.length === 1 ? '==' : 'in',
+                shard.length === 1 ? shard[0] : shard,
+              ),
             ),
-          ),
-        );
-      }
+          );
+        }
+    }
     const merged = [
       ...new Map(
         snapshots

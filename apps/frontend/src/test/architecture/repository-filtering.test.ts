@@ -18,6 +18,19 @@ const selectorMethods = new Set([
  * repository, including option datasets and pagination. */
 const allowances: { file: string; expression: string; reason: string }[] = [
   {
+    file: 'apps/frontend/src/features/projects/ProjectTimeMultipliers.tsx',
+    expression:
+      "Object . entries ( original . data ) . flatMap ( ( [ userId , history ] ) => history . map ( ( rule ) => ( { userId , multiplier : String ( rule . multiplier ) , effectiveFrom : rule . effectiveFrom ?? '' } ) ) )",
+    reason:
+      'Validated single-project multiplier configuration transformed into unsaved editor rows, not dataset selection',
+  },
+  {
+    file: 'apps/frontend/src/features/projects/ProjectTimeMultipliers.tsx',
+    expression: 'rows . filter ( ( _ , i ) => i !== index )',
+    reason:
+      'Delete one unsaved configuration form row by local index, not a business listing query',
+  },
+  {
     file: 'apps/frontend/src/features/people/person-identity.ts',
     expression:
       'name . split ( / \\ s + / ) . filter ( Boolean ) . slice ( 0 , 2 )',

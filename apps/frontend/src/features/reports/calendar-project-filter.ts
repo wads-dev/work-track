@@ -1,3 +1,32 @@
+/** Canonical selection identity, independent of URL ordering and duplicates. */
+export const canonicalCalendarIds = (ids: readonly string[]) => {
+  const unique = new Set(ids);
+  unique.delete(''); // Empty URL value encodes no selection, not a dataset predicate.
+  return [...unique].sort();
+};
+export function calendarProjects(params: URLSearchParams) {
+  return canonicalCalendarIds(
+    params.has('projectIds')
+      ? params.getAll('projectIds')
+      : [params.get('projectId') || ''],
+  );
+}
+export function updateCalendarProjects(
+  params: URLSearchParams,
+  ids: readonly string[],
+) {
+  const next = new URLSearchParams(params);
+  const selected = canonicalCalendarIds(ids);
+  next.delete('projectId');
+  next.delete('projectIds');
+  for (const id of selected) next.append('projectIds', id);
+  next.delete('subject');
+  if (selected.length !== 1) next.delete('allWeeks');
+  for (const key of ['record', 'recordTab', 'cursor', 'historyPage'])
+    next.delete(key);
+  return next;
+}
+
 export type CalendarProjectOption = { id: string; label: string };
 
 // Labels arrive already masked by safeProject; never search raw project metadata.

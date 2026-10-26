@@ -1,3 +1,5 @@
+import { canonical } from './web-transaction-adapter';
+import { timeMultipliersSchema } from '@work-track/core/registration/domain/time-multipliers';
 import { buildRecordEditPlan } from '@work-track/data/repositories/record-edit-plan';
 import {
   collection,
@@ -171,7 +173,25 @@ export class WebWorkRepository {
           'failed-precondition',
           'Alteração de escopo exige fluxo explícito.',
         );
-      const { projectId, requestId, reason, ...metadata } = input;
+      const {
+        projectId,
+        requestId,
+        reason,
+        expectedTimeMultipliers,
+        ...metadata
+      } = input;
+      if (
+        metadata.timeMultipliers !== undefined &&
+        canonical(
+          Object.hasOwn(before, 'timeMultipliers')
+            ? timeMultipliersSchema.parse(before.timeMultipliers)
+            : null,
+        ) !== canonical(expectedTimeMultipliers)
+      )
+        throw new ProjectManagementError(
+          'failed-precondition',
+          'Os multiplicadores foram alterados. Recarregue o projeto antes de salvar.',
+        );
       void projectId;
       void requestId;
       void reason;

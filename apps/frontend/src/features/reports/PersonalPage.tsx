@@ -24,6 +24,7 @@ import {
   calendarPerson,
   calendarRequest,
   updateCalendarPerson,
+  updateCalendarPeople,
   calendarReport,
   type CalendarResponse,
 } from './calendar-people';
@@ -42,7 +43,11 @@ import {
 } from '../../data/cache/record-deletion';
 
 import type { Functions } from 'firebase/functions';
-import { calendarDuration, durationLabel } from './calendar-duration';
+import {
+  calendarDuration,
+  calendarDurationDetails,
+  durationLabel,
+} from './calendar-duration';
 import { executePersonalReport } from '@work-track/core/reports/application/get-personal-report';
 import { executeCalendarReport } from '@work-track/core/reports/application/get-calendar-report';
 import { calendarInput } from '@work-track/core/reports/application/calendar-input';
@@ -59,15 +64,23 @@ import {
 } from 'react-router-dom';
 import { reportError } from './report-error';
 import { reportRepositoryMatches } from './report-repository-fence';
-import { UiIcon } from '../../shared/ui/UiIcons';
 import { ReportToolbar } from './ReportToolbar';
+import {
+  reportProjects,
+  updateReportProjects,
+  updateReportFilters,
+} from './report-project-filter';
+import { selectedProjectIds } from '@work-track/core/reports/domain/personal-report';
 import { EmptyState } from '../../shared/ui/Surface';
 import { RecordDrawer } from '../records/RecordDrawer';
 import { contextualRecordPath } from '../../app/routes';
 import { CalendarTimeline } from './CalendarTimeline';
 import { calendarEventDetails } from './calendar-event-details';
 import { layoutDay } from './timeline-layout';
-import { updatePersonalFilters } from './calendar-project-filter';
+import {
+  calendarProjects,
+  updateCalendarProjects,
+} from './calendar-project-filter';
 import { date, text } from '../../shared/data';
 import { safeProject, usePrivacy } from '../../shared/ui/privacy';
 import { hours } from './report-chart';
@@ -123,9 +136,11 @@ export function PersonalPage({
   const [infoOpen, setInfoOpen] = useState(false);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
-  const person = calendarPerson(params, uid);
+  const personParams = profile ? updateCalendarPerson(params, uid) : params;
+  const person = calendarPerson(personParams, uid);
+  const peopleKey = JSON.stringify(person.ids);
   useEffect(() => {
-    if (calendar && !params.get('uid'))
+    if (calendar && !params.has('uid') && !params.has('userIds'))
       setParams(updateCalendarPerson(params, uid), { replace: true });
   }, [calendar, params, uid, setParams]);
   const { revealed } = usePrivacy();
@@ -141,7 +156,11 @@ export function PersonalPage({
   const includeArchived = params.get('includeArchived') === 'true';
   const firstDate = params.get('fromDate') ?? '';
   const lastDate = params.get('toDate') ?? '';
-  const projectId = params.get('projectId') ?? '';
+  const projectIds = calendar
+    ? calendarProjects(params)
+    : reportProjects(params);
+  const projectsKey = JSON.stringify(projectIds);
+  const projectId = projectIds.length === 1 ? projectIds[0] : '';
   const recordId = params.get('record');
   const allWeeks = calendar && params.get('allWeeks') === 'true';
   const subject = calendar ? params.get('subject') || '' : '';
@@ -152,6 +171,8 @@ export function PersonalPage({
     projects.rows,
     revealed,
     person.mode,
+    peopleKey,
+    projectsKey,
     projectId,
     includeArchived,
   ]);
@@ -180,7 +201,7 @@ export function PersonalPage({
       .readReportCatalog({
         revealed,
         global: calendar && person.mode === 'global',
-        projectId,
+        projectIds,
         includeArchived,
       })
       .then((value) => {
@@ -211,12 +232,18 @@ export function PersonalPage({
   let invalid = '';
   let view: View = 'day';
   try {
+    selectedProjectIds({ projectIds });
+    if (calendar) {
+      calendarRequest(personParams, uid, '', '', zone, includeArchived);
+      if (projectIds.length > 100 || person.ids.length > 100)
+        throw new Error('Selecione no máximo 100 projetos ou pessoas.');
+    }
     if (!['day', 'three-days', 'week', 'month'].includes(rawView))
       throw new Error('Visualização inválida.');
     if (!['supercompact', 'compact', 'timeline'].includes(density))
       throw new Error('Densidade inválida.');
     view = rawView as View;
-    if (allWeeks && !projectId)
+    if (allWeeks && projectIds.length !== 1)
       throw new Error(
         'Selecione um projeto para consultar todas as semanas com atividade.',
       );
@@ -254,6 +281,8 @@ export function PersonalPage({
     rows: { uid: string; label: string }[];
   }>({ owner: '', partition: '', unavailable: false, revision: -1, rows: [] });
   const directoryPartition = JSON.stringify([
+    projectsKey,
+    peopleKey,
     projectId,
     includeArchived,
     zone,
@@ -264,8 +293,7 @@ export function PersonalPage({
   const scopedParticipants =
     directory.owner === uid &&
     directory.revision === accessRevision &&
-    directory.partition === directoryPartition &&
-    !privacyBlocked
+    directory.partition === directoryPartition
       ? directory.rows.map((person) => ({
           ...person,
           label: companyPeople.name(person.uid) || person.label,
@@ -292,7 +320,8 @@ export function PersonalPage({
     zone,
     projectId,
     includeArchived,
-    calendar ? person.selected : '',
+    calendar ? person.ids : [],
+    projectIds,
     allWeeks,
     subject,
     view,
@@ -330,12 +359,7 @@ export function PersonalPage({
   const [localError, setLocalError] = useState('');
   const [sourceLoading, setSourceLoading] = useState(false);
   const authorizedProjectIdsKey = JSON.stringify(
-    [
-      ...new Set([
-        ...projects.rows.map((p) => p.id),
-        ...(projectId ? [projectId] : []),
-      ]),
-    ].sort(),
+    [...new Set([...projects.rows.map((p) => p.id), ...projectIds])].sort(),
   );
   useEffect(() => {
     setLoading(true);
@@ -359,6 +383,8 @@ export function PersonalPage({
           query: JSON.stringify([
             from,
             to,
+            projectsKey,
+            peopleKey,
             projectId,
             allWeeks,
             authorizedProjectIdsKey,
@@ -390,6 +416,8 @@ export function PersonalPage({
     from,
     to,
     projectId,
+    projectsKey,
+    peopleKey,
     allWeeks,
   ]);
   const local =
@@ -398,7 +426,15 @@ export function PersonalPage({
     localSnapshot?.owner === uid &&
     localSnapshot.revision === accessRevision &&
     localSnapshot.query ===
-      JSON.stringify([from, to, projectId, allWeeks, authorizedProjectIdsKey])
+      JSON.stringify([
+        from,
+        to,
+        projectsKey,
+        peopleKey,
+        projectId,
+        allWeeks,
+        authorizedProjectIdsKey,
+      ])
       ? localSnapshot.snapshot
       : null;
   const localRepository = local?.repository;
@@ -440,7 +476,7 @@ export function PersonalPage({
             {
               ...(from ? { from } : {}),
               ...(to ? { to } : {}),
-              ...(projectId ? { projectId } : {}),
+              ...(projectIds.length ? { projectIds } : {}),
               timeZone: zone,
               includeArchived,
             },
@@ -452,7 +488,14 @@ export function PersonalPage({
                 localRepository as AuthorizedReportSnapshot['repository']
               ).calendar(),
               calendarInput.parse(
-                calendarRequest(params, uid, from, to, zone, includeArchived),
+                calendarRequest(
+                  personParams,
+                  uid,
+                  from,
+                  to,
+                  zone,
+                  includeArchived,
+                ),
               ),
               uid,
             ).then((data) => ({
@@ -468,7 +511,7 @@ export function PersonalPage({
               {
                 ...(from ? { from } : {}),
                 ...(to ? { to } : {}),
-                ...(projectId ? { projectId } : {}),
+                ...(projectIds.length ? { projectIds } : {}),
                 timeZone: zone,
                 limit: 50,
                 includeArchived,
@@ -538,7 +581,8 @@ export function PersonalPage({
     company,
     calendar,
     person.mode,
-    person.selected,
+    peopleKey,
+    projectsKey,
     queryIdentity,
     directoryPartition,
     privacyBlocked,
@@ -577,7 +621,7 @@ export function PersonalPage({
   function update(key: string, value: string) {
     const next = calendar
       ? updateCalendarFilters(params, key, value)
-      : updatePersonalFilters(params, key, value);
+      : updateReportFilters(params, key, value);
     if (calendar && key === 'clear') next.set('uid', uid);
     next.delete('record');
     setParams(next);
@@ -622,7 +666,10 @@ export function PersonalPage({
           }
           fromDate={firstDate}
           toDate={lastDate}
-          projectId={projectId}
+          projectIds={projectIds}
+          onProjectsChange={(ids) =>
+            setParams(updateReportProjects(params, ids))
+          }
           projects={catalog?.projectOptions ?? []}
           onFilter={update}
           onRefresh={() => {
@@ -641,24 +688,17 @@ export function PersonalPage({
           view={view}
           density={density}
           allWeeks={allWeeks}
-          projectId={projectId}
+          projectIds={projectIds}
           projects={catalog?.projectOptions ?? []}
           projectsLoading={projects.loading || !catalog}
           projectsError={
             projects.error ||
             (catalogError?.key === catalogKey ? catalogError.message : '')
           }
-          personId={person.selected}
+          userIds={person.ids}
           personDisabled={profile}
-          personAvatar={
-            person.selected === 'all' ? (
-              <UiIcon kind="people" />
-            ) : (
-              <PersonIdentity uid={person.selected} avatarOnly />
-            )
-          }
           personOptions={[
-            // Identity directory is a presentation join, not a report filter.
+            // Identity is never privacy-masked; this is a presentation join only.
             ...new Map([
               [
                 uid,
@@ -689,27 +729,6 @@ export function PersonalPage({
                   ] as const,
               ),
             ]).values(),
-            ...(participants.length > 0 &&
-            (!directory.unavailable || companyPeople.people.length > 0)
-              ? [
-                  {
-                    value: 'all',
-                    text: 'Todas as pessoas',
-                    label: 'Todas as pessoas',
-                  },
-                ]
-              : []),
-            ...(person.selected !== uid &&
-            person.selected !== 'all' &&
-            !participants.some((p) => p.uid === person.selected)
-              ? [
-                  {
-                    value: person.selected,
-                    text: 'Pessoa selecionada',
-                    label: <PersonIdentity uid={person.selected} />,
-                  },
-                ]
-              : []),
           ]}
           subject={subject}
           topics={topics}
@@ -720,8 +739,10 @@ export function PersonalPage({
           }
           onView={(value) => setParams(updateCalendarView(params, value))}
           onDensity={(value) => update('density', value)}
-          onPerson={(value) => setParams(updateCalendarPerson(params, value))}
-          onProject={(value) => update('projectId', value)}
+          onPerson={(value) => setParams(updateCalendarPeople(params, value))}
+          onProject={(value) =>
+            setParams(updateCalendarProjects(params, value))
+          }
           onSubject={(value) => update('subject', value)}
           onArchived={() => update('includeArchived', String(!includeArchived))}
           onRefresh={() => {
@@ -744,6 +765,11 @@ export function PersonalPage({
             </AlertDescription>
           </Alert>
         )}
+      {calendar && report && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Tempo computado: {durationLabel(report.totalMinutes)}
+        </p>
+      )}
       {calendar && subject && (
         <Alert>
           <AlertDescription>
@@ -932,7 +958,7 @@ export function PersonalPage({
             )}
             {calendar && allWeeks && (
               <CalendarHistory
-                showPeople={person.selected === 'all'}
+                showPeople={person.showPeople}
                 details={eventDetails}
                 weeks={report.occupiedWeeks ?? []}
                 occurrences={report.weekOccurrences ?? []}
@@ -950,7 +976,7 @@ export function PersonalPage({
             )}
             {calendar && !allWeeks && density === 'timeline' && (
               <CalendarTimeline
-                showPeople={person.selected === 'all'}
+                showPeople={person.showPeople}
                 details={eventDetails}
                 items={report.intervals}
                 day={selected}
@@ -1105,13 +1131,12 @@ export function PersonalPage({
                                             />
                                           </span>
                                         )}{' '}
-                                        {person.selected === 'all' &&
-                                          item.uid && (
-                                            <>
-                                              <PersonIdentity uid={item.uid} />
-                                              {' · '}
-                                            </>
-                                          )}
+                                        {person.showPeople && item.uid && (
+                                          <>
+                                            <PersonIdentity uid={item.uid} />
+                                            {' · '}
+                                          </>
+                                        )}
                                         {label(item.projectId)}
                                         <span className="block whitespace-normal text-xs">
                                           {eventDetails(item).topics}
@@ -1206,13 +1231,12 @@ export function PersonalPage({
                                             />
                                           </span>
                                         )}{' '}
-                                        {person.selected === 'all' &&
-                                          item.uid && (
-                                            <>
-                                              <PersonIdentity uid={item.uid} />
-                                              {' · '}
-                                            </>
-                                          )}
+                                        {person.showPeople && item.uid && (
+                                          <>
+                                            <PersonIdentity uid={item.uid} />
+                                            {' · '}
+                                          </>
+                                        )}
                                         {label(item.projectId)}
                                         <span className="block whitespace-normal text-xs">
                                           {eventDetails(item).topics}
@@ -1269,7 +1293,7 @@ export function PersonalPage({
                                     minute: '2-digit',
                                   }).format(new Date(item.effectiveEndedAt)) +
                                   ' · ' +
-                                  calendarDuration(item, start, end) +
+                                  calendarDurationDetails(item, start, end) +
                                   (item.estimated ? ' · Duração estimada' : '')}
                               </TooltipContent>
                             </Tooltip>
@@ -1314,8 +1338,8 @@ export function PersonalPage({
                             : 0),
                         0,
                       );
-                      return logged > p.minutes + 0.000001
-                        ? ' (logged: ' + durationLabel(logged) + ')'
+                      return Math.abs(logged - p.minutes) > 0.000001
+                        ? ' (registrado: ' + durationLabel(logged) + ')'
                         : '';
                     })()}
                   </li>

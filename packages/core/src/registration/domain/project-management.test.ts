@@ -1,11 +1,32 @@
 import { expect, it } from 'vitest';
 import {
   githubUrl,
+  updateProjectInput,
   publicAlias,
   mergeProjectsInput,
   mapTopics,
   assertProjectWritable,
 } from './project-management.js';
+it('requires a paired multiplier snapshot and preserves ordinary updates', () => {
+  const base = { projectId: 'p', requestId: 'r', reason: 'Configurar' };
+  expect(updateProjectInput.safeParse({ ...base, title: 'Novo' }).success).toBe(
+    true,
+  );
+  expect(
+    updateProjectInput.safeParse({
+      ...base,
+      timeMultipliers: {},
+      expectedTimeMultipliers: null,
+    }).success,
+  ).toBe(true);
+  expect(
+    updateProjectInput.safeParse({ ...base, timeMultipliers: {} }).success,
+  ).toBe(false);
+  expect(
+    updateProjectInput.safeParse({ ...base, expectedTimeMultipliers: null })
+      .success,
+  ).toBe(false);
+});
 it('accepts only exact HTTPS GitHub repository URLs', () => {
   expect(
     githubUrl.safeParse('https://github.com/wads/work-track').success,

@@ -9,6 +9,9 @@ export function updateCalendarFilters(
   if (key === 'clear') {
     for (const name of [
       'projectId',
+      'projectIds',
+      'userIds',
+      'uid',
       'subject',
       'allWeeks',
       'date',

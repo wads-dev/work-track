@@ -30,6 +30,7 @@ import {
   readOwnRecordListing,
   createProjectOptionRepository,
   resolveRecordTopic,
+  listingKey,
 } from './browser-listing-repository';
 it('rejects topic aliases without redirecting and retains records for truly removed topics', async () => {
   const project = mocks.docs.get('projects/p')!;
@@ -243,7 +244,7 @@ it('queries uid/project/ID/date guards and rechecks current parent ACL before ex
   expect(mocks.queries[0].clauses).toEqual(
     expect.arrayContaining([
       { field: 'uid', op: '==', value: 'alice' },
-      { field: 'projectId', op: '==', value: 'p' },
+      { field: 'projectId', op: 'in', value: ['p'] },
       expect.objectContaining({ field: 'startedAt', op: '<=' }),
     ]),
   );
@@ -381,12 +382,12 @@ it('chunks native authorization ID constraints without silently limiting complet
   });
   expect(result.total).toBe(65);
   expect(result.rows).toHaveLength(15);
-  expect(mocks.queries).toHaveLength(3);
+  expect(mocks.queries).toHaveLength(7);
   for (const target of mocks.queries)
     expect(
       (target.clauses.find((c) => c.field === 'projectId')?.value as string[])
         .length,
-    ).toBeLessThanOrEqual(30);
+    ).toBeLessThanOrEqual(10);
 });
 it('logs read/result counts for cache failures and never falls back remotely for missing parents', async () => {
   mocks.get.mockRejectedValueOnce(new Error('storage'));
@@ -524,4 +525,85 @@ it('does not wrap near year9999 range candidates below valid four-digit facts', 
     includeDeleted: false,
   });
   expect(result.rows.map((r) => r.id)).toEqual(['edge']);
+});
+
+it('queries every explicit project shard and overlap branch before pagination', async () => {
+  const ids = Array.from({ length: 23 }, (_, i) => 'selected-' + i);
+  for (const id of [...ids, 'unselected']) {
+    mocks.docs.set('projects/' + id, {
+      createdBy: 'alice',
+      type: 'work',
+      topics: [],
+      archived: false,
+      confidential: false,
+    });
+    record(id, {
+      projectId: id,
+      startedAt: '2026-09-01T00:00:00Z',
+      endedAt: '2026-11-01T00:00:00Z',
+    });
+    record(id + '-open', { projectId: id, startedAt: '2026-09-01T00:00:00Z' });
+  }
+  const result = await readOwnRecordListing(
+    db,
+    'alice',
+    new Set([...ids, 'unselected']),
+    {
+      projectIds: [...ids, ids[0]],
+      fromDate: '2026-10-01',
+      toDate: '2026-10-02',
+      size: 10,
+      page: 4,
+    },
+  );
+  expect(result.total).toBe(46);
+  expect(result.rows).toHaveLength(6);
+  expect(mocks.queries).toHaveLength(6);
+  for (const target of mocks.queries) {
+    const clause = target.clauses.find((c) => c.field === 'projectId')!;
+    expect(clause.op).toBe('in');
+    expect((clause.value as string[]).length).toBeLessThanOrEqual(10);
+    expect(clause.value).not.toContain('unselected');
+  }
+});
+it('fences project array selections canonically and rejects an unauthorized explicit project without broadening', async () => {
+  expect(listingKey({ projectIds: ['b', 'a', 'b'] })).toBe(
+    listingKey({ projectIds: ['a', 'b'] }),
+  );
+  expect(listingKey({ projectIds: ['a'] })).not.toBe(
+    listingKey({ projectIds: ['b'] }),
+  );
+  record('visible');
+  expect(
+    (
+      await readOwnRecordListing(db, 'alice', allowed, {
+        projectIds: ['p', 'forbidden'],
+      })
+    ).total,
+  ).toBe(0);
+  expect(mocks.get).not.toHaveBeenCalled();
+});
+
+it('rejects over-limit and conflicting direct selections instead of silently broadening or truncating', async () => {
+  const projectIds = Array.from({ length: 101 }, (_, i) => 'p' + i);
+  expect(() => listingKey({ projectIds })).toThrow('100');
+  await expect(
+    readOwnRecordListing(db, '', new Set(), { projectIds }),
+  ).rejects.toThrow('100');
+  await expect(
+    readOwnRecordListing(db, 'alice', allowed, {
+      projectIds: ['p', 'private'],
+      topic: 't',
+    }),
+  ).rejects.toThrow('exatamente um');
+  await expect(
+    readOwnRecordListing(db, 'alice', allowed, { projectIds: [], topic: 't' }),
+  ).rejects.toThrow('exatamente um');
+  await expect(
+    readOwnRecordListing(db, 'alice', allowed, {
+      projectIds: ['private'],
+      project: 'p',
+    }),
+  ).rejects.toThrow('conflitante');
+  expect(mocks.get).not.toHaveBeenCalled();
 });

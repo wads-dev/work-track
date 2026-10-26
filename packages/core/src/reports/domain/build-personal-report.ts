@@ -84,7 +84,9 @@ export function buildPersonalReport(
       warnings.add('Há intervalos sobrepostos no período.');
     const segments = global.segments(record, effectiveStart, effectiveEnd),
       loggedMinutes = Math.max(0, (effectiveEnd - effectiveStart) / 60000),
-      minutes = accountedMinutes(segments);
+      allocatedMinutes = accountedMinutes(segments),
+      timeMultiplier = record.timeMultiplier ?? 1,
+      minutes = allocatedMinutes * timeMultiplier;
     result.intervals.push({
       id: record.id,
       projectId: record.projectId,
@@ -95,6 +97,8 @@ export function buildPersonalReport(
       estimated,
       minutes,
       loggedMinutes,
+      allocatedMinutes,
+      timeMultiplier,
       accountingSegments: segments,
     });
     if (estimated) result.estimatedCount++;
