@@ -102,7 +102,12 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('firebase/firestore', () => ({ getFirestore: () => m.db }));
 vi.mock('react-router-dom', () => ({
-  useSearchParams: () => [m.params, vi.fn()],
+  useSearchParams: () => [
+    m.params,
+    (next: URLSearchParams) => {
+      m.params = next;
+    },
+  ],
   useLocation: () => ({ pathname: '/me', search: '' }),
   useParams: () => ({ projectId: 'p', topicId: 't' }),
   Link: 'a',
@@ -195,6 +200,8 @@ import { TopicDetails } from './TopicDetails';
 import { ReportToolbar } from './ReportToolbar';
 import { CalendarToolbar } from './CalendarToolbar';
 import { CalendarTimeline } from './CalendarTimeline';
+import { RecordDrawer } from '../records/RecordDrawer';
+import { PORTRAIT_MOBILE_QUERY } from './calendar-view';
 afterEach(() => {
   hooks.reset();
   vi.unstubAllGlobals();
@@ -232,6 +239,18 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.subscriptions.length = 0;
   m.params = new URLSearchParams();
+  vi.stubGlobal('document', { visibilityState: 'visible' });
+  vi.stubGlobal('window', {
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    setInterval: vi.fn(),
+    clearInterval: vi.fn(),
+    matchMedia: vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
   m.projects.complete = true;
   m.projects.loading = false;
   m.projects.error = '';
@@ -249,6 +268,50 @@ beforeEach(() => {
   });
   m.calculate.mockResolvedValue(report);
 });
+it.each([false, true])(
+  'defaults calendar view for portrait mobile=%s and preserves explicit links',
+  async (portrait) => {
+    vi.stubGlobal('window', {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      setInterval: vi.fn(),
+      clearInterval: vi.fn(),
+      matchMedia: vi.fn((query: string) => ({
+        matches: query === PORTRAIT_MOBILE_QUERY && portrait,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    });
+    let tree = await settle(() => PersonalPage({ ...props, calendar: true }));
+    const toolbar = () =>
+      elements(tree).find((element) => element.type === CalendarToolbar)!;
+    expect(toolbar().props.view).toBe(portrait ? 'day' : 'three-days');
+    m.params = new URLSearchParams('view=week&date=2026-10-10');
+    tree = await settle(() => PersonalPage({ ...props, calendar: true }));
+    expect(toolbar().props.view).toBe('week');
+    expect(toolbar().props.date).toBe('2026-10-10');
+  },
+);
+
+it('preserves the selected record when initializing the own-person calendar URL', async () => {
+  m.params = new URLSearchParams('view=day&date=2026-10-10&record=r');
+  const tree = await settle(() => PersonalPage({ ...props, calendar: true }));
+  expect(m.params.get('uid')).toBe('alice');
+  expect(m.params.get('record')).toBe('r');
+  const drawer = elements(tree).find(
+    (element) => element.type === RecordDrawer,
+  )!;
+  expect(drawer.props.recordId).toBe('r');
+  const toolbar = elements(tree).find(
+    (element) => element.type === CalendarToolbar,
+  )!;
+  expect(toolbar.props.view).toBe('day');
+  expect(toolbar.props.date).toBe('2026-10-10');
+  (drawer.props.onClose as () => void)();
+  expect(m.params.get('record')).toBeNull();
+  expect(m.params.get('date')).toBe('2026-10-10');
+});
+
 const props = {
   db: m.db as never,
   functions: m.functions as never,
@@ -465,6 +528,7 @@ it('calendar uses the same retained result and loading for click, focus, timer a
   vi.stubGlobal(
     'window',
     Object.assign(win, {
+      matchMedia: window.matchMedia,
       setInterval: vi.fn((callback: () => void) => {
         timer = callback;
         return 1;
