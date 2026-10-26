@@ -93,6 +93,8 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
       return () => {};
     },
   };
+  let dataRevision = 0,
+    auditRevision = 0;
   const requestedAudits = new Map<string, number>();
   entries.set(db, entry);
   const emit = () => {
@@ -137,6 +139,8 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
       ready.has('catalog:1') &&
       [...projectStops.keys()].every((key) => ready.has(key));
     const nextSnapshot: WorkspaceSignal = {
+      dataRevision,
+      auditRevision,
       auditReady: [...auditStops.keys()].filter((path) =>
         ready.has('audit:' + path),
       ),
@@ -145,6 +149,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
       syncing: !complete,
       error: '',
     };
+    if (JSON.stringify(entry.snapshot) === JSON.stringify(nextSnapshot)) return;
     entry.snapshot = nextSnapshot;
     traceFirestore('workspace.return', {
       projects: nextSnapshot.completedProjects.length,
@@ -204,6 +209,11 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
         }
         if (confirmed) ready.add(key);
         try {
+          // docChanges() excludes metadata-only transitions by default.
+          if (s.docChanges().length) {
+            if (collectionName === 'audit') auditRevision++;
+            else dataRevision++;
+          }
           coordinate(s);
           publish();
         } catch (error) {

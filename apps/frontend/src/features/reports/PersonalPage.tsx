@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils';
+import { measureFirestoreStage } from '../../data/sync/firestore-diagnostics';
 import { Clock3 } from 'lucide-react';
 import { ProjectAppearance } from '@work-track/core/registration/domain/project-color';
 import { useCompanyPeople } from '../people/CompanyPeopleContext';
@@ -324,9 +325,6 @@ export function PersonalPage({
     projectIds,
     allWeeks,
     subject,
-    view,
-    selected,
-    density,
   ]);
   const [reportRevision, setReportRevision] = useState(-1);
   const [cachedReport, setReport] = useState<PersonalReport | null>(null);
@@ -469,6 +467,9 @@ export function PersonalPage({
       setLoading(!failure);
       return;
     }
+    const finishCalculation = measureFirestoreStage(
+      calendar ? 'calendar.calculate' : 'report.calculate',
+    );
     const request =
       !calendar && !company
         ? executePersonalReport(
@@ -519,13 +520,18 @@ export function PersonalPage({
             ).then((data) => ({ data: data as PersonalReport }));
     void request
       .then(async (result) => {
+        finishCalculation();
+        const finishDetails = measureFirestoreStage('report.descriptions');
         const sources = calendar
           ? await new BrowserDetailRepository(
               db,
               uid,
               new Set(catalog.projects.keys()),
-            ).readDescriptions(result.data.intervals)
+            )
+              .readDescriptions(result.data.intervals)
+              .finally(() => finishDetails())
           : new Map<string, DescriptionSource>();
+        finishDetails();
         if (active) {
           if (
             deletionRevision(uid) !== revision ||
@@ -551,6 +557,7 @@ export function PersonalPage({
         }
       })
       .catch((failure: unknown) => {
+        finishCalculation(false);
         if (
           active &&
           deletionRevision(uid) === revision &&

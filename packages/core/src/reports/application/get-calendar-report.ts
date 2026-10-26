@@ -37,7 +37,20 @@ export interface CalendarRepository {
 /** Bound physical pagination as well as visible records: no unbounded private/deleted scan. */
 async function selection(
   read: (cursor?: string) => Promise<PersonalReportPage>,
+  complete?: () => Promise<PersonalReportPage>,
 ) {
+  if (complete) {
+    const result = await complete();
+    if (
+      result.nextCursor ||
+      result.records.length > 2000 ||
+      result.scannedCount > 2000
+    )
+      throw new ReportContextError(
+        'Seleção completa excede2000 ou retornou página parcial.',
+      );
+    return result;
+  }
   const records: ReportSourceRecord[] = [];
   let cursor: string | undefined;
   const seen = new Set<string>();
@@ -85,10 +98,16 @@ export async function executeCalendarReport(
     projectIds: input.projectIds,
     includeArchived: input.includeArchived,
   };
-  const raw = await selection((cursor) =>
+  const raw = await selection(
+    (cursor) =>
+      input.mode === 'own'
+        ? repository.own.readPage(uid, 100, cursor, options)
+        : repository.company.readPage(100, cursor, input.projectId, options),
     input.mode === 'own'
-      ? repository.own.readPage(uid, 100, cursor, options)
-      : repository.company.readPage(100, cursor, input.projectId, options),
+      ? repository.own.readCompleteSelection &&
+          (() => repository.own.readCompleteSelection!(uid, options))
+      : repository.company.readCompleteSelection &&
+          (() => repository.company.readCompleteSelection!(options)),
   );
   const valid = await repository.revalidate(raw.records, uid, input.mode);
   const visible = valid;
@@ -96,13 +115,16 @@ export async function executeCalendarReport(
   let directoryRaw: PersonalReportPage;
   {
     try {
-      directoryRaw = await selection((cursor) =>
-        repository.company.readPage(
-          100,
-          cursor,
-          input.projectId,
-          directoryOptions,
-        ),
+      directoryRaw = await selection(
+        (cursor) =>
+          repository.company.readPage(
+            100,
+            cursor,
+            input.projectId,
+            directoryOptions,
+          ),
+        repository.company.readCompleteSelection &&
+          (() => repository.company.readCompleteSelection!(directoryOptions)),
       );
     } catch (error) {
       if (input.mode !== 'own' || !(error instanceof ReportContextError))

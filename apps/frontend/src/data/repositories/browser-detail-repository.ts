@@ -128,28 +128,108 @@ export class BrowserDetailRepository {
     const selected = new Map(
       items.map((item) => [descriptionKey(item, this.viewer), item]),
     );
-    // Bound cache-read concurrency for complete historical calendars; this is
-    // request-local scheduling, not a retained snapshot/cache or remote listener.
-    const entries = [...selected];
-    for (let start = 0; start < entries.length; start += 32) {
-      await Promise.all(
-        entries.slice(start, start + 32).map(async ([key, item]) => {
-          const uid = item.uid || this.viewer;
-          const data = await this.readRecordDetail(
-            uid,
-            item.id,
-            item.projectId,
-          );
-          if (data)
-            result.set(key, {
-              id: item.id,
-              uid,
-              projectId: item.projectId,
-              interpretation: data.interpretation,
-              originalText: data.originalText,
+    if (!this.viewer) return result;
+    // All state is request-scoped: subsequent calls must re-read both records
+    // and parent ACLs from the native cache (including revocations/deletions).
+    const owners = new Map<string, string[]>();
+    for (const item of selected.values()) {
+      const uid = item.uid || this.viewer;
+      if (!validId(uid) || !validId(item.id)) continue;
+      const ids = owners.get(uid) ?? [];
+      ids.push(item.id);
+      owners.set(uid, ids);
+    }
+    const batchGet = async (groups: Map<string, string[]>) => {
+      const batches: { path: string; ids: string[] }[] = [];
+      for (const [path, ids] of groups) {
+        for (let start = 0; start < ids.length; start += 30)
+          batches.push({ path, ids: ids.slice(start, start + 30) });
+      }
+      const rows = new Map<string, Row[]>();
+      // Bound both Firestore's IN operand count and simultaneous local queries.
+      for (let start = 0; start < batches.length; start += 8) {
+        await Promise.all(
+          batches.slice(start, start + 8).map(async ({ path, ids }) => {
+            traceFirestore('cache.read', {
+              collection: path.split('/').at(-1) ?? '',
+              operation: 'detail.batch',
+              source: 'persistent-local',
             });
-        }),
-      );
+            const snapshot = await getDocsFromCache(
+              query(collection(this.db, path), where(documentId(), 'in', ids)),
+            );
+            traceFirestore('cache.result', {
+              operation: 'detail.batch',
+              count: snapshot.size,
+              source: 'persistent-local',
+            });
+            const existing = rows.get(path) ?? [];
+            existing.push(
+              ...snapshot.docs.map((item) => ({
+                id: item.id,
+                data: item.data(),
+              })),
+            );
+            rows.set(path, existing);
+          }),
+        );
+      }
+      return rows;
+    };
+    const records = await batchGet(
+      new Map(
+        [...owners].map(([uid, ids]) => ['users/' + uid + '/records', ids]),
+      ),
+    );
+    const candidates: {
+      key: string;
+      item: DetailSelection;
+      uid: string;
+      data: Row['data'];
+    }[] = [];
+    const parentIds = new Set<string>();
+    for (const uid of owners.keys()) {
+      for (const { id, data } of records.get('users/' + uid + '/records') ??
+        []) {
+        const key = descriptionKey({ uid, id }, this.viewer);
+        const item = selected.get(key);
+        const projectId = text(data.projectId);
+        // Schema, identity and ACL checks are validation, not dataset selection.
+        if (
+          !item ||
+          !canonicalRecord(data) ||
+          data.uid !== uid ||
+          !validId(projectId) ||
+          !this.authorizedIds.has(projectId) ||
+          (item.projectId && item.projectId !== projectId)
+        )
+          continue;
+        candidates.push({ key, item, uid, data });
+        parentIds.add(projectId);
+      }
+    }
+    const parents = await batchGet(new Map([['projects', [...parentIds]]]));
+    const projects = new Map(
+      (parents.get('projects') ?? []).map(({ id, data }) => [id, data]),
+    );
+    for (const { key, item, uid, data } of candidates) {
+      const project = projects.get(text(data.projectId));
+      if (
+        !project ||
+        !canonicalProject(project) ||
+        !canAccessProject(project, this.viewer) ||
+        (project.type === 'personal' && uid !== this.viewer)
+      )
+        continue;
+      if (uid === this.viewer) this.observeDeletion?.([{ id: item.id, data }]);
+      if (isDeletedRecord(data)) continue;
+      result.set(key, {
+        id: item.id,
+        uid,
+        projectId: item.projectId,
+        interpretation: data.interpretation,
+        originalText: data.originalText,
+      });
     }
     return result;
   }

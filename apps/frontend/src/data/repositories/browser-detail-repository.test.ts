@@ -171,6 +171,187 @@ it('keeps duplicate record IDs isolated by owner and selected project for descri
   ).toEqual(new Map());
   expect(mocks.remote).not.toHaveBeenCalled();
 });
+
+it('hydrates 128 records with five bounded record queries and one unique parent query', async () => {
+  const items = Array.from({ length: 128 }, (_, index) => ({
+    id: 'r' + index,
+    projectId: 'p',
+  }));
+  for (const item of items)
+    mocks.documents.set('users/me/records/' + item.id, record);
+  // Baseline the former hydration path against the same synthetic cache.
+  const repo = repository();
+  await Promise.all(
+    items.map((item) => repo.readRecordDetail('me', item.id, item.projectId)),
+  );
+  expect(mocks.reads).toHaveBeenCalledTimes(256);
+  mocks.reads.mockClear();
+  const result = await repo.readDescriptions([...items, ...items]);
+  expect(result.size).toBe(128);
+  expect(mocks.reads).not.toHaveBeenCalled();
+  expect(mocks.queries).toHaveBeenCalledTimes(6);
+  const calls = mocks.queries.mock.calls.map(([target]) => target);
+  expect(calls.map((target) => target.clauses[0].value.length)).toEqual([
+    30, 30, 30, 30, 8, 1,
+  ]);
+  expect(
+    calls.slice(0, 5).every((target) => target.path === 'users/me/records'),
+  ).toBe(true);
+  expect(calls[5]).toEqual({
+    path: 'projects',
+    clauses: [{ field: '__name__', op: 'in', value: ['p'] }],
+  });
+  expect(mocks.remote).not.toHaveBeenCalled();
+});
+
+it('batches unique parents at 30 and bounds cache query concurrency', async () => {
+  const items = Array.from({ length: 300 }, (_, index) => ({
+    id: 'r' + index,
+    projectId: 'p' + index,
+  }));
+  for (const item of items) {
+    mocks.documents.set('users/me/records/' + item.id, {
+      ...record,
+      projectId: item.projectId,
+    });
+    mocks.documents.set('projects/' + item.projectId, work);
+  }
+  const queryCache = mocks.queries.getMockImplementation()!;
+  let active = 0;
+  let peak = 0;
+  mocks.queries.mockImplementation(async (target) => {
+    active++;
+    peak = Math.max(peak, active);
+    await Promise.resolve();
+    const result = await queryCache(target);
+    active--;
+    return result;
+  });
+  expect(
+    (
+      await repository(items.map((item) => item.projectId)).readDescriptions(
+        items,
+      )
+    ).size,
+  ).toBe(300);
+  expect(mocks.queries).toHaveBeenCalledTimes(20);
+  expect(peak).toBe(8);
+  expect(
+    mocks.queries.mock.calls.every(
+      ([target]) => target.clauses[0].value.length === 30,
+    ),
+  ).toBe(true);
+});
+
+it('revalidates hydrated schemas, ACLs and deletions on every call without trusting retained selections', async () => {
+  const repo = repository();
+  const items = [{ id: 'r', projectId: 'p' }];
+  expect((await repo.readDescriptions(items)).size).toBe(1);
+  for (const parent of [
+    undefined,
+    { ...work, type: 'personal', createdBy: 'other' },
+    { ...work, confidential: undefined },
+  ]) {
+    if (parent) mocks.documents.set('projects/p', parent);
+    else mocks.documents.delete('projects/p');
+    expect(await repo.readDescriptions(items)).toEqual(new Map());
+  }
+  mocks.documents.set('projects/p', work);
+  for (const data of [
+    undefined,
+    { ...record, uid: 'other' },
+    { ...record, projectId: 'q' },
+    { ...record, deletedAt: 'now' },
+    { ...record, deletedAt: undefined },
+    { ...record, endedAt: undefined },
+  ]) {
+    if (data) mocks.documents.set('users/me/records/r', data);
+    else mocks.documents.delete('users/me/records/r');
+    expect(await repo.readDescriptions(items)).toEqual(new Map());
+  }
+  mocks.documents.set('users/me/records/r', {
+    ...record,
+    interpretation: 'Updated',
+  });
+  expect(
+    (await repo.readDescriptions(items)).get(descriptionKey(items[0], 'me'))
+      ?.interpretation,
+  ).toBe('Updated');
+  expect(await repository([]).readDescriptions(items)).toEqual(new Map());
+  expect(mocks.remote).not.toHaveBeenCalled();
+});
+
+it('isolates description owners, viewers and database instances while preserving confidential project identity', async () => {
+  mocks.documents.set('projects/p', { ...work, confidential: true });
+  mocks.documents.set('users/other/records/r', {
+    ...record,
+    uid: 'other',
+    interpretation: 'Other',
+  });
+  const items = [
+    { id: 'r', projectId: 'p' },
+    { id: 'r', uid: 'other', projectId: 'p' },
+  ];
+  const result = await repository().readDescriptions(items);
+  expect(result.get(descriptionKey(items[0], 'me'))).toMatchObject({
+    uid: 'me',
+    projectId: 'p',
+  });
+  expect(result.get(descriptionKey(items[1], 'me'))?.interpretation).toBe(
+    'Other',
+  );
+  expect(mocks.queries.mock.calls.map(([target]) => target.path)).toEqual([
+    'users/me/records',
+    'users/other/records',
+    'projects',
+  ]);
+  mocks.documents.set('projects/p', { ...work, type: 'personal' });
+  expect((await repository().readDescriptions(items)).size).toBe(1);
+  const otherAccount = new BrowserDetailRepository(
+    {} as Firestore,
+    'other',
+    new Set(['p']),
+  );
+  expect(
+    await otherAccount.readDescriptions([{ id: 'r', projectId: 'p' }]),
+  ).toEqual(new Map());
+  expect(mocks.remote).not.toHaveBeenCalled();
+});
+
+it('observes only authorized own lifecycle changes and rejects malformed paths before native queries', async () => {
+  const observe = vi.fn();
+  const repo = new BrowserDetailRepository(db, 'me', new Set(['p']), observe);
+  const item = { id: 'r', projectId: 'p' };
+  await repo.readDescriptions([item]);
+  mocks.documents.set('users/me/records/r', { ...record, deletedAt: 'now' });
+  expect(await repo.readDescriptions([item])).toEqual(new Map());
+  expect(observe.mock.calls).toEqual([
+    [[{ id: 'r', data: record }]],
+    [[{ id: 'r', data: { ...record, deletedAt: 'now' } }]],
+  ]);
+  mocks.queries.mockClear();
+  expect(
+    await repo.readDescriptions([
+      { ...item, id: '../r' },
+      { ...item, uid: 'bad/owner' },
+    ]),
+  ).toEqual(new Map());
+  expect(
+    await new BrowserDetailRepository(db, '', new Set(['p'])).readDescriptions([
+      item,
+    ]),
+  ).toEqual(new Map());
+  expect(mocks.queries).not.toHaveBeenCalled();
+});
+
+it('propagates batch cache failures rather than returning silent partial hydration or reading remotely', async () => {
+  mocks.queries.mockRejectedValueOnce(new Error('cache failed'));
+  await expect(
+    repository().readDescriptions([{ id: 'r', projectId: 'p' }]),
+  ).rejects.toThrow('cache failed');
+  expect(mocks.remote).not.toHaveBeenCalled();
+});
+
 it('queries exact audit collection with native document ordering and limit, retaining deleted events', async () => {
   mocks.documents.set('users/me/records/r/audit/z', { event: 'last' });
   mocks.documents.set('users/me/records/r/audit/a', {

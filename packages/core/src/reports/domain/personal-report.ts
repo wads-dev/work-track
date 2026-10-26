@@ -94,6 +94,11 @@ export interface PersonalReportPage {
   nextCursor: string | null;
 }
 export interface PersonalReportRepository {
+  /** Optional complete native selection, bounded to2000; never a partial page. */
+  readCompleteSelection?(
+    uid: string,
+    selection?: ReportRecordSelection,
+  ): Promise<PersonalReportPage>;
   readTopics(
     projectIds: string[],
     uid: string,

@@ -33,8 +33,20 @@ export function subscribeAuthorizedReport(
   void _requiredProjectIds;
   void _range;
   let active = true,
-    serial = 0;
+    serial = 0,
+    lastVersion: string | undefined;
   const stop = observeWorkspace(db, uid, (snapshot) => {
+    const version =
+      snapshot.dataRevision === undefined
+        ? undefined
+        : JSON.stringify([
+            snapshot.dataRevision,
+            snapshot.completedProjects,
+            snapshot.complete,
+            snapshot.error,
+          ]);
+    if (version !== undefined && version === lastVersion) return;
+    lastVersion = version;
     const ticket = ++serial;
     if (snapshot.error) {
       fail(new Error(snapshot.error));
@@ -82,6 +94,7 @@ export function subscribeAuthorizedReport(
         });
       } catch (error) {
         if (!active || ticket !== serial) return;
+        lastVersion = undefined; // A transient cache failure must not memoize failure.
         const e = error instanceof Error ? error : new Error(String(error));
         fail(e);
       }

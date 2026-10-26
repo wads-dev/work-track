@@ -769,3 +769,189 @@ it('rejects duplicated topic IDs as ambiguous instead of silently using the last
     repo.readPage(100, undefined, 'p', { topicId: 'x', includeArchived: true }),
   ).rejects.toThrow('Identidade de tópico inválida');
 });
+
+it.each(['personal', 'company'] as const)(
+  'reads a 1000-record complete %s selection once instead of rereading 5500 native documents',
+  async (scope) => {
+    const repo = fixture(
+      Array.from({ length: 1000 }, (_, i) =>
+        row(String(i).padStart(4, '0'), closed),
+      ),
+    );
+    const own = repo.own();
+    const selection = { to: range.to, includeArchived: true };
+    const nativeRecordCount = async () => {
+      let count = 0;
+      for (let i = 0; i < nativeCache.getDocsFromCache.mock.calls.length; i++) {
+        const [q] = nativeCache.getDocsFromCache.mock.calls[i];
+        if ((q as CacheQuery).base !== 'projects')
+          count += (await nativeCache.getDocsFromCache.mock.results[i].value)
+            .size;
+      }
+      return count;
+    };
+    const complete =
+      scope === 'personal'
+        ? await own.readCompleteSelection!('alice', selection)
+        : await repo.readCompleteSelection(selection);
+    expect(complete).toMatchObject({ scannedCount: 1000, nextCursor: null });
+    expect(recordQueries()).toHaveLength(1);
+    expect(await nativeRecordCount()).toBe(1000);
+    nativeCache.getDocsFromCache.mockClear();
+    const legacy: ReportSourceRecord[] = [];
+    let cursor: string | undefined;
+    do {
+      const page =
+        scope === 'personal'
+          ? await own.readPage('alice', 100, cursor, selection)
+          : await repo.readPage(100, cursor, undefined, selection);
+      legacy.push(...page.records);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(recordQueries()).toHaveLength(10);
+    expect(await nativeRecordCount()).toBe(5500);
+    expect(complete.records).toEqual(legacy);
+    const input = { ...range, timeZone: 'UTC', includeArchived: true };
+    expect(
+      buildPersonalReport(input, complete, asOf, complete.records),
+    ).toEqual(
+      buildPersonalReport(
+        input,
+        {
+          records: legacy,
+          scannedCount: legacy.length,
+          nextCursor: null,
+        },
+        asOf,
+        legacy,
+      ),
+    );
+  },
+);
+
+it.each(['personal', 'company'] as const)(
+  'rejects complete %s overflow both per native query and across project shards',
+  async (scope) => {
+    const read = (repo: FirestoreReportRepository) =>
+      scope === 'personal'
+        ? repo.own().readCompleteSelection!('alice')
+        : repo.readCompleteSelection();
+    await expect(
+      read(
+        fixture(Array.from({ length: 2001 }, (_, i) => row(String(i), closed))),
+      ),
+    ).rejects.toThrow('2000');
+    const projects = Array.from({ length: 11 }, (_, i) => project('p' + i));
+    const records = projects.flatMap((p, n) =>
+      Array.from({ length: 190 }, (_, i) =>
+        row(n + '-' + i, { ...closed, projectId: p.id }),
+      ),
+    );
+    await expect(read(fixture(records, projects))).rejects.toThrow('2000');
+  },
+);
+
+it.each(['personal', 'company'] as const)(
+  'keeps complete %s selections fresh after record edits, deletion and ACL revocation',
+  async (scope) => {
+    const repo = fixture([row('selected', closed)]);
+    const own = repo.own();
+    const read = () =>
+      scope === 'personal'
+        ? own.readCompleteSelection!('alice')
+        : repo.readCompleteSelection();
+    const first = await read();
+    nativeCache.seedWorkspace(
+      state({
+        projects: [project()],
+        records: [
+          row('selected', {
+            endedAt: '2026-10-08T14:00:00Z',
+          }),
+        ],
+      }),
+    );
+    expect((await read()).records[0].endedAt).toBe('2026-10-08T14:00:00Z');
+    expect(
+      await repo.revalidate(first.records, 'alice', scope === 'personal'),
+    ).toEqual([]);
+    nativeCache.seedWorkspace(
+      state({
+        projects: [project()],
+        records: [
+          row('selected', {
+            ...closed,
+            deletedAt: 'removed',
+          }),
+        ],
+      }),
+    );
+    expect((await read()).records).toEqual([]);
+    nativeCache.seedWorkspace(
+      state({
+        projects: [
+          project('p', {
+            type: 'personal',
+            createdBy: 'bob',
+          }),
+        ],
+        records: [row('selected', closed)],
+      }),
+    );
+    expect((await read()).records).toEqual([]);
+    await expect(own.readCompleteSelection!('bob')).rejects.toThrow(
+      'Visualizador',
+    );
+  },
+);
+
+it('retains native project, person, range and residual topic selection in complete reads', async () => {
+  const repo = fixture(
+    [
+      row('match', { ...closed, topics: [{ topicId: 'x' }] }),
+      row('wrong-topic', closed),
+      row('wrong-owner', { ...closed, topics: [{ topicId: 'x' }] }, 'bob'),
+      row('wrong-project', {
+        ...closed,
+        projectId: 'q',
+        topics: [{ topicId: 'x' }],
+      }),
+      row('outside', {
+        startedAt: '2026-11-01T12:00:00Z',
+        endedAt: '2026-11-01T13:00:00Z',
+      }),
+    ],
+    [
+      project('p', { topics: [{ archived: false, id: 'x', title: 'X' }] }),
+      project('q'),
+    ],
+  );
+  const selection = {
+    ...range,
+    projectId: 'p',
+    userIds: ['alice'],
+    topicId: 'x',
+    includeArchived: true,
+  };
+  const company = await repo.readCompleteSelection(selection);
+  const personal = await repo.own().readCompleteSelection!('alice', selection);
+  expect(company.records.map((r) => r.id)).toEqual(['match']);
+  expect(personal.records.map((r) => r.id)).toEqual(['match']);
+  for (const q of recordQueries()) {
+    expect(q.constraints).toEqual(
+      expect.arrayContaining([
+        { field: 'projectId', op: 'in', value: ['p'] },
+        { field: 'deletedAt', op: '==', value: null },
+        expect.objectContaining({ field: 'startedAt', op: '<' }),
+      ]),
+    );
+    expect(q.constraints).not.toContainEqual(
+      expect.objectContaining({ field: '__name__', op: '>' }),
+    );
+  }
+  expect(recordQueries()[0].constraints).toContainEqual({
+    field: 'uid',
+    op: 'in',
+    value: ['alice'],
+  });
+});

@@ -16,6 +16,10 @@ export interface CompanyReport extends Omit<
   intervals: (PersonalReport['intervals'][number] & { uid: string })[];
 }
 export interface CompanyReportRepository {
+  /** Optional complete native selection; current ACL revalidation remains separate. */
+  readCompleteSelection?(
+    selection?: ReportRecordSelection,
+  ): Promise<import('./personal-report.js').PersonalReportPage>;
   readTopics(
     projectIds: string[],
   ): Promise<
