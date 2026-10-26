@@ -184,6 +184,61 @@ function fixture() {
     },
   };
 }
+it.each(['own', 'global'] as const)(
+  'uses complete selection in %s mode and preserves revalidation fences',
+  async (mode) => {
+    const f = fixture();
+    const own = f.repo.own.readPage.bind(f.repo.own),
+      company = f.repo.company.readPage.bind(f.repo.company);
+    const ownComplete = vi.fn(
+      (uid: string, selection?: ReportRecordSelection) =>
+        own(uid, 2000, undefined, selection),
+    );
+    const companyComplete = vi.fn((selection?: ReportRecordSelection) =>
+      company(2000, undefined, selection?.projectId, selection),
+    );
+    const ownPage = vi.fn(() => {
+      throw new Error('unexpected pagination');
+    });
+    const companyPage = vi.fn(() => {
+      throw new Error('unexpected pagination');
+    });
+    const revalidate = vi.fn(f.repo.revalidate.bind(f.repo));
+    f.repo.own.readCompleteSelection = ownComplete;
+    f.repo.company.readCompleteSelection = companyComplete;
+    f.repo.own.readPage = ownPage;
+    f.repo.company.readPage = companyPage;
+    f.repo.revalidate = revalidate;
+    const result = await executeCalendarReport(
+      f.repo,
+      { ...input, mode, allWeeks: false, includeArchived: false },
+      'alice',
+    );
+    expect(result.totalMinutes).toBeGreaterThan(0);
+    expect(revalidate).toHaveBeenCalledTimes(4);
+    expect(companyComplete).toHaveBeenCalled();
+    expect(ownPage).not.toHaveBeenCalled();
+    expect(companyPage).not.toHaveBeenCalled();
+  },
+);
+it.each([
+  { nextCursor: 'partial', scannedCount: 1 },
+  { nextCursor: null, scannedCount: 2001 },
+])('rejects partial complete-selection adapter: %j', async (partial) => {
+  const f = fixture();
+  f.repo.company.readCompleteSelection = () =>
+    Promise.resolve({
+      records: [],
+      ...partial,
+    });
+  await expect(
+    executeCalendarReport(
+      f.repo,
+      { ...input, mode: 'global', allWeeks: false, includeArchived: false },
+      'alice',
+    ),
+  ).rejects.toThrow('parcial');
+});
 it('keeps open zero-duration starts visible without adding hours or exposing private records', async () => {
   const f = fixture();
   const start = '2026-10-02T12:00:00Z';
@@ -235,8 +290,8 @@ it('defaults own includes ownpersonal only; Global explicit org never foreignper
   expect(own).toMatchObject({
     mode: 'own',
     policy: 'calendar-v3',
-    hoursPolicy: 'personal-v3',
-    totalMinutes: 120,
+    hoursPolicy: 'personal-v4',
+    totalMinutes: 60,
     page: { partial: false, nextCursor: null },
   });
   expect(own.intervals.map((r) => r.uid)).toEqual(['alice', 'alice']);
@@ -684,8 +739,8 @@ it('repository topic selection preserves a next-start cut from the unselected to
   expect(result.intervals).toHaveLength(1);
   expect(result.intervals[0]).toMatchObject({
     id: 'wanted-open',
-    minutes: 240,
-    effectiveEndedAt: '2026-10-02T16:00:00.000Z',
+    minutes: 330,
+    effectiveEndedAt: '2026-10-02T18:00:00.000Z',
   });
 });
 it('topic filtering afterengine preserves six-hour estimates without daily cap and fails unsafe aliases or midread merges', async () => {
@@ -728,7 +783,7 @@ it('topic filtering afterengine preserves six-hour estimates without daily cap a
       .filter((r) => r.id === 'second')
       .map((r) => ({ ...r, subjectAssignedMinutes: r.minutes })),
   );
-  expect(filtered.totalMinutes).toBe(360);
+  expect(filtered.totalMinutes).toBe(300);
   f.repo.own.readTopics = () =>
     Promise.resolve({
       w: [

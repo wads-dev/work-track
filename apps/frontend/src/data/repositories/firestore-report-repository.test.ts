@@ -62,6 +62,61 @@ const referenceRecord = (doc: CacheDocument): ReportSourceRecord =>
     endedAt: doc.data.endedAt ?? undefined,
   }) as ReportSourceRecord;
 
+it.each(['personal', 'company'] as const)(
+  'two-project %s report selects natively while unselected archived facts still share global time',
+  async (scope) => {
+    const records = [
+      row('selected-p', closed),
+      row('selected-q', { ...closed, projectId: 'q' }),
+      row('unselected-archived', { ...closed, projectId: 'r' }),
+    ];
+    const repo = fixture(records, [
+      project(),
+      project('q'),
+      project('r', { archived: true }),
+    ]);
+    const input = {
+      ...range,
+      projectIds: ['p', 'q'],
+      timeZone: 'UTC',
+      includeArchived: false,
+    };
+    const result =
+      scope === 'personal'
+        ? await executePersonalReport(repo.own(), input, 'alice', asOf)
+        : await executeCompanyReport(repo, input, asOf);
+    expect(result.intervals.map((r) => r.id)).toEqual([
+      'selected-p',
+      'selected-q',
+    ]);
+    expect(result.totalMinutes).toBe(40);
+    expect(result.byProject).toEqual([
+      { projectId: 'p', minutes: 20 },
+      { projectId: 'q', minutes: 20 },
+    ]);
+    expect(result).toMatchObject({
+      scope: 'all-selected',
+      page: { partial: false, nextCursor: null },
+    });
+    expect(result.warnings.some((w) => w.includes('sobrepostos'))).toBe(true);
+    expect(
+      recordQueries().some((q) =>
+        q.constraints.some(
+          (c) =>
+            c.field === 'projectId' &&
+            c.op === 'in' &&
+            JSON.stringify(c.value) === JSON.stringify(['p', 'q']),
+        ),
+      ),
+    ).toBe(true);
+    expect((await repo.loadContext(['alice'])).map((r) => r.id)).toEqual([
+      'selected-p',
+      'selected-q',
+      'unselected-archived',
+    ]);
+  },
+);
+
 it('fixture executes collection/group, owner/project, document names, in, ordering, range and limits before decoding', () => {
   const { firestore: f } = nativeCache;
   nativeCache.seed([
@@ -162,24 +217,125 @@ it('batches project and person in predicates without dropping combinations or du
     r.path = r.path.replace('/same', '/' + index);
   const repo = fixture(records, projects);
   const page = await repo.readPage(200, undefined, undefined, {
+    projectIds: projects.map((p) => p.id),
     userIds: people,
     includeArchived: true,
   });
   expect(page.records).toHaveLength(124);
+  await expect(
+    repo.readPage(200, undefined, 'p0', { projectIds: ['p0'] }),
+  ).rejects.toThrow('Conflicting');
   expect(queries().filter((q) => q.base === 'projects')).toHaveLength(2);
-  expect(recordQueries()).toHaveLength(16);
+  expect(recordQueries()).toHaveLength(13);
   for (const q of recordQueries()) {
     const projectIds = q.constraints.find((c) => c.field === 'projectId')!
       .value as string[];
     const users = q.constraints.find((c) => c.field === 'uid')!
       .value as string[];
-    expect(projectIds.length * users.length).toBeLessThanOrEqual(30);
+    expect(projectIds.length * users.length).toBeLessThanOrEqual(10);
     expect(q.constraints).toContainEqual({
       kind: 'orderBy',
       field: '__name__',
       direction: 'asc',
     });
   }
+});
+it('resolves trusted factors at original starts for selected and full context, never from record payloads', async () => {
+  const p = project();
+  p.data.timeMultipliers = {
+    alice: [
+      { multiplier: 2, effectiveFrom: null },
+      { multiplier: 3, effectiveFrom: '2026-10-08T12:30:00Z' },
+    ],
+  };
+  const repo = fixture(
+    [
+      row('before', { ...closed, timeMultiplier: 999 }),
+      row('after', {
+        ...closed,
+        startedAt: '2026-10-08T12:45:00Z',
+        timeMultiplier: 999,
+      }),
+    ],
+    [p],
+  );
+  const selected = await repo.readPage(100, undefined, undefined, {
+    projectIds: ['p'],
+    userIds: ['alice'],
+    ...range,
+  });
+  expect(selected.records.map((r) => [r.id, r.timeMultiplier])).toEqual([
+    ['after', 3],
+    ['before', 2],
+  ]);
+  const context = await repo.loadContext(['alice']);
+  expect(context.map((r) => [r.id, r.timeMultiplier])).toEqual([
+    ['after', 3],
+    ['before', 2],
+  ]);
+  // Crop after the new rule: original start12:00 still uses2, not3.
+  const calendar = await executeCalendarReport(
+    repo.calendar(),
+    {
+      mode: 'own',
+      projectIds: ['p'],
+      userIds: ['alice'],
+      from: '2026-10-08T12:30:00Z',
+      to: '2026-10-08T12:40:00Z',
+      timeZone: 'UTC',
+      includeArchived: false,
+      allWeeks: false,
+    },
+    'alice',
+    asOf,
+  );
+  expect(calendar.totalMinutes).toBe(20);
+  expect(calendar.intervals[0].timeMultiplier).toBe(2);
+});
+it('calendar multiplies independently by person after selection and keeps full context trusted', async () => {
+  const p = project();
+  p.data.timeMultipliers = {
+    alice: [{ multiplier: 1, effectiveFrom: null }],
+    bob: [{ multiplier: 0.25, effectiveFrom: null }],
+  };
+  const repo = fixture(
+    [
+      row('senior', {
+        startedAt: '2026-10-08T08:00:00Z',
+        endedAt: '2026-10-08T09:00:00Z',
+        timeMultiplier: 999,
+      }),
+      row(
+        'junior',
+        {
+          startedAt: '2026-10-08T08:00:00Z',
+          endedAt: '2026-10-08T12:00:00Z',
+          timeMultiplier: 999,
+        },
+        'bob',
+      ),
+    ],
+    [p],
+  );
+  const result = await executeCalendarReport(
+    repo.calendar(),
+    {
+      mode: 'global',
+      projectIds: ['p'],
+      userIds: ['alice', 'bob'],
+      ...range,
+      timeZone: 'UTC',
+      includeArchived: false,
+      allWeeks: false,
+    },
+    'alice',
+    asOf,
+  );
+  expect(result.totalMinutes).toBe(120);
+  expect(result.byUser.map((u) => [u.uid, u.minutes])).toEqual([
+    ['alice', 60],
+    ['bob', 60],
+  ]);
 });
 it('rejects missing storage lifecycle fields and queries live records natively', async () => {
   const repo = fixture([row('missing', { deletedAt: undefined }), row('null')]);
@@ -260,7 +416,7 @@ it('matches existing shared domain interval math, overlap sums, UTC-offset clipp
     context,
   );
   expect(actual.intervals).toEqual(expected.intervals);
-  expect(actual.totalMinutes).toBe(1080);
+  expect(actual.totalMinutes).toBe(650);
   expect(actual.estimatedCount).toBe(1);
   expect(actual.page.partial).toBe(false);
   expect(actual.warnings.some((w) => w.includes('sobrepostos'))).toBe(true);
@@ -300,7 +456,7 @@ it('computes estimates from unselected same-project/topic history, and retains a
     asOf,
   );
   expect(result).toMatchObject({
-    totalMinutes: 60,
+    totalMinutes: 300,
     estimatedCount: 1,
     page: { partial: false },
   });
@@ -612,4 +768,190 @@ it('rejects duplicated topic IDs as ambiguous instead of silently using the last
   await expect(
     repo.readPage(100, undefined, 'p', { topicId: 'x', includeArchived: true }),
   ).rejects.toThrow('Identidade de tópico inválida');
+});
+
+it.each(['personal', 'company'] as const)(
+  'reads a 1000-record complete %s selection once instead of rereading 5500 native documents',
+  async (scope) => {
+    const repo = fixture(
+      Array.from({ length: 1000 }, (_, i) =>
+        row(String(i).padStart(4, '0'), closed),
+      ),
+    );
+    const own = repo.own();
+    const selection = { to: range.to, includeArchived: true };
+    const nativeRecordCount = async () => {
+      let count = 0;
+      for (let i = 0; i < nativeCache.getDocsFromCache.mock.calls.length; i++) {
+        const [q] = nativeCache.getDocsFromCache.mock.calls[i];
+        if ((q as CacheQuery).base !== 'projects')
+          count += (await nativeCache.getDocsFromCache.mock.results[i].value)
+            .size;
+      }
+      return count;
+    };
+    const complete =
+      scope === 'personal'
+        ? await own.readCompleteSelection!('alice', selection)
+        : await repo.readCompleteSelection(selection);
+    expect(complete).toMatchObject({ scannedCount: 1000, nextCursor: null });
+    expect(recordQueries()).toHaveLength(1);
+    expect(await nativeRecordCount()).toBe(1000);
+    nativeCache.getDocsFromCache.mockClear();
+    const legacy: ReportSourceRecord[] = [];
+    let cursor: string | undefined;
+    do {
+      const page =
+        scope === 'personal'
+          ? await own.readPage('alice', 100, cursor, selection)
+          : await repo.readPage(100, cursor, undefined, selection);
+      legacy.push(...page.records);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(recordQueries()).toHaveLength(10);
+    expect(await nativeRecordCount()).toBe(5500);
+    expect(complete.records).toEqual(legacy);
+    const input = { ...range, timeZone: 'UTC', includeArchived: true };
+    expect(
+      buildPersonalReport(input, complete, asOf, complete.records),
+    ).toEqual(
+      buildPersonalReport(
+        input,
+        {
+          records: legacy,
+          scannedCount: legacy.length,
+          nextCursor: null,
+        },
+        asOf,
+        legacy,
+      ),
+    );
+  },
+);
+
+it.each(['personal', 'company'] as const)(
+  'rejects complete %s overflow both per native query and across project shards',
+  async (scope) => {
+    const read = (repo: FirestoreReportRepository) =>
+      scope === 'personal'
+        ? repo.own().readCompleteSelection!('alice')
+        : repo.readCompleteSelection();
+    await expect(
+      read(
+        fixture(Array.from({ length: 2001 }, (_, i) => row(String(i), closed))),
+      ),
+    ).rejects.toThrow('2000');
+    const projects = Array.from({ length: 11 }, (_, i) => project('p' + i));
+    const records = projects.flatMap((p, n) =>
+      Array.from({ length: 190 }, (_, i) =>
+        row(n + '-' + i, { ...closed, projectId: p.id }),
+      ),
+    );
+    await expect(read(fixture(records, projects))).rejects.toThrow('2000');
+  },
+);
+
+it.each(['personal', 'company'] as const)(
+  'keeps complete %s selections fresh after record edits, deletion and ACL revocation',
+  async (scope) => {
+    const repo = fixture([row('selected', closed)]);
+    const own = repo.own();
+    const read = () =>
+      scope === 'personal'
+        ? own.readCompleteSelection!('alice')
+        : repo.readCompleteSelection();
+    const first = await read();
+    nativeCache.seedWorkspace(
+      state({
+        projects: [project()],
+        records: [
+          row('selected', {
+            endedAt: '2026-10-08T14:00:00Z',
+          }),
+        ],
+      }),
+    );
+    expect((await read()).records[0].endedAt).toBe('2026-10-08T14:00:00Z');
+    expect(
+      await repo.revalidate(first.records, 'alice', scope === 'personal'),
+    ).toEqual([]);
+    nativeCache.seedWorkspace(
+      state({
+        projects: [project()],
+        records: [
+          row('selected', {
+            ...closed,
+            deletedAt: 'removed',
+          }),
+        ],
+      }),
+    );
+    expect((await read()).records).toEqual([]);
+    nativeCache.seedWorkspace(
+      state({
+        projects: [
+          project('p', {
+            type: 'personal',
+            createdBy: 'bob',
+          }),
+        ],
+        records: [row('selected', closed)],
+      }),
+    );
+    expect((await read()).records).toEqual([]);
+    await expect(own.readCompleteSelection!('bob')).rejects.toThrow(
+      'Visualizador',
+    );
+  },
+);
+
+it('retains native project, person, range and residual topic selection in complete reads', async () => {
+  const repo = fixture(
+    [
+      row('match', { ...closed, topics: [{ topicId: 'x' }] }),
+      row('wrong-topic', closed),
+      row('wrong-owner', { ...closed, topics: [{ topicId: 'x' }] }, 'bob'),
+      row('wrong-project', {
+        ...closed,
+        projectId: 'q',
+        topics: [{ topicId: 'x' }],
+      }),
+      row('outside', {
+        startedAt: '2026-11-01T12:00:00Z',
+        endedAt: '2026-11-01T13:00:00Z',
+      }),
+    ],
+    [
+      project('p', { topics: [{ archived: false, id: 'x', title: 'X' }] }),
+      project('q'),
+    ],
+  );
+  const selection = {
+    ...range,
+    projectId: 'p',
+    userIds: ['alice'],
+    topicId: 'x',
+    includeArchived: true,
+  };
+  const company = await repo.readCompleteSelection(selection);
+  const personal = await repo.own().readCompleteSelection!('alice', selection);
+  expect(company.records.map((r) => r.id)).toEqual(['match']);
+  expect(personal.records.map((r) => r.id)).toEqual(['match']);
+  for (const q of recordQueries()) {
+    expect(q.constraints).toEqual(
+      expect.arrayContaining([
+        { field: 'projectId', op: 'in', value: ['p'] },
+        { field: 'deletedAt', op: '==', value: null },
+        expect.objectContaining({ field: 'startedAt', op: '<' }),
+      ]),
+    );
+    expect(q.constraints).not.toContainEqual(
+      expect.objectContaining({ field: '__name__', op: '>' }),
+    );
+  }
+  expect(recordQueries()[0].constraints).toContainEqual({
+    field: 'uid',
+    op: 'in',
+    value: ['alice'],
+  });
 });

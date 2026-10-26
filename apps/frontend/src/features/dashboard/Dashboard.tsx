@@ -11,6 +11,10 @@ import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
 import { AlertTriangle, Info } from 'lucide-react';
 import { RecordsList } from '../records/RecordsList';
 import { RecordsToolbar } from '../records/RecordsToolbar';
+import {
+  recordProjectIds,
+  writeRecordProjects,
+} from '../records/records-selection';
 import { Button } from '../../components/ui/button';
 import {
   Select,
@@ -114,14 +118,15 @@ export function Dashboard({
     query.uid === uid && query.revealed === revealed ? query.text : '';
   const setLocalFilter = (text: string) => setQuery({ uid, revealed, text });
   const [pageState, setPageState] = useState({ key: '', page: 0 });
-  const topicFilter = params.get('topic') ?? '';
+  const recordProjects = recordProjectIds(params);
+  const topicFilter =
+    recordProjects.length === 1 ? (params.get('topic') ?? '') : '';
   const fromDate = params.get('fromDate') ?? '';
   const toDate = params.get('toDate') ?? '';
   const zone = 'America/Sao_Paulo';
   const [pageSize] = useState(50);
   const pageKey = JSON.stringify([uid, revealed, filter, params.toString()]);
   const activePage = pageState.key === pageKey ? pageState.page : 0;
-  const projectFilter = params.get('project') ?? '';
   const archiveFilter = params.get('status') ?? 'active';
   const projectScope = params.get('scope') === 'personal' ? 'personal' : 'work';
   const rawProjects = useProjects(functions, uid);
@@ -136,7 +141,7 @@ export function Dashboard({
     revealed,
   });
   const rawRecords = useOwnRecords(db, uid, mode !== 'projects' && !projectId, {
-    project: projectFilter,
+    projectIds: recordProjects,
     topic: topicFilter,
     query: filter,
     fromDate,
@@ -175,9 +180,15 @@ export function Dashboard({
     if (
       params.has('q') ||
       (mode !== 'projects' &&
-        (params.has('recordStatus') || params.has('timeZone')))
+        (params.has('recordStatus') ||
+          params.has('timeZone') ||
+          writeRecordProjects(params, recordProjectIds(params)).toString() !==
+            params.toString()))
     ) {
-      const next = new URLSearchParams(params);
+      const next =
+        mode !== 'projects'
+          ? writeRecordProjects(params, recordProjectIds(params))
+          : new URLSearchParams(params);
       next.delete('q');
       if (mode !== 'projects') {
         next.delete('recordStatus');
@@ -435,12 +446,16 @@ export function Dashboard({
           params={params}
           search={filter}
           onFilter={updateFilter}
+          onProjectsChange={(ids) =>
+            setParams(writeRecordProjects(params, ids), { replace: true })
+          }
           onClear={() => {
             setLocalFilter('');
             const next = new URLSearchParams(params);
             for (const key of [
               'q',
               'project',
+              'projectIds',
               'topic',
               'fromDate',
               'toDate',

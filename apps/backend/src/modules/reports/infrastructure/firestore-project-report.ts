@@ -1,3 +1,4 @@
+import { resolveTimeMultiplier } from '@work-track/core/registration/domain/time-multipliers';
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
@@ -123,9 +124,16 @@ export class FirestoreProjectReportRepository implements ProjectReportRepository
       topics.map((topic) => [topic.id, topic.title]),
     );
     return {
-      records: personal
+      records: (personal
         ? selected.filter((r) => r.uid === viewerUid)
-        : selected,
+        : selected
+      ).map((record) => ({
+        ...record,
+        timeMultiplier: resolveTimeMultiplier(
+          metadata.timeMultipliers?.[record.uid],
+          record.startedAt,
+        ),
+      })),
       personal,
       archived: Boolean(project.data()?.archived || project.data()?.mergedInto),
       topicLabels,

@@ -27,6 +27,10 @@ export type CalendarResponse = {
     effectiveEndedAt: string;
     estimated: boolean;
     minutes: number;
+    loggedMinutes?: number;
+    allocatedMinutes?: number;
+    timeMultiplier?: number;
+    accountingSegments?: import('../reports/domain/accounted-time.js').AccountingSegment[];
     topics?: { topicId: string; label: string; assignedMinutes?: number }[];
     subjectAssignedMinutes?: number;
     readOnly: boolean;
@@ -47,7 +51,7 @@ export type TopicFacts = {
   lastRecordStartedAt: string | null;
 };
 export type TopicDetailReport = TopicFacts & {
-  hoursPolicy?: 'personal-v3' | 'company-v3';
+  hoursPolicy?: 'personal-v4' | 'company-v4';
   budgetTimeZone?: 'America/Sao_Paulo';
   policy: string;
   scope: string;
@@ -83,6 +87,10 @@ export type TopicDetailReport = TopicFacts & {
     effectiveEndedAt: string;
     estimated: boolean;
     minutes: number;
+    loggedMinutes?: number;
+    allocatedMinutes?: number;
+    timeMultiplier?: number;
+    accountingSegments?: import('../reports/domain/accounted-time.js').AccountingSegment[];
     assignedMinutes?: number;
     readOnly: boolean;
   }[];

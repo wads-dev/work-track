@@ -228,10 +228,10 @@ describe('actual calendar use case: adversarial numeric bounded-context parity',
   });
 
   it.each([
-    ['14m59s', '2026-10-08T13:14:59Z', 180],
-    ['15m', '2026-10-08T13:15:00Z', 60],
+    ['14m59s', '2026-10-08T13:14:59Z', 345 + 1 / 120],
+    ['15m', '2026-10-08T13:15:00Z', 345],
   ])(
-    'next closed %s applies the exact 15-minute cut threshold',
+    'next closed %s shares its overlap without truncating the open interval',
     async (_name, end, expected) => {
       const records = [
         ancient,
@@ -250,7 +250,7 @@ describe('actual calendar use case: adversarial numeric bounded-context parity',
     },
   );
 
-  it('same-start estimates spend chronological ID-ordered saldo regardless of input order', async () => {
+  it('same-start estimates share equally regardless of input order', async () => {
     const records = [
       ancient,
       make('z', 'other', '2026-10-08T12:00:00Z'),
@@ -262,8 +262,8 @@ describe('actual calendar use case: adversarial numeric bounded-context parity',
       '2026-10-08T00:00:00Z',
       '2026-10-09T00:00:00Z',
     );
-    expect(limited.intervals.find((r) => r.id === 'a')?.minutes).toBe(360);
-    expect(limited.intervals.find((r) => r.id === 'z')?.minutes).toBe(360);
+    expect(limited.intervals.find((r) => r.id === 'a')?.minutes).toBe(180);
+    expect(limited.intervals.find((r) => r.id === 'z')?.minutes).toBe(180);
     expect(
       numeric(
         await run(
@@ -316,7 +316,7 @@ describe('actual calendar use case: adversarial numeric bounded-context parity',
       'UTC',
       'p',
     );
-    expect(limited.totalMinutes).toBe(90);
+    expect(limited.totalMinutes).toBe(360);
     expect(limited.intervals.map((r) => r.id)).toEqual([
       'open',
       'selected-fact',
@@ -329,7 +329,7 @@ describe('actual calendar use case: adversarial numeric bounded-context parity',
       globalEstimates(context, Date.parse('2026-10-09T00:00:00Z')).ends.get(
         uid + '/open',
       ),
-    ).toBe(Date.parse('2026-10-08T14:00:00Z'));
+    ).toBe(Date.parse('2026-10-08T19:00:00Z'));
   });
 });
 

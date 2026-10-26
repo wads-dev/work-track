@@ -17,7 +17,8 @@ export function assertContext(
       current.startedAt !== r.startedAt ||
       current.endedAt !== r.endedAt ||
       current.projectId !== r.projectId ||
-      current.timeZone !== r.timeZone
+      current.timeZone !== r.timeZone ||
+      (current.timeMultiplier ?? 1) !== (r.timeMultiplier ?? 1)
     )
       throw new ReportContextError(
         'Página mudou durante consulta; recarregue para obter contexto consistente.',
@@ -61,15 +62,6 @@ export function globalEstimates(
           'Fusos mistos: contexto global usa um fuso canônico por pessoa; estimativas limitadas também à meia-noite desse fuso.',
         );
       if (end === undefined) {
-        const next = sorted.find(
-          (other) =>
-            other.uid === r.uid &&
-            other.projectId === r.projectId &&
-            Date.parse(other.startedAt) > start &&
-            (other.endedAt === undefined ||
-              Date.parse(other.endedAt) - Date.parse(other.startedAt) >=
-                15 * 60000),
-        );
         end = Math.max(
           start,
           Math.min(
@@ -77,7 +69,6 @@ export function globalEstimates(
             start + 6 * 3600000,
             nextMidnight(start, r.timeZone),
             dayEnd,
-            next ? Date.parse(next.startedAt) : Infinity,
           ),
         );
       }

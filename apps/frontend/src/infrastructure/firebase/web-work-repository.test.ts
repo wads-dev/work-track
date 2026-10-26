@@ -106,6 +106,99 @@ beforeEach(() => {
   state.data.set('projects/p', project);
   state.data.set('users/alice/records/r', record);
 });
+it('rejects stale multiplier maps and preserves saved histories on ordinary edits', async () => {
+  const timeMultipliers = { alice: [{ multiplier: 2, effectiveFrom: null }] };
+  state.data.set('projects/p', { ...project, timeMultipliers });
+  await expect(
+    repo.updateProject(
+      {
+        projectId: 'p',
+        requestId: 'multipliers',
+        reason: 'Configurar',
+        timeMultipliers,
+        expectedTimeMultipliers: null,
+      },
+      'alice',
+    ),
+  ).rejects.toThrow('Recarregue');
+  expect(state.reads).toHaveLength(2);
+  expect(state.writes).toHaveLength(0);
+  await repo.updateProject(
+    { projectId: 'p', requestId: 'ordinary', reason: 'Editar', title: 'Novo' },
+    'alice',
+  );
+  expect(state.data.get('projects/p')?.timeMultipliers).toEqual(
+    timeMultipliers,
+  );
+});
+it('writes multiplier history directly with SDK transaction, audit and idempotent retry for another authorized editor', async () => {
+  const timeMultipliers = {
+    alice: [
+      { multiplier: 0.25, effectiveFrom: null },
+      { multiplier: 0.5, effectiveFrom: '2026-10-06T09:30:00-03:00' },
+    ],
+  };
+  const input = {
+    projectId: 'p',
+    requestId: 'factor-sdk',
+    reason: 'Configurar',
+    timeMultipliers,
+    expectedTimeMultipliers: null,
+  };
+  const result = await repo.updateProject(input, 'bob');
+  expect(state.data.get('projects/p')?.timeMultipliers).toEqual(
+    timeMultipliers,
+  );
+  expect(state.data.get('projects/p')).not.toHaveProperty(
+    'expectedTimeMultipliers',
+  );
+  expect(state.data.get('projects/p/audit/factor-sdk')).toMatchObject({
+    authorUid: 'bob',
+    before: project,
+    after: { timeMultipliers },
+  });
+  const writes = state.writes.length;
+  expect(await repo.updateProject(input, 'bob')).toEqual(result);
+  expect(state.writes).toHaveLength(writes);
+});
+it('rejects malformed histories or missing CAS before Firebase reads', async () => {
+  for (const input of [
+    {
+      timeMultipliers: { alice: [{ multiplier: -1, effectiveFrom: null }] },
+      expectedTimeMultipliers: null,
+    },
+    { timeMultipliers: {}, expectedTimeMultipliers: undefined },
+  ])
+    await expect(
+      repo.updateProject(
+        {
+          projectId: 'p',
+          requestId: 'bad-factor',
+          reason: 'Configurar',
+          ...input,
+        },
+        'alice',
+      ),
+    ).rejects.toThrow();
+  expect(state.reads).toHaveLength(0);
+  expect(state.writes).toHaveLength(0);
+});
+it('does not broaden personal project access for multiplier writes', async () => {
+  state.data.set('projects/p', { ...project, type: 'personal' });
+  await expect(
+    repo.updateProject(
+      {
+        projectId: 'p',
+        requestId: 'factor-denied',
+        reason: 'Configurar',
+        timeMultipliers: {},
+        expectedTimeMultipliers: null,
+      },
+      'bob',
+    ),
+  ).rejects.toThrow();
+  expect(state.writes).toHaveLength(0);
+});
 it('allows authenticated noncreator work/existing writes and atomic actor audit, retries same intent', async () => {
   const input = {
     projectId: 'p',

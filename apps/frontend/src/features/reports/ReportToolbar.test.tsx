@@ -10,7 +10,8 @@ function render(includeArchived?: boolean, loading = false) {
         loading={loading}
         fromDate=""
         toDate=""
-        projectId=""
+        projectIds={[]}
+        onProjectsChange={() => {}}
         projects={[]}
         onFilter={() => {}}
         onRefresh={() => {}}

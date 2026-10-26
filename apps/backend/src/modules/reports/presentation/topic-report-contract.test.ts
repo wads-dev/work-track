@@ -290,16 +290,16 @@ describe('personal report topic contract', () => {
       'alice',
     );
     expect(result.intervals.map((interval) => interval.id)).toEqual(['active']);
-    expect(result.byProject).toEqual([{ projectId: 'project', minutes: 60 }]);
+    expect(result.byProject).toEqual([{ projectId: 'project', minutes: 30 }]);
     expect(
       result.byTopic.map((topic) => [
         topic.projectId,
         topic.topicId,
         topic.minutes,
       ]),
-    ).toEqual([['project', 'code', 30]]);
-    expect(result.totalMinutes).toBe(60);
-    expect(result.unassignedMinutes).toBe(30);
+    ).toEqual([['project', 'code', 15]]);
+    expect(result.totalMinutes).toBe(30);
+    expect(result.unassignedMinutes).toBe(15);
     expectCommonTopicContract(result);
   });
 

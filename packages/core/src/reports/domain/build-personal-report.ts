@@ -1,15 +1,11 @@
 import { activeRecords } from '../../registration/domain/record-lifecycle.js';
-import {
-  globalEstimates,
-  recordKey,
-  assertContext,
-} from './global-estimates.js';
+import { recordKey, assertContext } from './global-estimates.js';
 import type {
   PersonalReport,
   PersonalReportInput,
   PersonalReportPage,
 } from './personal-report.js';
-const M = 60000;
+import { buildTimeAccounting, accountedMinutes } from './accounted-time.js';
 export function buildPersonalReport(
   input: PersonalReportInput,
   page: PersonalReportPage,
@@ -22,12 +18,12 @@ export function buildPersonalReport(
   const from = input.from ? Date.parse(input.from) : -Infinity,
     to = input.to ? Date.parse(input.to) : Infinity,
     warnings = new Set<string>([
-      'Política personal-v3: contexto global America/Sao_Paulo allprojects/full-context, sem teto diário; abertos limitados a6h, agora, meia-noite e próximo início próprio no mesmo projeto; fechados menores que15min ignorados como corte.',
+      'Política personal-v4: rateio igual de sobreposições por pessoa no contexto autorizado completo antes dos filtros; abertos limitados a6h, agora e meia-noite, sem corte por próximo início.',
       'Estimativas não persistidas; fatos fechados preservados. Intervalos são recortados somente para visualização no período.',
-      'Sobreposições são somadas; interrupções não são descontadas automaticamente.',
+      'Sobreposições são rateadas por trecho; interrupções não são descontadas automaticamente.',
     ]);
   const result: PersonalReport = {
-    policy: 'personal-v3',
+    policy: 'personal-v4',
     budgetTimeZone: 'America/Sao_Paulo',
     asOf: new Date(asOf).toISOString(),
     ...(input.from ? { from: input.from } : {}),
@@ -55,7 +51,7 @@ export function buildPersonalReport(
   const records = [...page.records].sort(
       (a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt),
     ),
-    global = globalEstimates(context, asOf),
+    global = buildTimeAccounting(context, asOf),
     projects = new Map<string, number>();
   for (const warning of global.warnings) warnings.add(warning);
   for (const record of records) {
@@ -86,7 +82,11 @@ export function buildPersonalReport(
       )
     )
       warnings.add('Há intervalos sobrepostos no período.');
-    const minutes = (effectiveEnd - effectiveStart) / M;
+    const segments = global.segments(record, effectiveStart, effectiveEnd),
+      loggedMinutes = Math.max(0, (effectiveEnd - effectiveStart) / 60000),
+      allocatedMinutes = accountedMinutes(segments),
+      timeMultiplier = record.timeMultiplier ?? 1,
+      minutes = allocatedMinutes * timeMultiplier;
     result.intervals.push({
       id: record.id,
       projectId: record.projectId,
@@ -96,6 +96,10 @@ export function buildPersonalReport(
       effectiveEndedAt: new Date(effectiveEnd).toISOString(),
       estimated,
       minutes,
+      loggedMinutes,
+      allocatedMinutes,
+      timeMultiplier,
+      accountingSegments: segments,
     });
     if (estimated) result.estimatedCount++;
     result.totalMinutes += minutes;

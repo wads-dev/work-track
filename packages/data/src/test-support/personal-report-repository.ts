@@ -1,3 +1,5 @@
+import { resolveTimeMultiplier } from '@work-track/core/registration/domain/time-multipliers';
+import { selectedProjectIds } from '@work-track/core/reports/domain/personal-report';
 /* eslint-disable @typescript-eslint/require-await -- Test doubles preserve async repository rejection contracts without database I/O. */
 import type {
   PersonalReportRepository,
@@ -37,7 +39,13 @@ export class ClientPersonalReportRepository implements PersonalReportRepository 
       throw new ReportContextError(
         'Limite operacional de contexto global excedido (2000 registros por pessoa); contate suporte para otimização da consulta, sem apagar histórico.',
       );
-    return visible;
+    return visible.map((r) => ({
+      ...r,
+      timeMultiplier: resolveTimeMultiplier(
+        this.projects.get(r.projectId)?.timeMultipliers?.[r.uid],
+        r.startedAt,
+      ),
+    }));
   }
   async readPersonalProject(projectId: string, viewerUid: string) {
     this.assertOwner([viewerUid]);
@@ -71,6 +79,7 @@ export class ClientPersonalReportRepository implements PersonalReportRepository 
     cursor?: string,
     selection?: ReportRecordSelection,
   ) {
+    selectedProjectIds(selection);
     const records = (await this.loadContext([uid]))
       .filter(
         (r) =>

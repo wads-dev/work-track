@@ -1,0 +1,5 @@
+{
+  "app": "worktrack",
+  "source": "apps/frontend/public/brand.svg",
+  "layers": "assets/app-icon"
+}

@@ -252,7 +252,7 @@ for (const kind of [
         projectId: 'project',
         topicId: 'removed',
       });
-      expect(page!.records).toEqual([historical]);
+      expect(page!.records).toEqual([{ ...historical, timeMultiplier: 1 }]);
       expect(
         (await repo.read({ projectId: 'project', topicId: 'target' }))!.records,
       ).toEqual([]);
@@ -272,7 +272,9 @@ for (const kind of [
       expect(breakdown.warnings).toEqual([
         expect.stringContaining('Tópico histórico ausente dos metadados'),
       ]);
-      expect(await repo.context()).toEqual([historical]);
+      expect(await repo.context()).toEqual([
+        { ...historical, timeMultiplier: 1 },
+      ]);
     });
 
     it('preserves omitted include-all reads but defaults supplied options to active projects', async () => {

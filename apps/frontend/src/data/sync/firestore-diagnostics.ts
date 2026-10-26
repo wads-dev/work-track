@@ -3,6 +3,24 @@ type Detail = Record<string, string | number | boolean | null>;
 type Entry = { at: number; event: string; detail: Detail };
 const events: Entry[] = [];
 const counts: Record<string, number> = {};
+let measurementSequence = 0;
+/** Request-local, content-free timing; detailed logging remains opt-in. */
+export function measureFirestoreStage(stage: string) {
+  const started = performance.now();
+  const requestId = ++measurementSequence;
+  traceFirestore('performance.start', { stage, requestId });
+  let finished = false;
+  return (success = true) => {
+    if (finished) return;
+    finished = true;
+    traceFirestore('performance.end', {
+      stage,
+      requestId,
+      success,
+      durationMs: Math.round((performance.now() - started) * 100) / 100,
+    });
+  };
+}
 export function traceFirestore(event: string, detail: Detail = {}) {
   // Lifetime totals must not depend on debug output or the bounded log ring.
   accumulateDocumentMetrics({

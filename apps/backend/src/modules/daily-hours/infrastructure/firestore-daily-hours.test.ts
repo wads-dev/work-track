@@ -147,6 +147,57 @@ const daySelection = (includeArchived = true): DailyHoursSelection => {
   return { startedAt: start, endedAt: end, includeArchived };
 };
 describe('read-only daily-hours own canonical repository', () => {
+  it('resolves project factor at original start, not the report crop, and ignores forged record factor', async () => {
+    const fact = source('weighted', {
+      startedAt: '2026-10-08T23:00:00-03:00',
+      endedAt: '2026-10-09T02:00:00-03:00',
+      timeMultiplier: 999,
+    });
+    const mock = setup([[fact]], {
+      a: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+        timeMultipliers: {
+          alice: [
+            { multiplier: 0.25, effectiveFrom: null },
+            { multiplier: 0.5, effectiveFrom: '2026-10-09T00:00:00-03:00' },
+          ],
+        },
+      },
+    });
+    const history = await mock.repository.loadOwnHistory('alice');
+    expect(history.records[0]?.timeMultiplier).toBe(0.25);
+    const result = buildDailyHours(
+      dailyHoursInput.parse({ date: '2026-10-09' }),
+      history,
+      'alice',
+      Date.parse('2026-10-10T00:00:00-03:00'),
+    );
+    expect(result.totalMinutes).toBe(30);
+    expect(result.intervals[0]).toMatchObject({
+      loggedMinutes: 120,
+      allocatedMinutes: 120,
+      timeMultiplier: 0.25,
+      minutes: 30,
+    });
+    expect(fact.value).toHaveProperty('timeMultiplier', 999);
+  });
+  it('fails closed on malformed authorized project factor history', async () => {
+    const mock = setup([[source('bad')]], {
+      a: {
+        createdBy: 'alice',
+        type: 'work',
+        archived: false,
+        confidential: false,
+        timeMultipliers: { alice: [{ multiplier: -1, effectiveFrom: null }] },
+      },
+    });
+    await expect(mock.repository.loadOwnHistory('alice')).rejects.toMatchObject(
+      { code: 'resource-exhausted' },
+    );
+  });
   it.each([null, '2026-10-09T09:00:00-03:00'])(
     'normalizes persisted end %s without mutating facts',
     async (endedAt) => {
@@ -499,13 +550,13 @@ describe('read-only daily-hours own canonical repository', () => {
       Date.parse('2026-10-09T23:00:00-03:00'),
     );
     expect(report).toMatchObject({
-      estimatedMinutes: 120,
-      closedMinutes: 60,
-      totalMinutes: 180,
+      estimatedMinutes: 200,
+      closedMinutes: 20,
+      totalMinutes: 220,
     });
     expect(report.intervals[0]).toMatchObject({
       id: 'open',
-      effectiveEndedAt: '2026-10-09T14:00:00.000Z',
+      effectiveEndedAt: '2026-10-09T18:00:00.000Z',
     });
   });
   it('advances physical native selection cursors over all-residual pages', async () => {

@@ -12,13 +12,72 @@ import { cn } from '../../lib/utils';
 import type { ProjectOption } from './project-search';
 import { createProjectOptionRepository } from '../../data/repositories/browser-listing-repository';
 import { usePrivacy } from '../../shared/ui/privacy';
+import { MultiSelect } from '../../shared/ui/MultiSelect';
+import { projectMultiSelectOptions } from '../../data/repositories/option-search-repository';
 
 // Radix reserves the empty string for its placeholder. Prefix real IDs so the
 // "all" option cannot collide with any project ID, while keeping the public API.
 const allValue = 'all';
 const selectValue = (id: string) => (id ? 'project:' + id : allValue);
 
-export function ProjectSelector({
+type ProjectSelectorCommonProps = {
+  projects: ProjectOption[];
+  loading?: boolean;
+  error?: string;
+  label?: string;
+  className?: string;
+  disabled?: boolean;
+};
+export type SingleProjectSelectorProps = ProjectSelectorCommonProps & {
+  multiple?: false;
+  projectId: string;
+  projectIds?: never;
+  onChange: (id: string) => void;
+  allowAll?: boolean;
+};
+export type MultipleProjectSelectorProps = ProjectSelectorCommonProps & {
+  multiple: true;
+  projectIds: string[];
+  projectId?: never;
+  onChange: (ids: string[]) => void;
+};
+export type ProjectSelectorProps =
+  SingleProjectSelectorProps | MultipleProjectSelectorProps;
+
+export function ProjectSelector(props: ProjectSelectorProps) {
+  return props.multiple ? (
+    <MultipleProjectSelector {...props} />
+  ) : (
+    <SingleProjectSelector {...props} />
+  );
+}
+
+function MultipleProjectSelector({
+  projects,
+  projectIds,
+  onChange,
+  label = 'Projetos',
+  ...props
+}: MultipleProjectSelectorProps) {
+  const { revealed } = usePrivacy();
+  const options = useMemo(
+    () => projectMultiSelectOptions(projects, revealed),
+    [projects, revealed],
+  );
+  return (
+    <MultiSelect
+      {...props}
+      label={label}
+      values={projectIds}
+      options={options}
+      allLabel="Todos os projetos"
+      plural="projetos selecionados"
+      onChange={onChange}
+    />
+  );
+}
+
+function SingleProjectSelector({
   projects,
   projectId,
   onChange,
@@ -28,17 +87,7 @@ export function ProjectSelector({
   className,
   allowAll = true,
   disabled = false,
-}: {
-  projects: ProjectOption[];
-  projectId: string;
-  onChange: (id: string) => void;
-  loading?: boolean;
-  error?: string;
-  label?: string;
-  className?: string;
-  allowAll?: boolean;
-  disabled?: boolean;
-}) {
+}: SingleProjectSelectorProps) {
   const id = useId();
   const { revealed } = usePrivacy();
   const searchRef = useRef<HTMLInputElement>(null);

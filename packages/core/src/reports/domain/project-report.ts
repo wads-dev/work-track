@@ -5,6 +5,8 @@ export interface ProjectReportInput {
   cursor?: string;
 }
 export interface ReportSourceRecord {
+  /** Trusted project metadata resolved at original startedAt, never decoded from record payload. */
+  timeMultiplier?: number;
   id: string;
   uid: string;
   projectId: string;
@@ -21,7 +23,7 @@ export interface ProjectReport extends Pick<
   scope?: 'all-selected';
   projectId: string;
   asOf: string;
-  policy: 'project-report-v3';
+  policy: 'project-report-v4';
   budgetTimeZone: 'America/Sao_Paulo';
   totalMinutes: number;
   byUser: { uid: string; label: string; minutes: number }[];
@@ -34,6 +36,10 @@ export interface ProjectReport extends Pick<
     effectiveEndedAt: string;
     estimated: boolean;
     minutes: number;
+    loggedMinutes?: number;
+    allocatedMinutes?: number;
+    timeMultiplier?: number;
+    accountingSegments?: import('./accounted-time.js').AccountingSegment[];
     topics: { topicId: string; minutes: number }[];
   }[];
   estimatedCount: number;

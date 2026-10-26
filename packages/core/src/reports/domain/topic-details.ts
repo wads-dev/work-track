@@ -121,7 +121,12 @@ export function buildTopicDetails(
         r.projectId === interval.projectId,
     ); // Engine does not emit UID; attach by positional canonical source below.
     return candidates.map((record) => {
-      const membership = calendarTopics(record, interval.minutes, topics),
+      const membership = calendarTopics(
+          record,
+          interval.minutes,
+          topics,
+          interval.loggedMinutes,
+        ),
         assigned = membership.topics.find(
           (t) => t.topicId === resolved.topicId,
         )?.assignedMinutes;

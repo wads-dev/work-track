@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./registration/domain/time-multipliers": {
+      "types": "./lib/registration/domain/time-multipliers.d.ts",
+      "development": "./src/registration/domain/time-multipliers.ts",
+      "default": "./lib/registration/domain/time-multipliers.js"
+    },
+    "./reports/domain/accounted-time": {
+      "types": "./lib/reports/domain/accounted-time.d.ts",
+      "development": "./src/reports/domain/accounted-time.ts",
+      "default": "./lib/reports/domain/accounted-time.js"
+    },
     "./registration/domain/project-color": {
       "types": "./lib/registration/domain/project-color.d.ts",
       "development": "./src/registration/domain/project-color.ts",

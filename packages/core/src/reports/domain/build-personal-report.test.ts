@@ -39,13 +39,13 @@ it('does not cut at starts in other projects and returns original facts without 
     make('two', '2026-10-08T11:00:00Z', 'b'),
   ];
   const result = run(records);
-  expect(result.intervals[0]?.minutes).toBe(360);
+  expect(result.intervals[0]?.minutes).toBe(210);
   expect(result.byProject).toEqual([
-    { projectId: 'a', minutes: 360 },
-    { projectId: 'b', minutes: 360 },
+    { projectId: 'a', minutes: 210 },
+    { projectId: 'b', minutes: 210 },
   ]);
   expect(records[0]).not.toHaveProperty('endedAt');
-  expect(result.policy).toBe('personal-v3');
+  expect(result.policy).toBe('personal-v4');
 });
 it('clamps visualization only, includes intersecting closed facts, excludes outside', () => {
   const result = run([
@@ -82,7 +82,7 @@ it('warns overlaps and partial page, zeroes future opens', () => {
     },
     Date.parse('2026-10-08T20:00:00Z'),
   );
-  expect(result.totalMinutes).toBe(240);
+  expect(result.totalMinutes).toBe(180);
   expect(result.page.partial).toBe(true);
   expect(result.warnings.some((w) => w.includes('sobrepostos'))).toBe(true);
 });
@@ -97,7 +97,7 @@ it('caps additionally at report midnight when record timezone differs', () => {
     Date.parse('2026-10-09T10:00:00Z'),
   );
   expect(result.totalMinutes).toBe(30);
-  expect(result.warnings.some((w) => w.includes('global'))).toBe(true);
+  expect(result.warnings.some((w) => w.includes('contexto'))).toBe(true);
 });
 it('caps at local midnight across DST', () => {
   const record = {

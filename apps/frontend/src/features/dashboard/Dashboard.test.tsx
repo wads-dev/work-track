@@ -9,7 +9,7 @@ it('passes all dataset selections and pagination to repository hooks without vie
     'scope: projectScope',
     'archive: archiveFilter',
     'query: filter',
-    'project: projectFilter',
+    'projectIds: recordProjects',
     'topic: topicFilter',
     'fromDate',
     'toDate',

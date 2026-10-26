@@ -4,9 +4,15 @@ import type { CommandGateway } from '@work-track/core/contracts/command-gateway'
 const mocks = vi.hoisted(() => ({
   uid: 'alice' as string | null,
   callable: vi.fn(),
+  callableFactory: vi.fn(),
   web: vi.fn(),
 }));
-vi.mock('firebase/functions', () => ({ httpsCallable: () => mocks.callable }));
+vi.mock('firebase/functions', () => ({
+  httpsCallable: (...args: unknown[]) => {
+    mocks.callableFactory(...args);
+    return mocks.callable;
+  },
+}));
 vi.mock('firebase/auth', () => ({
   getAuth: () => ({ currentUser: mocks.uid ? { uid: mocks.uid } : null }),
 }));
@@ -40,6 +46,7 @@ const functions = { app: {} } as Functions;
 beforeEach(() => {
   mocks.uid = 'alice';
   mocks.callable.mockReset();
+  mocks.callableFactory.mockReset();
   mocks.web.mockReset();
   mocks.web.mockResolvedValue({ ok: true });
   mocks.callable.mockResolvedValue({ data: { backend: true } });
@@ -75,6 +82,25 @@ it('dispatches exactly eight Web names, preserves data envelope, never invokes t
   }
   expect(mocks.web).toHaveBeenCalledTimes(8);
   expect(mocks.callable).not.toHaveBeenCalled();
+});
+it('routes multiplier updates directly to the Web repository without callable and requires authentication', async () => {
+  const input = {
+    projectId: 'p',
+    timeMultipliers: { alice: [{ multiplier: 0, effectiveFrom: null }] },
+    expectedTimeMultipliers: null,
+    requestId: 'r',
+    reason: 'Configurar',
+  };
+  expect(await createWebCommand(functions, 'updateProject')(input)).toEqual({
+    data: { ok: true },
+  });
+  expect(mocks.web).toHaveBeenCalledExactlyOnceWith(input, 'alice');
+  expect(mocks.callableFactory).not.toHaveBeenCalled();
+  expect(mocks.callable).not.toHaveBeenCalled();
+  mocks.uid = null;
+  await expect(
+    createWebCommand(functions, 'updateProject')(input),
+  ).rejects.toThrow('Autenticação');
 });
 it('rejects unknown and server-only names asynchronously without callable fallback', async () => {
   const gateway: CommandGateway = new WebCommandGateway(functions);

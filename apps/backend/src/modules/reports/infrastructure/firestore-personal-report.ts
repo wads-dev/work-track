@@ -1,6 +1,7 @@
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
+  compareReportDocuments,
   nextReportCursor,
   orderReportQuery,
   reportUpperDatePrefix,
@@ -15,6 +16,7 @@ import type {
   PersonalReportRepository,
   ReportRecordSelection,
 } from '@work-track/core/reports/domain/personal-report';
+import { selectedProjectIds } from '@work-track/core/reports/domain/personal-report';
 const source = reportRecordSchema('admin-owned');
 export class FirestorePersonalReportRepository implements PersonalReportRepository {
   constructor(private readonly db: Firestore) {}
@@ -63,19 +65,49 @@ export class FirestorePersonalReportRepository implements PersonalReportReposito
     cursor?: string,
     selection?: ReportRecordSelection,
   ) {
+    const projectIds = selectedProjectIds(selection);
+    if (projectIds?.length === 0)
+      return { records: [], scannedCount: 0, nextCursor: null };
     if (selection?.userIds && !selection.userIds.includes(uid))
       return { records: [], scannedCount: 0, nextCursor: null };
     const upper = reportUpperDatePrefix(selection);
-    let query: FirebaseFirestore.Query = this.db
+    const query: FirebaseFirestore.Query = this.db
       .collection('users')
       .doc(uid)
       .collection('records')
       .where('deletedAt', '==', null);
-    if (selection?.projectId)
-      query = query.where('projectId', '==', selection.projectId);
-    query = resumeReportQuery(orderReportQuery(query, upper), cursor, upper);
-    const snapshot = await query.limit(limit + 1).get(),
-      docs = snapshot.docs.slice(0, limit);
+    const shards: (string[] | undefined)[] = [];
+    if (projectIds) {
+      for (let i = 0; i < projectIds.length; i += 10)
+        shards.push(projectIds.slice(i, i + 10));
+    } else shards.push(undefined);
+    const snapshots: FirebaseFirestore.QuerySnapshot[] = [];
+    for (const projects of shards) {
+      const filtered = projects
+        ? query.where(
+            'projectId',
+            projects.length === 1 ? '==' : 'in',
+            projects.length === 1 ? projects[0] : projects,
+          )
+        : query;
+      snapshots.push(
+        await resumeReportQuery(
+          orderReportQuery(filtered, upper),
+          cursor,
+          upper,
+        )
+          .limit(limit + 1)
+          .get(),
+      );
+    }
+    const merged =
+      snapshots.length === 1
+        ? snapshots[0]!.docs
+        : snapshots
+            .flatMap((page) => page.docs)
+            .sort((a, b) => compareReportDocuments(a, b, upper));
+    const snapshot = { docs: merged },
+      docs = merged.slice(0, limit);
     const catalog = await readProjectCatalog(
       this.db,
       docs.flatMap((doc) =>

@@ -31,6 +31,7 @@ export type ProjectReadOptions = {
   size?: number;
 };
 export type OwnRecordReadOptions = Partial<RecordFilters> & {
+  projectIds?: string[];
   id?: string;
   openOnly?: boolean;
   alertBefore?: number;
@@ -60,9 +61,24 @@ export const emptyListing: ListingResult = {
   openRows: [],
   openCount: 0,
 };
+function canonicalRecordProjectIds(ids: string[] = []) {
+  const selected = [
+    ...new Set(ids.map((id) => id.trim()).filter(Boolean)),
+  ].sort();
+  if (selected.length > 100) throw Error('Selecione no máximo 100 projetos.');
+  return selected;
+}
 export const listingKey = (
   options: ProjectReadOptions | OwnRecordReadOptions = {},
-) => JSON.stringify(options);
+) =>
+  JSON.stringify(
+    'projectIds' in options
+      ? {
+          ...options,
+          projectIds: canonicalRecordProjectIds(options.projectIds),
+        }
+      : options,
+  );
 
 async function readQuery(target: Query<DocumentData>, label: string) {
   traceFirestore('cache.read', {
@@ -232,9 +248,24 @@ export async function readOwnRecordListing(
   authorizedIds: ReadonlySet<string>,
   options: OwnRecordReadOptions = {},
 ): Promise<ListingResult> {
+  const projectIds = canonicalRecordProjectIds(
+    options.projectIds ?? (options.project ? [options.project] : []),
+  );
+  if (
+    options.projectIds !== undefined &&
+    options.project &&
+    (projectIds.length !== 1 || projectIds[0] !== options.project.trim())
+  )
+    throw Error('Seleção singular e múltipla de projetos conflitante.');
+  if (
+    options.projectIds !== undefined &&
+    options.topic &&
+    projectIds.length !== 1
+  )
+    throw Error('Selecione exatamente um projeto para filtrar tópicos.');
   if (!uid || !authorizedIds.size) return emptyListing;
   const filters: RecordFilters = {
-    project: options.project ?? '',
+    project: '',
     topic: options.topic ?? '',
     query: options.query ?? '',
     fromDate: options.fromDate ?? '',
@@ -248,7 +279,6 @@ export async function readOwnRecordListing(
     : options.alertBefore;
   const clauses: QueryConstraint[] = [where('uid', '==', uid)];
   if (options.id) clauses.push(where(documentId(), '==', options.id));
-  if (filters.project) clauses.push(where('projectId', '==', filters.project));
   if (options.after) clauses.push(where(documentId(), '>', options.after));
   if (filters.status === 'open') clauses.push(where('endedAt', '==', null));
   if (filters.status === 'closed') clauses.push(where('endedAt', '>', ''));
@@ -276,10 +306,11 @@ export async function readOwnRecordListing(
         ]
       : [[]];
   const candidates: Row[] = [];
-  if (filters.project && !authorizedIds.has(filters.project))
-    return emptyListing;
-  const ids = filters.project ? [filters.project] : [...authorizedIds];
-  for (let start = 0; start < ids.length; start += 30) {
+  // ACL checks are fail-closed, never broaden a nonempty explicit selection.
+  if (projectIds.some((id) => !authorizedIds.has(id))) return emptyListing;
+  const ids = projectIds.length ? projectIds : [...authorizedIds];
+  // Bound every native IN shard; merge all branches before counts/pagination.
+  for (let start = 0; start < ids.length; start += 10) {
     for (const branch of branches) {
       candidates.push(
         ...(await readQuery(
@@ -287,9 +318,7 @@ export async function readOwnRecordListing(
             collection(db, 'users', uid, 'records'),
             ...clauses,
             ...branch,
-            ...(filters.project
-              ? []
-              : [where('projectId', 'in', ids.slice(start, start + 30))]),
+            where('projectId', 'in', ids.slice(start, start + 10)),
           ),
           'records',
         )),

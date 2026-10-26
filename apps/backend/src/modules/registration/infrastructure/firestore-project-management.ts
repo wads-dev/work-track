@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
+import { timeMultipliersSchema } from '@work-track/core/registration/domain/time-multipliers';
 import {
   assertProjectAccess,
   assertProjectMergeAccess,
@@ -13,6 +15,7 @@ import {
   ProjectManagementError,
   type ProjectManagementRepository,
   type UpdateProjectInput,
+  updateProjectInput,
   type MergeProjectsInput,
 } from '@work-track/core/registration/domain/project-management';
 import type { Project } from '@work-track/core/registration/domain/work-model';
@@ -86,6 +89,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
     });
   }
   async updateProject(input: UpdateProjectInput, uid: string) {
+    input = updateProjectInput.parse(input);
     const ref = this.db.collection('projects').doc(input.projectId),
       audit = ref.collection('audit').doc(input.requestId);
     return this.db.runTransaction(async (tx) => {
@@ -122,7 +126,26 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
           'failed-precondition',
           'Alteração de escopo exige fluxo explícito; atualização comum não altera pessoal/corporativo.',
         );
-      const { projectId, requestId, reason, ...metadata } = input;
+      const {
+        projectId,
+        requestId,
+        reason,
+        expectedTimeMultipliers,
+        ...metadata
+      } = input;
+      if (
+        metadata.timeMultipliers !== undefined &&
+        !isDeepStrictEqual(
+          Object.hasOwn(before, 'timeMultipliers')
+            ? timeMultipliersSchema.parse(before.timeMultipliers)
+            : null,
+          expectedTimeMultipliers,
+        )
+      )
+        throw new ProjectManagementError(
+          'failed-precondition',
+          'Os multiplicadores foram alterados. Recarregue o projeto antes de salvar.',
+        );
       void requestId;
       const patch: Record<string, unknown> = {
         ...metadata,

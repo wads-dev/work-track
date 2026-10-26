@@ -83,7 +83,7 @@ it.each(['me', 'other'])(
       /inline-flex items-center gap-1"><span>09:00 – 09:10<\/span><svg [^>]*aria-hidden="true"/,
     );
     expect(html).toContain(
-      'aria-label="Projeto · 09:00 — 09:10 · 10 min · Estimado"',
+      'aria-label="Projeto · 09:00 — 09:10 · Logged: 10min · Logged: 10min. Tempo computado requer contexto das outras atividades. · Estimado"',
     );
     expect(html).toContain('Secret topic · Secret summary');
     expect(html).toContain('min-height:1.125rem;height:1.125rem');

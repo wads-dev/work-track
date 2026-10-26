@@ -68,8 +68,8 @@ it('preserves full budget context and excludes inaccessible, deleted and foreign
     'alice',
     Date.parse('2026-10-09T00:00:00Z'),
   );
-  expect(report.totalMinutes).toBe(90);
-  expect(report.byProject).toEqual([{ projectId: 'work', minutes: 90 }]);
+  expect(report.totalMinutes).toBe(45);
+  expect(report.byProject).toEqual([{ projectId: 'work', minutes: 45 }]);
   await expect(repo.loadContext(['bob'])).rejects.toThrow(
     'authenticated owner',
   );

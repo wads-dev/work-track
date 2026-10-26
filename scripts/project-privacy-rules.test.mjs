@@ -70,7 +70,10 @@ function value(field) {
   if (field === null) return { nullValue: null };
   if (typeof field === 'string') return { stringValue: field };
   if (typeof field === 'boolean') return { booleanValue: field };
-  if (typeof field === 'number') return { integerValue: String(field) };
+  if (typeof field === 'number')
+    return Number.isInteger(field)
+      ? { integerValue: String(field) }
+      : { doubleValue: field };
   if (Array.isArray(field)) return { arrayValue: { values: field.map(value) } };
   return { mapValue: { fields: fields(field) } };
 }
@@ -931,6 +934,47 @@ test('project authorization: public authenticated and own personal', async (t) =
   );
 });
 
+test('authorized clients may edit multiplier histories through SDK without expanding project ACLs', async () => {
+  const project = {
+    id: 'multiplier-sdk',
+    type: 'work',
+    createdBy: alice,
+    archived: false,
+    confidential: false,
+    topics: [],
+    timeMultipliers: { [alice]: [{ multiplier: 0.25, effectiveFrom: null }] },
+  };
+  await allowed(write('projects/multiplier-sdk', project, aliceToken));
+  const changed = {
+    ...project,
+    timeMultipliers: { [alice]: [{ multiplier: 0.5, effectiveFrom: null }] },
+  };
+  await allowed(write('projects/multiplier-sdk', changed, bobToken));
+  await allowed(
+    write(
+      'projects/multiplier-sdk',
+      { ...changed, title: 'Ordinary edit' },
+      aliceToken,
+    ),
+  );
+  await allowed(
+    write(
+      'projects/multiplier-sdk',
+      { ...project, timeMultipliers: {} },
+      aliceToken,
+    ),
+  );
+  await denied(write('projects/multiplier-sdk', changed));
+  const personal = { ...project, id: 'multiplier-private', type: 'personal' };
+  await allowed(write('projects/multiplier-private', personal, aliceToken));
+  await denied(
+    write(
+      'projects/multiplier-private',
+      { ...personal, timeMultipliers: {} },
+      bobToken,
+    ),
+  );
+});
 test('native project creation can read a missing key without granting private project data', async () => {
   assert.equal((await get('projects/native-new', aliceToken)).status, 404);
   await denied(get('projects/personal-bob', aliceToken));

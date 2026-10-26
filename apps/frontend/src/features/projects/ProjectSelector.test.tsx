@@ -1,8 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ProjectSelector } from './ProjectSelector';
+import {
+  ProjectSelector,
+  type SingleProjectSelectorProps,
+} from './ProjectSelector';
 import { matchesProject } from './project-search';
+import { PrivacyContext } from '../../shared/ui/privacy';
+import { MultiSelect } from '../../shared/ui/MultiSelect';
+import { projectMultiSelectOptions } from '../../data/repositories/option-search-repository';
 
 const projects = [
   {
@@ -12,7 +18,7 @@ const projects = [
   },
   { id: 'all', label: 'Projeto chamado all' },
 ];
-const render = (props: Partial<Parameters<typeof ProjectSelector>[0]> = {}) =>
+const render = (props: Partial<SingleProjectSelectorProps> = {}) =>
   renderToStaticMarkup(
     <ProjectSelector
       projects={projects}
@@ -127,4 +133,61 @@ it('clears via the all item without conflicting with project IDs or offering cle
     "? [{ id: '', label: 'Todos os projetos' }, ...projects]",
   );
   expect(source).not.toContain('Limpar projeto');
+});
+
+it('uses the exact shared checkbox primitive in multiple mode with stable IDs and all semantics', () => {
+  const props = {
+    projects,
+    multiple: true as const,
+    projectIds: ['one', 'all'],
+    onChange: vi.fn(),
+  };
+  const actual = renderToStaticMarkup(<ProjectSelector {...props} />);
+  const shared = renderToStaticMarkup(
+    <MultiSelect
+      label="Projetos"
+      values={props.projectIds}
+      options={projectMultiSelectOptions(projects, false)}
+      allLabel="Todos os projetos"
+      plural="projetos selecionados"
+      onChange={props.onChange}
+    />,
+  );
+  expect(actual).toBe(shared);
+  expect(actual.match(/checked=""/g)).toHaveLength(2);
+  expect(actual).toContain('2 projetos selecionados');
+  expect(actual).toContain('Todos os projetos (limpar seleção)');
+  expect(
+    renderToStaticMarkup(<ProjectSelector {...props} projectIds={[]} />),
+  ).toContain('aria-pressed="true"');
+});
+
+it('keeps multiple selection safe under masking and supports loading/error/disabled state', () => {
+  const html = renderToStaticMarkup(
+    <PrivacyContext.Provider value={{ revealed: false }}>
+      <ProjectSelector
+        multiple
+        projectIds={['one']}
+        projects={projects}
+        onChange={vi.fn()}
+        loading
+        error="Falha no catálogo"
+      />
+    </PrivacyContext.Provider>,
+  );
+  expect(html).toContain('aria-busy="true"');
+  expect(html).toContain('aria-invalid="true"');
+  expect(html).toContain('Falha no catálogo');
+  expect(html).not.toContain('Entrega API');
+  const disabled = renderToStaticMarkup(
+    <ProjectSelector
+      multiple
+      projectIds={['one']}
+      projects={projects}
+      onChange={vi.fn()}
+      disabled
+    />,
+  );
+  expect(disabled).toContain('aria-disabled="true"');
+  expect(disabled).not.toContain('type="checkbox"');
 });

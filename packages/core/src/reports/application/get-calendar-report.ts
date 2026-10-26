@@ -15,6 +15,7 @@ import type { PersonalReportRepository } from '../domain/personal-report.js';
 import type { CompanyReportRepository } from '../domain/company-report.js';
 import type { ReportSourceRecord } from '../domain/project-report.js';
 import type { PersonalReportPage } from '../domain/personal-report.js';
+import { selectedProjectIds } from '../domain/personal-report.js';
 import type { CalendarInput } from './calendar-input.js';
 export class CalendarReportError extends Error {
   constructor(
@@ -36,7 +37,20 @@ export interface CalendarRepository {
 /** Bound physical pagination as well as visible records: no unbounded private/deleted scan. */
 async function selection(
   read: (cursor?: string) => Promise<PersonalReportPage>,
+  complete?: () => Promise<PersonalReportPage>,
 ) {
+  if (complete) {
+    const result = await complete();
+    if (
+      result.nextCursor ||
+      result.records.length > 2000 ||
+      result.scannedCount > 2000
+    )
+      throw new ReportContextError(
+        'Seleção completa excede2000 ou retornou página parcial.',
+      );
+    return result;
+  }
   const records: ReportSourceRecord[] = [];
   let cursor: string | undefined;
   const seen = new Set<string>();
@@ -64,6 +78,7 @@ export async function executeCalendarReport(
   uid: string,
   asOf = Date.now(),
 ) {
+  selectedProjectIds(input);
   if (input.mode === 'own' && input.userIds?.some((id) => id !== uid))
     throw new CalendarReportError(
       'permission-denied',
@@ -71,6 +86,7 @@ export async function executeCalendarReport(
     );
   const options = {
     projectId: input.projectId,
+    projectIds: input.projectIds,
     includeArchived: input.includeArchived,
     userIds: input.userIds,
     from: input.from,
@@ -79,12 +95,19 @@ export async function executeCalendarReport(
   };
   const directoryOptions = {
     projectId: input.projectId,
+    projectIds: input.projectIds,
     includeArchived: input.includeArchived,
   };
-  const raw = await selection((cursor) =>
+  const raw = await selection(
+    (cursor) =>
+      input.mode === 'own'
+        ? repository.own.readPage(uid, 100, cursor, options)
+        : repository.company.readPage(100, cursor, input.projectId, options),
     input.mode === 'own'
-      ? repository.own.readPage(uid, 100, cursor, options)
-      : repository.company.readPage(100, cursor, input.projectId, options),
+      ? repository.own.readCompleteSelection &&
+          (() => repository.own.readCompleteSelection!(uid, options))
+      : repository.company.readCompleteSelection &&
+          (() => repository.company.readCompleteSelection!(options)),
   );
   const valid = await repository.revalidate(raw.records, uid, input.mode);
   const visible = valid;
@@ -92,13 +115,16 @@ export async function executeCalendarReport(
   let directoryRaw: PersonalReportPage;
   {
     try {
-      directoryRaw = await selection((cursor) =>
-        repository.company.readPage(
-          100,
-          cursor,
-          input.projectId,
-          directoryOptions,
-        ),
+      directoryRaw = await selection(
+        (cursor) =>
+          repository.company.readPage(
+            100,
+            cursor,
+            input.projectId,
+            directoryOptions,
+          ),
+        repository.company.readCompleteSelection &&
+          (() => repository.company.readCompleteSelection!(directoryOptions)),
       );
     } catch (error) {
       if (input.mode !== 'own' || !(error instanceof ReportContextError))
@@ -144,7 +170,9 @@ export async function executeCalendarReport(
   let selectedTopic: string | undefined;
   if (input.topicId) {
     const resolved = resolveTopic(
-      topicMetadataMap(topics[input.projectId!] ?? []),
+      topicMetadataMap(
+        topics[(input.projectId ?? input.projectIds?.[0])!] ?? [],
+      ),
       input.topicId,
     );
     if ('error' in resolved)
@@ -228,7 +256,7 @@ export async function executeCalendarReport(
   return {
     scope: 'all-selected' as const,
     policy: 'calendar-v3' as const,
-    hoursPolicy: input.mode === 'own' ? 'personal-v3' : 'company-v3',
+    hoursPolicy: input.mode === 'own' ? 'personal-v4' : 'company-v4',
     mode: input.mode,
     viewerUid: uid,
     asOf: report.asOf,

@@ -261,7 +261,10 @@ export const state = (
   error: '',
   ...patch,
 });
-export const project = (id = 'p', data: Record<string, unknown> = {}) => ({
+export const project = (
+  id = 'p',
+  data: Record<string, unknown> = {},
+): { id: string; data: Record<string, unknown> } => ({
   id,
   data: {
     type: 'work',

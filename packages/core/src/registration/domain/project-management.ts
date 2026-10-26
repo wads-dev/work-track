@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { timeMultipliersSchema } from './time-multipliers.js';
 import { projectColor } from './project-color.js';
 import { normalize } from '../../shared/text/normalize.js';
 import type { Project, Topic } from './work-model.js';
@@ -47,6 +48,9 @@ export const updateProjectInput = z
     title: z.string().trim().min(2).max(160).optional(),
     description: z.string().trim().min(20).max(6000).optional(),
     ...metadata,
+    timeMultipliers: timeMultipliersSchema.optional(),
+    // null means the persisted field was absent; {} is an explicit empty map.
+    expectedTimeMultipliers: timeMultipliersSchema.nullable().optional(),
     requestId: safeId,
     reason: z.string().trim().min(1).max(1000),
   })
@@ -54,9 +58,21 @@ export const updateProjectInput = z
   .refine(
     (value) =>
       Object.keys(value).some(
-        (key) => !['projectId', 'requestId', 'reason'].includes(key),
+        (key) =>
+          ![
+            'projectId',
+            'requestId',
+            'reason',
+            'expectedTimeMultipliers',
+          ].includes(key),
       ),
     'Informe metadados para alterar.',
+  )
+  .refine(
+    (value) =>
+      (value.timeMultipliers !== undefined) ===
+      (value.expectedTimeMultipliers !== undefined),
+    'Multiplicadores exigem o mapa anterior para evitar sobrescrever alterações concorrentes.',
   );
 export const mergeProjectsInput = z
   .object({

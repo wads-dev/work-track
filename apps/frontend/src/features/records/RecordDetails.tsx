@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Timestamp } from 'firebase/firestore';
+import { durationLabel } from '../reports/calendar-duration';
 import { Copy, Check } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
@@ -20,6 +22,18 @@ export function RecordDetails({
   revealed: boolean;
 }) {
   const [copy, setCopy] = useState<'idle' | 'done' | 'error'>('idle');
+  const instant = (value: unknown) =>
+    value instanceof Timestamp
+      ? value.toMillis()
+      : typeof value === 'string'
+        ? Date.parse(value)
+        : NaN;
+  const start = instant(record.startedAt),
+    end = instant(record.endedAt);
+  const logged =
+    Number.isFinite(start) && Number.isFinite(end) && end >= start
+      ? durationLabel((end - start) / 60000)
+      : undefined;
   return (
     <div className="space-y-5 pt-4">
       <dl className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-5 [&_dt]:mb-1 [&_dt]:text-xs [&_dt]:text-muted-foreground [&_dd]:text-sm [&_dd]:whitespace-pre-wrap [&_dd]:[overflow-wrap:anywhere]">
@@ -51,6 +65,19 @@ export function RecordDetails({
             {record.endedAt
               ? date(record.endedAt, 'America/Sao_Paulo')
               : 'Em aberto'}
+          </dd>
+        </div>
+        <div className="col-span-2">
+          <dt>Logged</dt>
+          <dd>
+            {logged ??
+              (record.endedAt
+                ? 'Duração indisponível'
+                : 'Em aberto — duração ainda não definida')}
+          </dd>
+          <dd className="mt-1 text-xs text-muted-foreground">
+            O tempo contabilizado pode ser menor quando houver atividades
+            simultâneas. O rateio é calculado nos relatórios e no calendário.
           </dd>
         </div>
         <div className="col-span-2">

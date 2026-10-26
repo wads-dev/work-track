@@ -1,4 +1,6 @@
-# Correção de orçamento diário global
+# Histórico: proposta de orçamento diário global
+
+> Esta proposta foi substituída. A política vigente é a [contabilização V4](report-policy.md): rateio por sobreposição, estimativas de até seis horas e sem teto diário.
 
 ## Regra solicitada
 

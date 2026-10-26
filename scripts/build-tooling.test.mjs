@@ -323,7 +323,7 @@ test(
           "  const spy = vi.spyOn(access, 'canAccessProject').mockReturnValue(true);\n" +
           "  const record = { id: 'fixture', uid: 'synthetic', projectId: 'missing', deletedAt: null, startedAt: '2026-01-01T00:00:00Z', timeZone: 'UTC', topics: [] };\n" +
           "  const repository = new ClientPersonalReportRepository('synthetic', [record], new Map());\n" +
-          "  expect(await repository.loadContext(['synthetic'])).toEqual([record]);\n" +
+          "  expect(await repository.loadContext(['synthetic'])).toEqual([{ ...record, timeMultiplier: 1 }]);\n" +
           '  expect(spy).toHaveBeenCalledOnce();\n' +
           '});\n',
       );

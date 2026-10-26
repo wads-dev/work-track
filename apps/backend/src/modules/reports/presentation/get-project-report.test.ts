@@ -76,7 +76,7 @@ describe('getProjectReport callable adapter', () => {
       'alice',
     );
     expect(result).toMatchObject({
-      policy: 'project-report-v3',
+      policy: 'project-report-v4',
       asOf: '2026-10-08T20:00:00.000Z',
       page: { partial: false },
       scope: 'all-selected',

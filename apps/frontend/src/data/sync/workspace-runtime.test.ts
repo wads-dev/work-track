@@ -308,7 +308,7 @@ it('hundreds of records do not open hundreds of audit listeners; audit loading c
   observe();
   stop();
 });
-it('every SDK event notifies while blur preserves readiness and targets', async () => {
+it('metadata-only events do not invalidate content while blur preserves readiness and targets', async () => {
   const e = env();
   const stop = startWorkspaceSession(db, 'alice');
   await send('projects', [
@@ -348,11 +348,27 @@ it('every SDK event notifies while blur preserves readiness and targets', async 
     ],
     false,
   );
-  expect(next).toHaveBeenCalledTimes(2);
+  expect(next).toHaveBeenCalledTimes(1);
   e.setFocus(false);
   await settle();
-  expect(next).toHaveBeenCalledTimes(2);
+  expect(next).toHaveBeenCalledTimes(1);
   expect(before.complete).toBe(true);
+  await send('group:records', [
+    {
+      path: 'users/bob/records/r',
+      data: {
+        uid: 'bob',
+        projectId: 'p',
+        endedAt: '2026-10-01T01:00:00Z',
+        deletedAt: null,
+        topics: [],
+      },
+    },
+  ]);
+  expect(next).toHaveBeenCalledTimes(2);
+  expect(next.mock.lastCall![0].dataRevision).toBeGreaterThan(
+    before.dataRevision,
+  );
   e.setFocus(true);
   e.setFocus(true);
   await settle();

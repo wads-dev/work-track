@@ -1,12 +1,27 @@
+import type { CalendarInput } from '@work-track/core/reports/application/calendar-input';
 import type { CalendarResponse } from '@work-track/core/contracts/report-responses';
 export type { CalendarResponse } from '@work-track/core/contracts/report-responses';
 import { validateOccupiedWeeks } from './calendar-history';
+import {
+  calendarProjects,
+  canonicalCalendarIds,
+} from './calendar-project-filter';
 export function calendarPerson(params: URLSearchParams, uid: string) {
-  const selected = params.get('uid') || uid;
+  const ids = params.has('userIds')
+    ? canonicalCalendarIds(params.getAll('userIds'))
+    : params.get('uid') === 'all'
+      ? []
+      : [params.get('uid') || uid];
+  const selected = ids.length === 1 ? ids[0] : 'all';
   return {
     selected,
-    mode: selected === uid ? ('own' as const) : ('global' as const),
-    ...(selected !== 'all' ? { userIds: [selected] } : {}),
+    ids,
+    showPeople: ids.length !== 1,
+    mode:
+      ids.length === 1 && ids[0] === uid
+        ? ('own' as const)
+        : ('global' as const),
+    ...(ids.length ? { userIds: ids } : {}),
   };
 }
 export function calendarRequest(
@@ -16,32 +31,54 @@ export function calendarRequest(
   to: string,
   timeZone: string,
   includeArchived: boolean,
-) {
+): Omit<CalendarInput, 'allWeeks'> & { allWeeks?: boolean } {
   const person = calendarPerson(params, uid);
-  const projectId = params.get('projectId');
+  const projectIds = calendarProjects(params);
+  if (projectIds.length > 100 || person.ids.length > 100)
+    throw new Error('Selecione no máximo 100 projetos ou pessoas.');
+  if (params.has('projectIds') && params.has('projectId'))
+    throw new Error('Use projectIds ou projectId, não ambos.');
+  if (params.has('userIds') && params.has('uid'))
+    throw new Error('Use userIds ou uid, não ambos.');
   if (
     (params.get('subject') || params.get('allWeeks') === 'true') &&
-    !projectId
+    projectIds.length !== 1
   )
-    throw new Error('Selecione um projeto.');
+    throw new Error('Selecione exatamente um projeto.');
   return {
     ...(params.get('allWeeks') === 'true' ? { allWeeks: true } : { from, to }),
     timeZone,
     includeArchived,
     mode: person.mode,
-    ...(projectId ? { projectId } : {}),
+    ...(projectIds.length
+      ? params.has('projectIds')
+        ? { projectIds }
+        : { projectId: projectIds[0] }
+      : {}),
     ...(params.get('subject') ? { topicId: params.get('subject')! } : {}),
     ...(person.userIds ? { userIds: person.userIds } : {}),
   };
+}
+export function updateCalendarPeople(
+  params: URLSearchParams,
+  ids: readonly string[],
+) {
+  const next = new URLSearchParams(params);
+  next.delete('uid');
+  next.delete('userIds');
+  const selected = canonicalCalendarIds(ids);
+  if (!selected.length) next.set('uid', 'all');
+  else for (const id of selected) next.append('userIds', id);
+  for (const key of ['record', 'recordTab', 'cursor', 'historyPage'])
+    next.delete(key);
+  return next;
 }
 export function updateCalendarPerson(
   params: URLSearchParams,
   selected: string,
 ) {
-  const next = new URLSearchParams(params);
+  const next = updateCalendarPeople(params, []);
   next.set('uid', selected);
-  for (const key of ['record', 'recordTab', 'cursor', 'historyPage'])
-    next.delete(key);
   return next;
 }
 export function calendarReport(

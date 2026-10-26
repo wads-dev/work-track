@@ -15,6 +15,8 @@ export async function executeCompanyReport(
 ) {
   const page = await completeSelection((cursor) =>
       repository.readPage(100, cursor, input.projectId, {
+        projectIds: input.projectIds,
+        userIds: input.userIds,
         includeArchived: input.includeArchived,
         from: input.from,
         to: input.to,

@@ -1,13 +1,9 @@
 import { activeRecords } from '../../registration/domain/record-lifecycle.js';
 import type { ProjectReport, ReportPage } from './project-report.js';
 import { buildTopicBreakdown } from './topic-breakdown.js';
-import {
-  globalEstimates,
-  recordKey,
-  assertContext,
-} from './global-estimates.js';
+import { recordKey, assertContext } from './global-estimates.js';
 export { localDay, nextMidnight } from './report-time.js';
-const MINUTE = 60000;
+import { buildTimeAccounting, accountedMinutes } from './accounted-time.js';
 export function buildProjectReport(
   projectId: string,
   page: ReportPage,
@@ -22,19 +18,19 @@ export function buildProjectReport(
   assertContext(page.records, context);
   const warnings = new Set<string>();
   warnings.add(
-    'Estimativas sem teto diário: até agora e no máximo6h por registro aberto, com cortes por meia-noite e próximo início próprio no mesmo projeto; fatos preservados.',
+    'Estimativas sem teto diário: até agora e no máximo6h por registro aberto, com corte por meia-noite; horários originais preservados.',
   );
   if (hasCursor || page.nextCursor)
     warnings.add(
-      'Totais representam somente esta página; estimativas usam contexto global completo e próximo início próprio no mesmo projeto; fechados menores que15min ignorados como corte.',
+      'Totais representam somente esta página; rateio e estimativas usam contexto autorizado completo antes da paginação.',
     );
   warnings.add(
-    'Estimativas não persistidas; interrupções e sobreposições não são descontadas automaticamente.',
+    'Estimativas e rateio não persistidos; sobreposições divididas igualmente por pessoa; interrupções não descontadas automaticamente.',
   );
   const result: ProjectReport = {
     projectId,
     asOf: new Date(asOf).toISOString(),
-    policy: 'project-report-v3',
+    policy: 'project-report-v4',
     budgetTimeZone: 'America/Sao_Paulo',
     totalMinutes: 0,
     byUser: [],
@@ -49,7 +45,7 @@ export function buildProjectReport(
       partial: hasCursor || page.nextCursor !== null,
     },
   };
-  const global = globalEstimates(context, asOf);
+  const global = buildTimeAccounting(context, asOf);
   for (const warning of global.warnings) warnings.add(warning);
   const users = new Map<string, number>();
   const catalog = new Map([
@@ -85,7 +81,11 @@ export function buildProjectReport(
       result.estimatedCount++;
     }
     const effectiveEnd = end ?? start;
-    const minutes = Math.max(0, (effectiveEnd - start) / MINUTE);
+    const segments = global.segments(record, start, effectiveEnd),
+      loggedMinutes = Math.max(0, (effectiveEnd - start) / 60000),
+      allocatedMinutes = accountedMinutes(segments),
+      timeMultiplier = record.timeMultiplier ?? 1,
+      minutes = allocatedMinutes * timeMultiplier;
     if (
       result.records.some(
         (other) =>
@@ -95,11 +95,11 @@ export function buildProjectReport(
       )
     )
       warnings.add(
-        'Há sobreposições por usuário; intervalos são somados sem inferir troca ou simultaneidade.',
+        'Há sobreposições por usuário; minutos divididos igualmente por trecho.',
       );
     const breakdown = buildTopicBreakdown(
       page.records,
-      [{ ...record, minutes }],
+      [{ ...record, minutes, loggedMinutes }],
       catalog,
       labels,
     );
@@ -117,6 +117,10 @@ export function buildProjectReport(
       effectiveEndedAt: new Date(effectiveEnd).toISOString(),
       estimated,
       minutes,
+      loggedMinutes,
+      allocatedMinutes,
+      timeMultiplier,
+      accountingSegments: segments,
       topics: allocated,
     });
     result.totalMinutes += minutes;
