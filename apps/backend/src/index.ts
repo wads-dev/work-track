@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase-admin/app';
+import { FirestoreHistoricalRecordsRepository } from './modules/registration/infrastructure/firestore-historical-records.js';
 import { FirebaseCompanyPeopleRepository } from './modules/people/infrastructure/firebase-company-people.js';
 import { listCompanyPeopleHandler } from './modules/people/presentation/list-company-people.js';
 import { FirestoreMergeRepository } from './modules/merge/infrastructure/firestore-merge.js';
@@ -97,5 +98,6 @@ export const mcp = onRequest(
     new FirestoreRemovalRepository(getFirestore()),
     new FirestoreRecordMovementRepository(getFirestore()),
     new FirestoreMergeRepository(getFirestore()),
+    new FirestoreHistoricalRecordsRepository(getFirestore()),
   ),
 );
