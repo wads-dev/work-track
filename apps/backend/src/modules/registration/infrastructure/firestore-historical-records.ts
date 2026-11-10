@@ -1,4 +1,6 @@
+import { preserveTopicDistributions } from './topic-distributions.js';
 import { createHash } from 'node:crypto';
+import { assertProjectWritable } from '@work-track/core/registration/domain/project-management';
 import {
   FieldPath,
   type Firestore,
@@ -10,6 +12,7 @@ import {
 } from '@work-track/core/registration/domain/project-access';
 import { reportUpperDatePrefix } from '../../reports/infrastructure/admin-report-query.js';
 import type {
+  UpdateRecordTopicsBatchInput,
   GetRecordInput,
   ListRecordsInput,
 } from '../presentation/historical-record-tools.js';
@@ -17,6 +20,116 @@ import type {
 const budget = 10000;
 export class FirestoreHistoricalRecordsRepository {
   constructor(private readonly db: Firestore) {}
+
+  async updateRecordTopicsBatch(
+    input: UpdateRecordTopicsBatchInput,
+    uid: string,
+  ) {
+    const keys = input.records.map(
+      (item) => (item.recordOwnerUid ?? uid) + '/' + item.recordId,
+    );
+    if (new Set(keys).size !== keys.length)
+      throw new Error('Registros duplicados.');
+    const results = [];
+    for (const item of input.records) {
+      try {
+        const result = await this.db.runTransaction(async (tx) => {
+          const owner = item.recordOwnerUid ?? uid;
+          const ref = this.db
+            .collection('users')
+            .doc(owner)
+            .collection('records')
+            .doc(item.recordId);
+          const snap = await tx.get(ref);
+          const before = snap.data();
+          if (!before || before.uid !== owner || before.deletedAt)
+            throw new Error('Registro não encontrado.');
+          const project = (
+            await tx.get(
+              this.db.collection('projects').doc(before.projectId as string),
+            )
+          ).data();
+          if (
+            !canAccessProject(project, uid) ||
+            (owner !== uid && effectiveProjectType(project!) !== 'work')
+          )
+            throw new Error('Registro não encontrado.');
+          const auditId =
+            'topics-' +
+            createHash('sha256')
+              .update(uid + ':' + input.requestId)
+              .digest('hex');
+          const audit = ref.collection('audit').doc(auditId);
+          const prior = (await tx.get(audit)).data();
+          const request = JSON.stringify(item);
+          if (prior) {
+            if (prior.request !== request || prior.authorUid !== uid)
+              throw new Error('requestId já usado com outro conteúdo.');
+            return { recordId: item.recordId, status: 'replayed', auditId };
+          }
+          assertProjectWritable(project!);
+          const version =
+            snap.updateTime!.toMillis() + ':' + snap.updateTime!.nanoseconds;
+          if (version !== item.expectedVersion)
+            throw new Error('Conflito de versão; leia get_record novamente.');
+          const topics = preserveTopicDistributions(
+            before.topics,
+            item.topicIds,
+            project!.topics,
+          );
+          const after = { ...before, topics };
+          if (!input.confirmed)
+            return {
+              recordId: item.recordId,
+              status: 'preview',
+              before,
+              after,
+              expectedVersion: version,
+            };
+          const updatedAt = new Date().toISOString();
+          const patch = {
+            topics,
+            topicSnapshots: item.topicIds.map((id) =>
+              (project!.topics as { id: string }[]).find((t) => t.id === id),
+            ),
+            updatedAt,
+            updatedBy: uid,
+          };
+          tx.update(ref, patch);
+          tx.create(audit, {
+            operation: 'update_record_topics_batch',
+            request,
+            requestId: input.requestId,
+            authorUid: uid,
+            recordOwnerUid: owner,
+            reason: item.reason,
+            updatedAt,
+            before,
+            after: { ...before, ...patch },
+          });
+          return {
+            recordId: item.recordId,
+            status: 'updated',
+            auditId,
+            updatedAt,
+          };
+        });
+        results.push(result);
+      } catch (error) {
+        results.push({
+          recordId: item.recordId,
+          status: 'rejected',
+          error:
+            error instanceof Error ? error.message : 'Operação indisponível.',
+        });
+      }
+    }
+    return {
+      mode: input.confirmed ? 'execution' : 'preview',
+      atomic: false,
+      results,
+    };
+  }
 
   async getRecord(input: GetRecordInput, uid: string) {
     const owner = input.recordOwnerUid ?? uid;

@@ -16,12 +16,45 @@ export const listRecordsInput = z
     (v) => !v.from || !v.to || Date.parse(v.from) < Date.parse(v.to),
     'Intervalo inválido.',
   );
+export const updateRecordTopicsBatchInput = z
+  .object({
+    requestId: id,
+    confirmed: z.boolean().default(false),
+    records: z
+      .array(
+        z
+          .object({
+            recordId: id,
+            recordOwnerUid: id.optional(),
+            topicIds: z.array(id).min(1).max(30),
+            expectedVersion: z.string().min(1).max(100),
+            reason: z.string().trim().min(1).max(1000),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      new Set(v.records.map((r) => (r.recordOwnerUid ?? '') + '/' + r.recordId))
+        .size === v.records.length,
+    'Registros duplicados.',
+  );
+export type UpdateRecordTopicsBatchInput = z.infer<
+  typeof updateRecordTopicsBatchInput
+>;
 export const getRecordInput = z
   .object({ recordId: id, recordOwnerUid: id.optional() })
   .strict();
 export type GetRecordInput = z.infer<typeof getRecordInput>;
 export type ListRecordsInput = z.infer<typeof listRecordsInput>;
 export interface HistoricalRecordsRepository {
+  updateRecordTopicsBatch(
+    input: UpdateRecordTopicsBatchInput,
+    uid: string,
+  ): Promise<unknown>;
   getRecord(input: GetRecordInput, uid: string): Promise<unknown>;
   listRecords(input: ListRecordsInput, uid: string): Promise<unknown>;
 }
@@ -30,6 +63,42 @@ export function registerHistoricalRecordTools(
   repository: HistoricalRecordsRepository,
   uid: string,
 ) {
+  server.registerTool(
+    'update_record_topics_batch',
+    {
+      description:
+        'Corrija somente tópicos de até100 registros. Prévia sem escrita por padrão; confirmed true executa transações individuais com resultado por registro. Exige expectedVersion de get_record/list_records, motivo por item e requestId estável; retries idênticos não duplicam auditoria. Nunca altera fatos ou distribuições: registros distribuídos rejeitam remapeamentos; nenhuma distribuição é inventada. Leia evidências e mantenha casos ambíguos intactos.',
+      inputSchema: updateRecordTopicsBatchInput,
+      annotations: { idempotentHint: true, destructiveHint: true },
+    },
+    async (input) => {
+      try {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                await repository.updateRecordTopicsBatch(input, uid),
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text' as const,
+              text:
+                error instanceof Error
+                  ? error.message
+                  : 'Operação indisponível.',
+            },
+          ],
+        };
+      }
+    },
+  );
   server.registerTool(
     'get_record',
     {
