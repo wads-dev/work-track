@@ -9,11 +9,46 @@ import {
   effectiveProjectType,
 } from '@work-track/core/registration/domain/project-access';
 import { reportUpperDatePrefix } from '../../reports/infrastructure/admin-report-query.js';
-import type { ListRecordsInput } from '../presentation/historical-record-tools.js';
+import type {
+  GetRecordInput,
+  ListRecordsInput,
+} from '../presentation/historical-record-tools.js';
 
 const budget = 10000;
 export class FirestoreHistoricalRecordsRepository {
   constructor(private readonly db: Firestore) {}
+
+  async getRecord(input: GetRecordInput, uid: string) {
+    const owner = input.recordOwnerUid ?? uid;
+    const doc = await this.db
+      .collection('users')
+      .doc(owner)
+      .collection('records')
+      .doc(input.recordId)
+      .get();
+    const data = doc.data();
+    if (!data || data.uid !== owner || data.deletedAt)
+      throw new Error('Registro não encontrado.');
+    const project = (
+      await this.db
+        .collection('projects')
+        .doc(data.projectId as string)
+        .get()
+    ).data();
+    if (
+      !canAccessProject(project, uid) ||
+      (owner !== uid && effectiveProjectType(project!) !== 'work')
+    )
+      throw new Error('Registro não encontrado.');
+    return {
+      ...data,
+      id: doc.id,
+      recordOwnerUid: owner,
+      version: doc.updateTime!.toDate().toISOString(),
+      expectedVersion:
+        doc.updateTime!.toMillis() + ':' + doc.updateTime!.nanoseconds,
+    };
+  }
 
   async listRecords(input: ListRecordsInput, uid: string) {
     const owner = input.recordOwnerUid ?? uid;

@@ -16,8 +16,13 @@ export const listRecordsInput = z
     (v) => !v.from || !v.to || Date.parse(v.from) < Date.parse(v.to),
     'Intervalo inválido.',
   );
+export const getRecordInput = z
+  .object({ recordId: id, recordOwnerUid: id.optional() })
+  .strict();
+export type GetRecordInput = z.infer<typeof getRecordInput>;
 export type ListRecordsInput = z.infer<typeof listRecordsInput>;
 export interface HistoricalRecordsRepository {
+  getRecord(input: GetRecordInput, uid: string): Promise<unknown>;
   listRecords(input: ListRecordsInput, uid: string): Promise<unknown>;
 }
 export function registerHistoricalRecordTools(
@@ -25,6 +30,40 @@ export function registerHistoricalRecordTools(
   repository: HistoricalRecordsRepository,
   uid: string,
 ) {
+  server.registerTool(
+    'get_record',
+    {
+      description:
+        'Leia registro completo por ID e proprietário (padrão: você), incluindo evidências, interrupções, distribuições e expectedVersion atual. Respeita ACL do projeto.',
+      inputSchema: getRecordInput,
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    },
+    async (input) => {
+      try {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(await repository.getRecord(input, uid)),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text' as const,
+              text:
+                error instanceof Error
+                  ? error.message
+                  : 'Consulta indisponível.',
+            },
+          ],
+        };
+      }
+    },
+  );
   server.registerTool(
     'list_records',
     {
