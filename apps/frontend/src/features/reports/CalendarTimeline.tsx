@@ -250,6 +250,10 @@ export function CalendarTimeline({
                     aria-label={'Horas úteis de ' + d.key}
                   >
                     {dailyProgress(d.key).map((progress) => {
+                      const overtime = Math.max(
+                        0,
+                        progress.delivered - progress.expected,
+                      );
                       const caption =
                         label(progress.projectId) +
                         ': ' +
@@ -281,6 +285,40 @@ export function CalendarTimeline({
                               }}
                             />
                           </div>
+                          {progress.expected > 0 && overtime > 0 && (
+                            <div
+                              aria-label={
+                                label(progress.projectId) +
+                                ': ' +
+                                overtime.toFixed(1) +
+                                'h extras'
+                              }
+                              className="space-y-0.5"
+                            >
+                              <div className="truncate text-[10px]">
+                                {overtime.toFixed(1)}h extras
+                              </div>
+                              <div className="h-2 overflow-hidden rounded bg-muted dark:bg-white/20 dark:ring-1 dark:ring-inset dark:ring-white/30">
+                                <div
+                                  className="h-full rounded"
+                                  style={{
+                                    backgroundColor: color(progress.projectId),
+                                    width:
+                                      dailyProgressPercent({
+                                        ...progress,
+                                        expected: 0,
+                                        dailyHours:
+                                          progress.dailyHours ??
+                                          progress.expected,
+                                        delivered: overtime,
+                                      }) + '%',
+                                    backgroundImage:
+                                      'repeating-linear-gradient(135deg,transparent,transparent 3px,#ffffff55 3px,#ffffff55 6px)',
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

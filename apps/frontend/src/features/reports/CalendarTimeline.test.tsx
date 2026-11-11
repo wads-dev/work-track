@@ -44,6 +44,42 @@ it('keeps dark project progress visible without replacing project colors or chan
   expect(html).toContain('grid-rows-subgrid');
 });
 
+it('renders a separate proportional striped overtime bar after reaching a working-day target', () => {
+  const html = renderToStaticMarkup(
+    <MemoryRouter>
+      <TooltipProvider>
+        <CalendarTimeline
+          items={[
+            {
+              id: 'demo',
+              projectId: 'p',
+              effectiveStartedAt: '2026-10-19T03:00:00Z',
+              effectiveEndedAt: '2026-10-19T13:00:00Z',
+              estimated: false,
+            },
+          ]}
+          day="2026-10-19"
+          view="day"
+          zone="America/Sao_Paulo"
+          label={() => 'Projeto'}
+          color={() => '#123456'}
+          returnTo="/calendar"
+          viewerUid="me"
+          authorLabel={() => 'Pessoa'}
+          dailyProgress={() => [
+            { projectId: 'p', expected: 8, dailyHours: 8, delivered: 10 },
+          ]}
+        />
+      </TooltipProvider>
+    </MemoryRouter>,
+  );
+  expect(html).toContain('10.0h / 8h');
+  expect(html).toContain('2.0h extras');
+  expect(html).toContain('width:100%');
+  expect(html).toContain('width:25%');
+  expect(html).toContain('repeating-linear-gradient');
+});
+
 const render = (showPeople: boolean, revealed: boolean, minutes = 60) =>
   renderToStaticMarkup(
     <MemoryRouter>
