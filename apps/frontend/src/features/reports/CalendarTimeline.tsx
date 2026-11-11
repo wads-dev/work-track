@@ -57,7 +57,11 @@ export function CalendarTimeline({
   renderProject,
   showPeople = true,
   details,
+  dailyProgress,
 }: {
+  dailyProgress?: (
+    date: string,
+  ) => import('./daily-business-progress').DailyProgress[];
   items: Event[];
   day: string;
   view: View;
@@ -226,6 +230,58 @@ export function CalendarTimeline({
               >
                 {d.key}
               </h3>
+              {!d.outside && dailyProgress && (
+                <div
+                  className="mb-2 space-y-1"
+                  aria-label={'Horas úteis de ' + d.key}
+                >
+                  {dailyProgress(d.key).map((progress) => {
+                    const caption =
+                      label(progress.projectId) +
+                      ': ' +
+                      progress.delivered.toFixed(1) +
+                      'h / ' +
+                      progress.expected +
+                      'h' +
+                      (progress.expected === 0 && progress.delivered > 0
+                        ? ' · horas extras em dia sem meta'
+                        : '');
+                    return (
+                      <div
+                        key={progress.projectId}
+                        title={caption}
+                        aria-label={caption}
+                        tabIndex={0}
+                        className="space-y-0.5"
+                      >
+                        <div className="truncate text-[10px]">{caption}</div>
+                        <div className="h-1.5 overflow-hidden rounded bg-muted">
+                          <div
+                            className="h-full rounded"
+                            style={{
+                              background: color(progress.projectId),
+                              width:
+                                (progress.expected > 0
+                                  ? Math.min(
+                                      100,
+                                      (progress.delivered / progress.expected) *
+                                        100,
+                                    )
+                                  : progress.delivered > 0
+                                    ? 100
+                                    : 0) + '%',
+                              backgroundImage:
+                                progress.expected === 0
+                                  ? 'repeating-linear-gradient(135deg,transparent,transparent 3px,#ffffff55 3px,#ffffff55 6px)'
+                                  : undefined,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {d.outside && (
                 <span
                   className={cn(

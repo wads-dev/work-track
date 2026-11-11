@@ -1,4 +1,7 @@
 import { cn } from '../../lib/utils';
+import { observeHolidays } from '../../data/repositories/holiday-repository';
+import type { Holiday } from '@work-track/core/registration/domain/business-hours';
+import { dailyBusinessProgress } from './daily-business-progress';
 import { useMediaQuery } from '../../shared/ui/theme';
 import { defaultCalendarView, PORTRAIT_MOBILE_QUERY } from './calendar-view';
 import { measureFirestoreStage } from '../../data/sync/firestore-diagnostics';
@@ -152,6 +155,26 @@ export function PersonalPage({
   const { revealed } = usePrivacy();
   const companyPeople = useCompanyPeople();
   const projects = useProjects(functions, uid, company ? 'work' : 'all');
+  const [businessHolidays, setBusinessHolidays] = useState<Holiday[] | null>(
+    null,
+  );
+  const [businessHolidayError, setBusinessHolidayError] = useState('');
+  useEffect(
+    () =>
+      observeHolidays(
+        db,
+        uid,
+        (value) => {
+          setBusinessHolidays(value.holidays);
+          setBusinessHolidayError('');
+        },
+        (failure) => {
+          setBusinessHolidays(null);
+          setBusinessHolidayError(failure.message);
+        },
+      ),
+    [db, uid],
+  );
   const zone = 'America/Sao_Paulo';
   const density =
     params.get('density') ??
@@ -971,8 +994,30 @@ export function PersonalPage({
                 />
               </div>
             )}
+            {calendar && businessHolidayError && (
+              <p role="alert">
+                Calendário de horas úteis indisponível: {businessHolidayError}
+              </p>
+            )}
             {calendar && allWeeks && (
               <CalendarHistory
+                dailyProgress={
+                  businessHolidays
+                    ? (date) =>
+                        dailyBusinessProgress(
+                          date,
+                          new Map(
+                            Array.from(
+                              catalog?.projects ?? [],
+                              ([id, data]) => [id, safeProject(data, revealed)],
+                            ),
+                          ),
+                          businessHolidays,
+                          report.intervals,
+                          projectIds,
+                        )
+                    : undefined
+                }
                 showPeople={person.showPeople}
                 details={eventDetails}
                 weeks={report.occupiedWeeks ?? []}
@@ -991,6 +1036,23 @@ export function PersonalPage({
             )}
             {calendar && !allWeeks && density === 'timeline' && (
               <CalendarTimeline
+                dailyProgress={
+                  businessHolidays
+                    ? (date) =>
+                        dailyBusinessProgress(
+                          date,
+                          new Map(
+                            Array.from(
+                              catalog?.projects ?? [],
+                              ([id, data]) => [id, safeProject(data, revealed)],
+                            ),
+                          ),
+                          businessHolidays,
+                          report.intervals,
+                          projectIds,
+                        )
+                    : undefined
+                }
                 showPeople={person.showPeople}
                 details={eventDetails}
                 items={report.intervals}

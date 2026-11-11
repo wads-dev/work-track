@@ -178,6 +178,7 @@ export class WebWorkRepository {
         requestId,
         reason,
         expectedTimeMultipliers,
+        expectedBusinessHours,
         ...metadata
       } = input;
       if (
@@ -191,6 +192,15 @@ export class WebWorkRepository {
         throw new ProjectManagementError(
           'failed-precondition',
           'Os multiplicadores foram alterados. Recarregue o projeto antes de salvar.',
+        );
+      if (
+        metadata.businessHours !== undefined &&
+        canonical(before.businessHours ?? null) !==
+          canonical(expectedBusinessHours)
+      )
+        throw new ProjectManagementError(
+          'failed-precondition',
+          'Os contratos foram alterados. Recarregue antes de salvar.',
         );
       void projectId;
       void requestId;

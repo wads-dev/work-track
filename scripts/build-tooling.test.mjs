@@ -163,6 +163,7 @@ test('backend deploy selects exactly the remaining endpoints without force or br
     'functions:default:exportProjectForDeletion',
     'functions:default:listCompanyPeople',
     'functions:default:mcp',
+    'functions:default:updateCalendarHolidays',
   ]);
   assert(!command.includes('--force'));
   assert(command.includes('--project wadsworktrack --non-interactive'));

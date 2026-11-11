@@ -58,6 +58,7 @@ import {
 } from './shared/ui/privacy-preference';
 import { PendingBell, PendingPage } from './features/pending/PendingPage';
 import { RulesPage } from './features/rules/RulesPage';
+import { HolidaysPage } from './features/projects/HolidaysPage';
 import { UiIcon } from './shared/ui/UiIcons';
 import { PersonalPage } from './features/reports/PersonalPage';
 import { PersonPage } from './features/people/PersonPage';
@@ -282,6 +283,7 @@ function App() {
             ['/records', 'Meus registros', 'records'],
             ['/pending', 'Pendências', 'bell'],
             ['/rules', 'Regras', 'rules'],
+            ['/holidays', 'Feriados', 'calendar'],
           ] as const
         ).map(([to, label, kind]) => {
           const active =
@@ -353,11 +355,13 @@ function App() {
                           ? 'Calendário'
                           : location.pathname === '/pending'
                             ? 'Pendências'
-                            : location.pathname === '/rules'
-                              ? 'Regras'
-                              : location.pathname === '/me'
-                                ? 'Meu relatório'
-                                : 'Dashboard'}
+                            : location.pathname === '/holidays'
+                              ? 'Feriados'
+                              : location.pathname === '/rules'
+                                ? 'Regras'
+                                : location.pathname === '/me'
+                                  ? 'Meu relatório'
+                                  : 'Dashboard'}
                 </h1>
                 {toggleTheme}
                 <PendingBell db={services.db} uid={user.uid} />
@@ -425,6 +429,17 @@ function App() {
                   }
                 />
                 <Route path="/rules" element={<RulesPage />} />
+                <Route
+                  path="/holidays"
+                  element={
+                    <HolidaysPage
+                      key={user.uid}
+                      db={services.db}
+                      functions={services.functions}
+                      uid={user.uid}
+                    />
+                  }
+                />
                 <Route
                   path="/pending"
                   element={

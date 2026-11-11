@@ -14,6 +14,22 @@ export interface ProjectSelection {
 }
 /** Authoritative command implementation is server-side; clients use a command gateway. */
 export interface WorkRepository {
+  getHolidays?(): Promise<{
+    holidays: import('../registration/domain/business-hours.js').Holiday[];
+    expectedHolidays:
+      import('../registration/domain/business-hours.js').Holiday[] | null;
+  }>;
+  updateHolidays?(input: unknown, uid: string): Promise<unknown>;
+  getBusinessHours?(
+    projectId: string,
+    uid: string,
+  ): Promise<{
+    projectId: string;
+    businessHours: import('../registration/domain/business-hours.js').BusinessHoursPeriod[];
+    expectedBusinessHours:
+      | import('../registration/domain/business-hours.js').BusinessHoursPeriod[]
+      | null;
+  }>;
   searchRepositoryContext?(
     term: string,
     uid: string,

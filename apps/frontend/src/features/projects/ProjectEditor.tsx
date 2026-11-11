@@ -12,6 +12,7 @@ import { ProjectDeletion } from './ProjectDeletion';
 import { ownsVisibleProject } from './project-deletion';
 import { ProjectTopics } from './ProjectTopics';
 import { ProjectTimeMultipliers } from './ProjectTimeMultipliers';
+import { ProjectBusinessHours } from './ProjectBusinessHours';
 import { useProjects } from './hooks/useProjects';
 import { getAuth } from 'firebase/auth';
 import { safeProject, usePrivacy } from '../../shared/ui/privacy';
@@ -62,6 +63,12 @@ export function ProjectEditor({
         />
         <div className="min-w-0">{access}</div>
       </div>
+      <ProjectBusinessHours
+        key={'contracts/' + projectId + String(project.updatedAt)}
+        functions={functions}
+        projectId={projectId}
+        project={project}
+      />
       <ProjectTimeMultipliers
         key={projectId + String(project.updatedAt)}
         functions={functions}

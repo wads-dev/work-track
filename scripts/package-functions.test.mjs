@@ -158,6 +158,7 @@ test(
         'exportProjectForDeletion',
         'listCompanyPeople',
         'mcp',
+        'updateCalendarHolidays',
       ]);
       const retiredCallables = [
         'createProject',

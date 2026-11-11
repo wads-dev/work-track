@@ -168,6 +168,11 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     // 5. Coleções: regras curtas que expressam intenção
     // -------------------------------------------------------------------------
+    // Shared calendar metadata is readable by authenticated users; audited backend writes only.
+    match /calendarSettings/{settingId} {
+      allow read: if isAuthenticated() && settingId == 'holidays';
+      allow write: if false;
+    }
     match /projects/{projectId} {
       allow get: if isAuthenticated()
         && (!exists(projectPath(projectId)) || canAccessProject(resource.data));

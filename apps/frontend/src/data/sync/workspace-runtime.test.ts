@@ -8,6 +8,7 @@ it('synchronizes only explicit work and owner-qualified personal projects', () =
   ).toEqual([
     ['projects', ['type', '==', 'work']],
     ['projects', ['type', '==', 'personal'], ['createdBy', '==', 'alice']],
+    ['calendarSettings', ['__name__', '==', 'holidays']],
   ]);
   stop();
 });
@@ -43,6 +44,7 @@ const m = vi.hoisted(() => ({
   call: vi.fn(),
 }));
 vi.mock('firebase/firestore', () => ({
+  documentId: () => '__name__',
   collection: (_: unknown, path: string) => ({ path }),
   collectionGroup: (_: unknown, path: string) => ({ path: 'group:' + path }),
   where: (...args: unknown[]) => args,
@@ -248,8 +250,8 @@ it('never re-enables an already-enabled SDK at initial focus and opens one liste
   env();
   const stop = startWorkspaceSession(db, 'alice');
   expect(m.enable).not.toHaveBeenCalled();
-  expect(m.listeners).toHaveLength(2);
-  expect(new Set(m.listeners.map((l) => l.target.key)).size).toBe(2);
+  expect(m.listeners).toHaveLength(3);
+  expect(new Set(m.listeners.map((l) => l.target.key)).size).toBe(3);
   expect(m.listeners.every((l) => !l.options.source)).toBe(true);
   stop();
 });
@@ -284,14 +286,14 @@ it('hundreds of records do not open hundreds of audit listeners; audit loading c
   let snapshot: WorkspaceSignal | undefined;
   const observe = observeWorkspace(db, 'alice', (s) => (snapshot = s));
   expect(snapshot!.complete).toBe(true);
-  expect(m.listeners).toHaveLength(3);
+  expect(m.listeners).toHaveLength(4);
   const audit = observeWorkspaceAudit(
     db,
     'alice',
     'users/alice/records/r0',
     (s) => (snapshot = s),
   );
-  expect(m.listeners).toHaveLength(4);
+  expect(m.listeners).toHaveLength(5);
   expect(snapshot!.complete).toBe(true);
   await send('users/alice/records/r0/audit', []);
   expect(snapshot!.auditReady).toContain('users/alice/records/r0');
@@ -386,7 +388,7 @@ it('authorization grouping opens only one global records target for up to ten pr
       data: { type: 'work', archived: false, confidential: false, topics: [] },
     })),
   );
-  expect(m.listeners).toHaveLength(5);
+  expect(m.listeners).toHaveLength(6);
   const targets = m.listeners.filter((l) =>
     l.target.key.includes('group:records'),
   );

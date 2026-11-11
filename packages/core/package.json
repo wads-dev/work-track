@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./registration/domain/business-progress": {
+      "types": "./lib/registration/domain/business-progress.d.ts",
+      "development": "./src/registration/domain/business-progress.ts",
+      "default": "./lib/registration/domain/business-progress.js"
+    },
+    "./registration/domain/business-hours": {
+      "types": "./lib/registration/domain/business-hours.d.ts",
+      "development": "./src/registration/domain/business-hours.ts",
+      "default": "./lib/registration/domain/business-hours.js"
+    },
     "./registration/domain/time-multipliers": {
       "types": "./lib/registration/domain/time-multipliers.d.ts",
       "development": "./src/registration/domain/time-multipliers.ts",

@@ -1,5 +1,7 @@
 import { isDeletedRecord } from '@work-track/core/registration/domain/record-lifecycle';
 import { createHash } from 'node:crypto';
+import { readHolidays, updateHolidays } from './firestore-holidays.js';
+import { businessHoursSchema } from '@work-track/core/registration/domain/business-hours';
 import { searchRepositoryContext } from '@work-track/core/registration/domain/repository-search';
 import { ProjectDiscoveryRepository } from '@work-track/data/repositories/project-discovery-repository';
 import {
@@ -40,6 +42,27 @@ import { normalize } from '@work-track/core/shared/text/normalize';
 import { readRecentRecordCandidates } from './firestore-recent-records.js';
 export class FirestoreWorkRepository implements WorkRepository {
   constructor(private readonly db: Firestore) {}
+  getHolidays() {
+    return readHolidays(this.db);
+  }
+  updateHolidays(input: unknown, uid: string) {
+    return updateHolidays(this.db, input, uid);
+  }
+  async getBusinessHours(projectId: string, uid: string) {
+    const snapshot = await this.db.collection('projects').doc(projectId).get();
+    if (!snapshot.exists)
+      throw new ProjectManagementError('not-found', 'Projeto não encontrado.');
+    const data = snapshot.data()!;
+    const storedBusinessHours: unknown = data.businessHours;
+    assertProjectAccess(data, uid);
+    const businessHours = businessHoursSchema.parse(storedBusinessHours ?? []);
+    return {
+      projectId,
+      businessHours,
+      expectedBusinessHours:
+        storedBusinessHours === undefined ? null : businessHours,
+    };
+  }
   async listRecentRecords(raw: RecentRecordsInput, uid: string) {
     const now = new Date();
     const input = recentRecordsInput.parse(raw);

@@ -55,6 +55,7 @@ import {
   safeRecord,
 } from '../../shared/ui/privacy';
 import { ProjectEditor } from '../projects/ProjectEditor';
+import { ProjectBusinessProgress } from '../projects/BusinessProgress';
 import { ProjectAccess } from '../projects/ProjectAccess';
 import { ProjectHeader } from '../projects/ProjectHeader';
 import { ProjectArchive } from '../projects/ProjectArchive';
@@ -80,7 +81,12 @@ export function Dashboard({
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const recordId = params.get('record');
-  const projectTab = params.get('tab') === 'details' ? 'details' : 'overview';
+  const projectTab =
+    params.get('tab') === 'details'
+      ? 'details'
+      : params.get('tab') === 'history'
+        ? 'history'
+        : 'overview';
   const setProjectTab = (value: string) => {
     const next = writeUrlTab(params, 'tab', value);
     navigate({
@@ -277,8 +283,31 @@ export function Dashboard({
               >
                 Detalhes / Editar
               </TabsTrigger>
+              <TabsTrigger
+                id="project-tab-history"
+                aria-controls="project-panel-history"
+                value="history"
+              >
+                Histórico
+              </TabsTrigger>
             </TabsList>
           </ProjectHeader>
+          <TabsContent
+            value="history"
+            id="project-panel-history"
+            aria-labelledby="project-tab-history"
+          >
+            {projectTab === 'history' && (
+              <ProjectBusinessProgress
+                db={db}
+                uid={uid}
+                projectId={projectId}
+                project={selectedProject?.data}
+                hidden={isHidden(selectedProject?.data, revealed)}
+                history
+              />
+            )}
+          </TabsContent>
           <TabsContent
             forceMount
             value="details"
@@ -313,6 +342,15 @@ export function Dashboard({
             aria-labelledby="project-tab-overview"
             hidden={projectTab !== 'overview'}
           >
+            {projectTab === 'overview' && (
+              <ProjectBusinessProgress
+                db={db}
+                uid={uid}
+                projectId={projectId}
+                project={selectedProject?.data}
+                hidden={isHidden(selectedProject?.data, revealed)}
+              />
+            )}
             {projectTab === 'overview' && (
               <ProjectReport
                 refreshKey={reportRefresh}

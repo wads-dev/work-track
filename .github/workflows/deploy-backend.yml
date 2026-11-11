@@ -91,4 +91,4 @@ jobs:
             ], { stdio: 'inherit' });
           }
           NODE
-      - run: npx -y firebase-tools@latest deploy --only functions:default:mcp,functions:default:listCompanyPeople,functions:default:exportProjectForDeletion,functions:default:deleteProjectPermanently --project wadsworktrack --non-interactive
+      - run: npx -y firebase-tools@latest deploy --only functions:default:mcp,functions:default:listCompanyPeople,functions:default:exportProjectForDeletion,functions:default:deleteProjectPermanently,functions:default:updateCalendarHolidays --project wadsworktrack --non-interactive

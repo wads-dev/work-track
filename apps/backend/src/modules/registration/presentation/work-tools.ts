@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { updateHolidaysInput } from '../infrastructure/firestore-holidays.js';
 import {
   moveRecordInput,
   type MovementRepository,
@@ -136,7 +137,69 @@ export function registerWorkTools(
       };
     }
   };
+  if (repository.getHolidays)
+    server.registerTool(
+      'get_holidays',
+      {
+        description:
+          'Leia os feriados compartilhados e expectedHolidays para edição concorrente segura. Sábados e domingos já são não úteis; datas são específicas por ano.',
+        inputSchema: z.object({}).strict(),
+        annotations: { readOnlyHint: true, destructiveHint: false },
+      },
+      () => run(() => repository.getHolidays!()),
+    );
+  if (repository.updateHolidays)
+    server.registerTool(
+      'update_holidays',
+      {
+        description:
+          'Edite o calendário compartilhado de feriados. Leia get_holidays antes, envie calendário completo, expectedHolidays anterior (null se ausente), requestId estável e motivo. Afeta metas de todos os projetos.',
+        inputSchema: updateHolidaysInput,
+      },
+      (input) => run(() => repository.updateHolidays!(input, uid)),
+    );
+  if (repository.getBusinessHours)
+    server.registerTool(
+      'get_business_hours',
+      {
+        description:
+          'Leia o histórico de contratação em horas por dia útil de um projeto por ID. Retorna expectedBusinessHours para edição concorrente segura. Datas inicial e final inclusivas; fim null mantém vigência.',
+        inputSchema: z
+          .object({ projectId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/) })
+          .strict(),
+        annotations: { readOnlyHint: true, destructiveHint: false },
+      },
+      (input) => run(() => repository.getBusinessHours!(input.projectId, uid)),
+    );
   if (management) {
+    server.registerTool(
+      'update_business_hours',
+      {
+        description:
+          'Substitua histórico de contratação de horas por dia útil. Leia get_business_hours antes; envie businessHours e expectedBusinessHours iguais ao histórico anterior (null se ausente), projectId, requestId estável e reason. Períodos inclusivos sem sobreposição; fim null significa vigente. Array vazio desativa a feature. Não é preço nem multiplicador.',
+        inputSchema: updateProjectInput,
+      },
+      (input) =>
+        run(() => {
+          if (
+            input.businessHours === undefined ||
+            Object.keys(input).some(
+              (key) =>
+                ![
+                  'projectId',
+                  'requestId',
+                  'reason',
+                  'businessHours',
+                  'expectedBusinessHours',
+                ].includes(key),
+            )
+          )
+            throw new Error(
+              'Informe somente o histórico de contratação e seus dados de auditoria.',
+            );
+          return management.updateProject(input, uid);
+        }),
+    );
     server.registerTool(
       'archive_project',
       {

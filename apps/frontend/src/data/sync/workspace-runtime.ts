@@ -1,6 +1,7 @@
 import {
   collection,
   collectionGroup,
+  documentId,
   query,
   where,
   onSnapshot,
@@ -139,6 +140,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
       ready.has('catalog:1') &&
       [...projectStops.keys()].every((key) => ready.has(key));
     const nextSnapshot: WorkspaceSignal = {
+      calendarReady: ready.has('calendar:holidays'),
       dataRevision,
       auditRevision,
       auditReady: [...auditStops.keys()].filter((path) =>
@@ -168,7 +170,9 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
       ? 'projects'
       : key.startsWith('records:')
         ? 'records'
-        : 'audit';
+        : key.startsWith('calendar:')
+          ? 'calendarSettings'
+          : 'audit';
     traceFirestore('listen.attach', {
       key,
       collection: collectionName,
@@ -329,6 +333,15 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
           );
           reconcile();
         }),
+      ),
+    );
+    catalogStops.push(
+      watch(
+        query(
+          collection(db, 'calendarSettings'),
+          where(documentId(), '==', 'holidays'),
+        ),
+        'calendar:holidays',
       ),
     );
   };

@@ -1,6 +1,7 @@
 export type LocalDocument = { path: string; data: Record<string, unknown> };
 /** Notification only: screens query the SDK cache, never receive document copies. */
 export type WorkspaceSignal = {
+  calendarReady?: boolean;
   /** Monotonic content revision; metadata-only confirmations do not change it. */
   dataRevision?: number;
   auditRevision?: number;

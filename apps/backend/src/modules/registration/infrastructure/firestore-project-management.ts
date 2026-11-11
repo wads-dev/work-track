@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { businessHoursSchema } from '@work-track/core/registration/domain/business-hours';
 import { isDeepStrictEqual } from 'node:util';
 import { timeMultipliersSchema } from '@work-track/core/registration/domain/time-multipliers';
 import {
@@ -131,6 +132,7 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
         requestId,
         reason,
         expectedTimeMultipliers,
+        expectedBusinessHours,
         ...metadata
       } = input;
       if (
@@ -145,6 +147,19 @@ export class FirestoreProjectManagementRepository implements ProjectManagementRe
         throw new ProjectManagementError(
           'failed-precondition',
           'Os multiplicadores foram alterados. Recarregue o projeto antes de salvar.',
+        );
+      if (
+        metadata.businessHours !== undefined &&
+        !isDeepStrictEqual(
+          Object.hasOwn(before, 'businessHours')
+            ? businessHoursSchema.parse(before.businessHours)
+            : null,
+          expectedBusinessHours,
+        )
+      )
+        throw new ProjectManagementError(
+          'failed-precondition',
+          'Os contratos foram alterados. Recarregue antes de salvar.',
         );
       void requestId;
       const patch: Record<string, unknown> = {

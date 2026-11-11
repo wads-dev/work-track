@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { businessHoursSchema } from './business-hours.js';
 import { timeMultipliersSchema } from './time-multipliers.js';
 import { projectColor } from './project-color.js';
 import { normalize } from '../../shared/text/normalize.js';
@@ -48,6 +49,8 @@ export const updateProjectInput = z
     title: z.string().trim().min(2).max(160).optional(),
     description: z.string().trim().min(20).max(6000).optional(),
     ...metadata,
+    businessHours: businessHoursSchema.optional(),
+    expectedBusinessHours: businessHoursSchema.nullable().optional(),
     timeMultipliers: timeMultipliersSchema.optional(),
     // null means the persisted field was absent; {} is an explicit empty map.
     expectedTimeMultipliers: timeMultipliersSchema.nullable().optional(),
@@ -64,6 +67,7 @@ export const updateProjectInput = z
             'requestId',
             'reason',
             'expectedTimeMultipliers',
+            'expectedBusinessHours',
           ].includes(key),
       ),
     'Informe metadados para alterar.',
@@ -73,6 +77,12 @@ export const updateProjectInput = z
       (value.timeMultipliers !== undefined) ===
       (value.expectedTimeMultipliers !== undefined),
     'Multiplicadores exigem o mapa anterior para evitar sobrescrever alterações concorrentes.',
+  )
+  .refine(
+    (value) =>
+      (value.businessHours !== undefined) ===
+      (value.expectedBusinessHours !== undefined),
+    'Contratos exigem o histórico anterior para evitar sobrescrita concorrente.',
   );
 export const mergeProjectsInput = z
   .object({

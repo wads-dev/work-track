@@ -1,4 +1,6 @@
 import { initializeApp } from 'firebase-admin/app';
+import { updateHolidays } from './modules/registration/infrastructure/firestore-holidays.js';
+import { authorizeReport } from './modules/reports/presentation/get-project-report.js';
 import { FirebaseCompanyPeopleRepository } from './modules/people/infrastructure/firebase-company-people.js';
 import { listCompanyPeopleHandler } from './modules/people/presentation/list-company-people.js';
 import { FirestoreMergeRepository } from './modules/merge/infrastructure/firestore-merge.js';
@@ -23,6 +25,14 @@ import { FirestoreProjectDeletionRepository } from './modules/registration/infra
 import { projectDeletionHandler } from './modules/registration/presentation/project-deletion.js';
 
 initializeApp();
+
+export const updateCalendarHolidays = onCall(
+  { region: 'southamerica-east1', invoker: 'public', maxInstances: 3 },
+  (request) => {
+    authorizeReport(request.auth);
+    return updateHolidays(getFirestore(), request.data, request.auth!.uid);
+  },
+);
 
 export const listCompanyPeople = onCall(
   {

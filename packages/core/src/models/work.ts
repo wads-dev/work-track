@@ -11,6 +11,7 @@ export interface Topic {
   description: string;
 }
 export interface Project {
+  businessHours?: import('../registration/domain/business-hours.js').BusinessHoursPeriod[];
   timeMultipliers?: TimeMultipliers;
   color?: string | null;
   type: 'personal' | 'work';
