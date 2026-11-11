@@ -7,7 +7,7 @@
 - A barra de fundo indica a meta acumulada; a barra interna é a entrega. Divisões por pessoa exibem nome, horas e percentual relativo à meta mensal. Textos preservam valores acima de 100%. Meta zero não gera divisão por zero.
 - Na régua do calendário, projetos com contrato vigente têm barra diária na cor do projeto. Dia sem meta com entrega usa barra hachurada e identificação de horas extras.
 - MCP: get_business_hours({projectId}), update_business_hours({projectId,businessHours,expectedBusinessHours,requestId,reason}), get_holidays({}), update_holidays({holidays,expectedHolidays,requestId,reason}). Leia antes de editar; use o valor esperado retornado e mantenha requestId em retries. Datas YYYY-MM-DD, horasPerDay numérico; endDate null.
-- Alterações são auditadas e verificam concorrência. ACLs pessoais/corporativas e apresentação confidencial permanecem preservadas. Feriados são compartilhados; escrita usa backend autenticado corporativo. Consultas Web usam cache persistente alimentado pela sincronização global, sem listeners por navegação.
+- Alterações são auditadas e verificam concorrência. ACLs pessoais/corporativas e apresentação confidencial permanecem preservadas. Feriados são compartilhados; MCP escreve no backend existente e a interface Web usa transação Firestore autenticada corporativa, com auditoria obrigatória nas Rules. Não existe callable específica de feriados. Consultas Web usam cache persistente alimentado pela sincronização global, sem listeners por navegação.
 - Configuração histórica é recalculável: editar contratos/feriados antigos altera metas passadas, não fatos dos registros.
 
 ## Ambiente desta implementação

@@ -16,4 +16,6 @@ jobs:
       - run: npm ci
       - run: docker compose config --quiet
       - run: npm run build:packages
+      - name: Block new Firebase Functions (MCP only)
+        run: npm run check:functions-policy
       - run: npm run check

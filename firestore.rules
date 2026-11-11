@@ -168,10 +168,37 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     // 5. Coleções: regras curtas que expressam intenção
     // -------------------------------------------------------------------------
-    // Shared calendar metadata is readable by authenticated users; audited backend writes only.
+    function isCalendarEditor() {
+      return isAuthenticated()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('^[^@]+@wads[.]dev$')
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+    // Web transactions require an immutable receipt; MCP uses the same audited model.
     match /calendarSettings/{settingId} {
       allow read: if isAuthenticated() && settingId == 'holidays';
-      allow write: if false;
+      allow create, update: if settingId == 'holidays' && isCalendarEditor()
+        && request.resource.data.keys().hasOnly(['holidays', 'updatedBy', 'updatedAt', 'auditId'])
+        && request.resource.data.holidays is list
+        && request.resource.data.holidays.size() <= 2000
+        && request.resource.data.updatedBy == request.auth.uid
+        && isValidDocumentId(request.resource.data.auditId)
+        && !exists(/databases/$(database)/documents/calendarSettings/holidays/audit/$(request.resource.data.auditId))
+        && getAfter(/databases/$(database)/documents/calendarSettings/holidays/audit/$(request.resource.data.auditId)).data.authorUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/calendarSettings/holidays/audit/$(request.resource.data.auditId)).data.result.holidays == request.resource.data.holidays;
+      allow delete: if false;
+      match /audit/{auditId} {
+        allow get: if isCalendarEditor() && settingId == 'holidays';
+        allow create: if isCalendarEditor() && settingId == 'holidays'
+          && isValidDocumentId(auditId)
+          && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.reason is string
+          && request.resource.data.reason.size() > 0
+          && request.resource.data.reason.size() <= 1000
+          && getAfter(/databases/$(database)/documents/calendarSettings/holidays).data.auditId == auditId
+          && request.resource.data.result.holidays == getAfter(/databases/$(database)/documents/calendarSettings/holidays).data.holidays;
+        allow update, delete: if false;
+      }
     }
     match /projects/{projectId} {
       allow get: if isAuthenticated()

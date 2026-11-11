@@ -1,12 +1,17 @@
 import {
   collection,
+  doc,
+  getFirestore,
+  runTransaction,
   documentId,
   query,
   where,
   getDocsFromCache,
   type Firestore,
 } from 'firebase/firestore';
-import { httpsCallable, type Functions } from 'firebase/functions';
+import type { Functions } from 'firebase/functions';
+import { getAuth } from 'firebase/auth';
+import { canonical } from '../../infrastructure/firebase/web-transaction-adapter';
 import {
   holidaysSchema,
   type Holiday,
@@ -64,6 +69,44 @@ export async function saveHolidays(
     reason: string;
   },
 ) {
-  holidaysSchema.parse(input.holidays);
-  return httpsCallable(functions, 'updateCalendarHolidays')(input);
+  const holidays = holidaysSchema.parse(input.holidays);
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(input.requestId) || !input.reason.trim())
+    throw new Error('Auditoria obrigatória.');
+  const user = getAuth(functions.app).currentUser;
+  if (!user) throw new Error('Autenticação necessária.');
+  const db = getFirestore(functions.app);
+  const ref = doc(db, 'calendarSettings', 'holidays');
+  const audit = doc(ref, 'audit', input.requestId);
+  return runTransaction(db, async (tx) => {
+    const snapshot = await tx.get(ref),
+      prior = await tx.get(audit);
+    if (prior.exists()) {
+      if (
+        prior.data().authorUid !== user.uid ||
+        prior.data().request !== JSON.stringify(input)
+      )
+        throw new Error('requestId já utilizado.');
+      return;
+    }
+    const previous = snapshot.exists()
+      ? holidaysSchema.parse(snapshot.data().holidays)
+      : null;
+    if (canonical(previous) !== canonical(input.expectedHolidays))
+      throw new Error('Feriados alterados. Recarregue antes de salvar.');
+    const updatedAt = new Date().toISOString();
+    tx.set(ref, {
+      holidays,
+      updatedBy: user.uid,
+      updatedAt,
+      auditId: input.requestId,
+    });
+    tx.set(audit, {
+      authorUid: user.uid,
+      reason: input.reason,
+      request: JSON.stringify(input),
+      before: previous,
+      result: { holidays, expectedHolidays: holidays },
+      recordedAt: updatedAt,
+    });
+  });
 }
