@@ -1,5 +1,48 @@
 import { expect, it } from 'vitest';
-import { dailyBusinessProgress } from './daily-business-progress';
+import {
+  dailyBusinessProgress,
+  dailyProgressPercent,
+  isNonWorkingDay,
+} from './daily-business-progress';
+it('scales overtime against normal contract hours without doubling and caps visual overflow', () => {
+  expect(
+    dailyProgressPercent({
+      projectId: 'p',
+      expected: 0,
+      dailyHours: 8,
+      delivered: 2,
+    }),
+  ).toBe(25);
+  expect(
+    dailyProgressPercent({
+      projectId: 'p',
+      expected: 0,
+      dailyHours: 3,
+      delivered: 1.5,
+    }),
+  ).toBe(50);
+  expect(
+    dailyProgressPercent({
+      projectId: 'p',
+      expected: 0,
+      dailyHours: 8,
+      delivered: 12,
+    }),
+  ).toBe(100);
+  expect(
+    dailyProgressPercent({
+      projectId: 'p',
+      expected: 0,
+      dailyHours: 0,
+      delivered: 2,
+    }),
+  ).toBe(0);
+  expect(isNonWorkingDay('2026-11-07')).toBe(true);
+  expect(
+    isNonWorkingDay('2026-11-03', [{ date: '2026-11-03', name: 'Folga' }]),
+  ).toBe(true);
+  expect(isNonWorkingDay('2026-11-03')).toBe(false);
+});
 const projects = new Map<string, Record<string, unknown>>([
   [
     'p',
@@ -13,7 +56,7 @@ const projects = new Map<string, Record<string, unknown>>([
 ]);
 it('shows zero delivery on an expected working day and excludes disabled projects', () => {
   expect(dailyBusinessProgress('2026-11-03', projects, [], [])).toEqual([
-    { projectId: 'p', expected: 8, delivered: 0 },
+    { projectId: 'p', expected: 8, dailyHours: 8, delivered: 0 },
   ]);
 });
 it('preserves extra work on holidays and weekends with a zero target', () => {
@@ -29,7 +72,7 @@ it('preserves extra work on holidays and weekends with a zero target', () => {
     },
   ];
   expect(dailyBusinessProgress('2026-11-07', projects, [], items)).toEqual([
-    { projectId: 'p', expected: 0, delivered: 2 },
+    { projectId: 'p', expected: 0, dailyHours: 8, delivered: 2 },
   ]);
   expect(
     dailyBusinessProgress(

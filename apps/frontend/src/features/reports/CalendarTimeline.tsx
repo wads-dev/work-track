@@ -1,4 +1,9 @@
 import { cn } from '../../lib/utils';
+import {
+  dailyProgressPercent,
+  isNonWorkingDay,
+  nonWorkingDayClassName,
+} from './daily-business-progress';
 import { calendarDuration, calendarDurationDetails } from './calendar-duration';
 import type { AccountingSegment } from '@work-track/core/reports/domain/accounted-time';
 import { PersonIdentity } from '../people/PersonIdentity';
@@ -58,7 +63,9 @@ export function CalendarTimeline({
   showPeople = true,
   details,
   dailyProgress,
+  holidays = [],
 }: {
+  holidays?: import('@work-track/core/registration/domain/business-hours').Holiday[];
   dailyProgress?: (
     date: string,
   ) => import('./daily-business-progress').DailyProgress[];
@@ -214,7 +221,7 @@ export function CalendarTimeline({
         className={cn('overflow-x-auto p-2')}
       >
         <div
-          className={cn('grid gap-2')}
+          className={cn('grid grid-rows-[auto_1fr] gap-x-2 gap-y-3')}
           style={{
             gridTemplateColumns:
               'repeat(' + Math.min(days.length, 7) + ',minmax(15rem,1fr))',
@@ -222,211 +229,328 @@ export function CalendarTimeline({
           }}
         >
           {data.map((d) => (
-            <Card key={d.key} className={cn('gap-0 p-2 rounded-lg')}>
-              <h3
-                className={cn(
-                  'text-sm font-medium text-center h-12 relative min-w-0',
-                )}
+            <div
+              key={d.key}
+              className="row-span-2 grid min-w-0 grid-rows-subgrid overflow-hidden"
+            >
+              <header
+                className="space-y-2 px-2"
+                aria-label={'Resumo do dia ' + d.key}
               >
-                {d.key}
-              </h3>
-              {!d.outside && dailyProgress && (
-                <div
-                  className="mb-2 space-y-1"
-                  aria-label={'Horas úteis de ' + d.key}
-                >
-                  {dailyProgress(d.key).map((progress) => {
-                    const caption =
-                      label(progress.projectId) +
-                      ': ' +
-                      progress.delivered.toFixed(1) +
-                      'h / ' +
-                      progress.expected +
-                      'h' +
-                      (progress.expected === 0 && progress.delivered > 0
-                        ? ' · horas extras em dia sem meta'
-                        : '');
-                    return (
-                      <div
-                        key={progress.projectId}
-                        title={caption}
-                        aria-label={caption}
-                        tabIndex={0}
-                        className="space-y-0.5"
-                      >
-                        <div className="truncate text-[10px]">{caption}</div>
-                        <div className="h-2 overflow-hidden rounded bg-muted dark:bg-white/20 dark:ring-1 dark:ring-inset dark:ring-white/30">
-                          <div
-                            className="h-full rounded dark:ring-1 dark:ring-inset dark:ring-white/70"
-                            style={{
-                              background: color(progress.projectId),
-                              width:
-                                (progress.expected > 0
-                                  ? Math.min(
-                                      100,
-                                      (progress.delivered / progress.expected) *
-                                        100,
-                                    )
-                                  : progress.delivered > 0
-                                    ? 100
-                                    : 0) + '%',
-                              backgroundImage:
-                                progress.expected === 0
-                                  ? 'repeating-linear-gradient(135deg,transparent,transparent 3px,#ffffff55 3px,#ffffff55 6px)'
-                                  : undefined,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {d.outside && (
-                <span
+                <h3
                   className={cn(
-                    'text-xs absolute -mt-6 text-[10px] max-w-[210px] [overflow-wrap:anywhere]',
+                    'text-sm font-medium text-center relative min-w-0',
                   )}
                 >
-                  Fora do mês consultado — sem cobertura
-                </span>
-              )}
-              <div
-                className={cn('relative pl-12')}
-                style={{ height: axisSize(height + 30) }}
-              >
-                {ticks.map((minute, i) => (
+                  {d.key}
+                </h3>
+                {!d.outside && dailyProgress && (
                   <div
-                    key={i}
-                    className={cn('absolute left-0 right-0')}
-                    style={{
-                      top: axisSize(15 + projectMinute(minute, segments)),
-                    }}
+                    className="mb-2 space-y-1"
+                    aria-label={'Horas úteis de ' + d.key}
                   >
-                    <span
-                      className={cn(
-                        'text-xs absolute left-0 w-[2.625rem] leading-none -translate-y-1/2',
-                      )}
-                    >
-                      {clock(minute)}
-                    </span>
-                    <div className={cn('ml-12 border-t')} />
-                  </div>
-                ))}
-                {segments
-                  .filter((s) =>
-                    gaps.some((g) => g.start === s.start && g.end === s.end),
-                  )
-                  .map((s) => (
-                    <Button
-                      key={s.start}
-                      aria-expanded={!s.collapsed}
-                      aria-label={
-                        (s.collapsed ? 'Expandir' : 'Recolher') +
-                        ' intervalo ' +
-                        clock(s.start) +
-                        '–' +
-                        clock(s.end) +
-                        ' sem atividades em todos os dias'
-                      }
-                      onClick={() => {
-                        const key = s.start + '-' + s.end;
-                        setExpansion({
-                          period,
-                          keys: expanded.includes(key)
-                            ? expanded.filter((k) => k !== key)
-                            : [...expanded, key],
-                        });
-                      }}
-                      variant="ghost"
-                      className={cn(
-                        'absolute left-12 right-0 min-h-0 flex-col gap-0 p-0 text-xs leading-4 bg-muted overflow-hidden',
-                      )}
-                      style={{
-                        top: axisSize(15 + s.top + GAP_LABEL_MARGIN),
-                        height: axisSize(GAP_LABEL_HEIGHT),
-                      }}
-                    >
-                      <span>
-                        … {clock(s.start)}–{clock(s.end)}
-                      </span>
-                      <span>
-                        {Math.floor((s.end - s.start) / 60)}h{' '}
-                        {Math.round((s.end - s.start) % 60)}min sem atividades
-                      </span>
-                    </Button>
-                  ))}
-                <div
-                  className={cn(
-                    'pointer-events-none absolute top-[0.9375rem] left-12 right-0',
-                  )}
-                  style={{ height: axisSize(height) }}
-                >
-                  {d.events
-                    .filter((e) => !e.point)
-                    .map((e) => {
-                      const { personUid, fallback, personLabel } = identity(
-                        e.item,
-                      );
+                    {dailyProgress(d.key).map((progress) => {
                       const caption =
-                        label(e.item.projectId) +
-                        ' · ' +
-                        time(e.start) +
-                        ' — ' +
-                        time(e.end) +
-                        ' · ' +
-                        calendarDuration(e.item, e.start, e.end) +
-                        ' · ' +
-                        calendarDurationDetails(e.item, e.start, e.end) +
-                        (e.item.estimated ? ' · Estimado' : '') +
-                        (e.overlap ? ' · Sobreposição' : '');
+                        label(progress.projectId) +
+                        ': ' +
+                        (progress.expected === 0
+                          ? progress.delivered.toFixed(1) + 'h extras'
+                          : progress.delivered.toFixed(1) +
+                            'h / ' +
+                            progress.expected +
+                            'h');
                       return (
-                        <Tooltip
-                          key={JSON.stringify([
-                            e.item.uid || viewerUid,
-                            e.item.id,
-                          ])}
+                        <div
+                          key={progress.projectId}
+                          title={caption}
+                          aria-label={caption}
+                          tabIndex={0}
+                          className="space-y-0.5"
                         >
-                          <TooltipTrigger asChild>
-                            <Button
-                              tabIndex={0}
-                              aria-label={personLabel + caption}
-                              asChild
-                              variant="ghost"
-                              className={cn(
-                                'pointer-events-auto absolute min-h-0 hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-sm leading-snug',
-                              )}
+                          <div className="truncate text-[10px]">{caption}</div>
+                          <div className="h-2 overflow-hidden rounded bg-muted dark:bg-white/20 dark:ring-1 dark:ring-inset dark:ring-white/30">
+                            <div
+                              className="h-full rounded"
                               style={{
-                                top: axisSize(
-                                  projectMinute(e.wallStart, segments),
-                                ),
-                                minHeight: axisSize(
-                                  projectMinute(e.wallEnd, segments) -
-                                    projectMinute(e.wallStart, segments),
-                                ),
-                                height: axisSize(
-                                  projectMinute(e.wallEnd, segments) -
-                                    projectMinute(e.wallStart, segments),
-                                ),
-                                left: (e.column / e.columns) * 100 + '%',
-                                width: 100 / e.columns + '%',
-                                borderColor: color(e.item.projectId),
+                                background: color(progress.projectId),
+                                width: dailyProgressPercent(progress) + '%',
+                                backgroundImage:
+                                  progress.expected === 0
+                                    ? 'repeating-linear-gradient(135deg,transparent,transparent 3px,#ffffff55 3px,#ffffff55 6px)'
+                                    : undefined,
                               }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </header>
+              <Card
+                className={cn(
+                  'gap-0 p-2 rounded-lg',
+                  isNonWorkingDay(d.key, holidays) && nonWorkingDayClassName,
+                )}
+                data-non-working-day={
+                  isNonWorkingDay(d.key, holidays) || undefined
+                }
+              >
+                {d.outside && (
+                  <span
+                    className={cn(
+                      'text-xs absolute -mt-6 text-[10px] max-w-[210px] [overflow-wrap:anywhere]',
+                    )}
+                  >
+                    Fora do mês consultado — sem cobertura
+                  </span>
+                )}
+                <div
+                  className={cn('relative pl-12')}
+                  style={{ height: axisSize(height + 30) }}
+                >
+                  {ticks.map((minute, i) => (
+                    <div
+                      key={i}
+                      className={cn('absolute left-0 right-0')}
+                      style={{
+                        top: axisSize(15 + projectMinute(minute, segments)),
+                      }}
+                    >
+                      <span
+                        className={cn(
+                          'text-xs absolute left-0 w-[2.625rem] leading-none -translate-y-1/2',
+                        )}
+                      >
+                        {clock(minute)}
+                      </span>
+                      <div className={cn('ml-12 border-t')} />
+                    </div>
+                  ))}
+                  {segments
+                    .filter((s) =>
+                      gaps.some((g) => g.start === s.start && g.end === s.end),
+                    )
+                    .map((s) => (
+                      <Button
+                        key={s.start}
+                        aria-expanded={!s.collapsed}
+                        aria-label={
+                          (s.collapsed ? 'Expandir' : 'Recolher') +
+                          ' intervalo ' +
+                          clock(s.start) +
+                          '–' +
+                          clock(s.end) +
+                          ' sem atividades em todos os dias'
+                        }
+                        onClick={() => {
+                          const key = s.start + '-' + s.end;
+                          setExpansion({
+                            period,
+                            keys: expanded.includes(key)
+                              ? expanded.filter((k) => k !== key)
+                              : [...expanded, key],
+                          });
+                        }}
+                        variant="ghost"
+                        className={cn(
+                          'absolute left-12 right-0 min-h-0 flex-col gap-0 p-0 text-xs leading-4 bg-muted overflow-hidden',
+                        )}
+                        style={{
+                          top: axisSize(15 + s.top + GAP_LABEL_MARGIN),
+                          height: axisSize(GAP_LABEL_HEIGHT),
+                        }}
+                      >
+                        <span>
+                          … {clock(s.start)}–{clock(s.end)}
+                        </span>
+                        <span>
+                          {Math.floor((s.end - s.start) / 60)}h{' '}
+                          {Math.round((s.end - s.start) % 60)}min sem atividades
+                        </span>
+                      </Button>
+                    ))}
+                  <div
+                    className={cn(
+                      'pointer-events-none absolute top-[0.9375rem] left-12 right-0',
+                    )}
+                    style={{ height: axisSize(height) }}
+                  >
+                    {d.events
+                      .filter((e) => !e.point)
+                      .map((e) => {
+                        const { personUid, fallback, personLabel } = identity(
+                          e.item,
+                        );
+                        const caption =
+                          label(e.item.projectId) +
+                          ' · ' +
+                          time(e.start) +
+                          ' — ' +
+                          time(e.end) +
+                          ' · ' +
+                          calendarDuration(e.item, e.start, e.end) +
+                          ' · ' +
+                          calendarDurationDetails(e.item, e.start, e.end) +
+                          (e.item.estimated ? ' · Estimado' : '') +
+                          (e.overlap ? ' · Sobreposição' : '');
+                        return (
+                          <Tooltip
+                            key={JSON.stringify([
+                              e.item.uid || viewerUid,
+                              e.item.id,
+                            ])}
+                          >
+                            <TooltipTrigger asChild>
+                              <Button
+                                tabIndex={0}
+                                aria-label={personLabel + caption}
+                                asChild
+                                variant="ghost"
+                                className={cn(
+                                  'pointer-events-auto absolute min-h-0 hover:!h-auto hover:z-40 hover:shadow-lg focus-visible:!h-auto focus-visible:z-40 focus-visible:shadow-lg group min-w-0 p-0 rounded box-border border border-l-4 bg-card text-foreground overflow-hidden text-left block text-sm leading-snug',
+                                )}
+                                style={{
+                                  top: axisSize(
+                                    projectMinute(e.wallStart, segments),
+                                  ),
+                                  minHeight: axisSize(
+                                    projectMinute(e.wallEnd, segments) -
+                                      projectMinute(e.wallStart, segments),
+                                  ),
+                                  height: axisSize(
+                                    projectMinute(e.wallEnd, segments) -
+                                      projectMinute(e.wallStart, segments),
+                                  ),
+                                  left: (e.column / e.columns) * 100 + '%',
+                                  width: 100 / e.columns + '%',
+                                  borderColor: color(e.item.projectId),
+                                }}
+                              >
+                                {e.item.uid && e.item.uid !== viewerUid ? (
+                                  <span tabIndex={0}>
+                                    <span
+                                      className={cn(
+                                        'block whitespace-normal [overflow-wrap:anywhere]',
+                                      )}
+                                    >
+                                      {renderIdentity(personUid, fallback)}
+                                      {content(e.item, e.start, e.end)}
+                                      {e.overlap ? ' ⇆' : ''}
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <RouterLink
+                                    to={
+                                      contextualRecordPath(
+                                        returnTo.split('?')[0],
+                                        returnTo.includes('?')
+                                          ? '?' +
+                                              returnTo
+                                                .split('?')
+                                                .slice(1)
+                                                .join('?')
+                                          : '',
+                                        e.item.id,
+                                      ) ?? '#'
+                                    }
+                                  >
+                                    <span
+                                      className={cn(
+                                        'block whitespace-normal [overflow-wrap:anywhere]',
+                                      )}
+                                    >
+                                      {renderIdentity(personUid, fallback)}
+                                      {content(e.item, e.start, e.end)}
+                                      {e.overlap ? ' ⇆' : ''}
+                                    </span>
+                                  </RouterLink>
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {renderIdentity(personUid, fallback)}
+                              {caption}
+                              {details && (
+                                <span className="block">
+                                  {details(e.item).topics} ·{' '}
+                                  {details(e.item).summary}
+                                </span>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                  </div>
+                </div>
+                {/* Normal flow keeps simultaneous points reachable even inside
+                  collapsed gaps or outside the interval axis span. */}
+                {d.events.some((e) => e.point) && (
+                  <section
+                    aria-label={'Marcadores estimados de ' + d.key}
+                    className="mt-2 min-w-0"
+                  >
+                    <h4 className="text-xs font-medium mb-1">Sem duração</h4>
+                    <ul className="flex flex-col gap-1">
+                      {d.events
+                        .filter((e) => e.point)
+                        .map((e) => {
+                          const { personUid, fallback, personLabel } = identity(
+                            e.item,
+                          );
+                          const caption =
+                            personLabel +
+                            time(e.start) +
+                            ' · ' +
+                            label(e.item.projectId) +
+                            ' · Estimado · sem duração';
+                          const className =
+                            'block min-h-8 rounded border border-l-4 px-2 py-1 text-xs whitespace-normal [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-ring';
+                          return (
+                            <li
+                              key={JSON.stringify([
+                                e.item.uid || viewerUid,
+                                e.item.id,
+                              ])}
                             >
                               {e.item.uid && e.item.uid !== viewerUid ? (
-                                <span tabIndex={0}>
-                                  <span
-                                    className={cn(
-                                      'block whitespace-normal [overflow-wrap:anywhere]',
-                                    )}
-                                  >
-                                    {renderIdentity(personUid, fallback)}
-                                    {content(e.item, e.start, e.end)}
-                                    {e.overlap ? ' ⇆' : ''}
-                                  </span>
+                                <span
+                                  tabIndex={0}
+                                  aria-label={caption}
+                                  title={
+                                    caption +
+                                    (details
+                                      ? ' · ' +
+                                        details(e.item).topics +
+                                        ' · ' +
+                                        details(e.item).summary
+                                      : '')
+                                  }
+                                  className={className}
+                                  style={{
+                                    borderColor: color(e.item.projectId),
+                                  }}
+                                >
+                                  {renderIdentity(personUid, fallback)}
+                                  {content(e.item, e.start, e.end)}
+                                  sem duração
                                 </span>
                               ) : (
                                 <RouterLink
+                                  aria-label={caption}
+                                  title={
+                                    caption +
+                                    (details
+                                      ? ' · ' +
+                                        details(e.item).topics +
+                                        ' · ' +
+                                        details(e.item).summary
+                                      : '')
+                                  }
+                                  className={className}
+                                  style={{
+                                    borderColor: color(e.item.projectId),
+                                  }}
                                   to={
                                     contextualRecordPath(
                                       returnTo.split('?')[0],
@@ -441,121 +565,19 @@ export function CalendarTimeline({
                                     ) ?? '#'
                                   }
                                 >
-                                  <span
-                                    className={cn(
-                                      'block whitespace-normal [overflow-wrap:anywhere]',
-                                    )}
-                                  >
-                                    {renderIdentity(personUid, fallback)}
-                                    {content(e.item, e.start, e.end)}
-                                    {e.overlap ? ' ⇆' : ''}
-                                  </span>
+                                  {renderIdentity(personUid, fallback)}
+                                  {content(e.item, e.start, e.end)}
+                                  sem duração
                                 </RouterLink>
                               )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {renderIdentity(personUid, fallback)}
-                            {caption}
-                            {details && (
-                              <span className="block">
-                                {details(e.item).topics} ·{' '}
-                                {details(e.item).summary}
-                              </span>
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
-                </div>
-              </div>
-              {/* Normal flow keeps simultaneous points reachable even inside
-                  collapsed gaps or outside the interval axis span. */}
-              {d.events.some((e) => e.point) && (
-                <section
-                  aria-label={'Marcadores estimados de ' + d.key}
-                  className="mt-2 min-w-0"
-                >
-                  <h4 className="text-xs font-medium mb-1">Sem duração</h4>
-                  <ul className="flex flex-col gap-1">
-                    {d.events
-                      .filter((e) => e.point)
-                      .map((e) => {
-                        const { personUid, fallback, personLabel } = identity(
-                          e.item,
-                        );
-                        const caption =
-                          personLabel +
-                          time(e.start) +
-                          ' · ' +
-                          label(e.item.projectId) +
-                          ' · Estimado · sem duração';
-                        const className =
-                          'block min-h-8 rounded border border-l-4 px-2 py-1 text-xs whitespace-normal [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-ring';
-                        return (
-                          <li
-                            key={JSON.stringify([
-                              e.item.uid || viewerUid,
-                              e.item.id,
-                            ])}
-                          >
-                            {e.item.uid && e.item.uid !== viewerUid ? (
-                              <span
-                                tabIndex={0}
-                                aria-label={caption}
-                                title={
-                                  caption +
-                                  (details
-                                    ? ' · ' +
-                                      details(e.item).topics +
-                                      ' · ' +
-                                      details(e.item).summary
-                                    : '')
-                                }
-                                className={className}
-                                style={{ borderColor: color(e.item.projectId) }}
-                              >
-                                {renderIdentity(personUid, fallback)}
-                                {content(e.item, e.start, e.end)}
-                                sem duração
-                              </span>
-                            ) : (
-                              <RouterLink
-                                aria-label={caption}
-                                title={
-                                  caption +
-                                  (details
-                                    ? ' · ' +
-                                      details(e.item).topics +
-                                      ' · ' +
-                                      details(e.item).summary
-                                    : '')
-                                }
-                                className={className}
-                                style={{ borderColor: color(e.item.projectId) }}
-                                to={
-                                  contextualRecordPath(
-                                    returnTo.split('?')[0],
-                                    returnTo.includes('?')
-                                      ? '?' +
-                                          returnTo.split('?').slice(1).join('?')
-                                      : '',
-                                    e.item.id,
-                                  ) ?? '#'
-                                }
-                              >
-                                {renderIdentity(personUid, fallback)}
-                                {content(e.item, e.start, e.end)}
-                                sem duração
-                              </RouterLink>
-                            )}
-                          </li>
-                        );
-                      })}
-                  </ul>
-                </section>
-              )}
-            </Card>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  </section>
+                )}
+              </Card>
+            </div>
           ))}
         </div>
       </div>

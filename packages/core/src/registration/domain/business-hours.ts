@@ -54,6 +54,17 @@ export const holidaysSchema = z
       });
   });
 export type Holiday = z.infer<typeof holidaySchema>;
+/** Resolve an embedded contract rule for domain calculation, not dataset retrieval. */
+export function businessHoursContractForDate(
+  date: string,
+  periods: BusinessHoursPeriod[],
+) {
+  return periods.find(
+    (period) =>
+      period.startDate <= date &&
+      (period.endDate === null || period.endDate >= date),
+  );
+}
 export function businessHoursForDate(
   date: string,
   periods: BusinessHoursPeriod[],
@@ -63,11 +74,7 @@ export function businessHoursForDate(
   const weekday = new Date(date + 'T12:00:00Z').getUTCDay();
   if (weekday === 0 || weekday === 6 || holidays.some((h) => h.date === date))
     return 0;
-  return (
-    periods.find(
-      (p) => p.startDate <= date && (p.endDate === null || p.endDate >= date),
-    )?.hoursPerDay ?? 0
-  );
+  return businessHoursContractForDate(date, periods)?.hoursPerDay ?? 0;
 }
 export function monthBusinessHours(
   month: string,

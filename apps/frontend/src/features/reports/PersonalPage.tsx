@@ -1,7 +1,11 @@
 import { cn } from '../../lib/utils';
 import { observeHolidays } from '../../data/repositories/holiday-repository';
 import type { Holiday } from '@work-track/core/registration/domain/business-hours';
-import { dailyBusinessProgress } from './daily-business-progress';
+import {
+  dailyBusinessProgress,
+  isNonWorkingDay,
+  nonWorkingDayClassName,
+} from './daily-business-progress';
 import { useMediaQuery } from '../../shared/ui/theme';
 import { defaultCalendarView, PORTRAIT_MOBILE_QUERY } from './calendar-view';
 import { measureFirestoreStage } from '../../data/sync/firestore-diagnostics';
@@ -1001,6 +1005,7 @@ export function PersonalPage({
             )}
             {calendar && allWeeks && (
               <CalendarHistory
+                holidays={businessHolidays ?? []}
                 dailyProgress={
                   businessHolidays
                     ? (date) =>
@@ -1036,6 +1041,7 @@ export function PersonalPage({
             )}
             {calendar && !allWeeks && density === 'timeline' && (
               <CalendarTimeline
+                holidays={businessHolidays ?? []}
                 dailyProgress={
                   businessHolidays
                     ? (date) =>
@@ -1102,6 +1108,11 @@ export function PersonalPage({
                   return (
                     <Card
                       key={day}
+                      data-non-working-day={
+                        (!outside &&
+                          isNonWorkingDay(day, businessHolidays ?? [])) ||
+                        undefined
+                      }
                       className={cn(
                         'p-2 shadow-none border rounded-lg min-w-0 overflow-hidden',
                         view === 'month' || entries.length
@@ -1111,6 +1122,9 @@ export function PersonalPage({
                           ? 'sm:min-h-[88px]'
                           : 'sm:min-h-[116px]',
                         outside && 'opacity-55',
+                        !outside &&
+                          isNonWorkingDay(day, businessHolidays ?? []) &&
+                          nonWorkingDayClassName,
                       )}
                     >
                       <h3
@@ -1122,7 +1136,7 @@ export function PersonalPage({
                         )}
                       >
                         {new Intl.DateTimeFormat('pt-BR', {
-                          weekday: view === 'month' ? undefined : 'short',
+                          weekday: 'short',
                           day: 'numeric',
                           month: view === 'month' ? undefined : 'short',
                           timeZone: zone,
