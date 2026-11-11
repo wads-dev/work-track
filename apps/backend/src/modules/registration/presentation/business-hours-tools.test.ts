@@ -108,6 +108,7 @@ it('exposes contract and holiday tools, passes actor identity and validates hist
         {
           date: '2026-12-25',
           type: 'every_year_same_date' as const,
+          scope: 'federal' as const,
           name: 'Natal',
         },
         { date: '2026-11-02', name: 'Finados' },

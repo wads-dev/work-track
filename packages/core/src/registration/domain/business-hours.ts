@@ -47,6 +47,8 @@ export const holidaySchema = z
     date: holidayDateSchema,
     name: z.string().trim().min(1).max(160),
     type: z.enum(['every_year_same_date', 'specific_date']).optional(),
+    // Informational jurisdiction only; never a calendar selection predicate.
+    scope: z.enum(['federal', 'state', 'municipal']).optional(),
   })
   .strict();
 export const holidaysSchema = z

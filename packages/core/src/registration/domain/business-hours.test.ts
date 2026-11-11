@@ -10,6 +10,29 @@ import {
 } from './business-hours.js';
 const periods = [{ startDate: '2026-11-01', endDate: null, hoursPerDay: 8 }];
 describe('business hours contracts', () => {
+  it('preserves optional scope without changing holiday matching or monthly targets', () => {
+    const contract = [
+      { startDate: '2020-01-01', endDate: null, hoursPerDay: 8 },
+    ];
+    const original = {
+      date: '2026-12-25',
+      name: 'Natal',
+      type: 'every_year_same_date' as const,
+    };
+    for (const scope of ['federal', 'state', 'municipal'] as const) {
+      const value = holidaysSchema.parse([{ ...original, scope }]);
+      expect(value[0]!.scope).toBe(scope);
+      expect(
+        monthBusinessHours('2026-12', contract, value, '2026-12-31').total,
+      ).toBe(
+        monthBusinessHours('2026-12', contract, [original], '2026-12-31').total,
+      );
+    }
+    expect(
+      holidaysSchema.safeParse([{ ...original, scope: 'planet' }]).success,
+    ).toBe(false);
+    expect(holidaysSchema.parse([original])[0]).not.toHaveProperty('scope');
+  });
   it('validates explicit recurrence types and preserves legacy expected values', () => {
     const legacy = { date: '2026-12-25', name: 'Natal específico' };
     expect(holidaysSchema.parse([legacy])).toEqual([legacy]);

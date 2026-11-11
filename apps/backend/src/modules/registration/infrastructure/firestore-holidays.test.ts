@@ -33,6 +33,30 @@ function fixture() {
   } as unknown as Firestore;
   return { db, values };
 }
+it('updates an existing empty calendar document using the same expected value as read', async () => {
+  const { db, values } = fixture();
+  values.set('calendarSettings/holidays', {});
+  const before = await readHolidays(db);
+  expect(before.expectedHolidays).toEqual([]);
+  await updateHolidays(
+    db,
+    {
+      holidays: [
+        {
+          date: '2026-12-25',
+          name: 'Natal',
+          type: 'every_year_same_date',
+          scope: 'federal',
+        },
+      ],
+      expectedHolidays: before.expectedHolidays,
+      requestId: 'empty',
+      reason: 'Preencher calendário vazio',
+    },
+    'alice',
+  );
+  expect((await readHolidays(db)).holidays[0]!.scope).toBe('federal');
+});
 it('audits holiday changes, retries idempotently and rejects stale calendars', async () => {
   const { db, values } = fixture();
   expect(await readHolidays(db)).toEqual({

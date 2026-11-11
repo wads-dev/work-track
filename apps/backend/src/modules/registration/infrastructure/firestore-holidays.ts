@@ -34,7 +34,7 @@ export async function updateHolidays(db: Firestore, raw: unknown, uid: string) {
         .parse(prior.data()!.result);
     }
     const previous = before.exists
-      ? holidaysSchema.parse(before.data()!.holidays)
+      ? holidaysSchema.parse(before.data()!.holidays ?? [])
       : null;
     if (!isDeepStrictEqual(previous, input.expectedHolidays))
       throw new Error('Feriados alterados. Recarregue antes de salvar.');
