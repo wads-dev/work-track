@@ -1,4 +1,8 @@
 import express from 'express';
+import {
+  registerHistoricalRecordTools,
+  type HistoricalRecordsRepository,
+} from '../../modules/registration/presentation/historical-record-tools.js';
 import type { MergeRepository } from '@work-track/core/merge/domain/merge';
 import { registerMergeTool } from '../../modules/merge/presentation/merge-tool.js';
 import type { MovementRepository } from '@work-track/core/registration/domain/record-movement';
@@ -35,6 +39,7 @@ export function createApp(
   removalRepository?: RemovalRepository,
   movementRepository?: MovementRepository,
   mergeRepository?: MergeRepository,
+  historicalRepository?: HistoricalRecordsRepository,
 ) {
   const app = express();
   app.disable('x-powered-by');
@@ -164,6 +169,8 @@ export function createApp(
         /^[A-Za-z0-9_-]{1,128}$/.test(uid)
       )
         registerMergeTool(server, mergeRepository, uid);
+      if (historicalRepository && typeof uid === 'string' && uid)
+        registerHistoricalRecordTools(server, historicalRepository, uid);
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });
