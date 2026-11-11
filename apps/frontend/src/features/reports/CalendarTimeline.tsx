@@ -1,6 +1,7 @@
 import { cn } from '../../lib/utils';
+import { CalendarDayHeading } from './CalendarDayHeading';
+import { CalendarDayProgress } from './CalendarDayProgress';
 import {
-  dailyProgressPercent,
   isNonWorkingDay,
   nonWorkingDayClassName,
 } from './daily-business-progress';
@@ -237,92 +238,18 @@ export function CalendarTimeline({
                 className="space-y-2 px-2"
                 aria-label={'Resumo do dia ' + d.key}
               >
-                <h3
-                  className={cn(
-                    'text-sm font-medium text-center relative min-w-0',
-                  )}
-                >
-                  {d.key}
-                </h3>
+                <CalendarDayHeading
+                  day={d.key}
+                  zone={zone}
+                  month={view === 'month'}
+                />
                 {!d.outside && dailyProgress && (
-                  <div
-                    className="mb-2 space-y-1"
-                    aria-label={'Horas úteis de ' + d.key}
-                  >
-                    {dailyProgress(d.key).map((progress) => {
-                      const overtime = Math.max(
-                        0,
-                        progress.delivered - progress.expected,
-                      );
-                      const caption =
-                        label(progress.projectId) +
-                        ': ' +
-                        (progress.expected === 0
-                          ? progress.delivered.toFixed(1) + 'h extras'
-                          : progress.delivered.toFixed(1) +
-                            'h / ' +
-                            progress.expected +
-                            'h');
-                      return (
-                        <div
-                          key={progress.projectId}
-                          title={caption}
-                          aria-label={caption}
-                          tabIndex={0}
-                          className="space-y-0.5"
-                        >
-                          <div className="truncate text-[10px]">{caption}</div>
-                          <div className="h-2 overflow-hidden rounded bg-muted dark:bg-white/20 dark:ring-1 dark:ring-inset dark:ring-white/30">
-                            <div
-                              className="h-full rounded"
-                              style={{
-                                background: color(progress.projectId),
-                                width: dailyProgressPercent(progress) + '%',
-                                backgroundImage:
-                                  progress.expected === 0
-                                    ? 'repeating-linear-gradient(135deg,transparent,transparent 3px,#ffffff55 3px,#ffffff55 6px)'
-                                    : undefined,
-                              }}
-                            />
-                          </div>
-                          {progress.expected > 0 && overtime > 0 && (
-                            <div
-                              aria-label={
-                                label(progress.projectId) +
-                                ': ' +
-                                overtime.toFixed(1) +
-                                'h extras'
-                              }
-                              className="space-y-0.5"
-                            >
-                              <div className="truncate text-[10px]">
-                                {overtime.toFixed(1)}h extras
-                              </div>
-                              <div className="h-2 overflow-hidden rounded bg-muted dark:bg-white/20 dark:ring-1 dark:ring-inset dark:ring-white/30">
-                                <div
-                                  className="h-full rounded"
-                                  style={{
-                                    backgroundColor: color(progress.projectId),
-                                    width:
-                                      dailyProgressPercent({
-                                        ...progress,
-                                        expected: 0,
-                                        dailyHours:
-                                          progress.dailyHours ??
-                                          progress.expected,
-                                        delivered: overtime,
-                                      }) + '%',
-                                    backgroundImage:
-                                      'repeating-linear-gradient(135deg,transparent,transparent 3px,#ffffff55 3px,#ffffff55 6px)',
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <CalendarDayProgress
+                    day={d.key}
+                    progress={dailyProgress(d.key)}
+                    label={label}
+                    color={color}
+                  />
                 )}
               </header>
               <Card

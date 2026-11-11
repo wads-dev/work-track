@@ -1,4 +1,6 @@
 import { cn } from '../../lib/utils';
+import { CalendarDayHeading } from './CalendarDayHeading';
+import { CalendarDayProgress } from './CalendarDayProgress';
 import { observeHolidays } from '../../data/repositories/holiday-repository';
 import type { Holiday } from '@work-track/core/registration/domain/business-hours';
 import {
@@ -1106,303 +1108,339 @@ export function PersonalPage({
                     (event) => event.item,
                   );
                   return (
-                    <Card
+                    <div
                       key={day}
-                      data-non-working-day={
-                        (!outside &&
-                          isNonWorkingDay(day, businessHolidays ?? [])) ||
-                        undefined
-                      }
-                      className={cn(
-                        'p-2 shadow-none border rounded-lg min-w-0 overflow-hidden',
-                        view === 'month' || entries.length
-                          ? 'min-h-20'
-                          : 'min-h-11',
-                        density === 'supercompact'
-                          ? 'sm:min-h-[88px]'
-                          : 'sm:min-h-[116px]',
-                        outside && 'opacity-55',
-                        !outside &&
-                          isNonWorkingDay(day, businessHolidays ?? []) &&
-                          nonWorkingDayClassName,
-                      )}
+                      className="row-span-2 grid min-w-0 grid-rows-subgrid gap-y-2"
                     >
-                      <h3
+                      <header
+                        aria-label={'Resumo do dia ' + day}
                         className={cn(
-                          'text-sm font-medium mb-1 text-muted-foreground overflow-hidden sm:text-sm',
-                          view === 'month'
-                            ? 'text-[11px] whitespace-nowrap'
-                            : 'text-sm whitespace-normal',
+                          'min-w-0 space-y-2 px-2',
+                          outside && 'opacity-55',
                         )}
                       >
-                        {new Intl.DateTimeFormat('pt-BR', {
-                          weekday: 'short',
-                          day: 'numeric',
-                          month: view === 'month' ? undefined : 'short',
-                          timeZone: zone,
-                        }).format(new Date(day + 'T12:00:00Z'))}
-                      </h3>
-                      {outside ? (
-                        <span className={cn('text-xs')}>
-                          Fora do mês consultado — sem cobertura
-                        </span>
-                      ) : entries.length === 0 ? (
-                        <span
-                          className={cn(
-                            'text-xs sm:block',
-                            view === 'month' ? 'hidden' : 'block',
-                          )}
-                        >
-                          Sem atividades
-                        </span>
-                      ) : (
-                        entries.map((item) => (
-                          <div key={JSON.stringify([item.uid || uid, item.id])}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  tabIndex={0}
-                                  asChild
-                                  variant="ghost"
-                                  className={cn(
-                                    'block text-left border-l-4 my-2 w-full min-w-0 max-w-full h-auto',
-                                    density === 'supercompact'
-                                      ? 'whitespace-nowrap py-0.5'
-                                      : 'whitespace-normal py-2',
-                                  )}
-                                  style={{
-                                    borderLeftColor: color(item.projectId),
-                                  }}
-                                >
-                                  {item.uid && item.uid !== uid ? (
-                                    <span tabIndex={0}>
-                                      <span
-                                        className={cn(
-                                          'text-xs block overflow-hidden text-ellipsis',
-                                          density === 'supercompact'
-                                            ? 'whitespace-nowrap'
-                                            : 'whitespace-normal',
-                                        )}
-                                      >
+                        <CalendarDayHeading
+                          day={day}
+                          zone={zone}
+                          month={view === 'month'}
+                        />
+                        {!outside && businessHolidays && (
+                          <CalendarDayProgress
+                            day={day}
+                            label={label}
+                            color={color}
+                            progress={dailyBusinessProgress(
+                              day,
+                              new Map(
+                                Array.from(
+                                  catalog?.projects ?? [],
+                                  ([id, data]) => [
+                                    id,
+                                    safeProject(data, revealed),
+                                  ],
+                                ),
+                              ),
+                              businessHolidays,
+                              report.intervals,
+                              projectIds,
+                            )}
+                          />
+                        )}
+                      </header>
+                      <Card
+                        data-non-working-day={
+                          (!outside &&
+                            isNonWorkingDay(day, businessHolidays ?? [])) ||
+                          undefined
+                        }
+                        className={cn(
+                          'p-2 shadow-none border rounded-lg min-w-0 overflow-hidden',
+                          view === 'month' || entries.length
+                            ? 'min-h-20'
+                            : 'min-h-11',
+                          density === 'supercompact'
+                            ? 'sm:min-h-[88px]'
+                            : 'sm:min-h-[116px]',
+                          outside && 'opacity-55',
+                          !outside &&
+                            isNonWorkingDay(day, businessHolidays ?? []) &&
+                            nonWorkingDayClassName,
+                        )}
+                      >
+                        {outside ? (
+                          <span className={cn('text-xs')}>
+                            Fora do mês consultado — sem cobertura
+                          </span>
+                        ) : entries.length === 0 ? (
+                          <span
+                            className={cn(
+                              'text-xs sm:block',
+                              view === 'month' ? 'hidden' : 'block',
+                            )}
+                          >
+                            Sem atividades
+                          </span>
+                        ) : (
+                          entries.map((item) => (
+                            <div
+                              key={JSON.stringify([item.uid || uid, item.id])}
+                            >
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    tabIndex={0}
+                                    asChild
+                                    variant="ghost"
+                                    className={cn(
+                                      'block text-left border-l-4 my-2 w-full min-w-0 max-w-full h-auto',
+                                      density === 'supercompact'
+                                        ? 'whitespace-nowrap py-0.5'
+                                        : 'whitespace-normal py-2',
+                                    )}
+                                    style={{
+                                      borderLeftColor: color(item.projectId),
+                                    }}
+                                  >
+                                    {item.uid && item.uid !== uid ? (
+                                      <span tabIndex={0}>
                                         <span
-                                          aria-hidden="true"
                                           className={cn(
-                                            'inline-block size-1.5 mr-1 rounded-full',
+                                            'text-xs block overflow-hidden text-ellipsis',
+                                            density === 'supercompact'
+                                              ? 'whitespace-nowrap'
+                                              : 'whitespace-normal',
                                           )}
-                                          style={{
-                                            backgroundColor: color(
-                                              item.projectId,
-                                            ),
-                                          }}
-                                        />
-                                        {new Intl.DateTimeFormat('pt-BR', {
-                                          timeZone: zone,
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        }).format(
-                                          new Date(
-                                            Math.max(
-                                              start,
-                                              Date.parse(
-                                                item.effectiveStartedAt,
-                                              ),
-                                            ),
-                                          ),
-                                        )}
-                                        {item.estimated && (
+                                        >
                                           <span
-                                            className="ml-1 inline-flex align-middle"
-                                            role="img"
-                                            aria-label="Duração estimada"
-                                            title="Duração estimada"
-                                          >
-                                            <Clock3
-                                              className="size-3 shrink-0"
-                                              aria-hidden="true"
-                                            />
-                                          </span>
-                                        )}{' '}
-                                        {person.showPeople && item.uid && (
-                                          <>
-                                            <PersonIdentity uid={item.uid} />
-                                            {' · '}
-                                          </>
-                                        )}
-                                        {label(item.projectId)}
-                                        <span className="block whitespace-normal text-xs">
-                                          {eventDetails(item).topics}
-                                        </span>
-                                        {density !== 'supercompact' && (
-                                          <span className="block whitespace-normal text-sm">
-                                            {eventDetails(item).summary}
-                                          </span>
-                                        )}
-                                        {density !== 'supercompact' && (
-                                          <>
-                                            <br />
-                                            {new Intl.DateTimeFormat('pt-BR', {
-                                              timeZone: zone,
-                                              hour: '2-digit',
-                                              minute: '2-digit',
-                                            }).format(
-                                              new Date(
-                                                Math.min(
-                                                  end,
-                                                  Date.parse(
-                                                    item.effectiveEndedAt,
-                                                  ),
+                                            aria-hidden="true"
+                                            className={cn(
+                                              'inline-block size-1.5 mr-1 rounded-full',
+                                            )}
+                                            style={{
+                                              backgroundColor: color(
+                                                item.projectId,
+                                              ),
+                                            }}
+                                          />
+                                          {new Intl.DateTimeFormat('pt-BR', {
+                                            timeZone: zone,
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                          }).format(
+                                            new Date(
+                                              Math.max(
+                                                start,
+                                                Date.parse(
+                                                  item.effectiveStartedAt,
                                                 ),
                                               ),
-                                            )}
+                                            ),
+                                          )}
+                                          {item.estimated && (
+                                            <span
+                                              className="ml-1 inline-flex align-middle"
+                                              role="img"
+                                              aria-label="Duração estimada"
+                                              title="Duração estimada"
+                                            >
+                                              <Clock3
+                                                className="size-3 shrink-0"
+                                                aria-hidden="true"
+                                              />
+                                            </span>
+                                          )}{' '}
+                                          {person.showPeople && item.uid && (
+                                            <>
+                                              <PersonIdentity uid={item.uid} />
+                                              {' · '}
+                                            </>
+                                          )}
+                                          {label(item.projectId)}
+                                          <span className="block whitespace-normal text-xs">
+                                            {eventDetails(item).topics}
+                                          </span>
+                                          {density !== 'supercompact' && (
+                                            <span className="block whitespace-normal text-sm">
+                                              {eventDetails(item).summary}
+                                            </span>
+                                          )}
+                                          {density !== 'supercompact' && (
+                                            <>
+                                              <br />
+                                              {new Intl.DateTimeFormat(
+                                                'pt-BR',
+                                                {
+                                                  timeZone: zone,
+                                                  hour: '2-digit',
+                                                  minute: '2-digit',
+                                                },
+                                              ).format(
+                                                new Date(
+                                                  Math.min(
+                                                    end,
+                                                    Date.parse(
+                                                      item.effectiveEndedAt,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )}
 
-                                            {report.intervals.some(
-                                              (other) =>
-                                                other.id !== item.id &&
-                                                overlaps(item, other),
-                                            )
-                                              ? ' · Sobreposição'
-                                              : ''}
-                                          </>
-                                        )}
+                                              {report.intervals.some(
+                                                (other) =>
+                                                  other.id !== item.id &&
+                                                  overlaps(item, other),
+                                              )
+                                                ? ' · Sobreposição'
+                                                : ''}
+                                            </>
+                                          )}
+                                        </span>
                                       </span>
+                                    ) : (
+                                      <RouterLink
+                                        to={
+                                          contextualRecordPath(
+                                            location.pathname,
+                                            location.search,
+                                            item.id,
+                                          ) ?? '#'
+                                        }
+                                      >
+                                        <span
+                                          className={cn(
+                                            'text-xs block overflow-hidden text-ellipsis',
+                                            density === 'supercompact'
+                                              ? 'whitespace-nowrap'
+                                              : 'whitespace-normal',
+                                          )}
+                                        >
+                                          <span
+                                            aria-hidden="true"
+                                            className={cn(
+                                              'inline-block size-1.5 mr-1 rounded-full',
+                                            )}
+                                            style={{
+                                              backgroundColor: color(
+                                                item.projectId,
+                                              ),
+                                            }}
+                                          />
+                                          {new Intl.DateTimeFormat('pt-BR', {
+                                            timeZone: zone,
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                          }).format(
+                                            new Date(
+                                              Math.max(
+                                                start,
+                                                Date.parse(
+                                                  item.effectiveStartedAt,
+                                                ),
+                                              ),
+                                            ),
+                                          )}
+                                          {item.estimated && (
+                                            <span
+                                              className="ml-1 inline-flex align-middle"
+                                              role="img"
+                                              aria-label="Duração estimada"
+                                              title="Duração estimada"
+                                            >
+                                              <Clock3
+                                                className="size-3 shrink-0"
+                                                aria-hidden="true"
+                                              />
+                                            </span>
+                                          )}{' '}
+                                          {person.showPeople && item.uid && (
+                                            <>
+                                              <PersonIdentity uid={item.uid} />
+                                              {' · '}
+                                            </>
+                                          )}
+                                          {label(item.projectId)}
+                                          <span className="block whitespace-normal text-xs">
+                                            {eventDetails(item).topics}
+                                          </span>
+                                          {density !== 'supercompact' && (
+                                            <span className="block whitespace-normal text-sm">
+                                              {eventDetails(item).summary}
+                                            </span>
+                                          )}
+                                          {density !== 'supercompact' && (
+                                            <>
+                                              <br />
+                                              {new Intl.DateTimeFormat(
+                                                'pt-BR',
+                                                {
+                                                  timeZone: zone,
+                                                  hour: '2-digit',
+                                                  minute: '2-digit',
+                                                },
+                                              ).format(
+                                                new Date(
+                                                  Math.min(
+                                                    end,
+                                                    Date.parse(
+                                                      item.effectiveEndedAt,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )}
+
+                                              {report.intervals.some(
+                                                (other) =>
+                                                  other.id !== item.id &&
+                                                  overlaps(item, other),
+                                              )
+                                                ? ' · Sobreposição'
+                                                : ''}
+                                            </>
+                                          )}
+                                        </span>
+                                      </RouterLink>
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {label(item.projectId) +
+                                    ' · ' +
+                                    new Intl.DateTimeFormat('pt-BR', {
+                                      timeZone: zone,
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    }).format(
+                                      new Date(item.effectiveStartedAt),
+                                    ) +
+                                    ' — ' +
+                                    new Intl.DateTimeFormat('pt-BR', {
+                                      timeZone: zone,
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    }).format(new Date(item.effectiveEndedAt)) +
+                                    ' · ' +
+                                    calendarDurationDetails(item, start, end) +
+                                    (item.estimated
+                                      ? ' · Duração estimada'
+                                      : '')}
+                                </TooltipContent>
+                              </Tooltip>
+                              <span className={cn('text-xs block px-2')}>
+                                {projectLink(item.projectId)} ·{' '}
+                                {calendarDuration(item, start, end)}
+                                {item.estimated &&
+                                  item.effectiveStartedAt ===
+                                    item.effectiveEndedAt && (
+                                    <span className="sr-only">
+                                      Registro aberto · sem duração estimada
                                     </span>
-                                  ) : (
-                                    <RouterLink
-                                      to={
-                                        contextualRecordPath(
-                                          location.pathname,
-                                          location.search,
-                                          item.id,
-                                        ) ?? '#'
-                                      }
-                                    >
-                                      <span
-                                        className={cn(
-                                          'text-xs block overflow-hidden text-ellipsis',
-                                          density === 'supercompact'
-                                            ? 'whitespace-nowrap'
-                                            : 'whitespace-normal',
-                                        )}
-                                      >
-                                        <span
-                                          aria-hidden="true"
-                                          className={cn(
-                                            'inline-block size-1.5 mr-1 rounded-full',
-                                          )}
-                                          style={{
-                                            backgroundColor: color(
-                                              item.projectId,
-                                            ),
-                                          }}
-                                        />
-                                        {new Intl.DateTimeFormat('pt-BR', {
-                                          timeZone: zone,
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        }).format(
-                                          new Date(
-                                            Math.max(
-                                              start,
-                                              Date.parse(
-                                                item.effectiveStartedAt,
-                                              ),
-                                            ),
-                                          ),
-                                        )}
-                                        {item.estimated && (
-                                          <span
-                                            className="ml-1 inline-flex align-middle"
-                                            role="img"
-                                            aria-label="Duração estimada"
-                                            title="Duração estimada"
-                                          >
-                                            <Clock3
-                                              className="size-3 shrink-0"
-                                              aria-hidden="true"
-                                            />
-                                          </span>
-                                        )}{' '}
-                                        {person.showPeople && item.uid && (
-                                          <>
-                                            <PersonIdentity uid={item.uid} />
-                                            {' · '}
-                                          </>
-                                        )}
-                                        {label(item.projectId)}
-                                        <span className="block whitespace-normal text-xs">
-                                          {eventDetails(item).topics}
-                                        </span>
-                                        {density !== 'supercompact' && (
-                                          <span className="block whitespace-normal text-sm">
-                                            {eventDetails(item).summary}
-                                          </span>
-                                        )}
-                                        {density !== 'supercompact' && (
-                                          <>
-                                            <br />
-                                            {new Intl.DateTimeFormat('pt-BR', {
-                                              timeZone: zone,
-                                              hour: '2-digit',
-                                              minute: '2-digit',
-                                            }).format(
-                                              new Date(
-                                                Math.min(
-                                                  end,
-                                                  Date.parse(
-                                                    item.effectiveEndedAt,
-                                                  ),
-                                                ),
-                                              ),
-                                            )}
-
-                                            {report.intervals.some(
-                                              (other) =>
-                                                other.id !== item.id &&
-                                                overlaps(item, other),
-                                            )
-                                              ? ' · Sobreposição'
-                                              : ''}
-                                          </>
-                                        )}
-                                      </span>
-                                    </RouterLink>
                                   )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {label(item.projectId) +
-                                  ' · ' +
-                                  new Intl.DateTimeFormat('pt-BR', {
-                                    timeZone: zone,
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  }).format(new Date(item.effectiveStartedAt)) +
-                                  ' — ' +
-                                  new Intl.DateTimeFormat('pt-BR', {
-                                    timeZone: zone,
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  }).format(new Date(item.effectiveEndedAt)) +
-                                  ' · ' +
-                                  calendarDurationDetails(item, start, end) +
-                                  (item.estimated ? ' · Duração estimada' : '')}
-                              </TooltipContent>
-                            </Tooltip>
-                            <span className={cn('text-xs block px-2')}>
-                              {projectLink(item.projectId)} ·{' '}
-                              {calendarDuration(item, start, end)}
-                              {item.estimated &&
-                                item.effectiveStartedAt ===
-                                  item.effectiveEndedAt && (
-                                  <span className="sr-only">
-                                    Registro aberto · sem duração estimada
-                                  </span>
-                                )}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </Card>
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </Card>
+                    </div>
                   );
                 })}
               </div>
