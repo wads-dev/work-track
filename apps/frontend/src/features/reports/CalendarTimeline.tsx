@@ -255,9 +255,9 @@ export function CalendarTimeline({
                         className="space-y-0.5"
                       >
                         <div className="truncate text-[10px]">{caption}</div>
-                        <div className="h-1.5 overflow-hidden rounded bg-muted">
+                        <div className="h-2 overflow-hidden rounded bg-muted dark:bg-white/20 dark:ring-1 dark:ring-inset dark:ring-white/30">
                           <div
-                            className="h-full rounded"
+                            className="h-full rounded dark:ring-1 dark:ring-inset dark:ring-white/70"
                             style={{
                               background: color(progress.projectId),
                               width:

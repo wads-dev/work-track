@@ -5,6 +5,39 @@ import { PrivacyContext } from '../../shared/ui/privacy';
 import { CalendarTimeline } from './CalendarTimeline';
 import { TooltipProvider } from '../../components/ui/tooltip';
 
+it('keeps dark project progress visible without replacing project colors or changing delivery width', () => {
+  const html = renderToStaticMarkup(
+    <MemoryRouter>
+      <TooltipProvider>
+        <CalendarTimeline
+          items={[
+            {
+              id: 'demo',
+              projectId: 'p',
+              effectiveStartedAt: '2026-11-11T12:00:00Z',
+              effectiveEndedAt: '2026-11-11T16:00:00Z',
+              estimated: false,
+            },
+          ]}
+          day="2026-11-11"
+          view="day"
+          zone="America/Sao_Paulo"
+          label={() => 'Projeto escuro'}
+          color={() => '#101828'}
+          returnTo="/calendar"
+          viewerUid="me"
+          authorLabel={() => 'Pessoa'}
+          dailyProgress={() => [{ projectId: 'p', expected: 8, delivered: 4 }]}
+        />
+      </TooltipProvider>
+    </MemoryRouter>,
+  );
+  expect(html).toContain('dark:bg-white/20');
+  expect(html).toContain('dark:ring-white/70');
+  expect(html).toContain('background:#101828');
+  expect(html).toContain('width:50%');
+});
+
 const render = (showPeople: boolean, revealed: boolean, minutes = 60) =>
   renderToStaticMarkup(
     <MemoryRouter>
