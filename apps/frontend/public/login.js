@@ -1,6 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
 import {
   getAuth,
+  connectAuthEmulator,
   GoogleAuthProvider,
   signInWithPopup,
   inMemoryPersistence,
@@ -22,7 +23,18 @@ async function setup() {
   const configResponse = await fetch('/__/firebase/init.json');
   if (!configResponse.ok)
     throw new Error('Configuração Firebase indisponível.');
-  const auth = getAuth(initializeApp(await configResponse.json()));
+  const config = await configResponse.json();
+  const auth = getAuth(initializeApp(config));
+  if (config.projectId === 'demo-work-track') {
+    if (!['localhost', '127.0.0.1'].includes(location.hostname))
+      throw new Error('Demo login requires loopback.');
+    const port = config.emulatorPorts?.auth ?? 9099;
+    if (!Number.isInteger(port) || port < 1 || port > 65535)
+      throw new Error('Invalid Auth emulator port.');
+    connectAuthEmulator(auth, 'http://' + location.hostname + ':' + port);
+    document.querySelector('.intro').textContent =
+      'Ambiente DEMO local — autorize usando uma conta sintética do Auth Emulator. Não use credenciais de produção.';
+  }
   await setPersistence(auth, inMemoryPersistence);
   status.dataset.state = 'ready';
   status.textContent = '';

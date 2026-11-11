@@ -15,6 +15,9 @@ cd /workspace
 # No hooks, lockfile rewrites or generated artifacts on the host checkout.
 npm ci --ignore-scripts --no-audit --no-fund
 npm run build --workspace @work-track/backend
+# Firebase CLI isolates function workers from arbitrary parent environment variables.
+# Pass the public demo origin through a container-private emulator-only dotenv file.
+printf 'WORK_TRACK_PUBLIC_ORIGIN=%s\n' "${WORK_TRACK_PUBLIC_ORIGIN:?Local OAuth origin required}" > /workspace/apps/backend/dist/functions/.env.local
 mkdir -p /data
 if [ -f /data/export/firebase-export-metadata.json ]; then
   echo "[firebase] Restoring private local data from /data/export"

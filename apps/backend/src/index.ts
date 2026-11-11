@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase-admin/app';
+import { oauthBaseUrl } from './core/auth/domain/runtime-environment.js';
 import { FirestoreHistoricalRecordsRepository } from './modules/registration/infrastructure/firestore-historical-records.js';
 import { FirebaseCompanyPeopleRepository } from './modules/people/infrastructure/firebase-company-people.js';
 import { listCompanyPeopleHandler } from './modules/people/presentation/list-company-people.js';
@@ -76,7 +77,7 @@ export const deleteProjectPermanently = onCall(
 const provider = new WorkTrackOAuth(
   new FirestoreOAuthStore(getFirestore()),
   new FirebaseIdentityService(getAuth()),
-  'https://wadsworktrack.web.app',
+  oauthBaseUrl(process.env),
 );
 export const mcp = onRequest(
   {

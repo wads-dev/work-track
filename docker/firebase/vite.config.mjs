@@ -26,6 +26,26 @@ export default {
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    proxy: Object.fromEntries(
+      [
+        'mcp',
+        '.well-known',
+        'register',
+        'authorize',
+        'token',
+        'revoke',
+        'flow',
+        'complete',
+      ].map((route) => [
+        '^/' + route.replace('.', '\\.') + '(/|$|\\?)',
+        {
+          target:
+            process.env.WORK_TRACK_MCP_PROXY_TARGET ||
+            'http://localhost:5001/demo-work-track/southamerica-east1/mcp',
+          changeOrigin: true,
+        },
+      ]),
+    ),
     watch: { usePolling: true, interval: 200 },
   },
   plugins: [
@@ -36,6 +56,10 @@ export default {
       apply: 'serve',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
+          if (req.url?.split('?')[0] === '/login') {
+            req.url = req.url.replace('/login', '/login.html');
+            return next();
+          }
           if (req.url?.split('?')[0] !== '/__/firebase/init.json')
             return next();
           res.setHeader('Content-Type', 'application/json');

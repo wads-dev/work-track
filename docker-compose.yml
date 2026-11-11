@@ -11,6 +11,7 @@ services:
       --config /workspace/docker/firebase/vite.config.mjs"
     environment:
       npm_config_cache: /cache/npm
+      WORK_TRACK_MCP_PROXY_TARGET: http://firebase:5001/demo-work-track/southamerica-east1/mcp
       WORK_TRACK_AUTH_PORT: '${FIREBASE_AUTH_PORT:-9099}'
       WORK_TRACK_FIRESTORE_PORT: '${FIREBASE_FIRESTORE_PORT:-8081}'
       WORK_TRACK_FUNCTIONS_PORT: '${FIREBASE_FUNCTIONS_PORT:-5001}'
@@ -34,6 +35,7 @@ services:
       FIREBASE_EMULATORS_PATH: /cache/emulators
       npm_config_cache: /cache/npm
       XDG_CONFIG_HOME: /cache/config
+      WORK_TRACK_PUBLIC_ORIGIN: 'http://localhost:${FRONTEND_PORT:-5173}'
       GCLOUD_PROJECT: demo-work-track
       GOOGLE_CLOUD_PROJECT: demo-work-track
     ports:
