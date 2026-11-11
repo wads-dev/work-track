@@ -40,7 +40,14 @@ it('audits holiday changes, retries idempotently and rejects stale calendars', a
     expectedHolidays: null,
   });
   const input = {
-    holidays: [{ date: '2026-11-02', name: 'Finados' }],
+    holidays: [
+      { date: '2026-11-02', name: 'Finados' },
+      {
+        date: '2026-12-25',
+        type: 'every_year_same_date' as const,
+        name: 'Natal anual',
+      },
+    ],
     expectedHolidays: null,
     requestId: 'r',
     reason: 'Cadastrar',

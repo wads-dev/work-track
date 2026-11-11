@@ -40,20 +40,42 @@ export const businessHoursSchema = z
     }
   });
 export type BusinessHoursPeriod = z.infer<typeof businessHoursPeriodSchema>;
+/** Dates stay complete; annual recurrence ignores only the year. */
+export const holidayDateSchema = calendarDateSchema;
 export const holidaySchema = z
-  .object({ date: calendarDateSchema, name: z.string().trim().min(1).max(160) })
+  .object({
+    date: holidayDateSchema,
+    name: z.string().trim().min(1).max(160),
+    type: z.enum(['every_year_same_date', 'specific_date']).optional(),
+  })
   .strict();
 export const holidaysSchema = z
   .array(holidaySchema)
   .max(2000)
   .superRefine((items, ctx) => {
-    if (new Set(items.map((item) => item.date)).size !== items.length)
+    if (
+      new Set(
+        items.map((item) =>
+          item.type === 'every_year_same_date'
+            ? 'annual:' + item.date.substring(5)
+            : 'date:' + item.date,
+        ),
+      ).size !== items.length
+    )
       ctx.addIssue({
         code: 'custom',
         message: 'Há feriados duplicados na mesma data.',
       });
   });
 export type Holiday = z.infer<typeof holidaySchema>;
+export function isHoliday(date: string, holidays: Holiday[]): boolean {
+  calendarDateSchema.parse(date);
+  return holidays.some((holiday) =>
+    holiday.type === 'every_year_same_date'
+      ? holiday.date.substring(5) === date.substring(5)
+      : holiday.date === date,
+  );
+}
 /** Resolve an embedded contract rule for domain calculation, not dataset retrieval. */
 export function businessHoursContractForDate(
   date: string,
@@ -72,8 +94,7 @@ export function businessHoursForDate(
 ): number {
   calendarDateSchema.parse(date);
   const weekday = new Date(date + 'T12:00:00Z').getUTCDay();
-  if (weekday === 0 || weekday === 6 || holidays.some((h) => h.date === date))
-    return 0;
+  if (weekday === 0 || weekday === 6 || isHoliday(date, holidays)) return 0;
   return businessHoursContractForDate(date, periods)?.hoursPerDay ?? 0;
 }
 export function monthBusinessHours(

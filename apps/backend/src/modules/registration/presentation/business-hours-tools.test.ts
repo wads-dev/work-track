@@ -104,13 +104,33 @@ it('exposes contract and holiday tools, passes actor identity and validates hist
     await client.callTool({ name: 'get_holidays', arguments: {} });
     expect(getHolidays).toHaveBeenCalledOnce();
     const holidays = {
-      holidays: [],
+      holidays: [
+        {
+          date: '2026-12-25',
+          type: 'every_year_same_date' as const,
+          name: 'Natal',
+        },
+        { date: '2026-11-02', name: 'Finados' },
+      ],
       expectedHolidays: null,
       requestId: 'h',
       reason: 'Calendário',
     };
     await client.callTool({ name: 'update_holidays', arguments: holidays });
     expect(updateHolidays).toHaveBeenCalledWith(holidays, 'alice');
+    updateHolidays.mockClear();
+    expect(
+      (
+        await client.callTool({
+          name: 'update_holidays',
+          arguments: {
+            ...holidays,
+            holidays: [{ date: '02-30', name: 'Inválido' }],
+          },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(updateHolidays).not.toHaveBeenCalled();
   } finally {
     await client.close();
     await server.close();

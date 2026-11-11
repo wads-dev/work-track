@@ -1,5 +1,6 @@
 import {
   businessHoursSchema,
+  isHoliday,
   businessHoursContractForDate,
   businessHoursForDate,
   type Holiday,
@@ -13,11 +14,7 @@ export const nonWorkingDayClassName =
   'bg-black/[0.04] dark:bg-black/20 dark:border-white/25';
 export function isNonWorkingDay(date: string, holidays: Holiday[] = []) {
   const weekday = new Date(date + 'T12:00:00Z').getUTCDay();
-  return (
-    weekday === 0 ||
-    weekday === 6 ||
-    holidays.some((holiday) => holiday.date === date)
-  );
+  return weekday === 0 || weekday === 6 || isHoliday(date, holidays);
 }
 export function dailyProgressPercent(progress: DailyProgress) {
   const reference =

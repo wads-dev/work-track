@@ -1,7 +1,7 @@
 # Horas úteis por projeto
 
 - Na edição do projeto, cadastre períodos de contratação com início e fim inclusivos. Fim vazio mantém a vigência; períodos não podem sobrepor. Carga diária de 0 a 24 horas, do projeto inteiro. Sem períodos, acompanhamento desativado.
-- O menu Feriados mantém calendário compartilhado, com datas específicas por ano. Sábado e domingo sempre têm meta zero. Não há importação automática de feriados nacionais/locais.
+- O menu Feriados mantém calendário compartilhado, com data completa `YYYY-MM-DD` e campo `type`: `every_year_same_date` ou `specific_date`. Ex.: `{date:"2026-12-25",name:"Natal",type:"every_year_same_date"}`. A interface mantém o seletor nativo de data; trocar o tipo não altera a data. `every_year_same_date` ignora o ano no cálculo; `specific_date` mantém ocorrência específica. Itens antigos sem `type` continuam específicos; preserve essa ausência no `expectedHolidays`. 29/02 anual só vale em anos bissextos. Uma ocorrência específica coincidente com um anual não desconta o dia duas vezes. Sábado e domingo sempre têm meta zero. Não há importação automática de feriados nacionais/locais.
 - A meta mensal soma a carga contratada de cada dia útil. A meta acumulada inclui hoje inteiro desde meia-noite em America/Sao_Paulo.
 - Visão geral exibe o mês atual; Histórico exibe meses desde o primeiro registro até o atual, incluindo meses vazios. Entregas usam o rateio, multiplicador e estimativas existentes, com recorte nos limites reais de cada mês.
 - A barra de fundo indica a meta acumulada; a barra interna é a entrega. Divisões por pessoa exibem nome, horas e percentual relativo à meta mensal. Textos preservam valores acima de 100%. Meta zero não gera divisão por zero.

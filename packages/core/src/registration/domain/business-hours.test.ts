@@ -3,11 +3,98 @@ import {
   businessHoursSchema,
   calendarDateSchema,
   holidaysSchema,
+  isHoliday,
+  businessHoursForDate,
   localCalendarDate,
   monthBusinessHours,
 } from './business-hours.js';
 const periods = [{ startDate: '2026-11-01', endDate: null, hoursPerDay: 8 }];
 describe('business hours contracts', () => {
+  it('validates explicit recurrence types and preserves legacy expected values', () => {
+    const legacy = { date: '2026-12-25', name: 'Natal específico' };
+    expect(holidaysSchema.parse([legacy])).toEqual([legacy]);
+    expect(isHoliday('2027-12-25', [legacy])).toBe(false);
+    expect(
+      isHoliday('2027-12-25', [{ ...legacy, type: 'specific_date' }]),
+    ).toBe(false);
+    expect(
+      holidaysSchema.safeParse([{ ...legacy, type: 'annual' }]).success,
+    ).toBe(false);
+    expect(
+      holidaysSchema.safeParse([{ ...legacy, annual: true }]).success,
+    ).toBe(false);
+    expect(
+      holidaysSchema.safeParse([
+        { date: '12-25', name: 'Natal', type: 'every_year_same_date' },
+      ]).success,
+    ).toBe(false);
+    expect(
+      holidaysSchema.safeParse([
+        { ...legacy, type: 'every_year_same_date' },
+        { ...legacy, date: '2027-12-25', type: 'every_year_same_date' },
+      ]).success,
+    ).toBe(false);
+  });
+  it('supports annual dates across years while preserving dated occurrences and leap day', () => {
+    const holidays = holidaysSchema.parse([
+      {
+        date: '2026-12-25',
+        type: 'every_year_same_date' as const,
+        name: 'Natal',
+      },
+      { date: '2026-11-03', name: 'Especial' },
+      {
+        date: '2024-02-29',
+        type: 'every_year_same_date' as const,
+        name: 'Bissexto',
+      },
+    ]);
+    expect(isHoliday('2026-12-25', holidays)).toBe(true);
+    expect(isHoliday('2027-12-25', holidays)).toBe(true);
+    expect(isHoliday('2027-11-03', holidays)).toBe(false);
+    expect(isHoliday('2026-11-03', holidays)).toBe(true);
+    expect(isHoliday('2028-02-29', holidays)).toBe(true);
+    expect(isHoliday('2027-02-28', holidays)).toBe(false);
+    for (const date of ['2-29', '13-01', '04-31', '02-30', '2027-02-29'])
+      expect(
+        holidaysSchema.safeParse([{ date, name: 'Inválido' }]).success,
+      ).toBe(false);
+    expect(
+      holidaysSchema.safeParse([
+        {
+          date: '2026-12-25',
+          type: 'every_year_same_date' as const,
+          name: 'A',
+        },
+        {
+          date: '2026-12-25',
+          type: 'every_year_same_date' as const,
+          name: 'B',
+        },
+      ]).success,
+    ).toBe(false);
+  });
+  it('counts coincident annual and specific holidays only once in monthly targets', () => {
+    const contract = [
+      { startDate: '2020-01-01', endDate: null, hoursPerDay: 8 },
+    ];
+    const annual = [
+      {
+        date: '2026-12-25',
+        type: 'every_year_same_date' as const,
+        name: 'Natal',
+      },
+    ];
+    const mixed = [...annual, { date: '2026-12-25', name: 'Natal específico' }];
+    expect(
+      monthBusinessHours('2026-12', contract, mixed, '2026-12-31').total,
+    ).toBe(monthBusinessHours('2026-12', contract, annual, '2026-12-31').total);
+    expect(businessHoursForDate('2026-12-25', contract, annual)).toBe(0);
+    expect(
+      monthBusinessHours('2026-12', contract, [], '2026-12-31').total -
+        monthBusinessHours('2026-12', contract, annual, '2026-12-31').total,
+    ).toBe(8);
+  });
   it('counts the whole current day at local midnight, excluding weekends and holidays', () => {
     const result = monthBusinessHours(
       '2026-11',

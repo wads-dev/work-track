@@ -43,8 +43,10 @@ export function HolidaysPage({
       <h1 className="text-2xl font-semibold">Feriados</h1>
       <p className="text-sm text-muted-foreground">
         Calendário compartilhado de dias sem meta para todos os projetos.
-        Sábados e domingos já são excluídos automaticamente. Cada feriado vale
-        para a data e o ano cadastrados, no fuso America/Sao_Paulo.
+        Sábados e domingos já são excluídos automaticamente. Use sempre a data
+        completa e escolha Todo ano na mesma data para repetir mês e dia todos
+        os anos, no fuso America/Sao_Paulo. Em 29/02, a repetição vale somente
+        em anos bissextos.
       </p>
       {error && <p role="alert">{error}</p>}
       {original ? (
@@ -66,7 +68,12 @@ function HolidayEditor({
   original: { holidays: Holiday[]; expectedHolidays: Holiday[] | null };
   functions: Functions;
 }) {
-  const [rows, setRows] = useState(original.holidays);
+  const [rows, setRows] = useState(() =>
+    original.holidays.map((holiday) => ({
+      ...holiday,
+      type: holiday.type ?? 'specific_date',
+    })),
+  );
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
@@ -76,7 +83,9 @@ function HolidayEditor({
     lock.current = true;
     setBusy(true);
     try {
-      const holidays = holidaysSchema.parse(rows);
+      const holidays = holidaysSchema.parse(
+        rows.map(({ date, name, type }) => ({ date, name, type })),
+      );
       const key = JSON.stringify({
         holidays,
         expectedHolidays: original.expectedHolidays,
@@ -105,6 +114,33 @@ function HolidayEditor({
       {rows.length === 0 && <p>Nenhum feriado cadastrado.</p>}
       {rows.map((row, index) => (
         <div key={index} className="flex flex-wrap gap-2">
+          <label className="flex items-center gap-2 text-sm">
+            Tipo
+            <select
+              aria-label={'Tipo do feriado ' + (index + 1)}
+              value={row.type}
+              disabled={busy}
+              className="h-9 rounded-md border bg-background px-2"
+              onChange={(e) =>
+                setRows((current) =>
+                  current.map((item, i) =>
+                    i === index
+                      ? {
+                          ...item,
+                          type: e.target.value as
+                            'every_year_same_date' | 'specific_date',
+                        }
+                      : item,
+                  ),
+                )
+              }
+            >
+              <option value="specific_date">Data específica</option>
+              <option value="every_year_same_date">
+                Todo ano na mesma data
+              </option>
+            </select>
+          </label>
           <Input
             className="w-44"
             aria-label={'Data do feriado ' + (index + 1)}
@@ -152,7 +188,10 @@ function HolidayEditor({
           variant="outline"
           disabled={busy}
           onClick={() =>
-            setRows((current) => [...current, { date: '', name: '' }])
+            setRows((current) => [
+              ...current,
+              { date: '', name: '', type: 'specific_date' as const },
+            ])
           }
         >
           Adicionar feriado

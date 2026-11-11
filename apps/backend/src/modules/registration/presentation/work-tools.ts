@@ -142,7 +142,7 @@ export function registerWorkTools(
       'get_holidays',
       {
         description:
-          'Leia os feriados compartilhados e expectedHolidays para edição concorrente segura. Sábados e domingos já são não úteis; datas são específicas por ano.',
+          'Leia os feriados compartilhados e expectedHolidays para edição concorrente segura. Sábados e domingos já são não úteis. Cada item mantém date YYYY-MM-DD e type: every_year_same_date repete mês/dia todos os anos; specific_date vale só na data cadastrada. Itens antigos sem type são specific_date. Ex.: {date:"2026-12-25",name:"Natal",type:"every_year_same_date"}. 29/02 anual só ocorre em anos bissextos.',
         inputSchema: z.object({}).strict(),
         annotations: { readOnlyHint: true, destructiveHint: false },
       },
@@ -153,7 +153,7 @@ export function registerWorkTools(
       'update_holidays',
       {
         description:
-          'Edite o calendário compartilhado de feriados. Leia get_holidays antes, envie calendário completo, expectedHolidays anterior (null se ausente), requestId estável e motivo. Afeta metas de todos os projetos.',
+          'Edite o calendário compartilhado de feriados. Leia get_holidays antes, envie calendário completo, expectedHolidays anterior (null se ausente), requestId estável e motivo. Afeta metas de todos os projetos. Cada item é {date,name,type}: date sempre YYYY-MM-DD; type every_year_same_date repete mês/dia todo ano, specific_date é uma ocorrência específica. Itens antigos sem type são específicos. Natal: {date:"2026-12-25",name:"Natal",type:"every_year_same_date"}. 29/02 anual só em anos bissextos. Preserve todos os campos no expectedHolidays, sem adicionar type aos itens antigos. Não duplique mês/dia entre anuais nem data entre específicos; anual e específico coincidentes não descontam duas vezes.',
         inputSchema: updateHolidaysInput,
       },
       (input) => run(() => repository.updateHolidays!(input, uid)),

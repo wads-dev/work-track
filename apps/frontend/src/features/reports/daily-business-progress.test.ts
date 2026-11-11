@@ -43,6 +43,26 @@ it('scales overtime against normal contract hours without doubling and caps visu
   ).toBe(true);
   expect(isNonWorkingDay('2026-11-03')).toBe(false);
 });
+it('marks annual holidays as nonworking across calendar years', () => {
+  expect(
+    isNonWorkingDay('2026-12-25', [
+      {
+        date: '2026-12-25',
+        type: 'every_year_same_date' as const,
+        name: 'Natal',
+      },
+    ]),
+  ).toBe(true);
+  expect(
+    isNonWorkingDay('2028-12-25', [
+      {
+        date: '2026-12-25',
+        type: 'every_year_same_date' as const,
+        name: 'Natal',
+      },
+    ]),
+  ).toBe(true);
+});
 const projects = new Map<string, Record<string, unknown>>([
   [
     'p',
