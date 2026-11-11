@@ -12,6 +12,7 @@ export function durationLabel(minutes: number) {
     : number.format(rest) + 'min';
 }
 type CalendarDurationItem = {
+  calculationPending?: boolean;
   minutes?: number;
   loggedMinutes?: number;
   allocatedMinutes?: number;
@@ -28,6 +29,14 @@ export function calendarDurationDetails(
   const start = Math.max(from, Date.parse(item.effectiveStartedAt)),
     end = Math.min(to, Date.parse(item.effectiveEndedAt));
   const logged = Math.max(0, (end - start) / 60000);
+  if (item.calculationPending)
+    return (
+      'Registrado: ' +
+      (item.loggedMinutes === undefined
+        ? '… (registro aberto)'
+        : durationLabel(logged)) +
+      ' · Computado: …'
+    );
   if (!item.accountingSegments)
     return (
       'Logged: ' +
@@ -51,6 +60,7 @@ export function calendarDurationDetails(
 }
 export function calendarDuration(
   item: {
+    calculationPending?: boolean;
     minutes?: number;
     loggedMinutes?: number;
     allocatedMinutes?: number;
@@ -65,6 +75,12 @@ export function calendarDuration(
   const start = Math.max(from, Date.parse(item.effectiveStartedAt)),
     end = Math.min(to, Date.parse(item.effectiveEndedAt));
   const logged = Math.max(0, (end - start) / 60000);
+  if (item.calculationPending)
+    return (
+      '… (registrado: ' +
+      (item.loggedMinutes === undefined ? '…' : durationLabel(logged)) +
+      ')'
+    );
   // Never infer an accounted duration from wall-clock endpoints without context.
   const minutes = item.accountingSegments
     ? accountedMinutes(item.accountingSegments, start, end) *

@@ -36,7 +36,7 @@ it('keeps dark project progress visible without replacing project colors or chan
   expect(html).toContain('dark:ring-white/30');
   expect(html).not.toContain('dark:ring-white/70');
   expect(html).not.toContain('dark:shadow-');
-  expect(html).toContain('background:#101828');
+  expect(html).toContain('background-color:#101828');
   expect(html).toContain('width:50%');
   const headerEnd = html.indexOf('</header>');
   expect(html.indexOf('Horas úteis de 2026-11-11')).toBeLessThan(headerEnd);

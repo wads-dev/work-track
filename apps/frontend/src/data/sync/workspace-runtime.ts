@@ -345,6 +345,23 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
       ),
     );
   };
+  let suspensionTimer: ReturnType<typeof setTimeout> | undefined;
+  let transportPaused = false;
+  const cancelSuspension = () => {
+    if (suspensionTimer !== undefined) clearTimeout(suspensionTimer);
+    suspensionTimer = undefined;
+  };
+  const scheduleSuspension = () => {
+    cancelSuspension();
+    traceFirestore('network.pause.scheduled', { delayMs: 30000 });
+    suspensionTimer = setTimeout(() => {
+      suspensionTimer = undefined;
+      if (disposed || focused) return;
+      transportPaused = true;
+      traceFirestore('network.pause', { focused });
+      void disableNetwork(db).catch(fail);
+    }, 30000);
+  };
   const focus = () => {
     const next = document.visibilityState === 'visible' && document.hasFocus();
     if (next === focused || disposed) return;
@@ -352,10 +369,14 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     traceFirestore('network.focus', { focused });
     // Keep query targets/resume tokens alive; SDK handles IndexedDB and multi-tab synchronization.
     if (next) {
-      void enableNetwork(db).catch(fail);
+      cancelSuspension();
+      if (transportPaused) {
+        transportPaused = false;
+        void enableNetwork(db).catch(fail);
+      }
     } else {
-      // Transport suspension must not blank already-authorized local views.
-      void disableNetwork(db).catch(fail);
+      // Grace period lets in-flight synchronization finish during short tab switches.
+      scheduleSuspension();
     }
   };
   entry.audit = (path) => {
@@ -378,7 +399,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
     if (disposed) return;
     start();
   };
-  if (!focused) void disableNetwork(db).catch(fail);
+  if (!focused) scheduleSuspension();
   start();
   document.addEventListener('visibilitychange', focus);
   window.addEventListener('focus', focus);
@@ -389,6 +410,7 @@ export function startWorkspaceSession(db: Firestore, uid: string) {
   focus();
   return () => {
     disposed = true;
+    cancelSuspension();
     epoch++;
     catalogStops.forEach((s) => s());
     projectStops.forEach((s) => s());

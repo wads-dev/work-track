@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils';
+import { calendarPreview } from './calendar-preview';
 import { CalendarDayHeading } from './CalendarDayHeading';
 import { CalendarDayProgress } from './CalendarDayProgress';
 import { observeHolidays } from '../../data/repositories/holiday-repository';
@@ -10,7 +11,10 @@ import {
 } from './daily-business-progress';
 import { useMediaQuery } from '../../shared/ui/theme';
 import { defaultCalendarView, PORTRAIT_MOBILE_QUERY } from './calendar-view';
-import { measureFirestoreStage } from '../../data/sync/firestore-diagnostics';
+import {
+  measureFirestoreStage,
+  traceFirestore,
+} from '../../data/sync/firestore-diagnostics';
 import { Clock3 } from 'lucide-react';
 import { ProjectAppearance } from '@work-track/core/registration/domain/project-color';
 import { useCompanyPeople } from '../people/CompanyPeopleContext';
@@ -114,11 +118,13 @@ type PersonalReport = Omit<
   import('@work-track/core/reports/domain/personal-report').PersonalReport,
   'policy' | 'intervals' | 'from' | 'to' | 'budgetTimeZone'
 > & {
+  calculationPending?: boolean;
   policy: string;
   budgetTimeZone: string;
   from: string;
   to: string;
   intervals: (import('@work-track/core/reports/domain/personal-report').PersonalReport['intervals'][number] & {
+    calculationPending?: boolean;
     uid?: string;
     readOnly?: boolean;
     topics?: { label: string }[];
@@ -369,6 +375,10 @@ export function PersonalPage({
     AuthorizedReportSnapshot['repository'] | undefined
   >(undefined);
   const [loading, setLoading] = useState(true);
+  const [calculationTime, setCalculationTime] = useState<{
+    query: string;
+    ms: number;
+  } | null>(null);
   const [error, setError] = useState('');
   const [descriptions, setDescriptions] = useState<
     ReadonlyMap<string, DescriptionSource>
@@ -497,6 +507,7 @@ export function PersonalPage({
     }
     setLoading(true);
     setError('');
+    if (sourceLoading || catalogLoading) return;
     if (!localRepository || !catalog) {
       const failure =
         catalogError?.key === catalogKey ? catalogError.message : localError;
@@ -504,6 +515,7 @@ export function PersonalPage({
       setLoading(!failure);
       return;
     }
+    const calculationStarted = performance.now();
     const finishCalculation = measureFirestoreStage(
       calendar ? 'calendar.calculate' : 'report.calculate',
     );
@@ -536,6 +548,28 @@ export function PersonalPage({
                 ),
               ),
               uid,
+              Date.now(),
+              !allWeeks
+                ? (records) => {
+                    if (
+                      !active ||
+                      deletionRevision(uid) !== revision ||
+                      projectAccessRevision() !== accessRevision
+                    )
+                      return;
+                    traceFirestore('calendar.preview', {
+                      count: records.length,
+                    });
+                    setReportAccessRevision(accessRevision);
+                    setReportOwner(uid);
+                    setReportQuery(queryIdentity);
+                    setReportRevision(revision);
+                    setReportRepository(localRepository);
+                    setReport(
+                      calendarPreview(records, from, to, zone, Date.now()),
+                    );
+                  }
+                : undefined,
             ).then((data) => ({
               data: calendarReport(
                 data as CalendarResponse,
@@ -558,6 +592,11 @@ export function PersonalPage({
     void request
       .then(async (result) => {
         finishCalculation();
+        if (active)
+          setCalculationTime({
+            query: queryIdentity,
+            ms: performance.now() - calculationStarted,
+          });
         const finishDetails = measureFirestoreStage('report.descriptions');
         const sources = calendar
           ? await new BrowserDetailRepository(
@@ -600,6 +639,7 @@ export function PersonalPage({
           deletionRevision(uid) === revision &&
           projectAccessRevision() === accessRevision
         ) {
+          setReport(null);
           setError(reportError(failure));
           setLoading(false);
         }
@@ -613,6 +653,8 @@ export function PersonalPage({
     catalogError,
     catalogKey,
     localRepository,
+    sourceLoading,
+    catalogLoading,
     localError,
     functions,
     from,
@@ -724,6 +766,13 @@ export function PersonalPage({
         />
       ) : (
         <CalendarToolbar
+          calculationMs={
+            calculationTime?.query === queryIdentity &&
+            report &&
+            !report.calculationPending
+              ? calculationTime.ms
+              : undefined
+          }
           loading={
             loading || projects.loading || sourceLoading || catalogLoading
           }
@@ -811,7 +860,10 @@ export function PersonalPage({
         )}
       {calendar && report && (
         <p role="status" className="text-sm text-muted-foreground">
-          Tempo computado: {durationLabel(report.totalMinutes)}
+          Tempo computado:{' '}
+          {report.calculationPending
+            ? '… calculando'
+            : durationLabel(report.totalMinutes)}
         </p>
       )}
       {calendar && subject && (
@@ -838,6 +890,31 @@ export function PersonalPage({
               podem mudar após a confirmação do servidor.
             </AlertDescription>
           </Alert>
+        )}
+      {calendar &&
+        !report &&
+        !error &&
+        !invalid &&
+        !privacyBlocked &&
+        !allWeeks && (
+          <section
+            aria-label="Calendário carregando registros"
+            className="grid grid-cols-1 gap-2 sm:grid-cols-7"
+            aria-busy="true"
+          >
+            {calendarDays(selected, view).map((day) => (
+              <div key={day} className="min-w-0 space-y-2">
+                <CalendarDayHeading
+                  day={day}
+                  zone={zone}
+                  month={view === 'month'}
+                />
+                <div className="h-24 rounded-lg border bg-card p-2 text-xs text-muted-foreground">
+                  Carregando registros…
+                </div>
+              </div>
+            ))}
+          </section>
         )}
       {error ? (
         <Alert variant="destructive">
@@ -1022,6 +1099,7 @@ export function PersonalPage({
                           businessHolidays,
                           report.intervals,
                           projectIds,
+                          report.calculationPending,
                         )
                     : undefined
                 }
@@ -1058,6 +1136,7 @@ export function PersonalPage({
                           businessHolidays,
                           report.intervals,
                           projectIds,
+                          report.calculationPending,
                         )
                     : undefined
                 }
@@ -1143,6 +1222,7 @@ export function PersonalPage({
                               businessHolidays,
                               report.intervals,
                               projectIds,
+                              report.calculationPending,
                             )}
                           />
                         )}
@@ -1457,7 +1537,8 @@ export function PersonalPage({
                       className={cn('inline-block size-3 mr-2')}
                       style={{ backgroundColor: color(p.projectId) }}
                     />
-                    {projectLink(p.projectId)} · {durationLabel(p.minutes)}
+                    {projectLink(p.projectId)} ·{' '}
+                    {report.calculationPending ? '…' : durationLabel(p.minutes)}
                     {(() => {
                       const logged = report.intervals.reduce(
                         (sum, i) =>
@@ -1467,7 +1548,8 @@ export function PersonalPage({
                             : 0),
                         0,
                       );
-                      return Math.abs(logged - p.minutes) > 0.000001
+                      return report.calculationPending ||
+                        Math.abs(logged - p.minutes) > 0.000001
                         ? ' (registrado: ' + durationLabel(logged) + ')'
                         : '';
                     })()}

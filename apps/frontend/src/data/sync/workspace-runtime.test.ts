@@ -126,6 +126,7 @@ async function send(path: string, rows: LocalDocument[], changed = true) {
   await settle();
 }
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   m.listeners = [];
   m.cacheListeners = [];
@@ -178,12 +179,17 @@ it('native global targets survive navigation and use only cached data for projec
   observe();
   stop();
 });
-it('focus disables SDK network without destroying query resume targets, resume enables it', async () => {
+it('focus suspends SDK network only after thirty seconds and resumes without new targets', async () => {
+  vi.useFakeTimers();
   const e = env();
   const stop = startWorkspaceSession(db, 'alice');
   const count = m.listeners.length;
   e.setFocus(false);
   await settle();
+  expect(m.disable).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(29999);
+  expect(m.disable).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
   expect(m.disable).toHaveBeenCalledOnce();
   expect(m.listeners.every((l) => l.stop.mock.calls.length === 0)).toBe(true);
   e.setFocus(true);
@@ -191,6 +197,21 @@ it('focus disables SDK network without destroying query resume targets, resume e
   expect(m.enable).toHaveBeenCalledOnce();
   expect(m.listeners).toHaveLength(count);
   stop();
+});
+it('cancels pending suspension on quick return and on disposal', async () => {
+  vi.useFakeTimers();
+  const e = env();
+  const stop = startWorkspaceSession(db, 'alice');
+  e.setFocus(false);
+  await vi.advanceTimersByTimeAsync(20000);
+  e.setFocus(true);
+  await vi.advanceTimersByTimeAsync(30000);
+  expect(m.disable).not.toHaveBeenCalled();
+  expect(m.enable).not.toHaveBeenCalled();
+  e.setFocus(false);
+  stop();
+  await vi.advanceTimersByTimeAsync(30000);
+  expect(m.disable).not.toHaveBeenCalled();
 });
 it('revocation removes project rows and late callbacks cannot restore account data', async () => {
   env();
@@ -374,7 +395,7 @@ it('metadata-only events do not invalidate content while blur preserves readines
   e.setFocus(true);
   e.setFocus(true);
   await settle();
-  expect(m.enable).toHaveBeenCalledOnce();
+  expect(m.enable).not.toHaveBeenCalled();
   observe();
   stop();
 });

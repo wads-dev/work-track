@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '../../components/ui/tooltip';
 import { CalendarToolbar } from './CalendarToolbar';
-function markup(profile = false, loading = false) {
+function markup(profile = false, loading = false, calculationMs?: number) {
   const noop = vi.fn();
   return renderToStaticMarkup(
     createElement(TooltipProvider, {
@@ -35,11 +35,17 @@ function markup(profile = false, loading = false) {
         onArchived: noop,
         onRefresh: noop,
         loading,
+        calculationMs,
       }),
     }),
   );
 }
 describe('calendar toolbar design-system contract', () => {
+  it('shows integer milliseconds or a pending label', () => {
+    expect(markup(false, true, 2554.7)).toContain('Calculando…');
+    expect(markup(false, false, 2554.7)).toContain('Calculado em 2555 ms');
+    expect(markup()).not.toContain('Calculado em');
+  });
   it('indicates refresh progress only on the refresh icon', () => {
     expect(markup(false, true)).toContain('motion-safe:animate-spin');
     expect(markup(false, true)).toContain('aria-busy="true"');

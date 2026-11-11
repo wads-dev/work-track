@@ -16,6 +16,25 @@ export function CalendarDayProgress({
   return (
     <div className="mb-2 space-y-1" aria-label={'Horas úteis de ' + day}>
       {progress.map((progress) => {
+        if (progress.calculationPending)
+          return (
+            <div
+              key={progress.projectId}
+              className="space-y-0.5"
+              role="status"
+              aria-label={label(progress.projectId) + ': calculando horas'}
+            >
+              <div className="truncate text-[10px]">
+                {label(progress.projectId)}: …
+              </div>
+              <div className="h-2 overflow-hidden rounded bg-muted">
+                <div
+                  className="h-full w-1/3 animate-pulse rounded motion-reduce:animate-none"
+                  style={{ backgroundColor: color(progress.projectId) }}
+                />
+              </div>
+            </div>
+          );
         const overtime = Math.max(0, progress.delivered - progress.expected);
         const caption =
           label(progress.projectId) +
@@ -36,7 +55,7 @@ export function CalendarDayProgress({
               <div
                 className="h-full rounded"
                 style={{
-                  background: color(progress.projectId),
+                  backgroundColor: color(progress.projectId),
                   width: dailyProgressPercent(progress) + '%',
                   backgroundImage:
                     progress.expected === 0

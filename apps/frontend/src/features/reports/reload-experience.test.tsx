@@ -520,6 +520,45 @@ it('an obsolete calculation cannot restore totals after an access change', async
   expect(toolbar().props.total).toBe('2 h');
   expect(toolbar().props.loading).toBe(false);
 });
+it('renders validated calendar facts while computed hours remain pending', async () => {
+  m.params = new URLSearchParams('uid=alice&date=2026-10-08&view=day');
+  m.calculate.mockImplementation((...args: unknown[]) => {
+    const preview = args[4] as ((rows: unknown[]) => void) | undefined;
+    preview?.([
+      {
+        id: 'early',
+        uid: 'alice',
+        projectId: 'p',
+        startedAt: '2026-10-08T12:00:00Z',
+        endedAt: '2026-10-08T15:00:00Z',
+        timeZone: 'America/Sao_Paulo',
+        topics: [],
+      },
+    ]);
+    return new Promise(() => {});
+  });
+  const tree = await settle(() => PersonalPage({ ...props, calendar: true }));
+  const timeline = elements(tree).find((e) => e.type === CalendarTimeline)!;
+  expect(timeline).toBeDefined();
+  const intervals = timeline.props.items as {
+    id: string;
+    loggedMinutes: number;
+    calculationPending: boolean;
+  }[];
+  expect(intervals[0]).toMatchObject({
+    id: 'early',
+    loggedMinutes: 180,
+    calculationPending: true,
+  });
+  expect(
+    elements(tree).find((e) => e.type === CalendarToolbar)!.props.loading,
+  ).toBe(true);
+  expect(
+    elements(tree).some(
+      (e) => e.props['aria-label'] === 'Legenda dos projetos',
+    ),
+  ).toBe(true);
+});
 it('calendar uses the same retained result and loading for click, focus, timer and listener', async () => {
   const win = new EventTarget();
   const doc = { visibilityState: 'visible' };

@@ -77,6 +77,7 @@ export async function executeCalendarReport(
   input: CalendarInput,
   uid: string,
   asOf = Date.now(),
+  onSelection?: (records: readonly ReportSourceRecord[]) => void,
 ) {
   selectedProjectIds(input);
   if (input.mode === 'own' && input.userIds?.some((id) => id !== uid))
@@ -111,6 +112,8 @@ export async function executeCalendarReport(
   );
   const valid = await repository.revalidate(raw.records, uid, input.mode);
   const visible = valid;
+  // Optional display-only preview: current ACL/deletion validation has completed; no totals yet.
+  onSelection?.(visible);
   let participantsUnavailable = false;
   let directoryRaw: PersonalReportPage;
   {

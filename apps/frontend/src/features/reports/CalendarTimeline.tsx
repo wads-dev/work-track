@@ -40,6 +40,7 @@ import {
   type Timed,
 } from './timeline-layout';
 type Event = Timed & {
+  calculationPending?: boolean;
   minutes?: number;
   loggedMinutes?: number;
   allocatedMinutes?: number;

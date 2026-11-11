@@ -11,6 +11,35 @@ import {
 import type { ReportRecordSelection } from '@work-track/core/reports/domain/personal-report';
 import type { ReportSourceRecord } from '@work-track/core/reports/domain/project-report';
 import { ReportContextError } from '@work-track/core/reports/domain/global-estimates';
+it('publishes only revalidated selection before a slow directory calculation finishes', async () => {
+  const { repo, catalog } = fixture();
+  let release!: () => void;
+  const original = repo.company.readPage.bind(repo.company);
+  repo.company.readPage = async (...args) => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return original(...args);
+  };
+  const preview = vi.fn<(records: readonly ReportSourceRecord[]) => void>();
+  const result = executeCalendarReport(
+    repo,
+    { ...input, mode: 'own', includeArchived: false, allWeeks: false },
+    'alice',
+    Date.parse('2026-10-08T12:00:00Z'),
+    preview,
+  );
+  for (let i = 0; i < 30; i++) await Promise.resolve();
+  expect(preview).toHaveBeenCalledOnce();
+  expect(
+    preview.mock.calls[0]![0].every(
+      (r: ReportSourceRecord) => r.uid === 'alice',
+    ),
+  ).toBe(true);
+  catalog.delete('w');
+  release();
+  await expect(result).rejects.toThrow();
+});
 const auth = {
   uid: 'alice',
   token: {

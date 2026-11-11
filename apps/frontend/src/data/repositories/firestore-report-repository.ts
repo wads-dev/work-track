@@ -464,18 +464,27 @@ export class FirestoreReportRepository implements CompanyReportRepository {
           .map((r) => recordPath(r)),
       ),
     ];
-    for (let i = 0; i < names.length; i += 30) {
-      const batch = names.slice(i, i + 30);
-      const values = await this.read(
-        query(
-          collectionGroup(this.db, 'records'),
-          where(documentId(), 'in', batch),
+    // Bounded parallel local reads preserve every ACL/content revalidation while
+    // avoiding a serialized IndexedDB roundtrip for every 30 document names.
+    for (let offset = 0; offset < names.length; offset += 120) {
+      const batches: string[][] = [];
+      for (let i = offset; i < Math.min(offset + 120, names.length); i += 30)
+        batches.push(names.slice(i, i + 30));
+      const results = await Promise.all(
+        batches.map((batch) =>
+          this.read(
+            query(
+              collectionGroup(this.db, 'records'),
+              where(documentId(), 'in', batch),
+            ),
+            'report.revalidate',
+            projects,
+            strictPersonalCodec,
+          ),
         ),
-        'report.revalidate',
-        projects,
-        strictPersonalCodec,
       );
-      for (const value of values) current.set(recordPath(value), value);
+      for (const values of results)
+        for (const value of values) current.set(recordPath(value), value);
     }
     return rows.filter((r) => {
       const value = current.get(recordPath(r));

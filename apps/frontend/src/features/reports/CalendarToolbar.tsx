@@ -94,6 +94,7 @@ export function CalendarToolbar({
   onArchived,
   onRefresh,
   loading = false,
+  calculationMs,
 }: {
   date: string;
   view: string;
@@ -119,6 +120,7 @@ export function CalendarToolbar({
   onArchived: () => void;
   onRefresh: () => void;
   loading?: boolean;
+  calculationMs?: number;
 }) {
   return (
     <QueryToolbar
@@ -126,6 +128,17 @@ export function CalendarToolbar({
       compact
       actions={
         <>
+          {(loading || calculationMs !== undefined) && (
+            <span
+              role="status"
+              className="whitespace-nowrap text-xs text-muted-foreground/60 tabular-nums"
+              title="Tempo da última consulta local e cálculo; não inclui autenticação e sincronização inicial"
+            >
+              {loading
+                ? 'Calculando…'
+                : 'Calculado em ' + Math.round(calculationMs!) + ' ms'}
+            </span>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

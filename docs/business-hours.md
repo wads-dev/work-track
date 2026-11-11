@@ -10,6 +10,13 @@
 - Alterações são auditadas e verificam concorrência. ACLs pessoais/corporativas e apresentação confidencial permanecem preservadas. Feriados são compartilhados; MCP escreve no backend existente e a interface Web usa transação Firestore autenticada corporativa, com auditoria obrigatória nas Rules. Não existe callable específica de feriados. Consultas Web usam cache persistente alimentado pela sincronização global, sem listeners por navegação.
 - Configuração histórica é recalculável: editar contratos/feriados antigos altera metas passadas, não fatos dos registros.
 
+## Futuro — calendário por localização do projeto (não implementado)
+
+- TODO: permitir identificar o estado e o município de cada feriado estadual/municipal, além do `scope` informativo.
+- TODO: permitir configurar o estado e o município de referência em cada projeto, conforme o calendário contratualmente aplicável ao cliente — não inferir pela residência do usuário.
+- TODO: resolver o calendário aplicável ao projeto combinando feriados federais com os estaduais e municipais daquela localização. Exemplo: cliente de Curitiba/PR pode seguir Curitiba e Paraná, em vez de São Paulo/SP.
+- A regra de escolha, eventuais exceções contratuais e compatibilidade dos registros atuais deverão ser definidas antes da implementação. Hoje `scope` continua apenas informativo e o calendário é compartilhado; nenhuma filtragem por localização foi adicionada.
+
 ## Ambiente desta implementação
 
 Por solicitação expressa, desenvolvimento na pasta principal e branch main, com Compose padrão (frontend 5173, Auth 9099, Firestore 8081, Functions 5001 e UI 4001). Somente demo-work-track e dados sintéticos. Frontend com HMR; Functions/Rules exigem recriação do serviço firebase usando a imagem existente. Containers permanecem disponíveis para revisão.

@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./reports/domain/calendar-preview": {
+      "types": "./lib/reports/domain/calendar-preview.d.ts",
+      "development": "./src/reports/domain/calendar-preview.ts",
+      "default": "./lib/reports/domain/calendar-preview.js"
+    },
     "./registration/domain/business-progress": {
       "types": "./lib/registration/domain/business-progress.d.ts",
       "development": "./src/registration/domain/business-progress.ts",
