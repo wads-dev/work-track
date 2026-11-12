@@ -1,6 +1,6 @@
 import type { ReportSourceRecord } from './project-report.js';
 /** Display projection only: sources already selected and revalidated by repositories.
- * Open records are points until contextual estimates arrive; never invent a persisted end. */
+ * Open records use now for display until contextual estimates arrive; never persist an end. */
 export function calendarPreview(
   records: readonly ReportSourceRecord[],
   from: string,
@@ -14,7 +14,7 @@ export function calendarPreview(
     const open = !record.endedAt;
     const start = Math.max(started, from ? Date.parse(from) : -Infinity);
     const end = open
-      ? started
+      ? Math.max(started, Math.min(now, to ? Date.parse(to) : Infinity))
       : Math.min(Date.parse(record.endedAt!), to ? Date.parse(to) : Infinity);
     if (
       open ? started < start || (to && started >= Date.parse(to)) : end <= start

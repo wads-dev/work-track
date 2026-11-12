@@ -606,18 +606,30 @@ it('calendar uses the same retained result and loading for click, focus, timer a
   ];
   for (const trigger of triggers) {
     let resolve!: (value: typeof calendar) => void;
-    m.calculate.mockImplementationOnce(
-      () =>
-        new Promise((yes) => {
-          resolve = yes;
-        }),
-    );
+    m.calculate.mockImplementationOnce((...args: unknown[]) => {
+      const preview = args[4] as ((rows: unknown[]) => void) | undefined;
+      preview?.([
+        {
+          id: 'regressed-preview',
+          uid: 'alice',
+          projectId: 'p',
+          startedAt: '2026-10-08T12:00:00Z',
+          timeZone: 'America/Sao_Paulo',
+          topics: [],
+        },
+      ]);
+      return new Promise((yes) => {
+        resolve = yes;
+      });
+    });
     const before = m.calculate.mock.calls.length;
     trigger();
     tree = await settle(view);
     expect(m.calculate).toHaveBeenCalledTimes(before + 1);
     expect(toolbar().props.loading).toBe(true);
     expect(hasCalendar()).toBe(true);
+    const retained = elements(tree).find((e) => e.type === CalendarTimeline)!;
+    expect(retained.props.items).toEqual(calendar.intervals);
     resolve(calendar);
     tree = await settle(view);
     expect(toolbar().props.loading).toBe(false);

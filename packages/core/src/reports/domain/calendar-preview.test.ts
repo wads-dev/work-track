@@ -23,7 +23,7 @@ it('clips factual logged time without inventing computed totals', () => {
   expect(value.calculationPending).toBe(true);
   expect(value.byProject).toEqual([{ projectId: 'p', minutes: 0 }]);
 });
-it('shows open occurrences as pending points, not elapsed or fabricated estimates', () => {
+it('places open occurrences up to now for display without persisting an end or computed totals', () => {
   const { endedAt, ...open } = record;
   expect(endedAt).toBeDefined();
   const value = calendarPreview(
@@ -31,10 +31,12 @@ it('shows open occurrences as pending points, not elapsed or fabricated estimate
     '2026-11-08T03:00:00Z',
     '2026-11-10T03:00:00Z',
     'America/Sao_Paulo',
-    Date.now(),
+    Date.parse('2026-11-09T05:00:00Z'),
   );
   expect(Date.parse(value.intervals[0]!.effectiveEndedAt)).toBe(
-    Date.parse(open.startedAt),
+    Date.parse('2026-11-09T05:00:00Z'),
   );
   expect(value.intervals[0]!.loggedMinutes).toBeUndefined();
+  expect(value.intervals[0]).not.toHaveProperty('endedAt');
+  expect(value.intervals[0]!.minutes).toBe(0);
 });

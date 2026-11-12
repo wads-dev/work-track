@@ -515,6 +515,16 @@ export function PersonalPage({
       setLoading(!failure);
       return;
     }
+    // A refresh must not replace a completed result with a less complete preview.
+    // Retain only within the same owner/query and current access/deletion fences.
+    const retainComputed =
+      cachedReport &&
+      !cachedReport.calculationPending &&
+      reportOwner === uid &&
+      reportQuery === queryIdentity &&
+      reportRevision === revision &&
+      reportAccessRevision === accessRevision &&
+      reportRepositoryMatches(true, localRepository, reportRepository);
     const calculationStarted = performance.now();
     const finishCalculation = measureFirestoreStage(
       calendar ? 'calendar.calculate' : 'report.calculate',
@@ -553,6 +563,7 @@ export function PersonalPage({
                 ? (records) => {
                     if (
                       !active ||
+                      retainComputed ||
                       deletionRevision(uid) !== revision ||
                       projectAccessRevision() !== accessRevision
                     )
