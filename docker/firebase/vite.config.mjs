@@ -56,6 +56,21 @@ export default {
       apply: 'serve',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
+          if (req.url?.split('?')[0] === '/__dev/firebase-production-config') {
+            res.setHeader('Cache-Control', 'no-store');
+            void fetch('https://wadsworktrack.web.app/__/firebase/init.json')
+              .then(async (response) => {
+                if (!response.ok)
+                  throw new Error('Production bootstrap unavailable');
+                res.setHeader('Content-Type', 'application/json');
+                res.end(await response.text());
+              })
+              .catch(() => {
+                res.statusCode = 502;
+                res.end('Production bootstrap unavailable');
+              });
+            return;
+          }
           if (req.url?.split('?')[0] === '/login') {
             req.url = req.url.replace('/login', '/login.html');
             return next();

@@ -12,11 +12,11 @@ services:
     environment:
       npm_config_cache: /cache/npm
       WORK_TRACK_MCP_PROXY_TARGET: http://firebase:5001/demo-work-track/southamerica-east1/mcp
-      WORK_TRACK_AUTH_PORT: '${FIREBASE_AUTH_PORT:-9099}'
-      WORK_TRACK_FIRESTORE_PORT: '${FIREBASE_FIRESTORE_PORT:-8081}'
-      WORK_TRACK_FUNCTIONS_PORT: '${FIREBASE_FUNCTIONS_PORT:-5001}'
+      WORK_TRACK_AUTH_PORT: '${FIREBASE_AUTH_PORT:-3401}'
+      WORK_TRACK_FIRESTORE_PORT: '${FIREBASE_FIRESTORE_PORT:-3402}'
+      WORK_TRACK_FUNCTIONS_PORT: '${FIREBASE_FUNCTIONS_PORT:-3403}'
     ports:
-      - '127.0.0.1:${FRONTEND_PORT:-5173}:5173' # Vite frontend + HMR
+      - '127.0.0.1:${FRONTEND_PORT:-3400}:5173' # Vite frontend + HMR
     volumes:
       - .:/workspace
       - vite_root_dependencies:/workspace/node_modules
@@ -35,14 +35,14 @@ services:
       FIREBASE_EMULATORS_PATH: /cache/emulators
       npm_config_cache: /cache/npm
       XDG_CONFIG_HOME: /cache/config
-      WORK_TRACK_PUBLIC_ORIGIN: 'http://localhost:${FRONTEND_PORT:-5173}'
+      WORK_TRACK_PUBLIC_ORIGIN: 'http://localhost:${FRONTEND_PORT:-3400}'
       GCLOUD_PROJECT: demo-work-track
       GOOGLE_CLOUD_PROJECT: demo-work-track
     ports:
-      - '127.0.0.1:${FIREBASE_AUTH_PORT:-9099}:9099' # Auth
-      - '127.0.0.1:${FIREBASE_FIRESTORE_PORT:-8081}:8081' # Firestore
-      - '127.0.0.1:${FIREBASE_FUNCTIONS_PORT:-5001}:5001' # Functions
-      - '127.0.0.1:${FIREBASE_UI_PORT:-4001}:4000' # Emulator UI (host configurable)
+      - '127.0.0.1:${FIREBASE_AUTH_PORT:-3401}:9099' # Auth
+      - '127.0.0.1:${FIREBASE_FIRESTORE_PORT:-3402}:8081' # Firestore
+      - '127.0.0.1:${FIREBASE_FUNCTIONS_PORT:-3403}:5001' # Functions
+      - '127.0.0.1:${FIREBASE_UI_PORT:-3404}:4000' # Emulator UI (host configurable)
     volumes:
       - ./package.json:/input/package.json:ro
       - ./package-lock.json:/input/package-lock.json:ro

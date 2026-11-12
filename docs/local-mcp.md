@@ -7,7 +7,7 @@ Use o frontend Docker como origem única, não o endpoint interno da Function:
   "mcpServers": {
     "work-track-local": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "http://localhost:5173/mcp", "--allow-http"]
+      "args": ["-y", "mcp-remote", "http://localhost:3400/mcp", "--allow-http"]
     }
   }
 }

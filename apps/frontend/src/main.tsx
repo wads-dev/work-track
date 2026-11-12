@@ -1,3 +1,4 @@
+import { DevelopmentEnvironmentToggle } from './infrastructure/firebase/DevelopmentEnvironmentToggle';
 import { ownRecordsRepository } from './data/cache/own-records-repository';
 import { deletionAccount } from './data/cache/record-deletion';
 import { useEffect, useState } from 'react';
@@ -594,5 +595,6 @@ if (root)
   createRoot(root).render(
     <BrowserRouter>
       <App />
+      {import.meta.env.DEV && <DevelopmentEnvironmentToggle />}
     </BrowserRouter>,
   );

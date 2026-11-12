@@ -1,4 +1,5 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
+import { developmentProductionMode } from './development-environment';
 import {
   browserLocalPersistence,
   browserPopupRedirectResolver,
@@ -25,7 +26,16 @@ export function emulatorMode(projectId: string, hostname: string): boolean {
   return true;
 }
 export async function initializeServices() {
-  const response = await fetch('/__/firebase/init.json');
+  const productionOverride = developmentProductionMode(
+    import.meta.env.DEV,
+    location.hostname,
+    typeof localStorage === 'undefined' ? undefined : localStorage,
+  );
+  const response = await fetch(
+    productionOverride
+      ? '/__dev/firebase-production-config'
+      : '/__/firebase/init.json',
+  );
   if (!response.ok)
     throw new Error('Configuração Firebase indisponível. Recarregue a página.');
   const config: unknown = await response.json();
@@ -41,6 +51,11 @@ export async function initializeServices() {
   ) {
     throw new Error('Configuração Firebase inválida.');
   }
+  if (
+    productionOverride &&
+    (config.projectId !== 'wadsworktrack' || 'emulatorPorts' in config)
+  )
+    throw new Error('Configuração de produção inesperada. Volte ao modo demo.');
   const emulator = emulatorMode(config.projectId, location.hostname);
   document.documentElement.style.setProperty(
     '--emulator-inset',
