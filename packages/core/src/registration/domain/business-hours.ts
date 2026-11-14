@@ -112,17 +112,35 @@ export function monthBusinessHours(
   calendarDateSchema.parse(today);
   const cursor = new Date(month + '-01T12:00:00Z');
   let total = 0,
-    expected = 0;
+    expected = 0,
+    businessDays = 0,
+    holidayDays = 0,
+    weekdayHolidays = 0,
+    contractedBusinessDays = 0;
   const days: { date: string; hours: number }[] = [];
   while (cursor.toISOString().slice(0, 7) === month) {
     const date = cursor.toISOString().slice(0, 10);
+    const weekday = cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6;
+    const holiday = isHoliday(date, holidays);
+    if (holiday) holidayDays++;
+    if (weekday && holiday) weekdayHolidays++;
+    if (weekday && !holiday) businessDays++;
     const hours = businessHoursForDate(date, periods, holidays);
+    if (hours > 0) contractedBusinessDays++;
     days.push({ date, hours });
     total += hours;
     if (date <= today) expected += hours;
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
-  return { total, expected, days };
+  return {
+    total,
+    expected,
+    days,
+    businessDays,
+    holidayDays,
+    weekdayHolidays,
+    contractedBusinessDays,
+  };
 }
 export function localCalendarDate(
   now: Date,
