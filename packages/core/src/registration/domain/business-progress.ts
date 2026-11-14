@@ -13,6 +13,14 @@ export interface BusinessProgress {
   total: number;
   expected: number;
   delivered: number;
+  businessDays: number;
+  holidayDays: number;
+  weekdayHolidays: number;
+  contractedBusinessDays: number;
+  future: boolean;
+  projected: boolean;
+  openingBalance?: number;
+  closingBalance?: number;
   people: { uid: string; label: string; hours: number }[];
 }
 /** Aggregates already-authorized accounting segments, not a persisted dataset selection.
@@ -22,7 +30,17 @@ export function projectBusinessProgress(
   periods: BusinessHoursPeriod[],
   holidays: Holiday[],
   now: Date,
+  options: {
+    futureMonths?: number;
+    carryBalance?: boolean;
+    currentOnly?: boolean;
+  } = {},
 ): BusinessProgress[] {
+  const futureMonths = options.futureMonths ?? 0;
+  if (!Number.isInteger(futureMonths) || futureMonths < 0 || futureMonths > 24)
+    throw new Error('Informe entre 0 e 24 meses futuros.');
+  if (report.page.partial)
+    throw new Error('Relatório incompleto; nenhum progresso parcial exibido.');
   businessHoursSchema.parse(periods);
   const today = localCalendarDate(now);
   const currentMonth = today.slice(0, 7);
@@ -30,6 +48,9 @@ export function projectBusinessProgress(
     report.byUser.map((person) => [person.uid, person.label]),
   );
   let first = currentMonth;
+  for (const period of periods)
+    if (period.startDate.slice(0, 7) < first)
+      first = period.startDate.slice(0, 7);
   for (const record of report.records)
     first = [
       first,
@@ -60,7 +81,10 @@ export function projectBusinessProgress(
   }
   const result: BusinessProgress[] = [];
   const cursor = new Date(first + '-01T12:00:00Z');
-  while (cursor.toISOString().slice(0, 7) <= currentMonth) {
+  const endMonth = new Date(currentMonth + '-01T12:00:00Z');
+  endMonth.setUTCMonth(endMonth.getUTCMonth() + futureMonths);
+  let balance = 0;
+  while (cursor <= endMonth) {
     if (result.length >= 1200)
       throw new Error(
         'Histórico excede 100 anos; nenhum total parcial retornado.',
@@ -70,14 +94,28 @@ export function projectBusinessProgress(
     const people = [...(buckets.get(month) ?? new Map<string, number>())]
       .map(([uid, hours]) => ({ uid, hours, label: labels.get(uid) ?? uid }))
       .sort((a, b) => a.uid.localeCompare(b.uid));
+    const delivered = people.reduce((sum, p) => sum + p.hours, 0);
+    const openingBalance = balance;
+    balance += delivered - target.total;
     result.push({
       month,
+      businessDays: target.businessDays,
+      holidayDays: target.holidayDays,
+      weekdayHolidays: target.weekdayHolidays,
+      contractedBusinessDays: target.contractedBusinessDays,
+      future: month > currentMonth,
+      projected: month >= currentMonth,
+      ...(options.carryBalance
+        ? { openingBalance, closingBalance: balance }
+        : {}),
       total: target.total,
       expected: target.expected,
-      delivered: people.reduce((sum, p) => sum + p.hours, 0),
+      delivered,
       people,
     });
     cursor.setUTCMonth(cursor.getUTCMonth() + 1);
   }
-  return result.reverse();
+  return options.currentOnly
+    ? result.filter((row) => row.month === currentMonth)
+    : result.reverse();
 }

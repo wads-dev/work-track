@@ -225,8 +225,14 @@ export function Dashboard({
             revealed={revealed}
             loading={rawProjects.loading}
             search={location.search}
+            history={projectTab === 'history'}
             summary={
-              projectTab === 'overview' ? (
+              projectTab === 'history' ? (
+                <div
+                  ref={setReportSummaryTarget}
+                  className="min-w-0 shrink-0"
+                />
+              ) : projectTab === 'overview' ? (
                 <div ref={setReportSummaryTarget} className="shrink-0" />
               ) : undefined
             }
@@ -305,6 +311,7 @@ export function Dashboard({
                 project={selectedProject?.data}
                 hidden={isHidden(selectedProject?.data, revealed)}
                 history
+                controlsTarget={reportSummaryTarget}
               />
             )}
           </TabsContent>

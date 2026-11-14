@@ -6,6 +6,12 @@ it('renders expected target and person percentages relative to monthly total', (
     <ProgressBar
       value={{
         month: '2026-11',
+        businessDays: 20,
+        holidayDays: 2,
+        weekdayHolidays: 1,
+        contractedBusinessDays: 20,
+        future: false,
+        projected: true,
         total: 100,
         expected: 40,
         delivered: 20,
@@ -20,12 +26,20 @@ it('renders expected target and person percentages relative to monthly total', (
   expect(html).toContain('Bob: 12h · 12% do total do mês');
   expect(html).toContain('Faltam');
   expect(html).toContain('width:40%');
+  expect(html).toContain('20 dias úteis · 2 feriados');
+  expect(html).not.toContain('Saldo anterior');
 });
 it('never renders NaN or Infinity for zero targets and keeps overtime visible', () => {
   const html = renderToStaticMarkup(
     <ProgressBar
       value={{
         month: '2026-11',
+        businessDays: 20,
+        holidayDays: 2,
+        weekdayHolidays: 1,
+        contractedBusinessDays: 20,
+        future: false,
+        projected: true,
         total: 0,
         expected: 0,
         delivered: 8,
@@ -39,6 +53,12 @@ it('never renders NaN or Infinity for zero targets and keeps overtime visible', 
     <ProgressBar
       value={{
         month: '2026-11',
+        businessDays: 20,
+        holidayDays: 2,
+        weekdayHolidays: 1,
+        contractedBusinessDays: 20,
+        future: false,
+        projected: true,
         total: 8,
         expected: 8,
         delivered: 12,
@@ -48,4 +68,84 @@ it('never renders NaN or Infinity for zero targets and keeps overtime visible', 
   );
   expect(overtime).toContain('150%');
   expect(overtime).toContain('acima da meta mensal');
+});
+it('labels forecasts and shows signed carry without changing monthly delivery', () => {
+  const value = {
+    month: '2027-01',
+    businessDays: 20,
+    holidayDays: 1,
+    weekdayHolidays: 1,
+    contractedBusinessDays: 20,
+    future: true,
+    projected: true,
+    total: 160,
+    expected: 0,
+    delivered: 0,
+    openingBalance: -8,
+    closingBalance: -168,
+    people: [],
+  };
+  const html = renderToStaticMarkup(<ProgressBar value={value} />);
+  expect(html).toContain('Previsão');
+  expect(html).toContain('Saldo anterior: -8h');
+  expect(html).toContain('Saldo projetado após a meta mensal: -168h');
+  expect(html).toContain('Horas restantes com saldo: 168h');
+  expect(html).toContain('0h / 160h');
+  const credit = renderToStaticMarkup(
+    <ProgressBar
+      value={{ ...value, openingBalance: 180, closingBalance: 20 }}
+    />,
+  );
+  expect(credit).toContain('Saldo anterior: +180h');
+  expect(credit).toContain('Horas restantes com saldo: 0h');
+});
+it('prepends credit and overlays only the visible debt tail, respecting overtime', () => {
+  const value = {
+    month: '2026-11',
+    businessDays: 20,
+    holidayDays: 0,
+    weekdayHolidays: 0,
+    contractedBusinessDays: 20,
+    future: false,
+    projected: true,
+    total: 100,
+    expected: 40,
+    delivered: 60,
+    people: [],
+  };
+  const credit = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, openingBalance: 20 }} />,
+  );
+  expect(credit).toMatch(/data-carry="credit"[^>]+width:20%/);
+  expect(credit).toMatch(/data-progress="delivered"[^>]+left:20%;width:60%/);
+  expect(credit).not.toContain('data-carry="debt"');
+  const debt = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, openingBalance: -20 }} />,
+  );
+  expect(debt).toMatch(/data-carry="debt"[^>]+left:40%;width:20%/);
+  expect(debt).toContain('rgba(244,63,94,0.6)');
+  const excess = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, openingBalance: -80 }} />,
+  );
+  expect(excess).toMatch(/data-carry="debt"[^>]+left:0%;width:60%/);
+  expect(excess).toContain('Débito ainda não coberto: 20h');
+  const overtime = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, delivered: 120, openingBalance: -30 }} />,
+  );
+  expect(overtime).toMatch(/data-carry="debt"[^>]+left:90%;width:10%/);
+  const covered = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, delivered: 150, openingBalance: -20 }} />,
+  );
+  expect(covered).not.toContain('data-carry="debt"');
+  for (const openingBalance of [undefined, 0]) {
+    const off = renderToStaticMarkup(
+      <ProgressBar value={{ ...value, openingBalance }} />,
+    );
+    expect(off).not.toContain('data-carry=');
+  }
+  const zero = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, total: 0, openingBalance: -20 }} />,
+  );
+  expect(zero).not.toContain('data-carry=');
+  expect(zero).not.toMatch(/NaN|Infinity/);
 });

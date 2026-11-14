@@ -18,6 +18,7 @@ function render(
   search = '?returnTo=%2Fcalendar%3Fview%3Dweek',
   loading = false,
   catalog: Row[] = data ? [{ id: 'demo', data }] : [],
+  history = false,
 ) {
   return renderToStaticMarkup(
     <MemoryRouter>
@@ -27,6 +28,12 @@ function render(
         catalog={catalog}
         revealed={revealed}
         loading={loading}
+        history={history}
+        summary={
+          history ? (
+            <div aria-label="Opções do histórico">Controles</div>
+          ) : undefined
+        }
         search={search}
         actions={<button aria-label="Atualizar relatório" />}
       >
@@ -36,6 +43,24 @@ function render(
   );
 }
 describe('project detail header', () => {
+  it('combines history identity and controls without description or scope rows', () => {
+    const html = render(project, false, '', false, undefined, true);
+    expect(html).toContain('Histórico Laboratório Horizonte');
+    expect(html).toContain('Opções do histórico');
+    expect(html).not.toContain('Descrição demonstrativa.');
+    expect(html).not.toContain('Compartilhado');
+    expect(html).not.toContain('Histórico mensal');
+    const hidden = render(
+      { ...project, confidential: true },
+      false,
+      '',
+      false,
+      undefined,
+      true,
+    );
+    expect(hidden).not.toContain('Laboratório Horizonte');
+    expect(hidden).toContain('Projeto reservado');
+  });
   it('places compact tabs and actions before the project identity, with project color', () => {
     const html = render();
     expect(html.indexOf('role="tablist"')).toBeLessThan(html.indexOf('<h2'));
