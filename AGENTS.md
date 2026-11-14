@@ -14,9 +14,13 @@
 - Distinguir seleção de datasets de validação de schema/ACL, transformação, ordenação de apresentação e cálculos de domínio (intervalos, sobreposições, agregação). Segurança/validações não podem ser removidas para satisfazer regra superficialmente.
 - Consultas de intervalo devem cobrir registros que atravessam o período inteiro e registros abertos; não usar somente início/fim dentro do intervalo. Não retornar totais parciais silenciosamente. Não ampliar ACLs, gerar leituras remotas por navegação ou desativar índices locais.
 
-## Isolamento obrigatório
+## Isolamento e autorização para worktrees
 
-- Correções de bugs e features devem ser feitas em uma **Git worktree separada**, com branch própria baseada no estado relevante de origin/main. Nunca misture alterações pendentes do checkout principal.
+- **Nunca crie uma Git worktree sem perguntar ao usuário e receber autorização explícita.** Worktrees, dependências, builds e ambientes Docker associados podem consumir muito espaço de disco. Um pedido para implementar uma feature ou corrigir um bug não autoriza, por si só, criar outra worktree.
+- **Junto da pergunta**, liste as worktrees existentes usando `git worktree list`, informando caminho, branch e **data de criação da pasta** de cada uma, obtida dos metadados do sistema de arquivos. Não substitua essa data pela data do commit ou pela última modificação. Se a data de criação não estiver disponível, indique isso claramente, sem inventar. Quando viável, informe também o espaço ocupado para ajudar na decisão.
+- Ofereça na mesma pergunta as opções de criar uma nova worktree, reutilizar uma existente compatível ou trabalhar no checkout atual com branch própria, preservando alterações alheias. **Ofereça também excluir worktrees existentes que o usuário escolher**, para liberar espaço; listar ou oferecer exclusão não é autorização para executá-la. Aguarde a escolha antes de criar ou excluir qualquer worktree.
+- Antes de excluir uma worktree escolhida, confirme o caminho absoluto exato, o estado do Git (incluindo arquivos não rastreados) e se há trabalho, sessões ou ambientes Docker em uso. Informe alterações locais e riscos de perda. Se houver risco não contemplado na autorização, peça confirmação adicional; nunca use remoção forçada, descarte alterações ou remova branches automaticamente. A exclusão da worktree não autoriza parar containers ou apagar volumes; siga as autorizações específicas da seção de encerramento.
+- Quando autorizada, a worktree separada deve usar branch própria baseada no estado relevante de origin/main. Se o usuário preferir não criar outra, respeite essa escolha e adapte o fluxo ao checkout aprovado, sem misturar alterações pendentes nem sobrescrever trabalho de terceiros. Reutilize uma worktree compatível sempre que essa for a opção escolhida.
 - Antes de editar, confirme pwd, git status, branch, arquivos de instrução e estado do PR. Preserve alterações alheias. Não faça reset/clean ou descarte trabalho sem autorização.
 - Abra um PR e entregue o link. Se o PR anterior já foi mesclado, abra um novo PR; não é possível acrescentar commits a um PR mesclado.
 
