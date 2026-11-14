@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Firestore } from 'firebase/firestore';
 import {
   businessHoursSchema,
@@ -244,6 +245,7 @@ export function ProjectBusinessProgress({
   project,
   hidden,
   history = false,
+  controlsTarget,
 }: {
   db: Firestore;
   uid: string;
@@ -251,6 +253,7 @@ export function ProjectBusinessProgress({
   project?: Record<string, unknown>;
   hidden: boolean;
   history?: boolean;
+  controlsTarget?: HTMLElement | null;
 }) {
   const [source, setSource] = useState<{
     report: Awaited<ReturnType<typeof getProjectReport>>;
@@ -372,41 +375,79 @@ export function ProjectBusinessProgress({
       className="space-y-3"
       aria-label={history ? 'Histórico de horas úteis' : 'Horas úteis do mês'}
     >
-      <h2 className="text-lg font-semibold">
-        {history ? 'Histórico mensal' : 'Horas úteis do mês atual'}
-      </h2>
-      <p className="text-xs text-muted-foreground">
-        Meta acumulada inclui o dia de hoje inteiro desde meia-noite ·
-        America/Sao_Paulo. Entregas incluem estimativas de registros abertos,
-        conforme as regras do relatório.
-      </p>
-      {history && (
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border p-3">
-          <label className="flex items-center gap-2 text-sm">
-            Meses futuros
-            <select
-              className="rounded-md border bg-background p-2"
-              value={futureMonths}
-              onChange={(event) => setFutureMonths(Number(event.target.value))}
+      {history ? (
+        controlsTarget ? (
+          createPortal(
+            <div
+              className="flex flex-wrap items-center gap-x-4 gap-y-2"
+              aria-label="Opções do histórico"
             >
-              {Array.from({ length: 25 }, (_, month) => (
-                <option key={month} value={month}>
-                  {month}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <Switch checked={carryBalance} onCheckedChange={setCarryBalance} />
-            Transportar saldo entre meses
-          </label>
-          <p className="w-full text-xs text-muted-foreground">
-            Previsões usam somente contratos e feriados cadastrados. Dias úteis
-            excluem sábados, domingos e feriados.
-            {carryBalance &&
-              ' Saldo anterior + entregas − meta mensal = saldo seguinte, desde o primeiro mês do contrato ou registro. Mês atual e futuros são projeções sem novas entregas; incluem estimativas abertas, não um fechamento definitivo. Nenhum registro ou contrato é alterado.'}
-          </p>
-        </div>
+              <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+                Meses futuros
+                <select
+                  className="rounded-md border bg-background px-2 py-1"
+                  value={futureMonths}
+                  onChange={(event) =>
+                    setFutureMonths(Number(event.target.value))
+                  }
+                >
+                  {Array.from({ length: 25 }, (_, month) => (
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+                <Switch
+                  checked={carryBalance}
+                  onCheckedChange={setCarryBalance}
+                  aria-label="Transportar saldo entre meses"
+                />
+                Transportar saldo
+              </label>
+            </div>,
+            controlsTarget,
+          )
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">
+              Histórico{' '}
+              {typeof project?.title === 'string' ? project.title : ''}
+            </h2>
+            <div
+              className="flex flex-wrap items-center gap-x-4 gap-y-2"
+              aria-label="Opções do histórico"
+            >
+              <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+                Meses futuros
+                <select
+                  className="rounded-md border bg-background px-2 py-1"
+                  value={futureMonths}
+                  onChange={(event) =>
+                    setFutureMonths(Number(event.target.value))
+                  }
+                >
+                  {Array.from({ length: 25 }, (_, month) => (
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+                <Switch
+                  checked={carryBalance}
+                  onCheckedChange={setCarryBalance}
+                  aria-label="Transportar saldo entre meses"
+                />
+                Transportar saldo
+              </label>
+            </div>
+          </div>
+        )
+      ) : (
+        <h2 className="text-lg font-semibold">Horas úteis do mês atual</h2>
       )}
       {data.map((value) => (
         <ProgressBar

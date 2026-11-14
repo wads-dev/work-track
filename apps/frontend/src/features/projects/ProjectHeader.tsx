@@ -19,6 +19,7 @@ export function ProjectHeader({
   children,
   actions,
   summary,
+  history = false,
 }: {
   projectId: string;
   project?: Record<string, unknown>;
@@ -29,6 +30,7 @@ export function ProjectHeader({
   children: ReactNode;
   actions?: ReactNode;
   summary?: ReactNode;
+  history?: boolean;
 }) {
   const params = new URLSearchParams(search);
   const hidden = isHidden(project, revealed);
@@ -84,11 +86,12 @@ export function ProjectHeader({
               <>
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
                   <h2 className="min-w-0 text-2xl font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-3xl">
+                    {history && 'Histórico '}
                     {project
                       ? text(data.title, 'Projeto')
                       : 'Projeto indisponível'}
                   </h2>
-                  {project && !hidden && (
+                  {project && !hidden && !history && (
                     <Badge variant="secondary" className="shrink-0 gap-1.5">
                       <ScopeIcon className="size-3.5" aria-hidden="true" />
                       {personal ? 'Pessoal' : 'Compartilhado'}
@@ -98,11 +101,13 @@ export function ProjectHeader({
                     <Badge variant="outline">Arquivado</Badge>
                   )}
                 </div>
-                <p className="max-w-5xl whitespace-pre-line text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
-                  {project
-                    ? text(data.description, 'Sem descrição.')
-                    : 'O relatório consulta o projeto diretamente, independente do limite da lista.'}
-                </p>
+                {!history && (
+                  <p className="max-w-5xl whitespace-pre-line text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
+                    {project
+                      ? text(data.description, 'Sem descrição.')
+                      : 'O relatório consulta o projeto diretamente, independente do limite da lista.'}
+                  </p>
+                )}
               </>
             )}
           </div>
