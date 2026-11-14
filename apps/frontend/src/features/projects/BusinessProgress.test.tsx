@@ -99,3 +99,53 @@ it('labels forecasts and shows signed carry without changing monthly delivery', 
   expect(credit).toContain('Saldo anterior: +180h');
   expect(credit).toContain('Horas restantes com saldo: 0h');
 });
+it('prepends credit and overlays only the visible debt tail, respecting overtime', () => {
+  const value = {
+    month: '2026-11',
+    businessDays: 20,
+    holidayDays: 0,
+    weekdayHolidays: 0,
+    contractedBusinessDays: 20,
+    future: false,
+    projected: true,
+    total: 100,
+    expected: 40,
+    delivered: 60,
+    people: [],
+  };
+  const credit = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, openingBalance: 20 }} />,
+  );
+  expect(credit).toMatch(/data-carry="credit"[^>]+width:20%/);
+  expect(credit).toMatch(/data-progress="delivered"[^>]+left:20%;width:60%/);
+  expect(credit).not.toContain('data-carry="debt"');
+  const debt = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, openingBalance: -20 }} />,
+  );
+  expect(debt).toMatch(/data-carry="debt"[^>]+left:40%;width:20%/);
+  expect(debt).toContain('rgba(244,63,94,0.6)');
+  const excess = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, openingBalance: -80 }} />,
+  );
+  expect(excess).toMatch(/data-carry="debt"[^>]+left:0%;width:60%/);
+  expect(excess).toContain('Débito ainda não coberto: 20h');
+  const overtime = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, delivered: 120, openingBalance: -30 }} />,
+  );
+  expect(overtime).toMatch(/data-carry="debt"[^>]+left:90%;width:10%/);
+  const covered = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, delivered: 150, openingBalance: -20 }} />,
+  );
+  expect(covered).not.toContain('data-carry="debt"');
+  for (const openingBalance of [undefined, 0]) {
+    const off = renderToStaticMarkup(
+      <ProgressBar value={{ ...value, openingBalance }} />,
+    );
+    expect(off).not.toContain('data-carry=');
+  }
+  const zero = renderToStaticMarkup(
+    <ProgressBar value={{ ...value, total: 0, openingBalance: -20 }} />,
+  );
+  expect(zero).not.toContain('data-carry=');
+  expect(zero).not.toMatch(/NaN|Infinity/);
+});

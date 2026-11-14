@@ -14,7 +14,7 @@ Ligado, calcula cronologicamente desde o primeiro mês do contrato ou registro (
 
 **saldo anterior + horas entregues − meta mensal = saldo seguinte**
 
-Créditos e débitos passam por meses intermediários sem registros e meses sem meta. O histórico inclui meses contratados sem registros, para não omitir débitos. As barras continuam representando entregas reais/estimadas e metas originais; o transporte aparece separado.
+Créditos e débitos passam por meses intermediários sem registros e meses sem meta. O histórico inclui meses contratados sem registros, para não omitir débitos. As metas e entregas originais permanecem nos números. Na barra, crédito anterior aparece em azul no início e desloca as entregas para a direita. Débito anterior aparece como uma faixa rosa semitransparente e hachurada sobre a cauda das entregas do mês, consumindo primeiro horas extras fora da escala visível. Se o débito superar as entregas, a cauda cobre toda a entrega e o restante é indicado em texto. Mês sem meta não tem escala para desenhar saldo. A legenda e os valores completos permanecem disponíveis mesmo quando a escala da barra é excedida. Com o toggle desligado, não há segmentos de saldo.
 
 Além do saldo seguinte, mostra a posição até hoje (saldo anterior + entregas − meta esperada até hoje) e as horas ainda necessárias para cobrir a meta mensal com o saldo, nunca abaixo de zero.
 
